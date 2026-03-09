@@ -1,0 +1,35 @@
+# 核心數據處理與計算
+
+numpy>=1.24.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+
+# 數據源與網絡爬蟲
+
+yfinance>=0.2.36            # 獲取股價數據 (需新版以修復 API 變動)
+lxml>=5.0.0                 # 用於 pd.read_html 解析 Wikipedia 表格
+html5lib>=1.1               # 用於 pd.read_html 的備用解析器
+beautifulsoup4>=4.12.0      # 網頁解析依賴
+
+# 存儲格式支持
+
+pyarrow>=14.0.0             # 讀寫 Parquet 文件的高效引擎 (必需)
+
+# 機器學習與統計分析
+
+scikit-learn>=1.3.0         # PCA, OPTICS, TimeSeriesSplit
+statsmodels>=0.14.0         # Cointegration Test (coint), OLS
+joblib>=1.3.0               # 並行處理 (Parallel processing)
+torch>=1.10.0
+umap-learn>=0.5.3            # UMAP 降維
+stable-baselines3>=2.0.0  # 強化學習框架
+gym>=0.26.0                # 強化學習環境接口
+
+# 進階模型與解釋性
+
+xgboost>=2.0.0              # XGBoost 分類器
+shap>=0.44.0                # 模型解釋性 (SHAP Values)
+
+# 量化回測
+dtaidistance
+vectorbt>=0.25.0            # 高效向量化回測引擎

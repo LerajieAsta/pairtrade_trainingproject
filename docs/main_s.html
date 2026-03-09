@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="main_s_files/libs/clipboard/clipboard.min.js"></script>
+<script src="main_s_files/libs/quarto-html/tabby.min.js"></script>
+<script src="main_s_files/libs/quarto-html/popper.min.js"></script>
+<script src="main_s_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="main_s_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="main_s_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="main_s_files/libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.29">
+
+  <title>配對交易於S&amp;P500應用策略</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="main_s_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="main_s_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+  </style>
+  <link rel="stylesheet" href="main_s_files/libs/revealjs/dist/theme/quarto-2740581606dc327e82f18f789b69d8a0.css">
+  <link href="main_s_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="main_s_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="main_s_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="main_s_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+  
+  <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">配對交易於S&amp;P500應用策略</h1>
+
+<div class="quarto-title-authors">
+</div>
+
+</section>
+<section>
+<section id="配對交易回測框架執行" class="title-slide slide level1 center">
+<h1>配對交易回測框架執行</h1>
+
+</section>
+<section id="環境初始化與庫導入" class="slide level2">
+<h2>環境初始化與庫導入</h2>
+<p>導入所有必要的 Python 庫並進行環境配置，包括： - <strong>系統庫</strong>: os, json, traceback, warnings - <strong>數據處理</strong>: pandas, numpy - <strong>金融數據</strong>: yfinance, requests - <strong>統計分析</strong>: statsmodels, scipy - <strong>機器學習</strong>: scikit-learn (SVM, DBSCAN, PCA, RandomForest, MLP) - <strong>時間序列</strong>: dtaidistance (DTW 計算) - <strong>繪圖</strong>: matplotlib, seaborn</p>
+<p>同時設定中文字體支援和 Seaborn 風格。</p>
+</section>
+<section id="核心工具函數與基礎類別" class="slide level2 scrollable">
+<h2>核心工具函數與基礎類別</h2>
+<p>本段實作了配對交易框架的基礎組件：</p>
+<h3 id="主要功能">主要功能</h3>
+<ol type="1">
+<li><strong><code>get_sp500_tickers()</code></strong>: 從 Wikipedia 獲取 S&amp;P 500 成分股列表，支援本地緩存加速重複執行</li>
+<li><strong><code>DistanceUtils</code></strong>: 距離計算工具箱，包含傳統歐幾里得距離與 DTW (動態時間規畫) 距離</li>
+<li><strong><code>DataHandler</code></strong>: 股價數據下載、緩存與滾動視窗生成
+<ul>
+<li>下載調整收盤價 (Adj Close)</li>
+<li>自動處理缺失數據 (前向填充、後向填充)</li>
+<li>生成 252 天 (年度) 形成期 + 126 天 (半年) 交易期的滾動視窗</li>
+</ul></li>
+<li><strong><code>Strategy</code></strong> (抽象基類): 所有配對交易策略的基礎類別
+<ul>
+<li>定義 <code>train()</code> 和 <code>get_signals()</code> 的接口</li>
+<li>實作共用方法 <code>_calculate_ssd()</code> 計算配對距離排名</li>
+</ul></li>
+</ol>
+<h3 id="設計理念">設計理念</h3>
+<ul>
+<li><strong>模塊化</strong>: 每個組件獨立，便於擴展新策略</li>
+<li><strong>向量化</strong>: 使用 NumPy/Pandas 向量化操作提高運行效率</li>
+<li><strong>容錯性</strong>: 數據下載失敗自動降級，連接超時自動重試</li>
+</ul>
+</section>
+<section id="策略-1-距離法-distance-strategy" class="slide level2">
+<h2>策略 1: 距離法 (Distance Strategy)</h2>
+<h3 id="核心原理">核心原理</h3>
+<p>此策略基於歷史價格相似性配對，假設走勢相近的股票對存在均值迴歸特性。</p>
+<h4 id="配對選擇">配對選擇</h4>
+<ul>
+<li>計算歷史期間所有股票對的 <strong>SSD</strong> (平方和距離)</li>
+<li>SSD = <span class="math inline">\(\sum_{t} (P1_t - P2_t)^2\)</span>，值越小說明股票對走勢越接近</li>
+<li>选取 SSD 最小的 N 對作為交易配對</li>
+</ul>
+<h4 id="交易邏輯">交易邏輯</h4>
+<ul>
+<li><strong>價差 (Spread)</strong> = Norm<span class="math inline">\(_1\)</span> - Norm<span class="math inline">\(_2\)</span> (歸一化價格差)</li>
+<li><strong>進場條件</strong>:
+<ul>
+<li>做多: Spread &lt; -2σ (σ = 價差標準差)</li>
+<li>做空: Spread &gt; +2σ</li>
+</ul></li>
+<li><strong>平倉條件</strong>: Spread 回升至接近 0 時 (通常 &lt; 0.5σ)</li>
+<li><strong>對沖</strong>: 簡單 1:1 對沖，各持倉 50%</li>
+</ul>
+<h4 id="優缺點">優缺點</h4>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>優點</th>
+<th>缺點</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>計算快速簡潔</td>
+<td>忽視真實統計關係</td>
+</tr>
+<tr class="even">
+<td>無需參數調優</td>
+<td>易受偽配對陷阱</td>
+</tr>
+<tr class="odd">
+<td>初期篩選有效</td>
+<td>未考慮動態對沖比率</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="策略-2-協整法-cointegration-strategy" class="slide level2 scrollable">
+<h2>策略 2: 協整法 (Cointegration Strategy)</h2>
+<h3 id="核心原理-1">核心原理</h3>
+<p>此策略基於統計協整檢定，確保配對股票存在長期均衡關係。相比距離法更科學，引入對沖比率動態調整。</p>
+<h4 id="配對選擇-1">配對選擇</h4>
+<ol type="1">
+<li>計算對數價格: <span class="math inline">\(\log P1, \log P2\)</span></li>
+<li><strong>協整檢定</strong> (Johansen / Engle-Granger): p-value &lt; 0.05 判定為協整</li>
+<li><strong>線性回歸</strong>: <span class="math inline">\(\log P1 = \alpha + \beta \cdot \log P2\)</span></li>
+<li><strong>殘差提取</strong>: <span class="math inline">\(e_t = \log P1_t - (\alpha + \beta \log P2_t)\)</span></li>
+</ol>
+<h4 id="交易邏輯-1">交易邏輯</h4>
+<ul>
+<li><strong>Z-Score</strong>: <span class="math inline">\(Z_t = \frac{e_t - \mu}{\sigma}\)</span> (標準化殘差)</li>
+<li><strong>進場條件</strong>:
+<ul>
+<li>做多: <span class="math inline">\(Z_t &lt; -2\)</span> (Stock_1 被高估相對 Stock_2)</li>
+<li>做空: <span class="math inline">\(Z_t &gt; +2\)</span> (Stock_1 被低估相對 Stock_2)</li>
+</ul></li>
+<li><strong>平倉條件</strong>: <span class="math inline">\(|Z_t| &lt; 0.5\)</span> 時平倉</li>
+<li><strong>對沖比率</strong>: <span class="math inline">\(\beta\)</span> 自動計算，對沖比例為 <span class="math inline">\(1:\beta\)</span></li>
+</ul>
+<h4 id="優缺點-1">優缺點</h4>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>優點</th>
+<th>缺點</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>基於統計檢定，更嚴謹</td>
+<td>協整關係非恆定，易隨時間變化</td>
+</tr>
+<tr class="even">
+<td>動態對沖比率，充分利用槓桿</td>
+<td>需充足歷史數據估計參數</td>
+</tr>
+<tr class="odd">
+<td>減少偽配對陷阱</td>
+<td>市場結構變化可能破壞協整性</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="策略-3-svm-異常檢測-svm-strategy" class="slide level2">
+<h2>策略 3: SVM 異常檢測 (SVM Strategy)</h2>
+<h3 id="核心原理-2">核心原理</h3>
+<p>結合機器學習 One-Class SVM 的異常檢測，識別「正常」的高質量配對，過濾異常配對。</p>
+<h4 id="配對特徵提取">配對特徵提取</h4>
+<p>為每對股票計算 6 維特徵向量： 1. <strong>相關係數</strong>: 衡量線性關係强度，<span class="math inline">\(\text{Corr}(r_1, r_2)\)</span> 2. <strong>價差標準差</strong>: <span class="math inline">\(\sigma(\text{Spread})\)</span> 衡量配對穩定性 3. <strong>平均絕對價差</strong>: <span class="math inline">\(E[|\text{Spread}|]\)</span> 代表歷史價差水平 4. <strong>波動率比</strong>: <span class="math inline">\(\frac{\sigma_{\Delta P1}}{\sigma_{\Delta P2}}\)</span> 兩股票波動性相對關係 5. <strong>價差方差</strong>: <span class="math inline">\(\text{Var}(\text{Spread})\)</span> 價差變異度 6. <strong>價差範圍</strong>: <span class="math inline">\(\max(\text{Spread}) - \min(\text{Spread})\)</span> 價差極值</p>
+<h4 id="one-class-svm-異常檢測">One-Class SVM 異常檢測</h4>
+<ul>
+<li>訓練 SVM 學習「正常」配對的特徵分佈</li>
+<li>決策函數值高 = 更接近正常分佈 = 更好的配對</li>
+<li>計算 SVM 決策函數值，高分配對優先選用</li>
+</ul>
+<h4 id="交易邏輯-2">交易邏輯</h4>
+<p>同距離法 (基於價差的 Z-Score 回歸)</p>
+<h4 id="優缺點-2">優缺點</h4>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>優點</th>
+<th>缺點</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>综合多维度評估 (6個特徵)</td>
+<td>參數敏感性高</td>
+</tr>
+<tr class="even">
+<td>自動異常檢測，過濾極端配對</td>
+<td>特徵工程可能不完整</td>
+</tr>
+<tr class="odd">
+<td>比單純距離法更穩健</td>
+<td>SVM 核函數選擇影響結果</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="策略-4-混合策略-hybrid-strategy---ssd-dtw" class="slide level2 scrollable">
+<h2>策略 4: 混合策略 (Hybrid Strategy - SSD + DTW)</h2>
+<h3 id="核心原理-3">核心原理</h3>
+<p>融合靜態相似性 (SSD) 與動態相似性 (DTW) 兩個角度，進行雙重配對評分。</p>
+<h4 id="動態時間規畫-dtw">動態時間規畫 (DTW)</h4>
+<p>相比歐幾里得距離，DTW 對時間漂移不敏感，更好捕捉走勢形態相似性。 - <strong>定義</strong>: <span class="math inline">\(\min_{\text{warping path}} \sum \text{cost}(\text{warping path})\)</span> - <strong>優點</strong>: 允許時間軸拉伸，「形狀」相似即可</p>
+<h4 id="配對選擇-雙重排名">配對選擇 (雙重排名)</h4>
+<ol type="1">
+<li>計算所有候選配對的 <strong>SSD</strong> 和 <strong>DTW</strong></li>
+<li>分別進行排名 (1 = 最佳，N = 最差)</li>
+<li><strong>綜合得分</strong> = SSD 排名 + DTW 排名</li>
+<li>選擇綜合得分最低(最優) 的 N 對配對</li>
+</ol>
+<h4 id="交易邏輯-3">交易邏輯</h4>
+<p>同距離法 (基於價差的標準差回歸)</p>
+<h4 id="優缺點-3">優缺點</h4>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>優點</th>
+<th>缺點</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>多角度(靜態+動態)配對評估</td>
+<td>DTW 計算複雜，耗時較長</td>
+</tr>
+<tr class="even">
+<td>平衡並避免過度依賴單一特徵</td>
+<td>排名綜合方式較簡化</td>
+</tr>
+<tr class="odd">
+<td>對時間縮放不敏感</td>
+<td>需調整兩個指標的相對權重</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="策略-5-copula-方法-cmpi---copula-mispricing-index" class="slide level2">
+<h2>策略 5: Copula 方法 (CMPI - Copula Mispricing Index)</h2>
+<h3 id="核心原理-4">核心原理</h3>
+<p>採用 Copula 理論分解聯合分布，捕捉更複雜的依存結構，尤其是尾部相關性。</p>
+<h4 id="copula-基礎">Copula 基礎</h4>
+<ul>
+<li><strong>聯合分布分解</strong>: <span class="math inline">\(F(X,Y) = C(F_X(X), F_Y(Y))\)</span></li>
+<li><strong>改革</strong>: 盗用秩次轉換和逆正態變換得到特徵變量</li>
+<li><strong>高斯 Copula</strong>: 假設兩變量的依存結構為高斯 Copula
+<ul>
+<li>Spearman 相關性 ρ 衡量依存強度</li>
+</ul></li>
+</ul>
+<h4 id="cmpi-累積錯誤定價指數">CMPI (累積錯誤定價指數)</h4>
+<ul>
+<li><span class="math inline">\(M1_t = P(X回歸 | Y \text{當前走勢})\)</span> (條件概率)</li>
+<li><span class="math inline">\(M2_t = P(Y回歸 | X \text{當前走勢})\)</span> (條件概率)</li>
+<li><strong>累積</strong>: <span class="math inline">\(M1^\text{cumsum}_t, M2^\text{cumsum}_t\)</span></li>
+</ul>
+<h4 id="交易邏輯-4">交易邏輯</h4>
+<ul>
+<li><strong>做多</strong>: <span class="math inline">\(M1^\text{cumsum}_t &gt; \theta\)</span> 且 <span class="math inline">\(M2^\text{cumsum}_t &lt; -\theta\)</span></li>
+<li><strong>做空</strong>: <span class="math inline">\(M1^\text{cumsum}_t &lt; -\theta\)</span> 且 <span class="math inline">\(M2^\text{cumsum}_t &gt; \theta\)</span></li>
+<li><strong>平倉</strong>: 符號相反且幅度較小時平倉</li>
+</ul>
+<h4 id="優缺點-4">優缺點</h4>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>優點</th>
+<th>缺點</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>深層統計理論，捕捉尾部事件</td>
+<td>複雜度高，難以理解</td>
+</tr>
+<tr class="even">
+<td>動態適應市場狀況</td>
+<td>計算耗時，秩次轉換運算量大</td>
+</tr>
+<tr class="odd">
+<td>避免假設線性關係</td>
+<td>Copula 參數估計風險大</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="策略-6-ml---隨機森林信號過濾策略" class="slide level2">
+<h2>策略 6: ML - 隨機森林信號過濾策略</h2>
+<h3 id="交易邏輯說明">交易邏輯說明</h3>
+<ul>
+<li><strong>基礎配對</strong>: 先使用協整法選出優質配對</li>
+<li><strong>特徵工程</strong>: 對每對股票的殘差 (Spread) 計算：
+<ul>
+<li>1,2 期滯後值</li>
+<li>5 期滑動平均</li>
+<li>5 期滑動標準差</li>
+<li>價差變化</li>
+</ul></li>
+<li><strong>監督學習</strong>: 訓練隨機森林預測下一期 Z-Score 方向（上升/下降）</li>
+<li><strong>聯合過濾</strong>: 結合 Z-Score 信號與 ML 預測：
+<ul>
+<li>Z &lt; -2 <strong>且</strong> ML 預測上升 → 做多</li>
+<li>Z &gt; +2 <strong>且</strong> ML 預測下降 → 做空</li>
+</ul></li>
+</ul>
+<h3 id="優點">優點</h3>
+<ul>
+<li><strong>減少虛假信號</strong>: ML 過濾掉不可靠的 Z-Score 極值</li>
+<li><strong>特徵學習</strong>: 捕捉 Spread 的動態人型</li>
+<li><strong>實證有效</strong>: 限制交易次數，降低交易成本</li>
+</ul>
+<h3 id="缺點">缺點</h3>
+<ul>
+<li>模型過擬合風險</li>
+<li>需要足夠訓練數據</li>
+<li>隨機性可能導致不同運行結果不同</li>
+</ul>
+</section>
+<section id="策略-7-ml---神經網絡非線性配對-mlp-nonlinear-strategy" class="slide level2">
+<h2>策略 7: ML - 神經網絡非線性配對 (MLP NonLinear Strategy)</h2>
+<h3 id="核心原理-5">核心原理</h3>
+<p>超越線性假設，使用多層感知器 (MLP) 神經網絡學習股票對之間的非線性映射關係。</p>
+<h4 id="非線性建模">非線性建模</h4>
+<p>傳統協整假設: <span class="math inline">\(\log P_1 = \alpha + \beta \log P_2\)</span> (線性)</p>
+<p>神經網絡學習: <code>Stock_A = f_NN(Stock_B)</code> (非線性) - 輸入層: 1 個神經元 (Stock_B 歸一化價格) - 隱藏層: 1 層，8 個神經元，tanh 激活函數 - 輸出層: 1 個神經元 (Stock_A 預測值) - 優化器: L-BFGS (適合小規模數據)</p>
+<h4 id="特徵驗證">特徵驗證</h4>
+<ul>
+<li><strong>殘差</strong> = 實際價格 - 神經網絡預測值</li>
+<li><strong>平穩性檢驗</strong>: ADF 檢定 (p-value &lt; 0.05)</li>
+<li>只保留殘差平穩的配對，確保交易合法性</li>
+</ul>
+<h4 id="交易邏輯-5">交易邏輯</h4>
+<ul>
+<li>Z-Score 計算同協整法，基於殘差</li>
+<li>當 Z &gt; 2 時做空進場，Z &lt; -2 時做多進場</li>
+<li>當 |Z| &lt; 0.5 時平倉</li>
+</ul>
+<h4 id="優缺點-5">優缺點</h4>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>優點</th>
+<th>缺點</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>捕捉複雜非線性關係</td>
+<td>易過擬合，需大量訓練數據</td>
+</tr>
+<tr class="even">
+<td>自動特徵學習</td>
+<td>訓練時間較長</td>
+</tr>
+<tr class="odd">
+<td>對複雜股票對有效</td>
+<td>超參數敏感性高</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="回測引擎與報表生成" class="slide level2 scrollable">
+<h2>回測引擎與報表生成</h2>
+<p>本段實作完整的回測框架和績效報告系統。</p>
+<h3 id="backtester-類別功能">Backtester 類別功能</h3>
+<ul>
+<li><strong>run()</strong>: 執行滾動窗口回測，對每個 window 訓練策略和生成交易信號</li>
+<li><strong>report()</strong>: 生成comprehensive績效分析報告，包括：
+<ol type="1">
+<li>整體策略績效曲線圖</li>
+<li>各 Processing Window 的持倉統計 (策略活躍數、配對數)</li>
+<li>各 Window 各策略的累計損益率曲線</li>
+<li>詳細文字報告</li>
+</ol></li>
+</ul>
+<h3 id="存儲結構">存儲結構</h3>
+<ul>
+<li><code>self.results</code>: Dict[strategy_name -&gt; pd.Series] 整體策略每日損益</li>
+<li><code>self.window_results</code>: Dict[window_idx -&gt; Dict[strategy_name -&gt; pd.Series]] 各窗口策略損益</li>
+<li><code>self.window_pairs</code>: Dict[window_idx -&gt; Dict[strategy_name -&gt; List[(s1, s2)]]] 各窗口策略選中的配對</li>
+</ul>
+</section>
+<section id="執行回測" class="slide level2 scrollable">
+<h2>執行回測</h2>
+<p>本段執行完整的滾動回測，比較 7 種配對交易策略：</p>
+<h3 id="策略分類">策略分類</h3>
+<ul>
+<li><strong>基礎策略</strong> (2種): 距離法、協整法</li>
+<li><strong>進階策略</strong> (3種): SVM、混合法 (SSD+DTW)、Copula</li>
+<li><strong>機器學習</strong> (2種): 隨機森林信號過濾、MLP 神經網絡</li>
+</ul>
+<h3 id="回測參數">回測參數</h3>
+<ul>
+<li><strong>股票池</strong>: 完整 S&amp;P 500 成分股</li>
+<li><strong>回測期間</strong>: 2000-01-01 至 2024-12-31</li>
+<li><strong>每策略配對數</strong>: 20對</li>
+<li><strong>滾動視窗</strong>: 252 天形成期 + 126 天交易期</li>
+</ul>
+<h3 id="預期輸出">預期輸出</h3>
+<ol type="1">
+<li>整體策略績效曲線圖</li>
+<li>各 Processing Window 的持倉統計與損益分析</li>
+<li>詳細的配對紀錄表</li>
+</ol>
+<div id="3fd3b3f4" class="cell" data-execution_count="14">
+<div class="cell-output cell-output-stdout">
+<pre><code>============================================================
+🚀 開始進行配對交易回測
+============================================================
+股票池: 503 檔股票
+策略數量: 7 種
+------------------------------------------------------------
+[統一參數]
+  num_pairs: 20
+  transaction_cost_bps: 25.0
+  entry_sigma: 2.0
+  entry_z: 2.0
+  exit_sigma: 0.0
+  exit_z: 0.0
+------------------------------------------------------------
+[資料載入] 發現本地緩存 data\sp500_data_2000-01-01_2024-12-31.pkl，正在讀取...
+[資料載入] 緩存讀取成功。數據矩陣形狀: (6288, 100)
+[訊息] 已生成 47 個滾動回測視窗。
+處理視窗 1/47: 2001-01-02 ...
+處理視窗 2/47: 2001-07-03 ...
+處理視窗 3/47: 2002-01-08 ...
+處理視窗 4/47: 2002-07-10 ...
+處理視窗 5/47: 2003-01-08 ...
+處理視窗 6/47: 2003-07-10 ...
+處理視窗 7/47: 2004-01-08 ...
+處理視窗 8/47: 2004-07-12 ...
+處理視窗 9/47: 2005-01-07 ...
+處理視窗 10/47: 2005-07-11 ...
+處理視窗 11/47: 2006-01-09 ...
+處理視窗 12/47: 2006-07-11 ...
+處理視窗 13/47: 2007-01-10 ...
+處理視窗 14/47: 2007-07-12 ...
+處理視窗 15/47: 2008-01-10 ...
+處理視窗 16/47: 2008-07-11 ...
+處理視窗 17/47: 2009-01-09 ...
+處理視窗 18/47: 2009-07-13 ...
+處理視窗 19/47: 2010-01-11 ...
+處理視窗 20/47: 2010-07-13 ...
+處理視窗 21/47: 2011-01-10 ...
+處理視窗 22/47: 2011-07-12 ...
+處理視窗 23/47: 2012-01-10 ...
+處理視窗 24/47: 2012-07-11 ...
+處理視窗 25/47: 2013-01-11 ...
+處理視窗 26/47: 2013-07-15 ...
+處理視窗 27/47: 2014-01-13 ...
+處理視窗 28/47: 2014-07-15 ...
+處理視窗 29/47: 2015-01-13 ...
+處理視窗 30/47: 2015-07-15 ...
+處理視窗 31/47: 2016-01-13 ...
+處理視窗 32/47: 2016-07-14 ...
+處理視窗 33/47: 2017-01-12 ...
+處理視窗 34/47: 2017-07-14 ...
+處理視窗 35/47: 2018-01-12 ...
+處理視窗 36/47: 2018-07-16 ...
+處理視窗 37/47: 2019-01-15 ...
+處理視窗 38/47: 2019-07-17 ...
+處理視窗 39/47: 2020-01-15 ...
+處理視窗 40/47: 2020-07-16 ...
+處理視窗 41/47: 2021-01-14 ...
+處理視窗 42/47: 2021-07-16 ...
+處理視窗 43/47: 2022-01-13 ...
+處理視窗 44/47: 2022-07-18 ...
+處理視窗 45/47: 2023-01-17 ...
+處理視窗 46/47: 2023-07-19 ...
+處理視窗 47/47: 2024-01-18 ...
+
+[訊息] 回測已完成，正在生成報告...</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-12-output-2.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-12-output-3.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>====================================================================================================
+整體策略績效
+====================================================================================================
+----------------------------------------------------------------------------------------------------
+視窗  1 (2001-01-02): 啟用策略:  7 | 配對總數: 140
+視窗  2 (2001-07-03): 啟用策略:  7 | 配對總數: 139
+視窗  3 (2002-01-08): 啟用策略:  7 | 配對總數: 140
+視窗  4 (2002-07-10): 啟用策略:  7 | 配對總數: 135
+視窗  5 (2003-01-08): 啟用策略:  7 | 配對總數: 140
+視窗  6 (2003-07-10): 啟用策略:  7 | 配對總數: 140
+視窗  7 (2004-01-08): 啟用策略:  7 | 配對總數: 139
+視窗  8 (2004-07-12): 啟用策略:  7 | 配對總數: 131
+視窗  9 (2005-01-07): 啟用策略:  7 | 配對總數: 140
+視窗 10 (2005-07-11): 啟用策略:  7 | 配對總數: 132
+視窗 11 (2006-01-09): 啟用策略:  7 | 配對總數: 135
+視窗 12 (2006-07-11): 啟用策略:  7 | 配對總數: 134
+視窗 13 (2007-01-10): 啟用策略:  7 | 配對總數: 133
+視窗 14 (2007-07-12): 啟用策略:  7 | 配對總數: 134
+視窗 15 (2008-01-10): 啟用策略:  7 | 配對總數: 135
+視窗 16 (2008-07-11): 啟用策略:  7 | 配對總數: 139
+視窗 17 (2009-01-09): 啟用策略:  7 | 配對總數: 140
+視窗 18 (2009-07-13): 啟用策略:  7 | 配對總數: 140
+視窗 19 (2010-01-11): 啟用策略:  7 | 配對總數: 125
+視窗 20 (2010-07-13): 啟用策略:  7 | 配對總數: 131
+視窗 21 (2011-01-10): 啟用策略:  7 | 配對總數: 110
+視窗 22 (2011-07-12): 啟用策略:  7 | 配對總數: 137
+視窗 23 (2012-01-10): 啟用策略:  6 | 配對總數: 110
+視窗 24 (2012-07-11): 啟用策略:  6 | 配對總數: 114
+視窗 25 (2013-01-11): 啟用策略:  7 | 配對總數: 126
+視窗 26 (2013-07-15): 啟用策略:  7 | 配對總數: 129
+視窗 27 (2014-01-13): 啟用策略:  7 | 配對總數: 140
+視窗 28 (2014-07-15): 啟用策略:  6 | 配對總數: 104
+視窗 29 (2015-01-13): 啟用策略:  7 | 配對總數: 139
+視窗 30 (2015-07-15): 啟用策略:  7 | 配對總數: 120
+視窗 31 (2016-01-13): 啟用策略:  7 | 配對總數: 127
+視窗 32 (2016-07-14): 啟用策略:  7 | 配對總數: 134
+視窗 33 (2017-01-12): 啟用策略:  7 | 配對總數: 137
+視窗 34 (2017-07-14): 啟用策略:  7 | 配對總數: 127
+視窗 35 (2018-01-12): 啟用策略:  7 | 配對總數: 127
+視窗 36 (2018-07-16): 啟用策略:  7 | 配對總數: 127
+視窗 37 (2019-01-15): 啟用策略:  7 | 配對總數: 137
+視窗 38 (2019-07-17): 啟用策略:  7 | 配對總數: 108
+視窗 39 (2020-01-15): 啟用策略:  7 | 配對總數: 128
+視窗 40 (2020-07-16): 啟用策略:  7 | 配對總數: 138
+視窗 41 (2021-01-14): 啟用策略:  7 | 配對總數: 124
+視窗 42 (2021-07-16): 啟用策略:  7 | 配對總數: 133
+視窗 43 (2022-01-13): 啟用策略:  7 | 配對總數: 124
+視窗 44 (2022-07-18): 啟用策略:  7 | 配對總數: 140
+視窗 45 (2023-01-17): 啟用策略:  7 | 配對總數: 140
+視窗 46 (2023-07-19): 啟用策略:  7 | 配對總數: 130
+視窗 47 (2024-01-18): 啟用策略:  7 | 配對總數: 127
+
+====================================================================================================
+處理視窗分析
+====================================================================================================
+
+總處理視窗數: 47
+
+[回測績效摘要]
+            Strategy   CAGR Sharpe   MaxDD PnL ($)
+     Basic: Distance  4.40%   0.40 -25.82% $17,579
+Basic: Cointegration  0.22%   0.08 -47.99%    $538
+        Advance: SVM -5.53%  -0.29 -84.79% $-7,381
+     Advance: Hybrid  0.98%   0.14 -31.99%  $2,590
+     Advance: Copula -6.09%  -0.51 -82.84% $-7,719
+    ML: RandomForest  2.73%   0.28 -44.46%  $8,861
+             ML: MLP -0.98%  -0.01 -62.24% $-2,069</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Strategy</th>
+<th data-quarto-table-cell-role="th">CAGR</th>
+<th data-quarto-table-cell-role="th">Sharpe</th>
+<th data-quarto-table-cell-role="th">MaxDD</th>
+<th data-quarto-table-cell-role="th">PnL ($)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>Basic: Distance</td>
+<td>4.40%</td>
+<td>0.40</td>
+<td>-25.82%</td>
+<td>$17,579</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>Basic: Cointegration</td>
+<td>0.22%</td>
+<td>0.08</td>
+<td>-47.99%</td>
+<td>$538</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>Advance: SVM</td>
+<td>-5.53%</td>
+<td>-0.29</td>
+<td>-84.79%</td>
+<td>$-7,381</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>Advance: Hybrid</td>
+<td>0.98%</td>
+<td>0.14</td>
+<td>-31.99%</td>
+<td>$2,590</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>Advance: Copula</td>
+<td>-6.09%</td>
+<td>-0.51</td>
+<td>-82.84%</td>
+<td>$-7,719</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>ML: RandomForest</td>
+<td>2.73%</td>
+<td>0.28</td>
+<td>-44.46%</td>
+<td>$8,861</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>ML: MLP</td>
+<td>-0.98%</td>
+<td>-0.01</td>
+<td>-62.24%</td>
+<td>$-2,069</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<div id="4ad49108" class="cell" data-execution_count="15">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+🎯 開始生成高級分析圖表...
+--------------------------------------------------------------------------------</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-2.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-3.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-4.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-5.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-6.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-7.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<figure>
+<p><img data-src="main_s_files/figure-revealjs/cell-13-output-8.png"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+========================================================================================================================
+詳細性能對比表
+========================================================================================================================
+            策略   年化收益   CAGR    波動率 Sharpe    最大回撤    勝率    最佳月     最差月    最終資產
+      Distance  5.16%  4.40% 12.97%   0.40 -25.82% 56.5% 19.51% -16.29% $27,579
+ Cointegration  1.10%  0.22% 13.30%   0.08 -47.99% 47.3% 15.33% -10.97% $10,538
+           SVM -4.49% -5.53% 15.43%  -0.29 -84.79% 45.6% 12.07% -44.43%  $2,619
+        Hybrid  1.85%  0.98% 13.23%   0.14 -31.99% 52.3% 17.67% -15.52% $12,590
+        Copula -5.67% -6.09% 11.15%  -0.51 -82.84% 37.1% 16.34% -17.46%  $2,281
+  RandomForest  3.50%  2.73% 12.67%   0.28 -44.46% 54.1% 11.92%  -8.71% $18,861
+           MLP -0.16% -0.98% 12.78%  -0.01 -62.24% 48.8% 24.44% -20.85%  $7,931
+========================================================================================================================</code></pre>
+</div>
+</div>
+
+</section></section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="main_s_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="main_s_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="main_s_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="main_s_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': true,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1050,
+
+        height: 700,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>
