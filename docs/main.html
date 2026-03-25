@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pairs Trading Project - Documentation Hub</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --container-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at top right, rgba(56, 189, 248, 0.05), transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(129, 140, 248, 0.05), transparent 40%);
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 3rem;
+            width: 90%;
+            max-width: 800px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 25px 30px -5px rgba(0, 0, 0, 0.5), 0 10px 15px -6px rgba(0, 0, 0, 0.3);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-weight: 700;
+            font-size: 2.25rem;
+            margin: 0 0 0.5rem 0;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin: 0;
+            font-weight: 400;
+        }
+
+        .file-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .file-list li a {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            text-decoration: none;
+            color: var(--text-main);
+            font-weight: 500;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-list li a::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(to bottom, #38bdf8, #818cf8);
+            transform: scaleY(0);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: bottom;
+        }
+
+        .file-list li a:hover {
+            background-color: rgba(56, 189, 248, 0.05);
+            border-color: rgba(56, 189, 248, 0.3);
+            transform: translateX(4px);
+        }
+
+        .file-list li a:hover::before {
+            transform: scaleY(1);
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            background-color: rgba(56, 189, 248, 0.1);
+            color: var(--accent);
+            border-radius: 12px;
+            font-size: 1.25rem;
+            box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+        }
+
+        .file-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .file-name {
+            font-size: 1.1rem;
+            color: var(--text-main);
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .file-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        
+        .arrow {
+            color: var(--text-muted);
+            transition: color 0.2s ease, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .file-list li a:hover .arrow {
+            color: var(--bg-color);
+            background-color: var(--accent);
+            transform: translateX(2px);
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 1.5rem;
+            }
+            .file-info {
+                gap: 0.75rem;
+            }
+            h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
+    <!-- Import Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Documents & Reports</h1>
+            <p class="subtitle">Select a report to view details</p>
+        </header>
+
+        <ul class="file-list" id="report-list">
+            <li>
+                <a href="pt_step1.html">
+                    <div class="file-info">
+                        <div class="icon">📄</div>
+                        <div class="file-details">
+                            <span class="file-name">Pairs Trading Strategy (Step 1)</span>
+                            <span class="file-meta">pt_step1.html</span>
+                        </div>
+                    </div>
+                    <div class="arrow">➔</div>
+                </a>
+            </li>
+            <!-- Add future HTML files here -->
+        </ul>
+    </div>
+</body>
+</html>
