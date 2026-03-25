@@ -205,10 +205,14 @@
 </div>
 
 </section>
-<section id="研究動機-research-motivation" class="title-slide slide level2 center">
+<section id="研究動機-research-motivation" class="title-slide slide level2 center scrollable">
 <h2>1. 研究動機 (Research Motivation)</h2>
 <p>建立此基準模型（Baseline Model）的核心目的，是為了提供客觀、可靠的對比標竿。</p>
-<p>在導入複雜的深度增強式學習（Deep Reinforcement Learning, DRL）之前，必須先建立穩固的基礎： 1. <strong>確保資料純淨度</strong>：妥善處理歷史數據中的生存者偏誤（Survivorship Bias），確保回測結果貼近真實市場。 2. <strong>建立傳統交易邏輯底盤</strong>：實作具備共整合（Cointegration）與 Z-Score 邏輯的傳統配對交易系統，驗證均值回歸特性的有效性，作為後續 RL 代理人學習的基礎狀態與邏輯參考。</p>
+<p>在導入複雜的深度增強式學習（Deep Reinforcement Learning, DRL）之前，必須先建立穩固的基礎：</p>
+<ol type="1">
+<li><p><strong>確保資料純淨度</strong>：妥善處理歷史數據中的生存者偏誤（Survivorship Bias），確保回測結果貼近真實市場。</p></li>
+<li><p><strong>建立傳統交易邏輯底盤</strong>：實作具備共整合（Cointegration）與 Z-Score 邏輯的傳統配對交易系統，驗證均值回歸特性的有效性，作為後續 RL 代理人學習的基礎狀態與邏輯參考。</p></li>
+</ol>
 </section>
 
 <section id="文獻回顧-literature-review" class="title-slide slide level2 center">
@@ -231,15 +235,17 @@
 <li><strong>宏觀指標融合</strong>：自動整合 Yahoo Finance 的 VIX 波動率指數至特徵矩陣中，為未來環境狀態空間（State Space）提供總體經濟環境的降維特徵。</li>
 </ol></li>
 </ul>
-<p>## 4. 策略說明與實作細節 (Strategy Description &amp; Implementation Details)</p>
+</section>
+
+<section>
+<section id="策略說明與實作細節-strategy-description-implementation-details" class="title-slide slide level2 center">
+<h2>4. 策略說明與實作細節 (Strategy Description &amp; Implementation Details)</h2>
 <blockquote>
 <p><strong>策略依據</strong>：Gatev, Goetzmann &amp; Rouwenhorst (2006)</p>
 </blockquote>
 </section>
-
-<section>
-<section id="策略總覽" class="title-slide slide level2 center">
-<h2>策略總覽</h2>
+<section id="策略總覽" class="slide level3">
+<h3>策略總覽</h3>
 <p>配對交易為<strong>市場中性</strong>的統計套利策略。</p>
 <table class="caption-top">
 <thead>
@@ -779,7 +785,7 @@ Name: count, dtype: int64</code></pre>
 <section id="滾動視窗主迴圈" class="slide level3">
 <h3>滾動視窗主迴圈</h3>
 <pre><code>視窗 0: 形成期 [Day 0..251]  | 交易期 [Day 252..377]
-視窗 1: 形成期 [Day 126..377] | 交易期 [Day 378..503]
+視窗 1: 形成期 [Day 20..271] | 交易期 [Day 272..397]
 (每次向前滾動 ROLLING_WINDOW 個交易日)</code></pre>
 <div id="2fea3cfe" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href=""></a><span class="kw">def</span> run_backtesting(price_pivot, sector_map,</span>
@@ -1603,14 +1609,16 @@ Backtest done: 309 windows.</code></pre>
 </section>
 <section id="特徵工程與動態分群" class="slide level3">
 <h3>特徵工程與動態分群：</h3>
-<p>這個階段的目標是解決傳統靜態配對容易遭遇的「結構漂移」問題，建立具備抗震能力的動態配對池。 ●擴充進階特徵：在現有的對數報酬率、波動率（如 ATR）與 VIX 總體經濟數據之上，加入能衡量均值回歸強度的進階特徵，例如 Hurst 指數、擴單根檢定（ADF Test）統計量與動態半衰期（Half-life） 。</p>
+<p>這個階段的目標是解決傳統靜態配對容易遭遇的「結構漂移」問題，建立具備抗震能力的動態配對池。</p>
+<p>●擴充進階特徵：在現有的對數報酬率、波動率（如 ATR）與 VIX 總體經濟數據之上，加入能衡量均值回歸強度的進階特徵，例如 Hurst 指數、擴單根檢定（ADF Test）統計量與動態半衰期（Half-life） 。</p>
 <p>●實施板塊過濾與分群：保留目前實作的「產業板塊過濾（Sector-based filtering）」作為前置處理 。</p>
 <p>●接著，導入 Scikit-learn 的 DBSCAN 或 HDBSCAN 進行無監督學習，這類演算法能自動將財報爆雷的「雜訊股票」剔除 。</p>
 <p>●動態滾動選股：以「月」為單位執行滾動式動態分群，並從中嚴格挑選出 1 至 3 組具備高度共整合特徵的經典配對，準備餵給強化學習代理人 。</p>
 </section>
 <section id="強化學習模型建構" class="slide level3">
 <h3>強化學習模型建構</h3>
-<p>此階段將運用深度強化學習（DRL），取代傳統固定的 Z-Score 門檻，實現動態進出場控制。 ●定義馬可夫決策過程 (MDP)：狀態空間 (State)：整合 VIX 指數、標準化價差與動態半衰期，賦予模型總體市場風險感知能力 。</p>
+<p>此階段將運用深度強化學習（DRL），取代傳統固定的 Z-Score 門檻，實現動態進出場控制。</p>
+<p>●定義馬可夫決策過程 (MDP)：狀態空間 (State)：整合 VIX 指數、標準化價差與動態半衰期，賦予模型總體市場風險感知能力 。</p>
 <p>●動作空間 (Action)：設定為離散空間（做多價差、放空價差、平倉/空手）以加速收斂 。</p>
 <p>●獎勵函數 (Reward)：設計扣除交易成本的風險感知獎勵（如夏普比率），並對巨大未實現損失給予負面懲罰，引導代理人學會停損 。</p>
 <p>●模型訓練與局部學習：導入 Stable Baselines3 套件，選擇 DQN 或 PPO 演算法 。</p>
@@ -1618,13 +1626,15 @@ Backtest done: 309 windows.</code></pre>
 </section>
 <section id="系統回測與模型驗證" class="slide level3">
 <h3>系統回測與模型驗證</h3>
-<p>此階段的重點是防範量化回測最致命的「前視偏誤（Look-ahead Bias）」。 ●轉換為事件驅動架構：從目前求快的陣列矩陣運算，全面轉換為客製化的 OpenAI Gym 事件驅動（Event-driven）環境，嚴格模擬真實市場的時間流逝、滑價與手續費摩擦成本 。</p>
+<p>此階段的重點是防範量化回測最致命的「前視偏誤（Look-ahead Bias）」。</p>
+<p>●轉換為事件驅動架構：從目前求快的陣列矩陣運算，全面轉換為客製化的 OpenAI Gym 事件驅動（Event-driven）環境，嚴格模擬真實市場的時間流逝、滑價與手續費摩擦成本 。</p>
 <p>●滾動式推進分析：捨棄傳統的 K-Fold 交叉驗證，改採金融學界標準的滾動式推進分析（Walk-Forward Optimization），確保系統在 <span class="math inline">\(t\)</span> 時刻僅使用 <span class="math inline">\(t\)</span> 時刻以前的特徵 。</p>
 <p>●消融實驗 (Ablation Study)：量化比較移除 VIX 因子前後的效能差異，以實證特徵設計的學術貢獻 。</p>
 </section>
 <section id="論文撰寫與系統架構展現" class="slide level3">
 <h3>論文撰寫與系統架構展現</h3>
-<p>最後階段將聚焦於收斂實證結果，並強化資訊管理領域的學術價值。 ●模型可解釋性：加入 SHAP 數值分析，剖析 VIX 或價差等特徵對強化學習代理人決策的實際影響權重，提升論文深度 。</p>
+<p>最後階段將聚焦於收斂實證結果，並強化資訊管理領域的學術價值。</p>
+<p>●模型可解釋性：加入 SHAP 數值分析，剖析 VIX 或價差等特徵對強化學習代理人決策的實際影響權重，提升論文深度 。</p>
 <p>●繪製系統架構：產出涵蓋資料擷取、特徵工程、模型推論與風險控制四大層級的資訊系統軟體架構圖，突顯系統整合上的貢獻 。</p>
 <p>●排版：依據元智大學教務處的學位論文格式規範（如 A4 規格、版面邊距、中英文摘要格式）與 APA 參考文獻標準進行最終排版定稿 。</p>
 
