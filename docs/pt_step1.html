@@ -1,0 +1,2251 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="pt_step1_files/libs/clipboard/clipboard.min.js"></script>
+<script src="pt_step1_files/libs/quarto-html/tabby.min.js"></script>
+<script src="pt_step1_files/libs/quarto-html/popper.min.js"></script>
+<script src="pt_step1_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="pt_step1_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="pt_step1_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="pt_step1_files/libs/quarto-html/quarto-syntax-highlighting-dfa48a90d809c806c7ea2d5aecd9fc66.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.29">
+
+  <title>結合無監督動態分群與深度強化學習之配對交易系統建構與實證：以 S&amp;P 500 為例</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="pt_step1_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="pt_step1_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      { color: #003b4f; background-color: #f1f3f5; }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span { color: #003b4f; } /* Normal */
+    code span.al { color: #ad0000; } /* Alert */
+    code span.an { color: #5e5e5e; } /* Annotation */
+    code span.at { color: #657422; } /* Attribute */
+    code span.bn { color: #ad0000; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #003b4f; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #20794d; } /* Char */
+    code span.cn { color: #8f5902; } /* Constant */
+    code span.co { color: #5e5e5e; } /* Comment */
+    code span.cv { color: #5e5e5e; font-style: italic; } /* CommentVar */
+    code span.do { color: #5e5e5e; font-style: italic; } /* Documentation */
+    code span.dt { color: #ad0000; } /* DataType */
+    code span.dv { color: #ad0000; } /* DecVal */
+    code span.er { color: #ad0000; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #ad0000; } /* Float */
+    code span.fu { color: #4758ab; } /* Function */
+    code span.im { color: #00769e; } /* Import */
+    code span.in { color: #5e5e5e; } /* Information */
+    code span.kw { color: #003b4f; font-weight: bold; } /* Keyword */
+    code span.op { color: #5e5e5e; } /* Operator */
+    code span.ot { color: #003b4f; } /* Other */
+    code span.pp { color: #ad0000; } /* Preprocessor */
+    code span.sc { color: #5e5e5e; } /* SpecialChar */
+    code span.ss { color: #20794d; } /* SpecialString */
+    code span.st { color: #20794d; } /* String */
+    code span.va { color: #111111; } /* Variable */
+    code span.vs { color: #20794d; } /* VerbatimString */
+    code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="pt_step1_files/libs/revealjs/dist/theme/quarto-2740581606dc327e82f18f789b69d8a0.css">
+  <link href="pt_step1_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="pt_step1_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="pt_step1_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="pt_step1_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+  
+  <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">結合無監督動態分群與深度強化學習之配對交易系統建構與實證：以 S&amp;P 500 為例</h1>
+
+<div class="quarto-title-authors">
+</div>
+
+</section>
+<section id="研究動機-research-motivation" class="title-slide slide level2 center">
+<h2>1. 研究動機 (Research Motivation)</h2>
+<p>建立此基準模型（Baseline Model）的核心目的，是為了未來一年期論文中「強化學習（RL）交易模型」提供客觀、可靠的對比標竿。</p>
+<p>在導入複雜的深度增強式學習（Deep Reinforcement Learning, DRL）之前，必須先建立穩固的基礎： 1. <strong>確保資料純淨度</strong>：妥善處理歷史數據中的生存者偏誤（Survivorship Bias），確保回測結果貼近真實市場。 2. <strong>建立傳統交易邏輯底盤</strong>：實作具備共整合（Cointegration）與 Z-Score 邏輯的傳統配對交易系統，驗證均值回歸特性的有效性，作為後續 RL 代理人學習的基礎狀態與邏輯參考。</p>
+</section>
+
+<section id="文獻回顧-literature-review" class="title-slide slide level2 center">
+<h2>2. 文獻回顧 (Literature Review)</h2>
+<p>配對交易（Pairs Trading）為統計套利（Statistical Arbitrage）中經典的市場中性策略，本階段實作主要基於以下經典框架與最新研究進行建構：</p>
+<ul>
+<li><strong>傳統配對交易框架</strong>：參考 Gatev, Goetzmann &amp; Rouwenhorst (2006) 提出的經典方法論。該文獻奠定了使用距離法（Sum of Squared Differences, SSD）來篩選潛在配對，並採用滾動視窗（Rolling Window）機制的業界標準。</li>
+<li><strong>現代特徵擴展與機器學習應用</strong>：參考 Yufei Sun (2025) 對於配對交易系統性文獻的最新整理。其研究確立了將總體經濟指標（Macroeconomic Indicators，例如 VIX）納入考量，以及後續應用機器學習進行動態分群（Clustering）的發展方向，這也成為我們後續強化學習模型的特徵工程藍圖。</li>
+</ul>
+</section>
+
+<section id="資料說明與前置處理-data-description-preprocessing" class="title-slide slide level2 center scrollable">
+<h2>3. 資料說明與前置處理 (Data Description &amp; Preprocessing)</h2>
+<ul>
+<li><strong>資料來源</strong>：本研究使用 S&amp;P 500 歷史日 K 線資料庫 (<code>sp500_data.db</code>)，資料期間涵蓋 <strong>2000-01-01 至 2025-12-31</strong> 的數據。</li>
+<li><strong>資料清洗步驟</strong>：
+<ol type="1">
+<li><strong>前向填充與剔除稀疏股票</strong>：針對價格序列進行前向填充（Forward-fill）最多 5 天，避免假日或停牌影響，並剔除有效交易日過少的稀疏股票。</li>
+<li><strong>生存者偏誤（Survivorship Bias）處理</strong>：確保資料庫中包含歷史已下市成分股之數據，避免回測時因只考慮現有成分股而產生高估績效的生存者偏誤。</li>
+<li><strong>宏觀指標融合</strong>：自動整合 Yahoo Finance 的 VIX 波動率指數至特徵矩陣中，為未來環境狀態空間（State Space）提供總體經濟環境的降維特徵。</li>
+</ol></li>
+</ul>
+<p>## 4. 策略說明與實作細節 (Strategy Description &amp; Implementation Details)</p>
+<blockquote>
+<p><strong>策略依據</strong>：Gatev, Goetzmann &amp; Rouwenhorst (2006)</p>
+</blockquote>
+</section>
+
+<section>
+<section id="策略總覽" class="title-slide slide level2 center">
+<h2>策略總覽</h2>
+<p>配對交易為<strong>市場中性</strong>的統計套利策略。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: center;">階段</th>
+<th>名稱</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;"><strong>1</strong></td>
+<td>初始化與資料收集</td>
+<td>參數、SQLite、清理</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>2</strong></td>
+<td>配對選擇</td>
+<td>協整檢驗 → SSD 排序</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;"><strong>3</strong></td>
+<td>策略執行</td>
+<td>Z-Score 訊號 → PnL</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>4</strong></td>
+<td>績效評估</td>
+<td>Sharpe、MDD、CAGR</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="階段一初始化與資料收集" class="slide level3">
+<h3>階段一：初始化與資料收集</h3>
+</section>
+<section id="套件安裝" class="slide level3">
+<h3>1-1 套件安裝</h3>
+<div id="54747af4" class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href=""></a><span class="im">import</span> subprocess, sys</span>
+<span id="cb1-2"><a href=""></a><span class="cf">for</span> pkg <span class="kw">in</span> [<span class="st">'statsmodels'</span>,<span class="st">'plotly'</span>,<span class="st">'ipywidgets'</span>,<span class="st">'kaleido'</span>,<span class="st">'yfinance'</span>]:</span>
+<span id="cb1-3"><a href=""></a>    subprocess.check_call([sys.executable,<span class="st">'-m'</span>,<span class="st">'pip'</span>,<span class="st">'install'</span>,pkg,<span class="st">'-q'</span>])</span>
+<span id="cb1-4"><a href=""></a><span class="im">import</span> warnings<span class="op">;</span> warnings.filterwarnings(<span class="st">'ignore'</span>)</span>
+<span id="cb1-5"><a href=""></a><span class="im">import</span> sqlite3, numpy <span class="im">as</span> np, pandas <span class="im">as</span> pd</span>
+<span id="cb1-6"><a href=""></a><span class="im">import</span> logging</span>
+<span id="cb1-7"><a href=""></a><span class="im">from</span> itertools <span class="im">import</span> combinations</span>
+<span id="cb1-8"><a href=""></a><span class="im">from</span> statsmodels.tsa.stattools <span class="im">import</span> coint</span>
+<span id="cb1-9"><a href=""></a><span class="im">import</span> plotly.graph_objects <span class="im">as</span> go</span>
+<span id="cb1-10"><a href=""></a><span class="im">from</span> plotly.subplots <span class="im">import</span> make_subplots</span>
+<span id="cb1-11"><a href=""></a><span class="im">import</span> plotly.express <span class="im">as</span> px</span>
+<span id="cb1-12"><a href=""></a><span class="im">import</span> ipywidgets <span class="im">as</span> widgets</span>
+<span id="cb1-13"><a href=""></a><span class="im">from</span> IPython.display <span class="im">import</span> display, HTML</span>
+<span id="cb1-14"><a href=""></a>pd.set_option(<span class="st">'display.float_format'</span>,<span class="st">'</span><span class="sc">{:.4f}</span><span class="st">'</span>.<span class="bu">format</span>)</span>
+<span id="cb1-15"><a href=""></a><span class="co"># print('套件導入完成。')</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>套件導入完成。</code></pre>
+</div>
+</div>
+</section>
+<section id="全域參數設定" class="slide level3">
+<h3>1-2 全域參數設定</h3>
+<blockquote>
+<p><strong>使用者只需修改此區塊，即可調整所有策略參數。</strong></p>
+</blockquote>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>參數</th>
+<th>預設値</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>DB_PATH</code></td>
+<td><code>sp500_data.db</code></td>
+<td>SQLite 資料庫路徑</td>
+</tr>
+<tr class="even">
+<td><code>FORMATION_WINDOW</code></td>
+<td><code>252</code></td>
+<td>形成期（12M）</td>
+</tr>
+<tr class="odd">
+<td><code>TRADING_WINDOW</code></td>
+<td><code>126</code></td>
+<td>交易期（6M）</td>
+</tr>
+<tr class="even">
+<td><code>COINT_P_VALUE</code></td>
+<td><code>0.01</code></td>
+<td>協整檢驗顯著水準</td>
+</tr>
+<tr class="odd">
+<td><code>TOP_N_PAIRS</code></td>
+<td><code>[5,20]</code></td>
+<td>Top-N 配對數</td>
+</tr>
+<tr class="even">
+<td><code>Z_ENTRY</code></td>
+<td><code>1.5</code></td>
+<td>進場閾値</td>
+</tr>
+<tr class="odd">
+<td><code>Z_EXIT</code></td>
+<td><code>0.75</code></td>
+<td>出場閾値</td>
+</tr>
+<tr class="even">
+<td><code>STOP_LOSS</code></td>
+<td><code>3.0</code></td>
+<td>停損改密</td>
+</tr>
+<tr class="odd">
+<td><code>TRANSACTION_COST</code></td>
+<td><code>0.001</code></td>
+<td>單邊成本 0.1%</td>
+</tr>
+</tbody>
+</table>
+<div id="88827c31" class="cell" data-execution_count="15">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href=""></a><span class="co"># ================================================================</span></span>
+<span id="cb3-2"><a href=""></a><span class="co">#   Global Parameter Block  -- Edit here to tune strategy</span></span>
+<span id="cb3-3"><a href=""></a><span class="co"># ================================================================</span></span>
+<span id="cb3-4"><a href=""></a><span class="im">import</span> os <span class="im">as</span> _os</span>
+<span id="cb3-5"><a href=""></a><span class="co"># DB_PATH: absolute path to the 342MB database (project root)</span></span>
+<span id="cb3-6"><a href=""></a>DB_PATH           <span class="op">=</span> <span class="vs">r'c:</span><span class="er">\</span><span class="vs">Clark</span><span class="er">\</span><span class="vs">YZU</span><span class="er">\</span><span class="vs">Papper</span><span class="er">\</span><span class="vs">Code</span><span class="dv">\s</span><span class="vs">p500_data</span><span class="dv">.</span><span class="vs">db'</span></span>
+<span id="cb3-7"><a href=""></a>START_DATE        <span class="op">=</span> <span class="st">'2000-01-01'</span></span>
+<span id="cb3-8"><a href=""></a>END_DATE          <span class="op">=</span> <span class="st">'2025-12-31'</span></span>
+<span id="cb3-9"><a href=""></a>FORMATION_WINDOW  <span class="op">=</span> <span class="dv">252</span></span>
+<span id="cb3-10"><a href=""></a>TRADING_WINDOW    <span class="op">=</span> <span class="dv">126</span></span>
+<span id="cb3-11"><a href=""></a>COINT_P_VALUE     <span class="op">=</span> <span class="fl">0.01</span></span>
+<span id="cb3-12"><a href=""></a>TOP_N_PAIRS       <span class="op">=</span> [<span class="dv">5</span>, <span class="dv">20</span>]</span>
+<span id="cb3-13"><a href=""></a>Z_ENTRY           <span class="op">=</span> <span class="fl">1.5</span></span>
+<span id="cb3-14"><a href=""></a>Z_EXIT            <span class="op">=</span> <span class="fl">0.75</span></span>
+<span id="cb3-15"><a href=""></a>STOP_LOSS         <span class="op">=</span> <span class="fl">3.0</span></span>
+<span id="cb3-16"><a href=""></a>TRANSACTION_COST  <span class="op">=</span> <span class="fl">0.001</span></span>
+<span id="cb3-17"><a href=""></a>SECTOR_NEUTRAL    <span class="op">=</span> <span class="va">True</span></span>
+<span id="cb3-18"><a href=""></a>TARGET_SECTOR     <span class="op">=</span> <span class="st">'All'</span>          <span class="co"># 設定為All為全產業，可指定特定產業</span></span>
+<span id="cb3-19"><a href=""></a>MIN_HISTORY_DAYS  <span class="op">=</span> <span class="dv">200</span></span>
+<span id="cb3-20"><a href=""></a>HEDGE_RATIO       <span class="op">=</span> <span class="fl">1.0</span></span>
+<span id="cb3-21"><a href=""></a><span class="bu">print</span>(<span class="ss">f'DB     : </span><span class="sc">{</span>DB_PATH<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb3-22"><a href=""></a><span class="bu">print</span>(<span class="ss">f'DB exists: </span><span class="sc">{</span>_os<span class="sc">.</span>path<span class="sc">.</span>exists(DB_PATH)<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb3-23"><a href=""></a><span class="bu">print</span>(<span class="ss">f'DB size  : </span><span class="sc">{</span>_os<span class="sc">.</span>path<span class="sc">.</span>getsize(DB_PATH)<span class="op">//</span><span class="dv">1024</span><span class="op">//</span><span class="dv">1024</span><span class="sc">}</span><span class="ss"> MB'</span>)</span>
+<span id="cb3-24"><a href=""></a><span class="bu">print</span>(<span class="ss">f'Period : </span><span class="sc">{</span>START_DATE<span class="sc">}</span><span class="ss"> ~ </span><span class="sc">{</span>END_DATE<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb3-25"><a href=""></a><span class="bu">print</span>(<span class="ss">f'Windows: </span><span class="sc">{</span>FORMATION_WINDOW<span class="sc">}</span><span class="ss">d / </span><span class="sc">{</span>TRADING_WINDOW<span class="sc">}</span><span class="ss">d'</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>DB     : c:\Clark\YZU\Papper\Code\sp500_data.db
+DB exists: True
+DB size  : 342 MB
+Period : 2000-01-01 ~ 2025-12-31
+Windows: 252d / 126d</code></pre>
+</div>
+</div>
+</section>
+<section id="資料讀取與清理" class="slide level3">
+<h3>1-3 資料讀取與清理</h3>
+<p><strong>清理流程</strong>: 前向填充(最多5天) → 剪除稀疏股票 → 對齊日期</p>
+<p><strong>資料庫結構 (<code>sp500_data.db</code>)</strong>:</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>資料表</th>
+<th>關鍵欄位</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>daily_prices</code></td>
+<td><code>ticker, date, adj_close</code></td>
+</tr>
+<tr class="even">
+<td><code>tickers</code></td>
+<td><code>ticker, sector</code></td>
+</tr>
+</tbody>
+</table>
+<div id="43c6216b" class="cell" data-execution_count="16">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href=""></a><span class="kw">def</span> load_data_from_db(db_path, start_date, end_date):</span>
+<span id="cb5-2"><a href=""></a>    <span class="co">"""Load price and sector data from SQLite."""</span></span>
+<span id="cb5-3"><a href=""></a>    conn <span class="op">=</span> sqlite3.<span class="ex">connect</span>(db_path)</span>
+<span id="cb5-4"><a href=""></a>    price_queries <span class="op">=</span> [</span>
+<span id="cb5-5"><a href=""></a>        (<span class="ss">f"SELECT date, ticker, adj_close AS close FROM daily_prices "</span></span>
+<span id="cb5-6"><a href=""></a>         <span class="ss">f"WHERE date BETWEEN '</span><span class="sc">{</span>start_date<span class="sc">}</span><span class="ss">' AND '</span><span class="sc">{</span>end_date<span class="sc">}</span><span class="ss">' ORDER BY date"</span>),</span>
+<span id="cb5-7"><a href=""></a>        (<span class="ss">f"SELECT date, ticker, close FROM stock_prices "</span></span>
+<span id="cb5-8"><a href=""></a>         <span class="ss">f"WHERE date BETWEEN '</span><span class="sc">{</span>start_date<span class="sc">}</span><span class="ss">' AND '</span><span class="sc">{</span>end_date<span class="sc">}</span><span class="ss">' ORDER BY date"</span>),</span>
+<span id="cb5-9"><a href=""></a>    ]</span>
+<span id="cb5-10"><a href=""></a>    prices_df <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb5-11"><a href=""></a>    <span class="cf">for</span> q <span class="kw">in</span> price_queries:</span>
+<span id="cb5-12"><a href=""></a>        <span class="cf">try</span>:</span>
+<span id="cb5-13"><a href=""></a>            prices_df <span class="op">=</span> pd.read_sql_query(q, conn, parse_dates<span class="op">=</span>[<span class="st">'date'</span>])</span>
+<span id="cb5-14"><a href=""></a>            <span class="cf">if</span> <span class="bu">len</span>(prices_df) <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb5-15"><a href=""></a>                <span class="bu">print</span>(<span class="ss">f'Price rows: </span><span class="sc">{</span><span class="bu">len</span>(prices_df)<span class="sc">:,}</span><span class="ss">'</span>)</span>
+<span id="cb5-16"><a href=""></a>                <span class="cf">break</span></span>
+<span id="cb5-17"><a href=""></a>        <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb5-18"><a href=""></a>            <span class="cf">continue</span></span>
+<span id="cb5-19"><a href=""></a>    <span class="cf">if</span> prices_df <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">len</span>(prices_df) <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb5-20"><a href=""></a>        tbls <span class="op">=</span> pd.read_sql_query(<span class="st">"SELECT name FROM sqlite_master WHERE type='table'"</span>, conn)</span>
+<span id="cb5-21"><a href=""></a>        conn.close()</span>
+<span id="cb5-22"><a href=""></a>        <span class="cf">raise</span> <span class="pp">RuntimeError</span>(<span class="ss">f"No price table. Tables: </span><span class="sc">{</span>tbls[<span class="st">'name'</span>]<span class="sc">.</span>tolist()<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-23"><a href=""></a>    sector_queries <span class="op">=</span> [</span>
+<span id="cb5-24"><a href=""></a>        <span class="st">"SELECT ticker, sector FROM tickers"</span>,</span>
+<span id="cb5-25"><a href=""></a>        <span class="st">"SELECT ticker, sector FROM sp500_components GROUP BY ticker"</span>,</span>
+<span id="cb5-26"><a href=""></a>    ]</span>
+<span id="cb5-27"><a href=""></a>    sector_df <span class="op">=</span> <span class="va">None</span></span>
+<span id="cb5-28"><a href=""></a>    <span class="cf">for</span> q <span class="kw">in</span> sector_queries:</span>
+<span id="cb5-29"><a href=""></a>        <span class="cf">try</span>:</span>
+<span id="cb5-30"><a href=""></a>            sector_df <span class="op">=</span> pd.read_sql_query(q, conn)</span>
+<span id="cb5-31"><a href=""></a>            <span class="cf">if</span> <span class="bu">len</span>(sector_df) <span class="op">&gt;</span> <span class="dv">0</span>:</span>
+<span id="cb5-32"><a href=""></a>                <span class="bu">print</span>(<span class="ss">f'Sector rows: </span><span class="sc">{</span><span class="bu">len</span>(sector_df)<span class="sc">:,}</span><span class="ss">'</span>)</span>
+<span id="cb5-33"><a href=""></a>                <span class="cf">break</span></span>
+<span id="cb5-34"><a href=""></a>        <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb5-35"><a href=""></a>            <span class="cf">continue</span></span>
+<span id="cb5-36"><a href=""></a>    conn.close()</span>
+<span id="cb5-37"><a href=""></a>    <span class="cf">if</span> sector_df <span class="kw">is</span> <span class="va">None</span> <span class="kw">or</span> <span class="bu">len</span>(sector_df) <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb5-38"><a href=""></a>        <span class="bu">print</span>(<span class="st">'WARNING: No sector table, using Unknown.'</span>)</span>
+<span id="cb5-39"><a href=""></a>        sector_df <span class="op">=</span> pd.DataFrame({<span class="st">'ticker'</span>: prices_df[<span class="st">'ticker'</span>].unique(), <span class="st">'sector'</span>: <span class="st">'Unknown'</span>})</span>
+<span id="cb5-40"><a href=""></a>        </span>
+<span id="cb5-41"><a href=""></a>    <span class="co"># [Mod] Mitigate Survivorship Bias: Check if delisted components exist</span></span>
+<span id="cb5-42"><a href=""></a>    max_date <span class="op">=</span> prices_df[<span class="st">'date'</span>].<span class="bu">max</span>()</span>
+<span id="cb5-43"><a href=""></a>    max_dates <span class="op">=</span> prices_df.groupby(<span class="st">'ticker'</span>)[<span class="st">'date'</span>].<span class="bu">max</span>()</span>
+<span id="cb5-44"><a href=""></a>    delisted_count <span class="op">=</span> (max_dates <span class="op">&lt;</span> max_date <span class="op">-</span> pd.Timedelta(days<span class="op">=</span><span class="dv">30</span>)).<span class="bu">sum</span>()</span>
+<span id="cb5-45"><a href=""></a>    <span class="cf">if</span> delisted_count <span class="op">&lt;</span> <span class="dv">10</span>:</span>
+<span id="cb5-46"><a href=""></a>        <span class="im">import</span> logging</span>
+<span id="cb5-47"><a href=""></a>        logging.warning(<span class="st">"STRICT RESEARCH LIMITATION: Database lacks historically delisted S&amp;P 500 components. Survivorship Bias is present."</span>)</span>
+<span id="cb5-48"><a href=""></a>        </span>
+<span id="cb5-49"><a href=""></a>    <span class="cf">return</span> prices_df, sector_df</span>
+<span id="cb5-50"><a href=""></a></span>
+<span id="cb5-51"><a href=""></a></span>
+<span id="cb5-52"><a href=""></a><span class="kw">def</span> preprocess_prices(prices_df, min_days<span class="op">=</span>MIN_HISTORY_DAYS):</span>
+<span id="cb5-53"><a href=""></a>    <span class="co">"""Pivot, forward-fill, drop sparse tickers."""</span></span>
+<span id="cb5-54"><a href=""></a>    pivot <span class="op">=</span> prices_df.pivot_table(index<span class="op">=</span><span class="st">'date'</span>, columns<span class="op">=</span><span class="st">'ticker'</span>, values<span class="op">=</span><span class="st">'close'</span>, aggfunc<span class="op">=</span><span class="st">'last'</span>)</span>
+<span id="cb5-55"><a href=""></a>    pivot.index <span class="op">=</span> pd.to_datetime(pivot.index)</span>
+<span id="cb5-56"><a href=""></a>    pivot.sort_index(inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-57"><a href=""></a>    pivot.ffill(limit<span class="op">=</span><span class="dv">5</span>, inplace<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb5-58"><a href=""></a>    valid <span class="op">=</span> pivot.columns[pivot.notna().<span class="bu">sum</span>() <span class="op">&gt;=</span> min_days]</span>
+<span id="cb5-59"><a href=""></a>    pivot <span class="op">=</span> pivot[valid]</span>
+<span id="cb5-60"><a href=""></a>    <span class="bu">print</span>(<span class="ss">f'Matrix: </span><span class="sc">{</span><span class="bu">len</span>(pivot)<span class="sc">}</span><span class="ss"> days x </span><span class="sc">{</span><span class="bu">len</span>(pivot.columns)<span class="sc">}</span><span class="ss"> tickers'</span>)</span>
+<span id="cb5-61"><a href=""></a></span>
+<span id="cb5-62"><a href=""></a>    <span class="co"># [Mod] Integrate Macroeconomic Indicator (VIX)</span></span>
+<span id="cb5-63"><a href=""></a>    <span class="im">import</span> yfinance <span class="im">as</span> yf</span>
+<span id="cb5-64"><a href=""></a>    <span class="bu">print</span>(<span class="st">"Fetching VIX data..."</span>)</span>
+<span id="cb5-65"><a href=""></a>    <span class="cf">try</span>:</span>
+<span id="cb5-66"><a href=""></a>        vix_data <span class="op">=</span> yf.download(<span class="st">"^VIX"</span>, start<span class="op">=</span>pivot.index.<span class="bu">min</span>(), end<span class="op">=</span>pivot.index.<span class="bu">max</span>() <span class="op">+</span> pd.Timedelta(days<span class="op">=</span><span class="dv">1</span>), progress<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb5-67"><a href=""></a>        <span class="cf">if</span> <span class="bu">isinstance</span>(vix_data.columns, pd.MultiIndex):</span>
+<span id="cb5-68"><a href=""></a>            vix_close <span class="op">=</span> vix_data[<span class="st">'Close'</span>].squeeze()</span>
+<span id="cb5-69"><a href=""></a>        <span class="cf">else</span>:</span>
+<span id="cb5-70"><a href=""></a>            vix_close <span class="op">=</span> vix_data[<span class="st">'Close'</span>]</span>
+<span id="cb5-71"><a href=""></a>        vix_df <span class="op">=</span> pd.DataFrame({<span class="st">'VIX'</span>: vix_close})</span>
+<span id="cb5-72"><a href=""></a>        vix_df.index <span class="op">=</span> pd.to_datetime(vix_df.index).tz_localize(<span class="va">None</span>)</span>
+<span id="cb5-73"><a href=""></a>        vix_aligned <span class="op">=</span> vix_df.reindex(pivot.index).ffill()</span>
+<span id="cb5-74"><a href=""></a>        <span class="bu">print</span>(<span class="st">"VIX feature matrix aligned."</span>)</span>
+<span id="cb5-75"><a href=""></a>    <span class="cf">except</span> <span class="pp">Exception</span> <span class="im">as</span> e:</span>
+<span id="cb5-76"><a href=""></a>        <span class="bu">print</span>(<span class="ss">f"Error fetching VIX: </span><span class="sc">{</span>e<span class="sc">}</span><span class="ss">"</span>)</span>
+<span id="cb5-77"><a href=""></a>        vix_aligned <span class="op">=</span> pd.DataFrame(index<span class="op">=</span>pivot.index, columns<span class="op">=</span>[<span class="st">'VIX'</span>])</span>
+<span id="cb5-78"><a href=""></a></span>
+<span id="cb5-79"><a href=""></a>    <span class="cf">return</span> pivot, vix_aligned</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="051c5bf7" class="cell" data-execution_count="17">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href=""></a>prices_raw, sector_info <span class="op">=</span> load_data_from_db(DB_PATH, START_DATE, END_DATE)</span>
+<span id="cb6-2"><a href=""></a>price_pivot, vix_features <span class="op">=</span> preprocess_prices(prices_raw)</span>
+<span id="cb6-3"><a href=""></a>sector_map  <span class="op">=</span> sector_info.set_index(<span class="st">'ticker'</span>)[<span class="st">'sector'</span>].to_dict()</span>
+<span id="cb6-4"><a href=""></a>display(price_pivot.iloc[:<span class="dv">3</span>, :<span class="dv">6</span>])</span>
+<span id="cb6-5"><a href=""></a><span class="bu">print</span>(pd.Series(sector_map).value_counts().head(<span class="dv">10</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Price rows: 3,607,121
+Sector rows: 843
+Matrix: 6539 days x 660 tickers
+Fetching VIX data...
+VIX feature matrix aligned.</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th">ticker</th>
+<th data-quarto-table-cell-role="th">A</th>
+<th data-quarto-table-cell-role="th">AA</th>
+<th data-quarto-table-cell-role="th">AAL</th>
+<th data-quarto-table-cell-role="th">AAP</th>
+<th data-quarto-table-cell-role="th">AAPL</th>
+<th data-quarto-table-cell-role="th">ABBV</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">date</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2000-01-03</th>
+<td>43.0364</td>
+<td>68.8711</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>0.8385</td>
+<td>NaN</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2000-01-04</th>
+<td>39.7489</td>
+<td>69.1902</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>0.7678</td>
+<td>NaN</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2000-01-05</th>
+<td>37.2833</td>
+<td>73.1788</td>
+<td>NaN</td>
+<td>NaN</td>
+<td>0.7790</td>
+<td>NaN</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Unknown                   340
+Industrials                79
+Financials                 76
+Information Technology     71
+Health Care                60
+Consumer Discretionary     48
+Consumer Staples           36
+Utilities                  31
+Real Estate                31
+Materials                  26
+Name: count, dtype: int64</code></pre>
+</div>
+</div>
+</section>
+<section id="階段二配對選擇形成期" class="slide level3">
+<h3>階段二：配對選擇（形成期）</h3>
+<p><strong>Engle-Granger 協整檢驗</strong>： <span class="math display">\[P_{A,t} = \\alpha + \\beta P_{B,t} + \\varepsilon_t\]</span> 如果殘差 <span class="math inline">\(\\varepsilon_t\)</span> 的 ADF <span class="math inline">\(p &lt; 0.01\)</span>，則判定協整。</p>
+<p><strong>SSD 排序</strong>: <span class="math inline">\(\\text{SSD}(A,B)=\\sum(r_A^{norm}-r_B^{norm})^2\)</span></p>
+<p>SSD 越小 → 狸圖越相似 → 優先選入交易期。</p>
+<p><strong>選定流程</strong>: 同產業候選 → 協整檢驗 (<span class="math inline">\(p&lt;0.01\)</span>) → SSD由小到大排序 → Top-N</p>
+<div id="1b0705dc" class="cell" data-execution_count="18">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href=""></a><span class="kw">def</span> normalize_prices(prices):</span>
+<span id="cb9-2"><a href=""></a>    <span class="cf">return</span> prices <span class="op">/</span> prices.iloc[<span class="dv">0</span>]</span>
+<span id="cb9-3"><a href=""></a></span>
+<span id="cb9-4"><a href=""></a><span class="kw">def</span> compute_ssd(na, nb):</span>
+<span id="cb9-5"><a href=""></a>    <span class="cf">return</span> ((na <span class="op">-</span> nb) <span class="op">**</span> <span class="dv">2</span>).<span class="bu">sum</span>()</span>
+<span id="cb9-6"><a href=""></a></span>
+<span id="cb9-7"><a href=""></a><span class="kw">def</span> select_pairs_for_window(price_window, sector_map, top_ns,</span>
+<span id="cb9-8"><a href=""></a>                            coint_pval<span class="op">=</span>COINT_P_VALUE,</span>
+<span id="cb9-9"><a href=""></a>                            sector_neutral<span class="op">=</span>SECTOR_NEUTRAL,</span>
+<span id="cb9-10"><a href=""></a>                            target_sector<span class="op">=</span>TARGET_SECTOR):</span>
+<span id="cb9-11"><a href=""></a>    <span class="co">"""Cointegration + SSD ranking for one formation window."""</span></span>
+<span id="cb9-12"><a href=""></a>    norm  <span class="op">=</span> normalize_prices(price_window.dropna(axis<span class="op">=</span><span class="dv">1</span>))</span>
+<span id="cb9-13"><a href=""></a>    valid <span class="op">=</span> norm.columns.tolist()</span>
+<span id="cb9-14"><a href=""></a>    </span>
+<span id="cb9-15"><a href=""></a>    <span class="co"># [Mod] Scope Management: Target Sector Filtering</span></span>
+<span id="cb9-16"><a href=""></a>    <span class="cf">if</span> target_sector <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> target_sector <span class="op">!=</span> <span class="st">'All'</span>:</span>
+<span id="cb9-17"><a href=""></a>        valid <span class="op">=</span> [t <span class="cf">for</span> t <span class="kw">in</span> valid <span class="cf">if</span> sector_map.get(t, <span class="st">'Unknown'</span>) <span class="op">==</span> target_sector]</span>
+<span id="cb9-18"><a href=""></a>        <span class="bu">print</span>(<span class="ss">f'  Filtered by target sector (</span><span class="sc">{</span>target_sector<span class="sc">}</span><span class="ss">): </span><span class="sc">{</span><span class="bu">len</span>(valid)<span class="sc">}</span><span class="ss"> candidates remaining.'</span>)</span>
+<span id="cb9-19"><a href=""></a>        candidates <span class="op">=</span> [(a,b,target_sector) <span class="cf">for</span> a,b <span class="kw">in</span> combinations(valid,<span class="dv">2</span>)]</span>
+<span id="cb9-20"><a href=""></a>    <span class="cf">elif</span> sector_neutral:</span>
+<span id="cb9-21"><a href=""></a>        groups <span class="op">=</span> {}</span>
+<span id="cb9-22"><a href=""></a>        <span class="cf">for</span> t <span class="kw">in</span> valid:</span>
+<span id="cb9-23"><a href=""></a>            groups.setdefault(sector_map.get(t,<span class="st">'Unknown'</span>),[]).append(t)</span>
+<span id="cb9-24"><a href=""></a>        candidates <span class="op">=</span> [(a,b,s) <span class="cf">for</span> s,ms <span class="kw">in</span> groups.items()</span>
+<span id="cb9-25"><a href=""></a>                      <span class="cf">if</span> <span class="bu">len</span>(ms)<span class="op">&gt;=</span><span class="dv">2</span> <span class="cf">for</span> a,b <span class="kw">in</span> combinations(ms,<span class="dv">2</span>)]</span>
+<span id="cb9-26"><a href=""></a>    <span class="cf">else</span>:</span>
+<span id="cb9-27"><a href=""></a>        candidates <span class="op">=</span> [(a,b,<span class="st">'All'</span>) <span class="cf">for</span> a,b <span class="kw">in</span> combinations(valid,<span class="dv">2</span>)]</span>
+<span id="cb9-28"><a href=""></a>    <span class="bu">print</span>(<span class="ss">f'  Candidates: </span><span class="sc">{</span><span class="bu">len</span>(candidates)<span class="sc">:,}</span><span class="ss">'</span>)</span>
+<span id="cb9-29"><a href=""></a>    passed <span class="op">=</span> []</span>
+<span id="cb9-30"><a href=""></a>    <span class="cf">for</span> a,b,sector <span class="kw">in</span> candidates:</span>
+<span id="cb9-31"><a href=""></a>        <span class="cf">try</span>:</span>
+<span id="cb9-32"><a href=""></a>            sa <span class="op">=</span> price_window[a].dropna()</span>
+<span id="cb9-33"><a href=""></a>            sb <span class="op">=</span> price_window[b].dropna()</span>
+<span id="cb9-34"><a href=""></a>            idx <span class="op">=</span> sa.index.intersection(sb.index)</span>
+<span id="cb9-35"><a href=""></a>            <span class="cf">if</span> <span class="bu">len</span>(idx) <span class="op">&lt;</span> FORMATION_WINDOW<span class="op">*</span><span class="fl">0.8</span>: <span class="cf">continue</span></span>
+<span id="cb9-36"><a href=""></a>            _,pval,_ <span class="op">=</span> coint(sa[idx].values, sb[idx].values)</span>
+<span id="cb9-37"><a href=""></a>            <span class="cf">if</span> pval <span class="op">&lt;</span> coint_pval:</span>
+<span id="cb9-38"><a href=""></a>                ssd <span class="op">=</span> compute_ssd(norm[a], norm[b])</span>
+<span id="cb9-39"><a href=""></a>                passed.append({<span class="st">'stock_a'</span>:a,<span class="st">'stock_b'</span>:b,<span class="st">'sector'</span>:sector,<span class="st">'coint_p'</span>:pval,<span class="st">'ssd'</span>:ssd})</span>
+<span id="cb9-40"><a href=""></a>        <span class="cf">except</span> <span class="pp">Exception</span>:</span>
+<span id="cb9-41"><a href=""></a>            <span class="cf">continue</span></span>
+<span id="cb9-42"><a href=""></a>    <span class="bu">print</span>(<span class="ss">f'  Passed coint: </span><span class="sc">{</span><span class="bu">len</span>(passed)<span class="sc">:,}</span><span class="ss">'</span>)</span>
+<span id="cb9-43"><a href=""></a>    <span class="cf">if</span> <span class="kw">not</span> passed:</span>
+<span id="cb9-44"><a href=""></a>        <span class="cf">return</span> {n:[] <span class="cf">for</span> n <span class="kw">in</span> top_ns}</span>
+<span id="cb9-45"><a href=""></a>    df <span class="op">=</span> pd.DataFrame(passed).sort_values(<span class="st">'ssd'</span>)</span>
+<span id="cb9-46"><a href=""></a>    <span class="cf">return</span> {n: df.head(n).to_dict(<span class="st">'records'</span>) <span class="cf">for</span> n <span class="kw">in</span> top_ns}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="階段三策略執行交易期" class="slide level3">
+<h3>階段三：策略執行（交易期）</h3>
+<p><span class="math display">\[Z_t = (\\text{spread}_t - \\mu_{hist})/\\sigma_{hist}\]</span></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>訊號</th>
+<th>操作</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(Z &gt; +1.5\)</span></td>
+<td>放空A、做多B</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(Z &lt; -1.5\)</span></td>
+<td>做多A、放空B</td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(|Z| &lt; 0.75\)</span></td>
+<td>平倉</td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(|Z| &gt; 3.0\)</span></td>
+<td>停損平倉</td>
+</tr>
+</tbody>
+</table>
+<p><strong>跨日執行法 (Wait-One-Day)</strong>: 訊號後隔日執行，避免 bid-ask bounce。 <strong>Dollar-Neutral</strong>: 每配對 $1 做多 + $1 放空。</p>
+<div id="8673b525" class="cell" data-execution_count="19">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href=""></a><span class="kw">def</span> execute_pair_trades(trade_prices, pair, form_prices,</span>
+<span id="cb10-2"><a href=""></a>                        z_entry<span class="op">=</span>Z_ENTRY, z_exit<span class="op">=</span>Z_EXIT,</span>
+<span id="cb10-3"><a href=""></a>                        stop_loss<span class="op">=</span>STOP_LOSS, cost<span class="op">=</span>TRANSACTION_COST,</span>
+<span id="cb10-4"><a href=""></a>                        hedge_ratio<span class="op">=</span>HEDGE_RATIO):</span>
+<span id="cb10-5"><a href=""></a>    <span class="co">"""Dollar-neutral pair trade with wait-one-day rule."""</span></span>
+<span id="cb10-6"><a href=""></a>    a, b <span class="op">=</span> pair[<span class="st">'stock_a'</span>], pair[<span class="st">'stock_b'</span>]</span>
+<span id="cb10-7"><a href=""></a>    <span class="cf">try</span>:</span>
+<span id="cb10-8"><a href=""></a>        pa_t <span class="op">=</span> trade_prices[a].dropna()</span>
+<span id="cb10-9"><a href=""></a>        pb_t <span class="op">=</span> trade_prices[b].dropna()</span>
+<span id="cb10-10"><a href=""></a>        pa_f <span class="op">=</span> form_prices[a].dropna()</span>
+<span id="cb10-11"><a href=""></a>        pb_f <span class="op">=</span> form_prices[b].dropna()</span>
+<span id="cb10-12"><a href=""></a>    <span class="cf">except</span> <span class="pp">KeyError</span>:</span>
+<span id="cb10-13"><a href=""></a>        <span class="cf">return</span> pd.Series(<span class="fl">0.0</span>, index<span class="op">=</span>trade_prices.index)</span>
+<span id="cb10-14"><a href=""></a>    common <span class="op">=</span> pa_t.index.intersection(pb_t.index)</span>
+<span id="cb10-15"><a href=""></a>    <span class="cf">if</span> <span class="bu">len</span>(common) <span class="op">&lt;</span> <span class="dv">5</span>:</span>
+<span id="cb10-16"><a href=""></a>        <span class="cf">return</span> pd.Series(<span class="fl">0.0</span>, index<span class="op">=</span>trade_prices.index)</span>
+<span id="cb10-17"><a href=""></a>    na <span class="op">=</span> pa_t[common] <span class="op">/</span> pa_f.iloc[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb10-18"><a href=""></a>    nb <span class="op">=</span> pb_t[common] <span class="op">/</span> pb_f.iloc[<span class="op">-</span><span class="dv">1</span>]</span>
+<span id="cb10-19"><a href=""></a>    fi <span class="op">=</span> pa_f.index.intersection(pb_f.index)</span>
+<span id="cb10-20"><a href=""></a>    fs <span class="op">=</span> (pa_f[fi]<span class="op">/</span>pa_f[fi].iloc[<span class="dv">0</span>]) <span class="op">-</span> (pb_f[fi]<span class="op">/</span>pb_f[fi].iloc[<span class="dv">0</span>])</span>
+<span id="cb10-21"><a href=""></a>    mu, sd <span class="op">=</span> fs.mean(), fs.std()</span>
+<span id="cb10-22"><a href=""></a>    <span class="cf">if</span> sd <span class="op">&lt;</span> <span class="fl">1e-8</span>:</span>
+<span id="cb10-23"><a href=""></a>        <span class="cf">return</span> pd.Series(<span class="fl">0.0</span>, index<span class="op">=</span>trade_prices.index)</span>
+<span id="cb10-24"><a href=""></a>    z <span class="op">=</span> ((na <span class="op">-</span> nb) <span class="op">-</span> mu) <span class="op">/</span> sd</span>
+<span id="cb10-25"><a href=""></a>    pos, pnl_d <span class="op">=</span> <span class="dv">0</span>, {}</span>
+<span id="cb10-26"><a href=""></a>    pna, pnb <span class="op">=</span> na.iloc[<span class="dv">0</span>], nb.iloc[<span class="dv">0</span>]</span>
+<span id="cb10-27"><a href=""></a>    <span class="cf">for</span> i, dt <span class="kw">in</span> <span class="bu">enumerate</span>(common):</span>
+<span id="cb10-28"><a href=""></a>        zi, cna, cnb <span class="op">=</span> z.iloc[i], na.iloc[i], nb.iloc[i]</span>
+<span id="cb10-29"><a href=""></a>        p <span class="op">=</span> <span class="fl">0.0</span></span>
+<span id="cb10-30"><a href=""></a>        <span class="cf">if</span> i <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">and</span> pos <span class="op">!=</span> <span class="dv">0</span>:</span>
+<span id="cb10-31"><a href=""></a>            <span class="co"># [Mod] Application of hedge_ratio to position sizing</span></span>
+<span id="cb10-32"><a href=""></a>            p <span class="op">=</span> pos <span class="op">*</span> ((cna<span class="op">-</span>pna)<span class="op">/</span>pna <span class="op">-</span> hedge_ratio <span class="op">*</span> (cnb<span class="op">-</span>pnb)<span class="op">/</span>pnb)</span>
+<span id="cb10-33"><a href=""></a>        new <span class="op">=</span> pos</span>
+<span id="cb10-34"><a href=""></a>        <span class="cf">if</span> pos <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb10-35"><a href=""></a>            <span class="cf">if</span>   zi <span class="op">&gt;</span>  z_entry: new <span class="op">=</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span> p <span class="op">-=</span> <span class="dv">2</span> <span class="op">*</span> cost <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> hedge_ratio)</span>
+<span id="cb10-36"><a href=""></a>            <span class="cf">elif</span> zi <span class="op">&lt;</span> <span class="op">-</span>z_entry: new <span class="op">=</span> <span class="op">+</span><span class="dv">1</span><span class="op">;</span> p <span class="op">-=</span> <span class="dv">2</span> <span class="op">*</span> cost <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> hedge_ratio)</span>
+<span id="cb10-37"><a href=""></a>        <span class="cf">elif</span> <span class="bu">abs</span>(zi) <span class="op">&lt;</span> z_exit <span class="kw">or</span> <span class="bu">abs</span>(zi) <span class="op">&gt;</span> stop_loss:</span>
+<span id="cb10-38"><a href=""></a>            p <span class="op">-=</span> <span class="dv">2</span> <span class="op">*</span> cost <span class="op">*</span> (<span class="dv">1</span> <span class="op">+</span> hedge_ratio)<span class="op">;</span> new <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb10-39"><a href=""></a>        pos, pna, pnb <span class="op">=</span> new, cna, cnb</span>
+<span id="cb10-40"><a href=""></a>        pnl_d[dt] <span class="op">=</span> p</span>
+<span id="cb10-41"><a href=""></a>    <span class="cf">return</span> pd.Series(pnl_d, dtype<span class="op">=</span><span class="bu">float</span>).reindex(trade_prices.index, fill_value<span class="op">=</span><span class="fl">0.0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="滞動視窗主迴圈" class="slide level3">
+<h3>滞動視窗主迴圈</h3>
+<pre><code>視窗 0: 形成期 [Day 0..251]  | 交易期 [Day 252..377]
+視窗 1: 形成期 [Day 126..377] | 交易期 [Day 378..503]
+(每次向前滞動 TRADING_WINDOW 個交易日)</code></pre>
+<div id="2fea3cfe" class="cell" data-execution_count="20">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href=""></a><span class="kw">def</span> run_backtesting(price_pivot, sector_map,</span>
+<span id="cb12-2"><a href=""></a>                    formation_window<span class="op">=</span>FORMATION_WINDOW,</span>
+<span id="cb12-3"><a href=""></a>                    trading_window<span class="op">=</span>TRADING_WINDOW,</span>
+<span id="cb12-4"><a href=""></a>                    top_ns<span class="op">=</span>TOP_N_PAIRS):</span>
+<span id="cb12-5"><a href=""></a>    <span class="co">"""Main rolling-window backtest loop."""</span></span>
+<span id="cb12-6"><a href=""></a>    dates <span class="op">=</span> price_pivot.index</span>
+<span id="cb12-7"><a href=""></a>    N     <span class="op">=</span> <span class="bu">len</span>(dates)</span>
+<span id="cb12-8"><a href=""></a>    all_pnl <span class="op">=</span> {n: pd.DataFrame(index<span class="op">=</span>dates) <span class="cf">for</span> n <span class="kw">in</span> top_ns}</span>
+<span id="cb12-9"><a href=""></a>    records <span class="op">=</span> []</span>
+<span id="cb12-10"><a href=""></a>    si, wid <span class="op">=</span> <span class="dv">0</span>, <span class="dv">0</span></span>
+<span id="cb12-11"><a href=""></a>    <span class="cf">while</span> si <span class="op">+</span> formation_window <span class="op">+</span> trading_window <span class="op">&lt;=</span> N:</span>
+<span id="cb12-12"><a href=""></a>        fe <span class="op">=</span> si <span class="op">+</span> formation_window</span>
+<span id="cb12-13"><a href=""></a>        te <span class="op">=</span> fe <span class="op">+</span> trading_window</span>
+<span id="cb12-14"><a href=""></a>        <span class="bu">print</span>(<span class="ss">f'Window </span><span class="sc">{</span>wid<span class="sc">:02d}</span><span class="ss">  Form:</span><span class="sc">{</span>dates[si]<span class="sc">.</span>date()<span class="sc">}</span><span class="ss">-</span><span class="sc">{</span>dates[fe<span class="op">-</span><span class="dv">1</span>]<span class="sc">.</span>date()<span class="sc">}</span><span class="ss">  '</span></span>
+<span id="cb12-15"><a href=""></a>              <span class="ss">f'Trade:</span><span class="sc">{</span>dates[fe]<span class="sc">.</span>date()<span class="sc">}</span><span class="ss">-</span><span class="sc">{</span>dates[te<span class="op">-</span><span class="dv">1</span>]<span class="sc">.</span>date()<span class="sc">}</span><span class="ss">'</span>)</span>
+<span id="cb12-16"><a href=""></a>        fp  <span class="op">=</span> price_pivot.iloc[si:fe]</span>
+<span id="cb12-17"><a href=""></a>        tp  <span class="op">=</span> price_pivot.iloc[fe:te]</span>
+<span id="cb12-18"><a href=""></a>        sel <span class="op">=</span> select_pairs_for_window(fp, sector_map, top_ns)</span>
+<span id="cb12-19"><a href=""></a>        rec <span class="op">=</span> {<span class="st">'window_id'</span>:wid,<span class="st">'form_start'</span>:dates[si],<span class="st">'form_end'</span>:dates[fe<span class="op">-</span><span class="dv">1</span>],</span>
+<span id="cb12-20"><a href=""></a>               <span class="st">'trade_start'</span>:dates[fe],<span class="st">'trade_end'</span>:dates[te<span class="op">-</span><span class="dv">1</span>],<span class="st">'pairs_by_n'</span>:sel}</span>
+<span id="cb12-21"><a href=""></a>        records.append(rec)</span>
+<span id="cb12-22"><a href=""></a>        <span class="cf">for</span> n <span class="kw">in</span> top_ns:</span>
+<span id="cb12-23"><a href=""></a>            pairs <span class="op">=</span> sel.get(n,[])</span>
+<span id="cb12-24"><a href=""></a>            col   <span class="op">=</span> <span class="ss">f'W</span><span class="sc">{</span>wid<span class="sc">:02d}</span><span class="ss">'</span></span>
+<span id="cb12-25"><a href=""></a>            wpnl  <span class="op">=</span> pd.Series(<span class="fl">0.0</span>, index<span class="op">=</span>dates)</span>
+<span id="cb12-26"><a href=""></a>            <span class="cf">if</span> pairs:</span>
+<span id="cb12-27"><a href=""></a>                <span class="cf">for</span> p <span class="kw">in</span> pairs:</span>
+<span id="cb12-28"><a href=""></a>                    wpnl <span class="op">=</span> wpnl.add(execute_pair_trades(tp,p,fp)<span class="op">/</span><span class="bu">len</span>(pairs))</span>
+<span id="cb12-29"><a href=""></a>            all_pnl[n][col] <span class="op">=</span> wpnl</span>
+<span id="cb12-30"><a href=""></a>        si <span class="op">+=</span> trading_window<span class="op">;</span> wid <span class="op">+=</span> <span class="dv">1</span></span>
+<span id="cb12-31"><a href=""></a>    <span class="bu">print</span>(<span class="ss">f'Backtest done: </span><span class="sc">{</span>wid<span class="sc">}</span><span class="ss"> windows.'</span>)</span>
+<span id="cb12-32"><a href=""></a>    <span class="cf">return</span> all_pnl, records</span>
+<span id="cb12-33"><a href=""></a></span>
+<span id="cb12-34"><a href=""></a><span class="bu">print</span>(<span class="st">'Starting backtest...'</span>)</span>
+<span id="cb12-35"><a href=""></a>all_pnl, window_records <span class="op">=</span> run_backtesting(price_pivot, sector_map)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Starting backtest...
+Window 00  Form:2000-01-03-2000-12-29  Trade:2001-01-02-2001-07-02
+  Candidates: 9,739
+  Passed coint: 394
+Window 01  Form:2000-07-03-2001-07-02  Trade:2001-07-03-2002-01-07
+  Candidates: 10,064
+  Passed coint: 297
+Window 02  Form:2001-01-02-2002-01-07  Trade:2002-01-08-2002-07-09
+  Candidates: 10,401
+  Passed coint: 436
+Window 03  Form:2001-07-03-2002-07-09  Trade:2002-07-10-2003-01-07
+  Candidates: 10,771
+  Passed coint: 311
+Window 04  Form:2002-01-08-2003-01-07  Trade:2003-01-08-2003-07-09
+  Candidates: 11,269
+  Passed coint: 317
+Window 05  Form:2002-07-10-2003-07-09  Trade:2003-07-10-2004-01-07
+  Candidates: 11,510
+  Passed coint: 447
+Window 06  Form:2003-01-08-2004-01-07  Trade:2004-01-08-2004-07-09
+  Candidates: 11,645
+  Passed coint: 370
+Window 07  Form:2003-07-10-2004-07-09  Trade:2004-07-12-2005-01-06
+  Candidates: 11,785
+  Passed coint: 213
+Window 08  Form:2004-01-08-2005-01-06  Trade:2005-01-07-2005-07-08
+  Candidates: 11,903
+  Passed coint: 346
+Window 09  Form:2004-07-12-2005-07-08  Trade:2005-07-11-2006-01-06
+  Candidates: 12,218
+  Passed coint: 358
+Window 10  Form:2005-01-07-2006-01-06  Trade:2006-01-09-2006-07-10
+  Candidates: 12,411
+  Passed coint: 270
+Window 11  Form:2005-07-11-2006-07-10  Trade:2006-07-11-2007-01-09
+  Candidates: 12,627
+  Passed coint: 327
+Window 12  Form:2006-01-09-2007-01-09  Trade:2007-01-10-2007-07-11
+  Candidates: 13,115
+  Passed coint: 203
+Window 13  Form:2006-07-11-2007-07-11  Trade:2007-07-12-2008-01-09
+  Candidates: 13,333
+  Passed coint: 277
+Window 14  Form:2007-01-10-2008-01-09  Trade:2008-01-10-2008-07-10
+  Candidates: 13,741
+  Passed coint: 405
+Window 15  Form:2007-07-12-2008-07-10  Trade:2008-07-11-2009-01-08
+  Candidates: 14,159
+  Passed coint: 392
+Window 16  Form:2008-01-10-2009-01-08  Trade:2009-01-09-2009-07-10
+  Candidates: 14,400
+  Passed coint: 548
+Window 17  Form:2008-07-11-2009-07-10  Trade:2009-07-13-2010-01-08
+  Candidates: 14,676
+  Passed coint: 922
+Window 18  Form:2009-01-09-2010-01-08  Trade:2010-01-11-2010-07-12
+  Candidates: 14,676
+  Passed coint: 795
+Window 19  Form:2009-07-13-2010-07-12  Trade:2010-07-13-2011-01-07
+  Candidates: 14,676
+  Passed coint: 305
+Window 20  Form:2010-01-11-2011-01-07  Trade:2011-01-10-2011-07-11
+  Candidates: 14,997
+  Passed coint: 259
+Window 21  Form:2010-07-13-2011-07-11  Trade:2011-07-12-2012-01-09
+  Candidates: 15,399
+  Passed coint: 343
+Window 22  Form:2011-01-10-2012-01-09  Trade:2012-01-10-2012-07-10
+  Candidates: 15,749
+  Passed coint: 530
+Window 23  Form:2011-07-12-2012-07-10  Trade:2012-07-11-2013-01-10
+  Candidates: 15,972
+  Passed coint: 674
+Window 24  Form:2012-01-10-2013-01-10  Trade:2013-01-11-2013-07-12
+  Candidates: 16,406
+  Passed coint: 213
+Window 25  Form:2012-07-11-2013-07-12  Trade:2013-07-15-2014-01-10
+  Candidates: 16,909
+  Passed coint: 433
+Window 26  Form:2013-01-11-2014-01-10  Trade:2014-01-13-2014-07-14
+  Candidates: 17,098
+  Passed coint: 349
+Window 27  Form:2013-07-15-2014-07-14  Trade:2014-07-15-2015-01-12
+  Candidates: 17,461
+  Passed coint: 448
+Window 28  Form:2014-01-13-2015-01-12  Trade:2015-01-13-2015-07-14
+  Candidates: 17,688
+  Passed coint: 496
+Window 29  Form:2014-07-15-2015-07-14  Trade:2015-07-15-2016-01-12
+  Candidates: 18,002
+  Passed coint: 503
+Window 30  Form:2015-01-13-2016-01-12  Trade:2016-01-13-2016-07-13
+  Candidates: 18,437
+  Passed coint: 431
+Window 31  Form:2015-07-15-2016-07-13  Trade:2016-07-14-2017-01-11
+  Candidates: 18,841
+  Passed coint: 491
+Window 32  Form:2016-01-13-2017-01-11  Trade:2017-01-12-2017-07-13
+  Candidates: 19,712
+  Passed coint: 570
+Window 33  Form:2016-07-14-2017-07-13  Trade:2017-07-14-2018-01-11
+  Candidates: 19,658
+  Passed coint: 478
+Window 34  Form:2017-01-12-2018-01-11  Trade:2018-01-12-2018-07-13
+  Candidates: 19,753
+  Passed coint: 368
+Window 35  Form:2017-07-14-2018-07-13  Trade:2018-07-16-2019-01-14
+  Candidates: 19,414
+  Passed coint: 344
+Window 36  Form:2018-01-12-2019-01-14  Trade:2019-01-15-2019-07-16
+  Candidates: 18,859
+  Passed coint: 538
+Window 37  Form:2018-07-16-2019-07-16  Trade:2019-07-17-2020-01-14
+  Candidates: 18,745
+  Passed coint: 321
+Window 38  Form:2019-01-15-2020-01-14  Trade:2020-01-15-2020-07-15
+  Candidates: 18,802
+  Passed coint: 391
+Window 39  Form:2019-07-17-2020-07-15  Trade:2020-07-16-2021-01-13
+  Candidates: 19,147
+  Passed coint: 442
+Window 40  Form:2020-01-15-2021-01-13  Trade:2021-01-14-2021-07-15
+  Candidates: 19,328
+  Passed coint: 290
+Window 41  Form:2020-07-16-2021-07-15  Trade:2021-07-16-2022-01-12
+  Candidates: 19,830
+  Passed coint: 456
+Window 42  Form:2021-01-14-2022-01-12  Trade:2022-01-13-2022-07-15
+  Candidates: 20,229
+  Passed coint: 532
+Window 43  Form:2021-07-16-2022-07-15  Trade:2022-07-18-2023-01-13
+  Candidates: 20,513
+  Passed coint: 342
+Window 44  Form:2022-01-13-2023-01-13  Trade:2023-01-17-2023-07-18
+  Candidates: 20,710
+  Passed coint: 434
+Window 45  Form:2022-07-18-2023-07-18  Trade:2023-07-19-2024-01-17
+  Candidates: 20,863
+  Passed coint: 263
+Window 46  Form:2023-01-17-2024-01-17  Trade:2024-01-18-2024-07-18
+  Candidates: 21,045
+  Passed coint: 216
+Window 47  Form:2023-07-19-2024-07-18  Trade:2024-07-19-2025-01-17
+  Candidates: 21,205
+  Passed coint: 391
+Window 48  Form:2024-01-18-2025-01-17  Trade:2025-01-21-2025-07-22
+  Candidates: 21,535
+  Passed coint: 463
+Backtest done: 49 windows.</code></pre>
+</div>
+</div>
+</section>
+<section id="階段四績效評估與對比分析" class="slide level3">
+<h3>階段四：績效評估與對比分析</h3>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>指標</th>
+<th>公式</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>CAGR</strong></td>
+<td><span class="math inline">\((1+r_{total})^{252/T}-1\)</span></td>
+</tr>
+<tr class="even">
+<td><strong>Sharpe</strong></td>
+<td><span class="math inline">\(\\mu_{ann}/\\sigma_{ann}\)</span></td>
+</tr>
+<tr class="odd">
+<td><strong>MDD</strong></td>
+<td><span class="math inline">\(\\max(1-NAV_t/peak_t)\)</span></td>
+</tr>
+<tr class="even">
+<td><strong>Sortino</strong></td>
+<td>使用下行標準差</td>
+</tr>
+</tbody>
+</table>
+<div id="bbd64e7d" class="cell" data-execution_count="21">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href=""></a><span class="kw">def</span> compute_metrics(ret, label<span class="op">=</span><span class="st">''</span>):</span>
+<span id="cb14-2"><a href=""></a>    <span class="co">"""Annualised performance metrics from daily return series."""</span></span>
+<span id="cb14-3"><a href=""></a>    r <span class="op">=</span> ret.dropna().replace([np.inf,<span class="op">-</span>np.inf], np.nan).dropna()</span>
+<span id="cb14-4"><a href=""></a>    T <span class="op">=</span> <span class="bu">len</span>(r)</span>
+<span id="cb14-5"><a href=""></a>    <span class="cf">if</span> T <span class="op">==</span> <span class="dv">0</span>: <span class="cf">return</span> {}</span>
+<span id="cb14-6"><a href=""></a>    cum    <span class="op">=</span> (<span class="dv">1</span><span class="op">+</span>r).cumprod()</span>
+<span id="cb14-7"><a href=""></a>    tot    <span class="op">=</span> cum.iloc[<span class="op">-</span><span class="dv">1</span>]<span class="op">-</span><span class="dv">1</span></span>
+<span id="cb14-8"><a href=""></a>    cagr   <span class="op">=</span> (<span class="dv">1</span><span class="op">+</span>tot)<span class="op">**</span>(<span class="dv">252</span><span class="op">/</span>T)<span class="op">-</span><span class="dv">1</span></span>
+<span id="cb14-9"><a href=""></a>    vol    <span class="op">=</span> r.std()<span class="op">*</span>np.sqrt(<span class="dv">252</span>)</span>
+<span id="cb14-10"><a href=""></a>    sharpe <span class="op">=</span> (r.mean()<span class="op">*</span><span class="dv">252</span>)<span class="op">/</span>vol <span class="cf">if</span> vol<span class="op">&gt;</span><span class="dv">0</span> <span class="cf">else</span> np.nan</span>
+<span id="cb14-11"><a href=""></a>    mdd    <span class="op">=</span> ((cum<span class="op">-</span>cum.cummax())<span class="op">/</span>cum.cummax()).<span class="bu">min</span>()</span>
+<span id="cb14-12"><a href=""></a>    dn     <span class="op">=</span> r[r<span class="op">&lt;</span><span class="dv">0</span>].std()<span class="op">*</span>np.sqrt(<span class="dv">252</span>)</span>
+<span id="cb14-13"><a href=""></a>    sortino<span class="op">=</span> (r.mean()<span class="op">*</span><span class="dv">252</span>)<span class="op">/</span>dn <span class="cf">if</span> dn<span class="op">&gt;</span><span class="dv">0</span> <span class="cf">else</span> np.nan</span>
+<span id="cb14-14"><a href=""></a>    <span class="cf">return</span> {<span class="st">'策略'</span>:label,<span class="st">'CAGR(%)'</span>:<span class="bu">round</span>(cagr<span class="op">*</span><span class="dv">100</span>,<span class="dv">2</span>),</span>
+<span id="cb14-15"><a href=""></a>            <span class="st">'年化波動(%)'</span>:<span class="bu">round</span>(vol<span class="op">*</span><span class="dv">100</span>,<span class="dv">2</span>),</span>
+<span id="cb14-16"><a href=""></a>            <span class="st">'Sharpe'</span>:<span class="bu">round</span>(sharpe,<span class="dv">3</span>) <span class="cf">if</span> <span class="kw">not</span> np.isnan(sharpe) <span class="cf">else</span> np.nan,</span>
+<span id="cb14-17"><a href=""></a>            <span class="st">'Sortino'</span>:<span class="bu">round</span>(sortino,<span class="dv">3</span>) <span class="cf">if</span> <span class="kw">not</span> np.isnan(sortino) <span class="cf">else</span> np.nan,</span>
+<span id="cb14-18"><a href=""></a>            <span class="st">'最大回撤(%)'</span>:<span class="bu">round</span>(mdd<span class="op">*</span><span class="dv">100</span>,<span class="dv">2</span>),</span>
+<span id="cb14-19"><a href=""></a>            <span class="st">'勝率(%)'</span>:<span class="bu">round</span>((r<span class="op">&gt;</span><span class="dv">0</span>).mean()<span class="op">*</span><span class="dv">100</span>,<span class="dv">2</span>),</span>
+<span id="cb14-20"><a href=""></a>            <span class="st">'總報酬(%)'</span>:<span class="bu">round</span>(tot<span class="op">*</span><span class="dv">100</span>,<span class="dv">2</span>)}</span>
+<span id="cb14-21"><a href=""></a></span>
+<span id="cb14-22"><a href=""></a>strat_ret <span class="op">=</span> {}</span>
+<span id="cb14-23"><a href=""></a><span class="cf">for</span> n <span class="kw">in</span> TOP_N_PAIRS:</span>
+<span id="cb14-24"><a href=""></a>    df <span class="op">=</span> all_pnl[n]</span>
+<span id="cb14-25"><a href=""></a>    <span class="cf">if</span> df.empty: <span class="cf">continue</span></span>
+<span id="cb14-26"><a href=""></a>    combined <span class="op">=</span> df.<span class="bu">sum</span>(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb14-27"><a href=""></a>    aw <span class="op">=</span> (df<span class="op">!=</span><span class="dv">0</span>).<span class="bu">any</span>(axis<span class="op">=</span><span class="dv">0</span>).<span class="bu">sum</span>()</span>
+<span id="cb14-28"><a href=""></a>    <span class="cf">if</span> aw<span class="op">&gt;</span><span class="dv">0</span>: combined <span class="op">/=</span> aw</span>
+<span id="cb14-29"><a href=""></a>    strat_ret[<span class="ss">f'Top-</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">'</span>] <span class="op">=</span> combined</span>
+<span id="cb14-30"><a href=""></a>strat_ret[<span class="st">'S&amp;P500(EW)'</span>] <span class="op">=</span> price_pivot.pct_change().mean(axis<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb14-31"><a href=""></a></span>
+<span id="cb14-32"><a href=""></a>metrics_df <span class="op">=</span> pd.DataFrame(</span>
+<span id="cb14-33"><a href=""></a>    [m <span class="cf">for</span> lbl,r <span class="kw">in</span> strat_ret.items() <span class="cf">for</span> m <span class="kw">in</span> [compute_metrics(r,lbl)] <span class="cf">if</span> m]</span>
+<span id="cb14-34"><a href=""></a>).set_index(<span class="st">'策略'</span>)</span>
+<span id="cb14-35"><a href=""></a>display(metrics_df.style.background_gradient(cmap<span class="op">=</span><span class="st">'RdYlGn'</span>,axis<span class="op">=</span><span class="dv">0</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<style type="text/css">
+#T_f431a_row0_col0, #T_f431a_row0_col6, #T_f431a_row1_col0, #T_f431a_row1_col6, #T_f431a_row2_col0, #T_f431a_row2_col6 {
+  background-color: #000000;
+  color: #f1f1f1;
+}
+#T_f431a_row0_col1, #T_f431a_row0_col3, #T_f431a_row1_col1, #T_f431a_row1_col2, #T_f431a_row1_col3, #T_f431a_row1_col5, #T_f431a_row2_col4 {
+  background-color: #a50026;
+  color: #f1f1f1;
+}
+#T_f431a_row0_col2 {
+  background-color: #ea5739;
+  color: #f1f1f1;
+}
+#T_f431a_row0_col4 {
+  background-color: #0c7f43;
+  color: #f1f1f1;
+}
+#T_f431a_row0_col5 {
+  background-color: #be1827;
+  color: #f1f1f1;
+}
+#T_f431a_row1_col4, #T_f431a_row2_col1, #T_f431a_row2_col2, #T_f431a_row2_col3, #T_f431a_row2_col5 {
+  background-color: #006837;
+  color: #f1f1f1;
+}
+</style>
+
+<table id="T_f431a" class="caption-top">
+<thead>
+<tr class="header">
+<th class="blank level0" data-quarto-table-cell-role="th">&nbsp;</th>
+<th id="T_f431a_level0_col0" class="col_heading level0 col0" data-quarto-table-cell-role="th">CAGR(%)</th>
+<th id="T_f431a_level0_col1" class="col_heading level0 col1" data-quarto-table-cell-role="th">年化波動(%)</th>
+<th id="T_f431a_level0_col2" class="col_heading level0 col2" data-quarto-table-cell-role="th">Sharpe</th>
+<th id="T_f431a_level0_col3" class="col_heading level0 col3" data-quarto-table-cell-role="th">Sortino</th>
+<th id="T_f431a_level0_col4" class="col_heading level0 col4" data-quarto-table-cell-role="th">最大回撤(%)</th>
+<th id="T_f431a_level0_col5" class="col_heading level0 col5" data-quarto-table-cell-role="th">勝率(%)</th>
+<th id="T_f431a_level0_col6" class="col_heading level0 col6" data-quarto-table-cell-role="th">總報酬(%)</th>
+</tr>
+<tr class="even">
+<th class="index_name level0" data-quarto-table-cell-role="th">策略</th>
+<th class="blank col0" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col1" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col2" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col3" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col4" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col5" data-quarto-table-cell-role="th">&nbsp;</th>
+<th class="blank col6" data-quarto-table-cell-role="th">&nbsp;</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th id="T_f431a_level0_row0" class="row_heading level0 row0" data-quarto-table-cell-role="th">Top-5</th>
+<td id="T_f431a_row0_col0" class="data row0 col0">-0.710000</td>
+<td id="T_f431a_row0_col1" class="data row0 col1">0.130000</td>
+<td id="T_f431a_row0_col2" class="data row0 col2">-5.483000</td>
+<td id="T_f431a_row0_col3" class="data row0 col3">-7.105000</td>
+<td id="T_f431a_row0_col4" class="data row0 col4">-17.140000</td>
+<td id="T_f431a_row0_col5" class="data row0 col5">26.990000</td>
+<td id="T_f431a_row0_col6" class="data row0 col6">-16.890000</td>
+</tr>
+<tr class="even">
+<th id="T_f431a_level0_row1" class="row_heading level0 row1" data-quarto-table-cell-role="th">Top-20</th>
+<td id="T_f431a_row1_col0" class="data row1 col0">-0.680000</td>
+<td id="T_f431a_row1_col1" class="data row1 col1">0.100000</td>
+<td id="T_f431a_row1_col2" class="data row1 col2">-7.052000</td>
+<td id="T_f431a_row1_col3" class="data row1 col3">-9.619000</td>
+<td id="T_f431a_row1_col4" class="data row1 col4">-16.280000</td>
+<td id="T_f431a_row1_col5" class="data row1 col5">25.250000</td>
+<td id="T_f431a_row1_col6" class="data row1 col6">-16.270000</td>
+</tr>
+<tr class="odd">
+<th id="T_f431a_level0_row2" class="row_heading level0 row2" data-quarto-table-cell-role="th">S&amp;P500(EW)</th>
+<td id="T_f431a_row2_col0" class="data row2 col0">inf</td>
+<td id="T_f431a_row2_col1" class="data row2 col1">7884.160000</td>
+<td id="T_f431a_row2_col2" class="data row2 col2">2.450000</td>
+<td id="T_f431a_row2_col3" class="data row2 col3">1202.526000</td>
+<td id="T_f431a_row2_col4" class="data row2 col4">-34.610000</td>
+<td id="T_f431a_row2_col5" class="data row2 col5">58.170000</td>
+<td id="T_f431a_row2_col6" class="data row2 col6">inf</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<section id="累積-nav-曲線與回撤圖" class="slide level3">
+<h3>累積 NAV 曲線與回撤圖</h3>
+<div id="5f004676" class="cell" data-execution_count="22">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href=""></a>COLORS <span class="op">=</span> px.colors.qualitative.Plotly</span>
+<span id="cb15-2"><a href=""></a>fig_p <span class="op">=</span> make_subplots(rows<span class="op">=</span><span class="dv">2</span>,cols<span class="op">=</span><span class="dv">1</span>,shared_xaxes<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb15-3"><a href=""></a>    row_heights<span class="op">=</span>[<span class="fl">0.65</span>,<span class="fl">0.35</span>],</span>
+<span id="cb15-4"><a href=""></a>    subplot_titles<span class="op">=</span>[<span class="st">'累積淨値（NAV）曲線'</span>,<span class="st">'歷史回撤（Drawdown%）'</span>],</span>
+<span id="cb15-5"><a href=""></a>    vertical_spacing<span class="op">=</span><span class="fl">0.08</span>)</span>
+<span id="cb15-6"><a href=""></a><span class="cf">for</span> i,(lbl,ret) <span class="kw">in</span> <span class="bu">enumerate</span>(strat_ret.items()):</span>
+<span id="cb15-7"><a href=""></a>    r<span class="op">=</span>ret.dropna()<span class="op">;</span> nav<span class="op">=</span>(<span class="dv">1</span><span class="op">+</span>r).cumprod()</span>
+<span id="cb15-8"><a href=""></a>    dd<span class="op">=</span>((nav<span class="op">-</span>nav.cummax())<span class="op">/</span>nav.cummax())<span class="op">*</span><span class="dv">100</span></span>
+<span id="cb15-9"><a href=""></a>    c<span class="op">=</span>COLORS[i<span class="op">%</span><span class="bu">len</span>(COLORS)]</span>
+<span id="cb15-10"><a href=""></a>    fig_p.add_trace(go.Scatter(x<span class="op">=</span>nav.index,y<span class="op">=</span>nav.values,name<span class="op">=</span>lbl,</span>
+<span id="cb15-11"><a href=""></a>        line<span class="op">=</span><span class="bu">dict</span>(color<span class="op">=</span>c,width<span class="op">=</span><span class="dv">2</span>),</span>
+<span id="cb15-12"><a href=""></a>        hovertemplate<span class="op">=</span><span class="ss">f'%</span><span class="ch">{{</span><span class="ss">x|%Y-%m-%d</span><span class="ch">}}</span><span class="ss">&lt;br&gt;NAV:%</span><span class="ch">{{</span><span class="ss">y:.4f</span><span class="ch">}}</span><span class="ss">&lt;extra&gt;</span><span class="sc">{</span>lbl<span class="sc">}</span><span class="ss">&lt;/extra&gt;'</span>),row<span class="op">=</span><span class="dv">1</span>,col<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb15-13"><a href=""></a>    fig_p.add_trace(go.Scatter(x<span class="op">=</span>dd.index,y<span class="op">=</span>dd.values,name<span class="op">=</span>lbl,showlegend<span class="op">=</span><span class="va">False</span>,</span>
+<span id="cb15-14"><a href=""></a>        fill<span class="op">=</span><span class="st">'tozeroy'</span>,line<span class="op">=</span><span class="bu">dict</span>(color<span class="op">=</span>c,width<span class="op">=</span><span class="dv">1</span>),</span>
+<span id="cb15-15"><a href=""></a>        hovertemplate<span class="op">=</span><span class="ss">f'%</span><span class="ch">{{</span><span class="ss">x|%Y-%m-%d</span><span class="ch">}}</span><span class="ss">&lt;br&gt;DD:%</span><span class="ch">{{</span><span class="ss">y:.2f</span><span class="ch">}}</span><span class="ss">%&lt;extra&gt;</span><span class="sc">{</span>lbl<span class="sc">}</span><span class="ss">&lt;/extra&gt;'</span>),row<span class="op">=</span><span class="dv">2</span>,col<span class="op">=</span><span class="dv">1</span>)</span>
+<span id="cb15-16"><a href=""></a>fig_p.update_layout(title<span class="op">=</span><span class="st">'配對交易策略績效對比'</span>,height<span class="op">=</span><span class="dv">650</span>,template<span class="op">=</span><span class="st">'plotly_dark'</span>,</span>
+<span id="cb15-17"><a href=""></a>    hovermode<span class="op">=</span><span class="st">'x unified'</span>,legend<span class="op">=</span><span class="bu">dict</span>(orientation<span class="op">=</span><span class="st">'h'</span>,y<span class="op">=</span><span class="fl">1.02</span>,x<span class="op">=</span><span class="dv">1</span>,xanchor<span class="op">=</span><span class="st">'right'</span>))</span>
+<span id="cb15-18"><a href=""></a>fig_p.show()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-display">
+<pre><code>Unable to display output for mime type(s): application/vnd.plotly.v1+json</code></pre>
+</div>
+</div>
+</section>
+<section id="top-5-vs-top-20-統計表仿-gatev-2006" class="slide level3">
+<h3>Top-5 vs Top-20 統計表（仿 Gatev 2006）</h3>
+<div id="f77fa6db" class="cell" data-execution_count="23">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href=""></a>rows_d<span class="op">=</span>[]</span>
+<span id="cb17-2"><a href=""></a><span class="cf">for</span> rec <span class="kw">in</span> window_records:</span>
+<span id="cb17-3"><a href=""></a>    wid<span class="op">=</span>rec[<span class="st">'window_id'</span>]<span class="op">;</span> col<span class="op">=</span><span class="ss">f'W</span><span class="sc">{</span>wid<span class="sc">:02d}</span><span class="ss">'</span></span>
+<span id="cb17-4"><a href=""></a>    row<span class="op">=</span>{<span class="st">'視窗'</span>:wid,<span class="st">'形成期起'</span>:rec[<span class="st">'form_start'</span>].date(),<span class="st">'形成期迦'</span>:rec[<span class="st">'form_end'</span>].date(),</span>
+<span id="cb17-5"><a href=""></a>         <span class="st">'交易期起'</span>:rec[<span class="st">'trade_start'</span>].date(),<span class="st">'交易期迦'</span>:rec[<span class="st">'trade_end'</span>].date()}</span>
+<span id="cb17-6"><a href=""></a>    <span class="cf">for</span> n <span class="kw">in</span> TOP_N_PAIRS:</span>
+<span id="cb17-7"><a href=""></a>        df<span class="op">=</span>all_pnl.get(n,pd.DataFrame())</span>
+<span id="cb17-8"><a href=""></a>        <span class="cf">if</span> col <span class="kw">in</span> df.columns:</span>
+<span id="cb17-9"><a href=""></a>            row[<span class="ss">f'Top-</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">報酬(%)'</span>] <span class="op">=</span> <span class="bu">round</span>(df[col].<span class="bu">sum</span>()<span class="op">*</span><span class="dv">100</span>,<span class="dv">4</span>)</span>
+<span id="cb17-10"><a href=""></a>            row[<span class="ss">f'Top-</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">配對數'</span>] <span class="op">=</span> <span class="bu">len</span>(rec[<span class="st">'pairs_by_n'</span>].get(n,[]))</span>
+<span id="cb17-11"><a href=""></a>    row[<span class="st">'Top-5配對'</span>] <span class="op">=</span> <span class="st">', '</span>.join(<span class="ss">f"</span><span class="sc">{</span>p[<span class="st">'stock_a'</span>]<span class="sc">}</span><span class="ss">/</span><span class="sc">{</span>p[<span class="st">'stock_b'</span>]<span class="sc">}</span><span class="ss">"</span> <span class="cf">for</span> p <span class="kw">in</span> rec[<span class="st">'pairs_by_n'</span>].get(<span class="dv">5</span>,[])[:<span class="dv">5</span>])</span>
+<span id="cb17-12"><a href=""></a>    rows_d.append(row)</span>
+<span id="cb17-13"><a href=""></a>cmp_df <span class="op">=</span> pd.DataFrame([compute_metrics(strat_ret.get(<span class="ss">f'Top-</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">'</span>,pd.Series()),<span class="ss">f'Top-</span><span class="sc">{</span>n<span class="sc">}</span><span class="ss">'</span>) <span class="cf">for</span> n <span class="kw">in</span> TOP_N_PAIRS]).set_index(<span class="st">'策略'</span>)</span>
+<span id="cb17-14"><a href=""></a><span class="bu">print</span>(<span class="st">'</span><span class="ch">\n</span><span class="st">=== Top-N Portfolio Comparison ==='</span>)</span>
+<span id="cb17-15"><a href=""></a>display(cmp_df)</span>
+<span id="cb17-16"><a href=""></a>display(pd.DataFrame(rows_d))</span>
+<span id="cb17-17"><a href=""></a></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+=== Top-N Portfolio Comparison ===</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">CAGR(%)</th>
+<th data-quarto-table-cell-role="th">年化波動(%)</th>
+<th data-quarto-table-cell-role="th">Sharpe</th>
+<th data-quarto-table-cell-role="th">Sortino</th>
+<th data-quarto-table-cell-role="th">最大回撤(%)</th>
+<th data-quarto-table-cell-role="th">勝率(%)</th>
+<th data-quarto-table-cell-role="th">總報酬(%)</th>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">策略</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">Top-5</th>
+<td>-0.7100</td>
+<td>0.1300</td>
+<td>-5.4830</td>
+<td>-7.1050</td>
+<td>-17.1400</td>
+<td>26.9900</td>
+<td>-16.8900</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">Top-20</th>
+<td>-0.6800</td>
+<td>0.1000</td>
+<td>-7.0520</td>
+<td>-9.6190</td>
+<td>-16.2800</td>
+<td>25.2500</td>
+<td>-16.2700</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+
+<table class="dataframe caption-top" data-border="1">
+<thead>
+<tr class="header" style="text-align: right;">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">視窗</th>
+<th data-quarto-table-cell-role="th">形成期起</th>
+<th data-quarto-table-cell-role="th">形成期迦</th>
+<th data-quarto-table-cell-role="th">交易期起</th>
+<th data-quarto-table-cell-role="th">交易期迦</th>
+<th data-quarto-table-cell-role="th">Top-5報酬(%)</th>
+<th data-quarto-table-cell-role="th">Top-5配對數</th>
+<th data-quarto-table-cell-role="th">Top-20報酬(%)</th>
+<th data-quarto-table-cell-role="th">Top-20配對數</th>
+<th data-quarto-table-cell-role="th">Top-5配對</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>0</td>
+<td>2000-01-03</td>
+<td>2000-12-29</td>
+<td>2001-01-02</td>
+<td>2001-07-02</td>
+<td>-6.3941</td>
+<td>5</td>
+<td>-14.3212</td>
+<td>20</td>
+<td>AVB/BXP, ARE/CPT, ARE/REG, ITW/UPS, PLD/REG</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>1</td>
+<td>2000-07-03</td>
+<td>2001-07-02</td>
+<td>2001-07-03</td>
+<td>2002-01-07</td>
+<td>14.6736</td>
+<td>5</td>
+<td>-0.3191</td>
+<td>20</td>
+<td>HUBB/ITW, ARE/EQR, BF-B/KR, AFL/CB, BWA/SIG</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>2</td>
+<td>2001-01-02</td>
+<td>2002-01-07</td>
+<td>2002-01-08</td>
+<td>2002-07-09</td>
+<td>-25.6674</td>
+<td>5</td>
+<td>-21.1682</td>
+<td>20</td>
+<td>ARE/KIM, ARE/REG, D/DUK, NDSN/UPS, AXP/NTRS</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">3</th>
+<td>3</td>
+<td>2001-07-03</td>
+<td>2002-07-09</td>
+<td>2002-07-10</td>
+<td>2003-01-07</td>
+<td>-37.9774</td>
+<td>5</td>
+<td>-22.7682</td>
+<td>20</td>
+<td>ES/PEG, HIG/SPGI, ARE/O, ARE/SPG, CVX/TPL</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">4</th>
+<td>4</td>
+<td>2002-01-08</td>
+<td>2003-01-07</td>
+<td>2003-01-08</td>
+<td>2003-07-09</td>
+<td>-9.6284</td>
+<td>5</td>
+<td>-13.0933</td>
+<td>20</td>
+<td>HBAN/MTB, DTE/ETR, APD/PKG, KEY/MTB, CPT/EQR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">5</th>
+<td>5</td>
+<td>2002-07-10</td>
+<td>2003-07-09</td>
+<td>2003-07-10</td>
+<td>2004-01-07</td>
+<td>-10.0097</td>
+<td>5</td>
+<td>-13.7371</td>
+<td>20</td>
+<td>CPT/EQR, FRT/KIM, UNP/UPS, EXC/NEE, HBAN/PFG</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">6</th>
+<td>6</td>
+<td>2003-01-08</td>
+<td>2004-01-07</td>
+<td>2004-01-08</td>
+<td>2004-07-09</td>
+<td>-42.4404</td>
+<td>5</td>
+<td>-25.1031</td>
+<td>20</td>
+<td>HBAN/MTB, FRT/SPG, EMR/ITW, HBAN/SPGI, MTB/SPGI</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">7</th>
+<td>7</td>
+<td>2003-07-10</td>
+<td>2004-07-09</td>
+<td>2004-07-12</td>
+<td>2005-01-06</td>
+<td>-19.3777</td>
+<td>5</td>
+<td>-14.3084</td>
+<td>20</td>
+<td>NEE/SO, C/EG, CLX/PG, KIM/REG, NI/SO</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">8</th>
+<td>8</td>
+<td>2004-01-08</td>
+<td>2005-01-06</td>
+<td>2005-01-07</td>
+<td>2005-07-08</td>
+<td>-10.1605</td>
+<td>5</td>
+<td>-13.6458</td>
+<td>20</td>
+<td>BXP/KIM, AEP/ATO, NI/XEL, FRT/REG, BXP/REG</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">9</th>
+<td>9</td>
+<td>2004-07-12</td>
+<td>2005-07-08</td>
+<td>2005-07-11</td>
+<td>2006-01-06</td>
+<td>-5.1809</td>
+<td>5</td>
+<td>-5.6367</td>
+<td>20</td>
+<td>ARE/KIM, FRT/SPG, CCL/NKE, BAC/KEY, KO/TSN</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">10</th>
+<td>10</td>
+<td>2005-01-07</td>
+<td>2006-01-06</td>
+<td>2006-01-09</td>
+<td>2006-07-10</td>
+<td>-0.2607</td>
+<td>5</td>
+<td>-7.4319</td>
+<td>20</td>
+<td>GOOG/GOOGL, EQR/ESS, AVB/MAA, GL/JPM, AXP/SPGI</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">11</th>
+<td>11</td>
+<td>2005-07-11</td>
+<td>2006-07-10</td>
+<td>2006-07-11</td>
+<td>2007-01-09</td>
+<td>-6.3495</td>
+<td>5</td>
+<td>-13.3182</td>
+<td>20</td>
+<td>GOOG/GOOGL, MTB/WFC, USB/WFC, EQR/MAA, EQR/FRT</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">12</th>
+<td>12</td>
+<td>2006-01-09</td>
+<td>2007-01-09</td>
+<td>2007-01-10</td>
+<td>2007-07-11</td>
+<td>-18.6617</td>
+<td>5</td>
+<td>-16.8752</td>
+<td>20</td>
+<td>GOOG/GOOGL, FISV/TRV, AME/MMM, LNC/NWL, EMR/HON</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">13</th>
+<td>13</td>
+<td>2006-07-11</td>
+<td>2007-07-11</td>
+<td>2007-07-12</td>
+<td>2008-01-09</td>
+<td>-31.7155</td>
+<td>5</td>
+<td>-28.2382</td>
+<td>20</td>
+<td>GOOG/GOOGL, AIZ/CB, MKC/PG, HPQ/IBM, AJG/BRK-B</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">14</th>
+<td>14</td>
+<td>2007-01-10</td>
+<td>2008-01-09</td>
+<td>2008-01-10</td>
+<td>2008-07-10</td>
+<td>-19.4075</td>
+<td>5</td>
+<td>-24.8109</td>
+<td>20</td>
+<td>GOOG/GOOGL, CMS/CNP, AJG/WFC, ACGL/EG, VTR/WELL</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">15</th>
+<td>15</td>
+<td>2007-07-12</td>
+<td>2008-07-10</td>
+<td>2008-07-11</td>
+<td>2009-01-08</td>
+<td>-28.8147</td>
+<td>5</td>
+<td>-27.4483</td>
+<td>20</td>
+<td>GOOG/GOOGL, DUK/XEL, EQR/UDR, D/PPL, AEP/LNT</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">16</th>
+<td>16</td>
+<td>2008-01-10</td>
+<td>2009-01-08</td>
+<td>2009-01-09</td>
+<td>2009-07-10</td>
+<td>-19.5926</td>
+<td>5</td>
+<td>-7.8980</td>
+<td>20</td>
+<td>GOOG/GOOGL, EVRG/XEL, ATO/WEC, HUBB/RTX, AEE/AEP</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">17</th>
+<td>17</td>
+<td>2008-07-11</td>
+<td>2009-07-10</td>
+<td>2009-07-13</td>
+<td>2010-01-08</td>
+<td>-28.6394</td>
+<td>5</td>
+<td>-23.7114</td>
+<td>20</td>
+<td>GOOG/GOOGL, AVB/CPT, BKR/HAL, CBE/TWX, PNR/SWK</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">18</th>
+<td>18</td>
+<td>2009-01-09</td>
+<td>2010-01-08</td>
+<td>2010-01-11</td>
+<td>2010-07-12</td>
+<td>-15.7478</td>
+<td>5</td>
+<td>-7.6092</td>
+<td>20</td>
+<td>GOOG/GOOGL, EIX/EVRG, AEP/ES, AWK/ES, AEP/AWK</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">19</th>
+<td>19</td>
+<td>2009-07-13</td>
+<td>2010-07-12</td>
+<td>2010-07-13</td>
+<td>2011-01-07</td>
+<td>-23.7363</td>
+<td>5</td>
+<td>-19.0925</td>
+<td>20</td>
+<td>GOOG/GOOGL, CMS/PNW, CMS/CNP, AJG/WRB, BDX/JNJ</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">20</th>
+<td>20</td>
+<td>2010-01-11</td>
+<td>2011-01-07</td>
+<td>2011-01-10</td>
+<td>2011-07-11</td>
+<td>-0.9655</td>
+<td>5</td>
+<td>-21.6468</td>
+<td>20</td>
+<td>GOOG/GOOGL, EVRG/SO, DUK/ED, LNT/NI, EVRG/LNT</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">21</th>
+<td>21</td>
+<td>2010-07-13</td>
+<td>2011-07-11</td>
+<td>2011-07-12</td>
+<td>2012-01-09</td>
+<td>-20.0491</td>
+<td>5</td>
+<td>-14.0493</td>
+<td>20</td>
+<td>GOOG/GOOGL, SO/WEC, DUK/PNW, DUK/ED, WEC/XEL</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">22</th>
+<td>22</td>
+<td>2011-01-10</td>
+<td>2012-01-09</td>
+<td>2012-01-10</td>
+<td>2012-07-10</td>
+<td>-15.5286</td>
+<td>5</td>
+<td>-13.2387</td>
+<td>20</td>
+<td>GOOG/GOOGL, LNT/PNW, CMS/XEL, KIM/REG, ARE/KIM</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">23</th>
+<td>23</td>
+<td>2011-07-12</td>
+<td>2012-07-10</td>
+<td>2012-07-11</td>
+<td>2013-01-10</td>
+<td>-26.6921</td>
+<td>5</td>
+<td>-20.3909</td>
+<td>20</td>
+<td>GOOG/GOOGL, AVB/ESS, DUK/SO, PNW/XEL, CAH/COR</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">24</th>
+<td>24</td>
+<td>2012-01-10</td>
+<td>2013-01-10</td>
+<td>2013-01-11</td>
+<td>2013-07-12</td>
+<td>-30.4613</td>
+<td>5</td>
+<td>-20.3811</td>
+<td>20</td>
+<td>GOOG/GOOGL, AVB/MAA, PEG/XEL, AVB/ESS, ATO/PNW</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">25</th>
+<td>25</td>
+<td>2012-07-11</td>
+<td>2013-07-12</td>
+<td>2013-07-15</td>
+<td>2014-01-10</td>
+<td>-23.2476</td>
+<td>5</td>
+<td>-12.5905</td>
+<td>20</td>
+<td>GOOG/GOOGL, D/EVRG, IEX/PCAR, AXP/GL, MET/PRU</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">26</th>
+<td>26</td>
+<td>2013-01-11</td>
+<td>2014-01-10</td>
+<td>2014-01-13</td>
+<td>2014-07-14</td>
+<td>-30.0052</td>
+<td>5</td>
+<td>-18.0491</td>
+<td>20</td>
+<td>GOOG/GOOGL, DTE/WEC, BF-B/WMT, AMT/WY, HON/PAYX</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">27</th>
+<td>27</td>
+<td>2013-07-15</td>
+<td>2014-07-14</td>
+<td>2014-07-15</td>
+<td>2015-01-12</td>
+<td>-9.5514</td>
+<td>5</td>
+<td>-18.0846</td>
+<td>20</td>
+<td>PG/WMT, CMS/XEL, AWK/LNT, ESS/UDR, ESS/MAA</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">28</th>
+<td>28</td>
+<td>2014-01-13</td>
+<td>2015-01-12</td>
+<td>2015-01-13</td>
+<td>2015-07-14</td>
+<td>-5.8074</td>
+<td>5</td>
+<td>-10.0038</td>
+<td>20</td>
+<td>CMS/XEL, ITW/MMM, AEP/PCG, DUK/ED, JPM/RJF</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">29</th>
+<td>29</td>
+<td>2014-07-15</td>
+<td>2015-07-14</td>
+<td>2015-07-15</td>
+<td>2016-01-12</td>
+<td>-15.7650</td>
+<td>5</td>
+<td>-15.5325</td>
+<td>20</td>
+<td>ES/WEC, ATO/NEE, HSY/WMT, PNW/WEC, ES/PNW</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">30</th>
+<td>30</td>
+<td>2015-01-13</td>
+<td>2016-01-12</td>
+<td>2016-01-13</td>
+<td>2016-07-13</td>
+<td>-30.5838</td>
+<td>5</td>
+<td>-27.6861</td>
+<td>20</td>
+<td>CMS/XEL, AEP/SO, EQR/FRT, ES/PCG, AJG/STT</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">31</th>
+<td>31</td>
+<td>2015-07-15</td>
+<td>2016-07-13</td>
+<td>2016-07-14</td>
+<td>2017-01-11</td>
+<td>-18.5858</td>
+<td>5</td>
+<td>-22.5907</td>
+<td>20</td>
+<td>CMS/XEL, AON/BRO, CME/L, ALLE/CTAS, BK/MTB</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">32</th>
+<td>32</td>
+<td>2016-01-13</td>
+<td>2017-01-11</td>
+<td>2017-01-12</td>
+<td>2017-07-13</td>
+<td>-28.1542</td>
+<td>5</td>
+<td>-16.4370</td>
+<td>20</td>
+<td>DUK/ED, CMS/XEL, BAC/CFG, EXPD/UPS, PFE/RVTY</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">33</th>
+<td>33</td>
+<td>2016-07-14</td>
+<td>2017-07-13</td>
+<td>2017-07-14</td>
+<td>2018-01-11</td>
+<td>-21.8678</td>
+<td>5</td>
+<td>-24.5004</td>
+<td>20</td>
+<td>CMS/PPL, CMS/XEL, CMS/LNT, AEP/ED, ATO/PPL</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">34</th>
+<td>34</td>
+<td>2017-01-12</td>
+<td>2018-01-11</td>
+<td>2018-01-12</td>
+<td>2018-07-13</td>
+<td>-14.7121</td>
+<td>5</td>
+<td>-21.9407</td>
+<td>20</td>
+<td>PNW/SRE, MS/PNC, JNJ/SYK, MCO/MSCI, ROK/SWK</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">35</th>
+<td>35</td>
+<td>2017-07-14</td>
+<td>2018-07-13</td>
+<td>2018-07-16</td>
+<td>2019-01-14</td>
+<td>-14.9402</td>
+<td>5</td>
+<td>-13.3035</td>
+<td>20</td>
+<td>NWS/NWSA, DTE/XEL, COST/SYY, DLR/MAA, FITB/JPM</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">36</th>
+<td>36</td>
+<td>2018-01-12</td>
+<td>2019-01-14</td>
+<td>2019-01-15</td>
+<td>2019-07-16</td>
+<td>-24.3587</td>
+<td>5</td>
+<td>-21.8359</td>
+<td>20</td>
+<td>CPT/MAA, AEP/XEL, AEP/DUK, AWK/CMS, ARE/BXP</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">37</th>
+<td>37</td>
+<td>2018-07-16</td>
+<td>2019-07-16</td>
+<td>2019-07-17</td>
+<td>2020-01-14</td>
+<td>-20.6916</td>
+<td>5</td>
+<td>-28.2203</td>
+<td>20</td>
+<td>CMS/FE, ATO/LNT, DTE/FE, ED/NI, CB/FIS</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">38</th>
+<td>38</td>
+<td>2019-01-15</td>
+<td>2020-01-14</td>
+<td>2020-01-15</td>
+<td>2020-07-15</td>
+<td>-21.7691</td>
+<td>5</td>
+<td>-19.4051</td>
+<td>20</td>
+<td>NWS/NWSA, UA/UAA, NEE/SO, CBOE/ICE, RF/WFC</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">39</th>
+<td>39</td>
+<td>2019-07-17</td>
+<td>2020-07-15</td>
+<td>2020-07-16</td>
+<td>2021-01-13</td>
+<td>-9.5501</td>
+<td>5</td>
+<td>-12.7919</td>
+<td>20</td>
+<td>NWS/NWSA, RF/TFC, FIS/MA, NI/PNW, MA/MRSH</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">40</th>
+<td>40</td>
+<td>2020-01-15</td>
+<td>2021-01-13</td>
+<td>2021-01-14</td>
+<td>2021-07-15</td>
+<td>-15.1322</td>
+<td>5</td>
+<td>-12.4481</td>
+<td>20</td>
+<td>DHR/TMO, AZO/ORLY, IEX/UNP, AEP/PNW, DOV/SNA</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">41</th>
+<td>41</td>
+<td>2020-07-16</td>
+<td>2021-07-15</td>
+<td>2021-07-16</td>
+<td>2022-01-12</td>
+<td>-14.7627</td>
+<td>5</td>
+<td>-16.3293</td>
+<td>20</td>
+<td>AMGN/BAX, ROP/VRSN, LHX/WM, PEG/SO, IEX/UNP</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">42</th>
+<td>42</td>
+<td>2021-01-14</td>
+<td>2022-01-12</td>
+<td>2022-01-13</td>
+<td>2022-07-15</td>
+<td>-15.1645</td>
+<td>5</td>
+<td>-22.2709</td>
+<td>20</td>
+<td>AFL/BRK-B, D/WEC, AME/ITW, D/SO, EME/J</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">43</th>
+<td>43</td>
+<td>2021-07-16</td>
+<td>2022-07-15</td>
+<td>2022-07-18</td>
+<td>2023-01-13</td>
+<td>-29.4665</td>
+<td>5</td>
+<td>-24.5649</td>
+<td>20</td>
+<td>ACGL/CB, GOOG/GOOGL, AEE/ETR, JCI/ROK, NDAQ/SPGI</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">44</th>
+<td>44</td>
+<td>2022-01-13</td>
+<td>2023-01-13</td>
+<td>2023-01-17</td>
+<td>2023-07-18</td>
+<td>-32.5465</td>
+<td>5</td>
+<td>-28.2974</td>
+<td>20</td>
+<td>GOOG/GOOGL, NWS/NWSA, CPT/UDR, NTRS/USB, HD/NVR</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">45</th>
+<td>45</td>
+<td>2022-07-18</td>
+<td>2023-07-18</td>
+<td>2023-07-19</td>
+<td>2024-01-17</td>
+<td>-11.5267</td>
+<td>5</td>
+<td>-18.0909</td>
+<td>20</td>
+<td>SYF/WFC, PAYX/UNP, INCY/WAT, CE/QRVO, ICE/MCO</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">46</th>
+<td>46</td>
+<td>2023-01-17</td>
+<td>2024-01-17</td>
+<td>2024-01-18</td>
+<td>2024-07-18</td>
+<td>-22.0808</td>
+<td>5</td>
+<td>-15.7601</td>
+<td>20</td>
+<td>CNP/LNT, MCO/SPGI, EXPD/SNA, AOS/FAST, EW/ZBH</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">47</th>
+<td>47</td>
+<td>2023-07-19</td>
+<td>2024-07-18</td>
+<td>2024-07-19</td>
+<td>2025-01-17</td>
+<td>-25.5841</td>
+<td>5</td>
+<td>-24.9627</td>
+<td>20</td>
+<td>CMS/FE, CTRA/EXE, BRK-B/CINF, CMS/PPL, FE/PPL</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">48</th>
+<td>48</td>
+<td>2024-01-18</td>
+<td>2025-01-17</td>
+<td>2025-01-21</td>
+<td>2025-07-22</td>
+<td>-12.0153</td>
+<td>5</td>
+<td>-13.8745</td>
+<td>20</td>
+<td>CPT/EQR, CINF/NDAQ, KEY/RF, AJG/MCO, NDAQ/PNC</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+
+</section></section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="pt_step1_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="pt_step1_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="pt_step1_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="pt_step1_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': true,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'c/t',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1050,
+
+        height: 700,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>

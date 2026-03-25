@@ -1,1 +1,0 @@
-quarto render main_s.ipynb --to revealjs

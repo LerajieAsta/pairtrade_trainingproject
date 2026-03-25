@@ -33,3 +33,5 @@ shap>=0.44.0                # 模型解釋性 (SHAP Values)
 # 量化回測
 dtaidistance
 vectorbt>=0.25.0            # 高效向量化回測引擎
+
+SQLAlchemy

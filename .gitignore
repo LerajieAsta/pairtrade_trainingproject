@@ -34,3 +34,6 @@ Project/
 
 # Agents
 .agents/
+
+# Databases
+*.db
