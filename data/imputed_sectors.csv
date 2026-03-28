@@ -1,0 +1,341 @@
+ticker,sector
+DAY,Technology
+MHK,Consumer Cyclical
+LKQ,Consumer Cyclical
+SOLS,Basic Materials
+K,Unknown
+IPG,Unknown
+EMN,Basic Materials
+KMX,Consumer Cyclical
+ENPH,Technology
+CZR,Consumer Cyclical
+MKTX,Financial Services
+WBA,Unknown
+HES,Unknown
+ANSS,Unknown
+JNPR,Unknown
+DFS,Unknown
+BWA,Consumer Cyclical
+TFX,Healthcare
+CE,Basic Materials
+FMC,Basic Materials
+QRVO,Technology
+AMTM,Industrials
+CTLT,Unknown
+MRO,Unknown
+BBWI,Consumer Cyclical
+AAL,Industrials
+ETSY,Consumer Cyclical
+BIO,Healthcare
+RHI,Industrials
+CMA,Financial Services
+ILMN,Healthcare
+PXD,Unknown
+XRAY,Healthcare
+VFC,Consumer Cyclical
+WHR,Consumer Cyclical
+ZION,Financial Services
+SEE,Consumer Cyclical
+ALK,Industrials
+SEDG,Technology
+OGN,Healthcare
+ATVI,Unknown
+DXC,Technology
+LNC,Financial Services
+NWL,Consumer Defensive
+AAP,Consumer Cyclical
+DISH,Unknown
+FRC,Unknown
+LUMN,Communication Services
+SBNY,Financial Services
+SIVB,Unknown
+VNO,Real Estate
+ABMD,Unknown
+FBHS,Unknown
+MBC,Consumer Cyclical
+TWTR,Unknown
+NLSN,Unknown
+CTXS,Unknown
+DRE,Unknown
+PVH,Consumer Cyclical
+PENN,Consumer Cyclical
+UA,Consumer Cyclical
+UAA,Consumer Cyclical
+IPGP,Technology
+CERN,Unknown
+DISCA,Unknown
+DISCK,Unknown
+PBCT,Unknown
+INFO,Unknown
+XLNX,Unknown
+GPS,Unknown
+LEG,Consumer Cyclical
+HBI,Unknown
+WU,Financial Services
+KSU,Unknown
+PRGO,Healthcare
+UNM,Financial Services
+NOV,Energy
+MXIM,Unknown
+ALXN,Unknown
+HFC,Unknown
+FLIR,Unknown
+VAR,Unknown
+FLS,Industrials
+SLG,Real Estate
+XRX,Industrials
+VNT,Technology
+FTI,Energy
+CXO,Unknown
+TIF,Unknown
+AIV,Real Estate
+NBL,Unknown
+ETFC,Unknown
+COTY,Consumer Defensive
+KSS,Consumer Cyclical
+HRB,Consumer Cyclical
+ADS,Unknown
+HOG,Consumer Cyclical
+JWN,Unknown
+HP,Energy
+CPRI,Consumer Cyclical
+AGN,Unknown
+RTN,Unknown
+M,Consumer Cyclical
+ARNC,Unknown
+XEC,Unknown
+WCG,Unknown
+AMG,Financial Services
+TRIP,Consumer Cyclical
+MAC,Real Estate
+STI,Industrials
+VIAB,Unknown
+CELG,Unknown
+NKTR,Healthcare
+JEF,Financial Services
+TSS,Unknown
+APC,Energy
+FL,Unknown
+RHT,Unknown
+LLL,Unknown
+BMS,Unknown
+MAT,Consumer Cyclical
+FLR,Industrials
+DWDP,Unknown
+BHF,Financial Services
+GT,Consumer Cyclical
+NFX,Unknown
+SCG,Unknown
+ESRX,Unknown
+AET,Unknown
+SRCL,Unknown
+COL,Unknown
+CA,Unknown
+EVHC,Unknown
+ANDV,Unknown
+XL,Unknown
+GGP,Unknown
+DPS,Unknown
+TWX,Unknown
+RRC,Energy
+AYI,Industrials
+MON,Unknown
+NAVI,Financial Services
+WYN,Unknown
+CSRA,Unknown
+SIG,Consumer Cyclical
+PDCO,Unknown
+CHK,Unknown
+SNI,Unknown
+BCR,Unknown
+LVLT,Unknown
+SPLS,Unknown
+WFM,Unknown
+AN,Consumer Cyclical
+RIG,Energy
+BBBY,Unknown
+MUR,Energy
+MNK,Unknown
+RAI,Unknown
+BHI,Unknown
+YHOO,Unknown
+TDC,Technology
+R,Industrials
+MJN,Unknown
+TGNA,Communication Services
+DNB,Unknown
+SWN,Unknown
+URBN,Consumer Cyclical
+FTR,Unknown
+HAR,Unknown
+LLTC,Unknown
+ENDP,Unknown
+PBI,Industrials
+SE,Consumer Cyclical
+STJ,Unknown
+LM,Unknown
+OI,Consumer Cyclical
+AA,Basic Materials
+DO,Unknown
+HOT,Unknown
+EMC,Unknown
+TYC,Unknown
+CPGX,Unknown
+GAS,Unknown
+TE,Industrials
+CVC,Unknown
+BXLT,Unknown
+CCE,Unknown
+ARG,Unknown
+TWC,Unknown
+ADT,Industrials
+GME,Consumer Cyclical
+THC,Healthcare
+CAM,Unknown
+POM,Healthcare
+ESV,Unknown
+GMCR,Unknown
+CNX,Energy
+PCL,Unknown
+BRCM,Unknown
+PCP,Unknown
+ACE,Unknown
+FOSL,Consumer Cyclical
+ALTR,Unknown
+CMCSK,Unknown
+CSC,Unknown
+SIAL,Unknown
+GNW,Financial Services
+HCBK,Unknown
+JOY,Unknown
+HSP,Unknown
+PLL,Unknown
+DTV,Unknown
+NE,Energy
+FDO,Unknown
+KRFT,Unknown
+ATI,Industrials
+TEG,Unknown
+QEP,Unknown
+LO,Unknown
+WIN,Unknown
+AVP,Unknown
+DNR,Unknown
+NBR,Energy
+CFN,Unknown
+PETM,Unknown
+SWY,Unknown
+COV,Unknown
+BTU,Energy
+GHC,Consumer Defensive
+RDC,Unknown
+X,Unknown
+FRX,Unknown
+IGT,Unknown
+LSI,Unknown
+BEAM,Healthcare
+SLM,Financial Services
+CLF,Basic Materials
+WPX,Unknown
+LIFE,Financial Services
+ANF,Consumer Cyclical
+JDSU,Unknown
+MOLX,Unknown
+JCP,Unknown
+NYX,Unknown
+SAI,Unknown
+BMC,Unknown
+S,Technology
+APOL,Unknown
+FHN,Financial Services
+HNZ,Unknown
+DF,Unknown
+CVH,Unknown
+PCS,Unknown
+BIG,Unknown
+FII,Unknown
+TIE,Unknown
+RRD,Unknown
+CBE,Unknown
+SUN,Energy
+KFT,Unknown
+ANR,Unknown
+LXK,Unknown
+DV,Communication Services
+SHLD,Unknown
+GR,Unknown
+PGN,Unknown
+SLE,Communication Services
+NVLS,Unknown
+MMI,Real Estate
+EP,Energy
+SVU,Unknown
+MHS,Unknown
+CPWR,Utilities
+TLAB,Unknown
+AKS,Unknown
+MWW,Unknown
+WFR,Unknown
+JNS,Unknown
+ITT,Industrials
+CEPH,Unknown
+NSM,Unknown
+MI,Consumer Cyclical
+RSH,Unknown
+MEE,Unknown
+NOVL,Unknown
+GENZ,Unknown
+MFE,Unknown
+AYE,Unknown
+MDP,Unknown
+KG,Financial Services
+EK,Unknown
+ODP,Unknown
+NYT,Communication Services
+PTV,Unknown
+SII,Financial Services
+MIL,Unknown
+STR,Unknown
+XTO,Unknown
+BJS,Unknown
+RX,Unknown
+DYN,Healthcare
+KBH,Consumer Cyclical
+CVG,Unknown
+MBI,Financial Services
+SGP,Unknown
+CTX,Unknown
+ACAS,Unknown
+JNY,Unknown
+WB,Communication Services
+LEH,Unknown
+FRE,Unknown
+FNM,Unknown
+CFC,Unknown
+BC,Consumer Cyclical
+OMX,Unknown
+ABK,Unknown
+TRB,Unknown
+DJ,Unknown
+AV,Unknown
+SLR,Unknown
+NCR,Unknown
+FDC,Unknown
+KSE,Unknown
+ADCT,Healthcare
+TSG,Unknown
+SBL,Unknown
+ABS,Unknown
+GLK,Unknown
+QTRN,Unknown
+BS,Unknown
+GRA,Unknown
+CCK,Consumer Cyclical
+RAD,Unknown
+TMC,Basic Materials
+SMS,Unknown
+LDW,Unknown
+HPH,Unknown
+GRN,Unknown
+USL,Unknown
+HNG,Unknown
