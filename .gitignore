@@ -37,3 +37,6 @@ Project/
 
 # Databases
 *.db
+
+# tmp
+.tmp/
