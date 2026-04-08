@@ -40,3 +40,8 @@ Project/
 
 # tmp
 .tmp/
+tmp/
+
+# user specified Custom ignored data
+ref/
+reference/
