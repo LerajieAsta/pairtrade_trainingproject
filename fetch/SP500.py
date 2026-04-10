@@ -179,7 +179,7 @@ if __name__ == "__main__":
         try:
             save_constituents_info(df_info, connection)
             # 開始下載
-            download_and_save_data(all_tickers, connection, start_date="2010-01-01")
+            download_and_save_data(all_tickers, connection, start_date="2000-01-01")
             print(f"\n任務完成！所有數據已儲存至 {db_file}")
         finally:
             connection.close()
