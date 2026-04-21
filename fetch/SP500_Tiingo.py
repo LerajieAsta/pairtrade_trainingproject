@@ -87,7 +87,7 @@ def setup_database(db_name="SP500Full.db"):
     conn.commit()
     return conn
 
-def download_and_save_data(tickers, conn, start_date="2010-01-01"):
+def download_and_save_data(tickers, conn, start_date="2010-01-01", end_date="2026-04-18"):
     """
     使用 Tiingo API 下載股價並存入資料庫 (加入斷點續傳功能)
     """
@@ -116,7 +116,8 @@ def download_and_save_data(tickers, conn, start_date="2010-01-01"):
             fetch_start = (last_date + timedelta(days=1)).strftime('%Y-%m-%d')
             
             # 若計算出來的日期已超過今天，代表已是最新，直接跳過
-            if fetch_start > datetime.today().strftime('%Y-%m-%d'):
+            # if fetch_start > datetime.today().strftime('%Y-%m-%d'):
+            if fetch_start > end_date:
                 print(f"[{i+1}/{total}] {ticker} 已經是最新的 (最後更新: {max_date_str})，跳過。")
                 continue
                 
