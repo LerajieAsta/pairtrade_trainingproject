@@ -1,1 +1,1 @@
-quarto render pt_step1.ipynb --to revealjs
+quarto render your_file.ipynb
