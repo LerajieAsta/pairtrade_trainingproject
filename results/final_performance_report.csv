@@ -1,12 +1,12 @@
 Initial Capital (USD),10000
-Final Equity (USD),10006.58
-Total PnL (USD),6.58
-Total PnL (%),0.0658
-Annualized Return (%),0.0164
-Sharpe Ratio,0.0139
-Max Drawdown (%),-2.0809
-MDD Peak Date,2020-07-01
-MDD Trough Date,2021-11-30
+Final Equity (USD),10003.53
+Total PnL (USD),3.53
+Total PnL (%),0.0353
+Annualized Return (%),0.0088
+Sharpe Ratio,0.0063
+Max Drawdown (%),-2.3599
+MDD Peak Date,2020-05-20
+MDD Trough Date,2021-08-13
 Rolling Periods,43
-Win Rate (%),27.91
+Win Rate (%),37.21
 Total Trading Days,1008
