@@ -87,13 +87,13 @@ def setup_database(db_name="SP500Full.db"):
     conn.commit()
     return conn
 
-def download_and_save_data(tickers, conn, start_date="2010-01-01", end_date="2026-04-18"):
+def download_and_save_data(tickers, conn, start_date="2000-01-01", end_date=None):
     """
-    使用 Tiingo API 下載股價並存入資料庫 (加入斷點續傳功能)
+    使用 Tiingo API 下載股價並存入資料庫。
+    同時支援「向上更新」(Forward-fill) 與「向下補償」(Backfill)。
     """
-    if TIINGO_API_KEY == "YOUR_TIINGO_API_KEY_HERE":
-        print("錯誤：請先設定 TIINGO_API_KEY")
-        return
+    if not end_date:
+        end_date = datetime.today().strftime('%Y-%m-%d')
 
     headers = {
         'Content-Type': 'application/json',
@@ -102,78 +102,78 @@ def download_and_save_data(tickers, conn, start_date="2010-01-01", end_date="202
     
     total = len(tickers)
     for i, ticker in enumerate(tickers):
-        # ==========================================
-        # 斷點續傳邏輯：檢查資料庫中該標的最新的一筆日期
-        # ==========================================
         cursor = conn.cursor()
-        cursor.execute("SELECT MAX(Date) FROM Daily_Prices WHERE Symbol=?", (ticker,))
-        row = cursor.fetchone()
-        max_date_str = row[0] if row else None
         
+        # 取得目前資料庫中的日期區間
+        cursor.execute("SELECT MIN(Date), MAX(Date) FROM Daily_Prices WHERE Symbol=?", (ticker,))
+        min_date_str, max_date_str = cursor.fetchone()
+        
+        tasks = []
+        
+        # 邏輯 A: 回溯補償 (Backfill) - 如果現存最早日期比目標 start_date 還晚
+        if min_date_str and min_date_str > start_date:
+            backfill_end = (datetime.strptime(min_date_str, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+            tasks.append((start_date, backfill_end, "回溯歷史"))
+            
+        # 邏輯 B: 向上更新 (Forward-fill) - 如果現存最晚日期比 end_date 還早
         if max_date_str:
-            # 如果已有資料，從最後日期的「隔天」開始抓取
-            last_date = datetime.strptime(max_date_str, '%Y-%m-%d')
-            fetch_start = (last_date + timedelta(days=1)).strftime('%Y-%m-%d')
-            
-            # 若計算出來的日期已超過今天，代表已是最新，直接跳過
-            # if fetch_start > datetime.today().strftime('%Y-%m-%d'):
-            if fetch_start > end_date:
-                print(f"[{i+1}/{total}] {ticker} 已經是最新的 (最後更新: {max_date_str})，跳過。")
-                continue
-                
-            print(f"[{i+1}/{total}] 正在從 Tiingo 續傳 {ticker} 的數據 (從 {fetch_start} 開始)...")
+            if max_date_str < end_date:
+                forward_start = (datetime.strptime(max_date_str, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+                if forward_start <= end_date:
+                    tasks.append((forward_start, end_date, "同步新資料"))
         else:
-            # 資料庫沒資料，從預設的 start_date 開始抓
-            fetch_start = start_date
-            print(f"[{i+1}/{total}] 正在從 Tiingo 首次下載 {ticker} 的數據...")
+            # 邏輯 C: 全新下載
+            tasks.append((start_date, end_date, "首次下載"))
 
-        try:
-            # Tiingo API Endpoint (使用動態計算出的 fetch_start)
-            url = f"https://api.tiingo.com/tiingo/daily/{ticker}/prices?startDate={fetch_start}"
-            response = requests.get(url, headers=headers)
+        for f_start, f_end, task_type in tasks:
+            if f_start > f_end: continue
             
-            if response.status_code == 404:
-                print(f"提示: Tiingo 找不到 {ticker} 的數據 (可能已下市或代碼變更)。")
-                continue
-            elif response.status_code == 429 or response.status_code == 403:
-                print(f"\n警告: 似乎已經達到 Tiingo 的 API 請求限制 (狀態碼: {response.status_code})。")
-                print("您可以隨時終止程式，下個月再執行會自動從斷點續傳！")
-                # 遇到限制時提早中結，避免無限噴錯
-                break 
-            elif response.status_code != 200:
-                print(f"警告: {ticker} 獲取失敗 (狀態碼: {response.status_code}) - {response.text}")
-                continue
+            print(f"[{i+1}/{total}] {ticker} {task_type}: {f_start} -> {f_end}")
             
-            data = response.json()
-            if not data:
-                print(f"提示: {ticker} 在 {fetch_start} 之後沒有新數據 (可能遇假日或已下市)。")
-                continue
-            
-            df = pd.DataFrame(data)
-            
-            # 將 Tiingo 的欄位名稱轉換為符合資料庫的 Schema
-            df = df.rename(columns={
-                'date': 'Date',
-                'open': 'Open',
-                'high': 'High',
-                'low': 'Low',
-                'close': 'Close',
-                'adjClose': 'Adj_Close',
-                'volume': 'Volume'
-            })
-            
-            df['Symbol'] = ticker
-            # 轉換 ISO 8601 日期為 YYYY-MM-DD
-            df['Date'] = pd.to_datetime(df['Date']).dt.strftime('%Y-%m-%d')
-            
-            required_cols = ['Date', 'Symbol', 'Open', 'High', 'Low', 'Close', 'Adj_Close', 'Volume']
-            df_to_save = df[required_cols]
-            
-            # 寫入資料庫
-            df_to_save.to_sql('Daily_Prices', conn, if_exists='append', index=False)
-            
-        except Exception as e:
-            print(f"錯誤: 無法處理 {ticker}。原因: {e}")
+            try:
+                # Tiingo 允許同時指定 startDate 與 endDate
+                url = f"https://api.tiingo.com/tiingo/daily/{ticker}/prices?startDate={f_start}&endDate={f_end}"
+                response = requests.get(url, headers=headers)
+           
+                if response.status_code == 404:
+                    print(f"提示: Tiingo 找不到 {ticker} 的數據 (可能已下市或代碼變更)。")
+                    continue
+                elif response.status_code == 429 or response.status_code == 403:
+                    print(f"\n警告: 似乎已經達到 Tiingo 的 API 請求限制 (狀態碼: {response.status_code})。")
+                    print("您可以隨時終止程式，下個月再執行會自動從斷點續傳！")
+                    # 遇到限制時提早中結，避免無限噴錯
+                    break 
+                elif response.status_code != 200:
+                    print(f"警告: {ticker} 獲取失敗 (狀態碼: {response.status_code}) - {response.text}")
+                    continue
+                
+                data = response.json()
+                if not data: continue
+                               
+                df = pd.DataFrame(data)
+                
+                # 將 Tiingo 的欄位名稱轉換為符合資料庫的 Schema
+                df = df.rename(columns={
+                    'date': 'Date',
+                    'open': 'Open',
+                    'high': 'High',
+                    'low': 'Low',
+                    'close': 'Close',
+                    'adjClose': 'Adj_Close',
+                    'volume': 'Volume'
+                })
+                
+                df['Symbol'] = ticker
+                df['Date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+                
+                df_to_save = df[['Date', 'Symbol', 'open', 'high', 'low', 'close', 'adjClose', 'volume']]
+                df_to_save.columns = ['Date', 'Symbol', 'Open', 'High', 'Low', 'Close', 'Adj_Close', 'Volume']
+                
+                df_to_save.to_sql('Daily_Prices', conn, if_exists='append', index=False)
+                time.sleep(0.1) # 頻率限制緩衝
+                
+            except Exception as e:
+                print(f"錯誤: 無法處理 {ticker} ({task_type})。原因: {e}")
             
         # 避免觸發 API Rate Limit
         time.sleep(0.2)
@@ -242,8 +242,8 @@ if __name__ == "__main__":
         connection = setup_database(abs_db_path)
         try:
             save_constituents_info(df_info, connection)
-            # 開始下載 (改為從 2010 年起抓取)
-            download_and_save_data(all_tickers, connection, start_date="2010-01-01")
+            # 開始下載 (改為從 2000 年起抓取)
+            download_and_save_data(all_tickers, connection, start_date="2000-01-01")
             print(f"\n任務完成！所有數據已儲存至 {abs_db_path}")
         finally:
             connection.close()
