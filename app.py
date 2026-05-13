@@ -1,69 +1,117 @@
 import streamlit as st
 import os
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import numpy as np
 import re
+import plotly.graph_objects as go
 
 # ==========================================
 # PAGE CONFIGURATION
 # ==========================================
 st.set_page_config(
-    page_title="Pair Trading Backtest Dashboard", 
+    page_title="Pairs Trading Comparison", 
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # ==========================================
-# CUSTOM CSS FOR PREMIUM AESTHETICS
+# CUSTOM CSS FOR DARK THEME AESTHETICS
 # ==========================================
 st.markdown("""
 <style>
-    /* Main Background & Font */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
     
-    html, body, [class*="css"] {
+    /* Force dark theme aesthetics */
+    html, body, [class*="css"], .stApp {
         font-family: 'Inter', sans-serif;
+        background-color: #0e1117 !important;
+        color: #f8fafc !important;
     }
     
-    /* Gradient Title */
-    .main-title {
-        background: linear-gradient(90deg, #00C9FF 0%, #92FE9D 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 3rem !important;
+    /* Header Section */
+    .top-label {
+        color: #60a5fa; /* Lighter blue for dark mode */
         font-weight: 700;
-        margin-bottom: 0.5rem;
+        font-size: 13px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+    .main-title {
+        font-size: 42px;
+        font-weight: 900;
+        color: #f1f5f9;
+        line-height: 1.1;
+        margin-bottom: 8px;
+    }
+    .sub-title {
+        color: #94a3b8;
+        font-size: 15px;
     }
     
-    /* Subtitle / Description */
-    .sub-title {
-        color: #A0AEC0;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
+    /* Displayed Rows Badge */
+    .row-badge {
+        background-color: #1e293b;
+        color: white;
+        border-radius: 12px;
+        padding: 15px 30px;
+        text-align: center;
+        border: 1px solid #334155;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
+    .row-badge-title { font-size: 13px; color: #94a3b8; margin-bottom: 4px; }
+    .row-badge-val { font-size: 36px; font-weight: 900; line-height: 1; color: #f8fafc; }
     
     /* Metric Cards */
-    div[data-testid="metric-container"] {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
-        padding: 15px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    .metric-card {
+        border-radius: 16px;
+        padding: 24px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    /* Dark mode card variants */
+    .card-green { border: 1px solid #16a34a; background-color: rgba(22, 163, 74, 0.05); }
+    .card-blue { border: 1px solid #2563eb; background-color: rgba(37, 99, 235, 0.05); }
+    .card-orange { border: 1px solid #ea580c; background-color: rgba(234, 88, 12, 0.05); }
+    .card-red { border: 1px solid #dc2626; background-color: rgba(220, 38, 38, 0.05); }
+    
+    .card-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #cbd5e1;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+    .card-value {
+        font-size: 38px;
+        font-weight: 900;
+        margin-bottom: 8px;
+        line-height: 1;
+    }
+    /* Brighter colors for text on dark background */
+    .val-green { color: #4ade80; }
+    .val-blue { color: #60a5fa; }
+    .val-orange { color: #fb923c; }
+    .val-red { color: #f87171; }
+    
+    .card-desc {
+        font-size: 13px;
+        color: #94a3b8;
+        font-weight: 400;
+    }
+
+    /* DataFrame Styling Tweaks */
+    [data-testid="stDataFrame"] {
+        margin-top: -10px;
     }
     
-    div[data-testid="metric-container"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
-        border: 1px solid rgba(0, 201, 255, 0.5);
-    }
-    
-    /* Sidebar customization */
-    [data-testid="stSidebar"] {
-        background-color: #1E1E2E !important;
-    }
+    [data-testid="stMetricValue"] { display: none; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -74,19 +122,14 @@ st.markdown("""
 RESULTS_DIR = "results"
 INITIAL_CAPITAL = 10000.0
 
-
-# ==========================================
-# DATA LOADING & CACHING
-# ==========================================
 @st.cache_data
 def scan_strategies(base_dir):
-    """Scan directory recursively to find all strategies (lazy loading)."""
+    """Scan directory recursively to find all strategies."""
     strategies = []
     if not os.path.exists(base_dir):
         return strategies
     for root, dirs, files in os.walk(base_dir):
         if "detailed_trade_logs.csv" in files:
-            # Get relative path e.g., SSD_NoReEntry_NoSector/Top20_SL5_ZWin0
             rel_path = os.path.relpath(root, base_dir)
             strategies.append(rel_path.replace("\\", "/"))
     return sorted(strategies)
@@ -99,278 +142,379 @@ def load_data(strategy_path):
         return pd.DataFrame()
     
     dtypes = {
-        'Sector': 'category',
-        'Ticker_A': 'category',
-        'Ticker_B': 'category',
-        'Status': 'category',
-        'Pair_Rank': 'int16',
         'Position': 'int8',
-        'Days_Held': 'int16',
-        'Log_Mean_A': 'float32',
-        'Log_Std_A': 'float32',
-        'Log_Mean_B': 'float32',
-        'Log_Std_B': 'float32',
-        'Price_A': 'float32',
-        'Price_B': 'float32',
-        'Hedge_Ratio': 'float32',
-        'ZScore': 'float32',
-        'Unrealized_PnL': 'float32',
-        'Realized_PnL': 'float32',
-        'Cumulative_PnL': 'float32',
-        'Trade_PnL': 'float32',
         'Daily_Delta': 'float32',
+        'Trade_PnL': 'float32',
     }
+    # Load necessary columns for logic
+    cols_to_use = ['Date', 'Position', 'Ticker_A', 'Ticker_B', 'Daily_Delta', 'Trade_PnL']
     
-    df = pd.read_csv(file_path, dtype=dtypes, parse_dates=['Date', 'Period_Start', 'Period_End'])
-    return df
+    try:
+        df = pd.read_csv(file_path, usecols=cols_to_use, dtype=dtypes, parse_dates=['Date'])
+        return df
+    except Exception:
+        df = pd.read_csv(file_path, dtype=dtypes, parse_dates=['Date'])
+        return df
 
 
 # ==========================================
-# CALCULATIONS
+# METRICS & AGGREGATION LOGIC
 # ==========================================
-def calculate_metrics(df, strategy_name):
-    """Calculate performance metrics based on user-defined formulas."""
+def extract_features_from_path(strategy_path):
+    """Parse the directory path to extract features."""
+    method = "-"
+    top_n = "Top 20"
+    sl_pct = "5%"
+    zwin = "0"
     
-    # 1. Parse number of total pairs from strategy name
-    n_total_pairs = 20 # Default fallback
-    match = re.search(r'Top(\d+)', strategy_name)
-    if match:
-        n_total_pairs = int(match.group(1))
+    path_lower = strategy_path.lower()
+    if "eg" in path_lower: method = "EG"
+    elif "ssd" in path_lower: method = "SSD"
+    
+    match_top = re.search(r'top(\d+)', strategy_path, re.IGNORECASE)
+    if match_top: top_n = f"Top {match_top.group(1)}"
         
-    c_period = INITIAL_CAPITAL
-    c_pair = INITIAL_CAPITAL / n_total_pairs if n_total_pairs > 0 else INITIAL_CAPITAL
+    match_sl = re.search(r'sl(\d+)', strategy_path, re.IGNORECASE)
+    if match_sl: sl_pct = f"{match_sl.group(1)}%"
+        
+    match_zwin = re.search(r'zwin(\d+)', strategy_path, re.IGNORECASE)
+    if match_zwin: zwin = f"{match_zwin.group(1)}"
+        
+    # 新增分類解析邏輯
+    dataset = "Full" if "full" in path_lower else "Current" if "current" in path_lower else "-"
+    sector = "NoSector" if "nosector" in path_lower else "Sector" if "sector" in path_lower else "-"
+    reentry = "NoReEntry" if "noreentry" in path_lower else "ReEntry" if "reentry" in path_lower else "-"
+        
+    return dataset, sector, reentry, method, top_n, sl_pct, zwin
+
+def calculate_metrics_raw(df, strategy_path):
+    """Calculate RCC, REC, and other metrics based on formulas."""
+    dataset, sector, reentry, method, top_n, sl_pct, zwin = extract_features_from_path(strategy_path)
     
-    # 2. Aggregate to Portfolio Level
+    if df.empty:
+        return None
+
+    # Aggregate to Portfolio Level
     portfolio_daily = df.groupby('Date')['Daily_Delta'].sum().reset_index()
     portfolio_daily['Cumulative_PnL'] = portfolio_daily['Daily_Delta'].cumsum()
     
     final_pnl = portfolio_daily['Cumulative_PnL'].iloc[-1] if not portfolio_daily.empty else 0
     final_equity = INITIAL_CAPITAL + final_pnl
     
-    # 3. Annualized Return
-    # Assuming ~252 trading days/year
-    years = len(portfolio_daily) / 252.0 if not portfolio_daily.empty else 1.0
-    if final_equity > 0 and years > 0:
-        annualized_return = (final_equity / INITIAL_CAPITAL) ** (1/years) - 1
+    # Extract numerical Top N for capital calculations
+    match_top = re.search(r'\d+', top_n)
+    top_n_int = int(match_top.group()) if match_top else 20
+    
+    # --- RCC (Return on Committed Capital) ---
+    # R_cc = Period PnL / C_period
+    c_period = INITIAL_CAPITAL
+    rcc = final_pnl / c_period 
+    
+    # --- REC (Return on Engaged Capital) ---
+    # R_ec = Period PnL / (N_traded * C_pair)
+    # 1. Count unique pairs traded
+    if 'Position' in df.columns:
+        n_traded = len(df[df['Position'] != 0].drop_duplicates(subset=['Ticker_A', 'Ticker_B']))
+        n_trades = len(df[df['Position'] != 0]) # Total individual positions entered/held
     else:
-        annualized_return = 0
+        n_traded = 0
+        n_trades = 0
         
-    # 4. Sharpe Ratio
+    # 2. Capital per pair
+    c_pair = c_period / top_n_int if top_n_int > 0 else c_period
+    
+    # 3. Calc REC
+    engaged_capital = n_traded * c_pair
+    rec = final_pnl / engaged_capital if engaged_capital > 0 else 0
+        
+    # --- Sharpe Ratio ---
     daily_returns = portfolio_daily['Daily_Delta'] / INITIAL_CAPITAL
     if daily_returns.std() != 0:
         sharpe = np.sqrt(252) * daily_returns.mean() / daily_returns.std()
     else:
         sharpe = 0
         
-    # 5. Max Drawdown
+    # --- Max Drawdown % ---
     roll_max = portfolio_daily['Cumulative_PnL'].cummax()
     drawdown = portfolio_daily['Cumulative_PnL'] - roll_max
     mdd = drawdown.min()
-    
-    # 6. RCC & REC
-    rcc = final_pnl / c_period if c_period > 0 else 0
-    
-    # N_traded: number of unique pairs that actually entered a position
-    traded_pairs_df = df[df['Position'] != 0].groupby(['Ticker_A', 'Ticker_B']).size().reset_index()
-    n_traded = len(traded_pairs_df)
-    
-    engaged_capital = n_traded * c_pair
-    rec = final_pnl / engaged_capital if engaged_capital > 0 else 0
-    
-    # 7. Win Rate & Profit/Loss Ratio
-    # Filter only closed trades (where Trade_PnL is recorded)
-    closed_trades = df[df['Trade_PnL'] != 0]['Trade_PnL']
-    win_trades = closed_trades[closed_trades > 0]
-    loss_trades = closed_trades[closed_trades < 0]
-    
-    win_rate = len(win_trades) / len(closed_trades) if len(closed_trades) > 0 else 0
-    
-    avg_win = win_trades.mean() if len(win_trades) > 0 else 0
-    avg_loss = abs(loss_trades.mean()) if len(loss_trades) > 0 else 0
-    pnl_ratio = avg_win / avg_loss if avg_loss > 0 else float('inf')
-    
+    mdd_pct = mdd / INITIAL_CAPITAL
+        
     return {
-        'Strategy': strategy_name.split('/')[-1], # Keep it concise for display
-        'Full_Path': strategy_name,
-        'Final Equity': final_equity,
-        'Ann. Return': annualized_return,
-        'Sharpe': sharpe,
-        'MDD': mdd,
-        'RCC': rcc,
-        'REC': rec,
-        'Win Rate': win_rate,
-        'PnL Ratio': pnl_ratio
-    }, portfolio_daily
+        'DATASET': dataset,
+        'SECTOR': sector,
+        'RE-ENTRY': reentry,
+        'METHOD': method,
+        'TOP N': top_n,
+        'STOP LOSS %': sl_pct,
+        'Z-WINDOW': zwin,
+        'Final_Equity': final_equity,
+        'RCC_Raw': rcc,
+        'REC_Raw': rec,
+        'Sharpe_Raw': sharpe,
+        'MDD_Raw': mdd_pct,
+        'Total_Trades': n_trades,
+        '_path': strategy_path
+    }
+
+@st.cache_data(show_spinner=False)
+def build_master_dataframe(strategies):
+    """Builds a single master dataframe of all metrics for all strategies."""
+    records = []
+    for strat in strategies:
+        metrics = calculate_metrics_raw(load_data(strat), strat)
+        if metrics:
+            records.append(metrics)
+    return pd.DataFrame(records) if records else pd.DataFrame()
 
 
 # ==========================================
 # MAIN APP
 # ==========================================
 def main():
-    st.markdown('<div class="main-title">Pair Trading Analytics</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Interactive Dashboard for Cointegration Backtest Results</div>', unsafe_allow_html=True)
-    
     if not os.path.exists(RESULTS_DIR):
         st.error(f"Directory '{RESULTS_DIR}' not found. Please ensure the app is run from the project root.")
         return
-        
-    available_strategies = scan_strategies(RESULTS_DIR)
-    
-    if not available_strategies:
-        st.warning("No strategy logs found in the results directory.")
-        return
-        
-    # --- SIDEBAR ---
-    with st.sidebar:
-        st.markdown("### ⚙️ Strategy Selection")
-        selected_strategies = st.multiselect(
-            "Select up to 5 strategies to compare:",
-            options=available_strategies,
-            max_selections=5,
-            default=available_strategies[:1] if available_strategies else None
-        )
-        st.markdown("---")
-        st.info("💡 **Memory Optimization Active**: Data is lazily loaded and downcasted upon selection.")
-        
-    if not selected_strategies:
-        st.info("👈 Please select at least one strategy from the sidebar to view results.")
-        return
-        
-    # --- DATA PROCESSING ---
-    metrics_list = []
-    portfolio_dfs = {}
-    
-    with st.spinner("Crunching numbers and caching data..."):
-        for strategy in selected_strategies:
-            df = load_data(strategy)
-            if df.empty:
-                st.error(f"No data found for strategy {strategy}.")
-                continue
-            
-            metrics, portfolio_daily = calculate_metrics(df, strategy)
-            metrics_list.append(metrics)
-            portfolio_dfs[strategy] = portfolio_daily
-            
-    if not metrics_list:
-        return
-        
-    # --- HIGHLIGHT METRICS (If single strategy selected) ---
-    if len(metrics_list) == 1:
-        m = metrics_list[0]
-        cols = st.columns(4)
-        cols[0].metric("Final Equity", f"${m['Final Equity']:,.2f}", f"{m['Ann. Return']:.2%} Ann.")
-        cols[1].metric("Sharpe Ratio", f"{m['Sharpe']:.2f}")
-        cols[2].metric("RCC / REC", f"{m['RCC']:.2%} / {m['REC']:.2%}")
-        cols[3].metric("Win Rate", f"{m['Win Rate']:.2%}", f"{m['PnL Ratio']:.2f} P/L Ratio")
-        st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- COMPARISON TABLE ---
-    st.markdown("### 📊 Performance Metrics Overview")
-    metrics_df = pd.DataFrame(metrics_list).drop(columns=['Full_Path'])
+    available_strategies = scan_strategies(RESULTS_DIR)
+    if not available_strategies:
+        st.warning("No strategy logs found. Please generate backtest logs.")
+        return
+
+    with st.spinner("Compiling strategy database..."):
+        master_df = build_master_dataframe(available_strategies)
+        
+    if master_df.empty:
+        st.error("Could not parse metrics from the provided data.")
+        return
+
+    total_strategies = len(master_df)
+
+    # --- TOP HEADER SECTION ---
+    header_html = f"""
+    <div style="display: flex; justify-content: space-between; align-items: stretch; margin-bottom: 30px; margin-top: 10px;">
+        <div style="flex-grow: 1;">
+            <div class="top-label">QUANTITATIVE PERFORMANCE DATA</div>
+            <div class="main-title">Pairs Trading Comparison</div>
+            <div class="sub-title">Full dataset: {total_strategies} strategy combinations evaluated.</div>
+        </div>
+        <div class="row-badge" style="min-width: 150px;">
+            <div class="row-badge-title">Displayed Rows</div>
+            <div class="row-badge-val" id="row-count">{total_strategies}</div>
+        </div>
+    </div>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
+
+    # --- FILTERS ---
+    f_cols1 = st.columns(4)
+    f_cols2 = st.columns(3)
     
-    # Format the dataframe for display
-    display_df = metrics_df.copy()
-    display_df['Final Equity'] = display_df['Final Equity'].map('${:,.2f}'.format)
-    display_df['Ann. Return'] = display_df['Ann. Return'].map('{:.2%}'.format)
-    display_df['Sharpe'] = display_df['Sharpe'].map('{:.2f}'.format)
-    display_df['MDD'] = display_df['MDD'].map('${:,.2f}'.format)
-    display_df['RCC'] = display_df['RCC'].map('{:.2%}'.format)
-    display_df['REC'] = display_df['REC'].map('{:.2%}'.format)
-    display_df['Win Rate'] = display_df['Win Rate'].map('{:.2%}'.format)
-    display_df['PnL Ratio'] = display_df['PnL Ratio'].map('{:.2f}'.format)
-    
-    st.dataframe(display_df.set_index('Strategy'), use_container_width=True)
-    
-    # --- EQUITY CURVE ---
-    st.markdown("<br>### 📈 Cumulative Equity Curve", unsafe_allow_html=True)
-    
-    # Use Plotly Dark template for modern look
-    fig_eq = go.Figure()
-    
-    # Color palette
-    colors = ['#00C9FF', '#FF007A', '#00FFA3', '#FFC800', '#B200FF']
-    
-    for i, (strategy, pdf) in enumerate(portfolio_dfs.items()):
-        short_name = strategy.split('/')[-1]
-        fig_eq.add_trace(go.Scatter(
-            x=pdf['Date'], 
-            y=pdf['Cumulative_PnL'], 
-            mode='lines', 
-            name=short_name,
-            line=dict(width=2, color=colors[i % len(colors)]),
-            fill='tozeroy' if len(selected_strategies) == 1 else 'none',
-            fillcolor=f"rgba{tuple(list(int(colors[i % len(colors)].lstrip('#')[j:j+2], 16) for j in (0, 2, 4)) + [0.1])}" if len(selected_strategies) == 1 else None
-        ))
-    
-    fig_eq.update_layout(
-        template="plotly_dark",
-        xaxis_title="Date",
-        yaxis_title="Cumulative PnL ($)",
-        hovermode="x unified",
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        legend=dict(
-            orientation="h", 
-            yanchor="bottom", 
-            y=1.02, 
-            xanchor="right", 
-            x=1,
-            bgcolor='rgba(255,255,255,0.05)',
-            bordercolor='rgba(255,255,255,0.1)',
-            borderwidth=1
-        ),
-        margin=dict(l=0, r=0, t=30, b=0)
+    with f_cols1[0]:
+        options = ["All"] + sorted(master_df['DATASET'].unique().tolist())
+        sel_dataset = st.selectbox("DATASET", options)
+    with f_cols1[1]:
+        options = ["All"] + sorted(master_df['SECTOR'].unique().tolist())
+        sel_sector = st.selectbox("SECTOR", options)
+    with f_cols1[2]:
+        options = ["All"] + sorted(master_df['RE-ENTRY'].unique().tolist())
+        sel_reentry = st.selectbox("RE-ENTRY", options)
+    with f_cols1[3]:
+        options = ["All"] + sorted(master_df['METHOD'].unique().tolist())
+        sel_method = st.selectbox("METHOD", options)
+
+    with f_cols2[0]:
+        options = ["All"] + sorted(master_df['TOP N'].unique().tolist(), key=lambda x: int(re.search(r'\d+', x).group()) if re.search(r'\d+', x) else 0)
+        sel_topn = st.selectbox("TOP N", options)
+    with f_cols2[1]:
+        options = ["All"] + sorted(master_df['STOP LOSS %'].unique().tolist(), key=lambda x: int(x.replace('%','')) if x.replace('%','').isdigit() else 0)
+        sel_sl = st.selectbox("STOP LOSS %", options)
+    with f_cols2[2]:
+        options = ["All"] + sorted(master_df['Z-WINDOW'].unique().tolist(), key=lambda x: int(x) if x.isdigit() else 0)
+        sel_zwin = st.selectbox("Z-WINDOW", options)
+
+    # --- APPLY FILTERS ---
+    filtered_df = master_df.copy()
+    if sel_dataset != "All": filtered_df = filtered_df[filtered_df['DATASET'] == sel_dataset]
+    if sel_sector != "All": filtered_df = filtered_df[filtered_df['SECTOR'] == sel_sector]
+    if sel_reentry != "All": filtered_df = filtered_df[filtered_df['RE-ENTRY'] == sel_reentry]
+    if sel_method != "All": filtered_df = filtered_df[filtered_df['METHOD'] == sel_method]
+    if sel_topn != "All": filtered_df = filtered_df[filtered_df['TOP N'] == sel_topn]
+    if sel_sl != "All": filtered_df = filtered_df[filtered_df['STOP LOSS %'] == sel_sl]
+    if sel_zwin != "All": filtered_df = filtered_df[filtered_df['Z-WINDOW'] == sel_zwin]
+
+    st.markdown(
+        f"<script>document.getElementById('row-count').innerText = '{len(filtered_df)}';</script>", 
+        unsafe_allow_html=True
     )
-    st.plotly_chart(fig_eq, use_container_width=True)
+
+    # --- CALCULATE BEST METRICS FOR CARDS ---
+    if len(filtered_df) > 0:
+        best_rcc = filtered_df.loc[filtered_df['RCC_Raw'].idxmax()]
+        best_rec = filtered_df.loc[filtered_df['REC_Raw'].idxmax()]
+        best_shp = filtered_df.loc[filtered_df['Sharpe_Raw'].idxmax()]
+        low_dd = filtered_df.loc[filtered_df['MDD_Raw'].idxmax()] 
+    else:
+        best_rcc = best_rec = best_shp = low_dd = pd.Series({
+            'RCC_Raw': 0, 'REC_Raw': 0, 'Sharpe_Raw': 0, 'MDD_Raw': 0,
+            'DATASET': '-', 'SECTOR': '-', 'RE-ENTRY': '-',
+            'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-'
+        })
+
+    def make_desc(row): return f"{row['DATASET']} · {row['SECTOR']} · {row['RE-ENTRY']} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}"
+
+    # --- METRIC CARDS ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    c1, c2, c3, c4 = st.columns(4)
     
-    # --- PARAMETER HEATMAP ---
-    if len(selected_strategies) > 1:
-        st.markdown("<br>### 🎛️ Parameter Heatmap Analysis", unsafe_allow_html=True)
+    c1.markdown(f"""
+        <div class="metric-card card-green">
+            <div class="card-title">BEST RCC (Committed)</div>
+            <div class="card-value val-green">{best_rcc['RCC_Raw']:.2%}</div>
+            <div class="card-desc">{make_desc(best_rcc)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    c2.markdown(f"""
+        <div class="metric-card card-blue">
+            <div class="card-title">BEST REC (Engaged)</div>
+            <div class="card-value val-blue">{best_rec['REC_Raw']:.2%}</div>
+            <div class="card-desc">{make_desc(best_rec)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    c3.markdown(f"""
+        <div class="metric-card card-orange">
+            <div class="card-title">BEST SHARPE</div>
+            <div class="card-value val-orange">{best_shp['Sharpe_Raw']:.2f}</div>
+            <div class="card-desc">{make_desc(best_shp)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    c4.markdown(f"""
+        <div class="metric-card card-red">
+            <div class="card-title">LOWEST DRAWDOWN</div>
+            <div class="card-value val-red">{low_dd['MDD_Raw']:.2%}</div>
+            <div class="card-desc">{make_desc(low_dd)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # --- PERFORMANCE TABLE ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""
+        <h3 style='margin-bottom:0; font-weight: 900; color: #f1f5f9;'>Complete Performance Table</h3>
+        <p style='color: #94a3b8; font-size: 14px; margin-top: 5px; margin-bottom: 15px;'>
+        Click any column header to sort. Use filters above to narrow down parameters. <br>
+        <b style='color: #60a5fa;'>💡 點擊表格最左側的 Checkbox 勾選框，即可在下方繪製歷史走勢圖（最多 5 個）。</b></p>
+    """, unsafe_allow_html=True)
+    
+    if len(filtered_df) == 0:
+        st.warning("No strategies match the selected filters.")
+        return
+
+    # 先對 filtered_df 進行排序並重設 Index，確保後續依據 Index 繪圖時能精準對應
+    filtered_df = filtered_df.sort_values(by='RCC_Raw', ascending=False).reset_index(drop=True)
+
+    # Prepare Display DataFrame
+    display_df = filtered_df.copy()
+    display_df['FINAL EQUITY'] = display_df['Final_Equity']
+    display_df['RCC %'] = display_df['RCC_Raw']
+    display_df['REC %'] = display_df['REC_Raw']
+    display_df['SHARPE'] = display_df['Sharpe_Raw']
+    display_df['MAX DRAWDOWN %'] = display_df['MDD_Raw']
+    display_df['TOTAL TRADES'] = display_df['Total_Trades'].apply(lambda x: f"{int(x):,}")
+
+    cols = ['DATASET', 'SECTOR', 'RE-ENTRY', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 
+            'FINAL EQUITY', 'RCC %', 'REC %', 'SHARPE', 'MAX DRAWDOWN %', 'TOTAL TRADES']
+    display_df = display_df[cols]
+
+    def apply_color(val, color):
+        return f'color: {color}; font-weight: 700;'
+    
+    styled_df = display_df.style.format({
+        'FINAL EQUITY': '${:,.2f}',
+        'RCC %': '{:.2%}',
+        'REC %': '{:.2%}',
+        'SHARPE': '{:.2f}',
+        'MAX DRAWDOWN %': '{:.2%}'
+    })\
+    .map(lambda x: apply_color(x, '#f8fafc'), subset=['FINAL EQUITY'])\
+    .map(lambda x: apply_color(x, '#4ade80'), subset=['RCC %'])\
+    .map(lambda x: apply_color(x, '#60a5fa'), subset=['REC %'])\
+    .map(lambda x: apply_color(x, '#fb923c'), subset=['SHARPE'])\
+    .map(lambda x: apply_color(x, '#f87171'), subset=['MAX DRAWDOWN %'])\
+    .map(lambda x: 'color: #94a3b8; font-weight: 600;', subset=['DATASET', 'SECTOR', 'RE-ENTRY', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW'])
+
+    # 啟用原生 Checkbox 列選取功能
+    selection_event = st.dataframe(
+        styled_df, 
+        use_container_width=True,
+        hide_index=True,
+        height=400,
+        on_select="rerun",
+        selection_mode="multi-row"
+    )
+
+    # 獲取使用者勾選的行數清單 (回傳的是 Index 列表，例如 [0, 2, 5])
+    selected_rows = selection_event.selection.rows
+
+    # --- EQUITY CURVE COMPARISON ---
+    st.markdown("<br><hr style='border-color: #334155;'><br>", unsafe_allow_html=True)
+    st.markdown("""
+        <h3 style='margin-bottom:0; font-weight: 900; color: #f1f5f9;'>📈 Historical Performance Comparison</h3>
+    """, unsafe_allow_html=True)
+
+    # 限制繪圖數量上限為 5 個
+    if len(selected_rows) > 5:
+        st.warning("⚠️ 最多只能選擇 5 個策略進行繪圖，目前將為您顯示最先勾選的 5 個。")
+        selected_rows = selected_rows[:5]
+
+    if selected_rows:
+        fig = go.Figure()
         
-        heatmap_data = []
-        for metrics in metrics_list:
-            full_path = metrics['Full_Path']
+        for idx in selected_rows:
+            # 透過勾選的 Index 對應回 filtered_df 取出資料路徑
+            row_data = filtered_df.iloc[idx]
+            strat_path = row_data['_path']
+            legend_name = f"{row_data['DATASET']} · {row_data['SECTOR']} · {row_data['RE-ENTRY']} · {row_data['METHOD']} · {row_data['TOP N']} · SL {row_data['STOP LOSS %']} · ZWin {row_data['Z-WINDOW']}"
             
-            # Extract parameters: Stop Loss (SL) and Z-Score Window (ZWin)
-            sl_match = re.search(r'SL(\d+)', full_path)
-            zwin_match = re.search(r'ZWin(\d+)', full_path)
+            df = load_data(strat_path)
             
-            sl = int(sl_match.group(1)) if sl_match else "N/A"
-            zwin = int(zwin_match.group(1)) if zwin_match else "N/A"
-            
-            heatmap_data.append({
-                'Stop Loss (SL)': str(sl),
-                'Z-Score Window (ZWin)': str(zwin),
-                'Sharpe Ratio': metrics['Sharpe'],
-                'Strategy': metrics['Strategy']
-            })
-            
-        hm_df = pd.DataFrame(heatmap_data)
+            if not df.empty:
+                # Recalculate daily equity for plotting
+                port_daily = df.groupby('Date')['Daily_Delta'].sum().reset_index()
+                port_daily['Cumulative_PnL'] = port_daily['Daily_Delta'].cumsum()
+                port_daily['Equity'] = INITIAL_CAPITAL + port_daily['Cumulative_PnL']
+                
+                fig.add_trace(go.Scatter(
+                    x=port_daily['Date'], 
+                    y=port_daily['Equity'], 
+                    mode='lines', 
+                    name=legend_name,
+                    line=dict(width=2)
+                ))
         
-        # We need at least some variation to plot a meaningful heatmap
-        if len(hm_df['Stop Loss (SL)'].unique()) > 1 or len(hm_df['Z-Score Window (ZWin)'].unique()) > 1:
-            pivot_df = hm_df.pivot_table(
-                index='Stop Loss (SL)', 
-                columns='Z-Score Window (ZWin)', 
-                values='Sharpe Ratio', 
-                aggfunc='mean'
-            )
-            
-            fig_hm = px.imshow(
-                pivot_df, 
-                text_auto='.2f', 
-                color_continuous_scale='Mint',
-                aspect="auto"
-            )
-            fig_hm.update_layout(
-                template="plotly_dark",
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                margin=dict(l=0, r=0, t=30, b=0)
-            )
-            st.plotly_chart(fig_hm, use_container_width=True)
-        else:
-            st.info("⚠️ Not enough variation in parameters (SL, ZWin) among selected strategies to generate a meaningful heatmap.")
+        fig.update_layout(
+            template="plotly_dark",
+            xaxis_title="Date",
+            yaxis_title="Final Equity ($)",
+            hovermode="x unified",
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            legend=dict(
+                orientation="h", 
+                yanchor="top", 
+                y=-0.2, 
+                xanchor="center", 
+                x=0.5,
+                bgcolor='rgba(0,0,0,0)'
+            ),
+            margin=dict(l=0, r=0, t=30, b=100)
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("👆 請在上方表格最左側勾選您想查看的策略（至多 5 個），以生成歷史淨值走勢圖。")
 
 if __name__ == "__main__":
     main()
