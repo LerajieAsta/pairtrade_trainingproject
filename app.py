@@ -78,6 +78,7 @@ st.markdown("""
     /* Dark mode card variants */
     .card-green { border: 1px solid #16a34a; background-color: rgba(22, 163, 74, 0.05); }
     .card-blue { border: 1px solid #2563eb; background-color: rgba(37, 99, 235, 0.05); }
+    .card-purple { border: 1px solid #9333ea; background-color: rgba(147, 51, 234, 0.05); }
     .card-orange { border: 1px solid #ea580c; background-color: rgba(234, 88, 12, 0.05); }
     .card-red { border: 1px solid #dc2626; background-color: rgba(220, 38, 38, 0.05); }
     
@@ -97,6 +98,7 @@ st.markdown("""
     /* Brighter colors for text on dark background */
     .val-green { color: #4ade80; }
     .val-blue { color: #60a5fa; }
+    .val-purple { color: #c084fc; }
     .val-orange { color: #fb923c; }
     .val-red { color: #f87171; }
     
@@ -227,6 +229,38 @@ def calculate_metrics_raw(df, strategy_path):
     engaged_capital = n_traded * c_pair
     rec = final_pnl / engaged_capital if engaged_capital > 0 else 0
         
+    # --- 依據圖片公式計算每月、累積與年化報酬率 ---
+    if not portfolio_daily.empty:
+        # 確保 Date 是 datetime 格式
+        portfolio_daily['Date'] = pd.to_datetime(portfolio_daily['Date'])
+        portfolio_daily['Equity'] = INITIAL_CAPITAL + portfolio_daily['Cumulative_PnL']
+        
+        # 取得每個月底的淨值 (使用 to_period 安全分群)
+        portfolio_daily['YearMonth'] = portfolio_daily['Date'].dt.to_period('M')
+        eom_equity = portfolio_daily.groupby('YearMonth')['Equity'].last()
+        
+        if len(eom_equity) > 0:
+            # 插入初始本金作為第 0 個月的值，以計算第 1 個月的報酬率
+            equity_values = np.insert(eom_equity.values, 0, INITIAL_CAPITAL)
+            
+            # 計算 Ri (第 i 個月的報酬率)
+            monthly_returns = (equity_values[1:] / equity_values[:-1]) - 1
+            
+            n_months = len(monthly_returns) # n = 總月數
+            
+            if n_months > 0:
+                # 累積報酬率 = 1 * (1+r1) * (1+r2) * ... * (1+rn) - 1
+                cum_ret = np.prod(1 + monthly_returns) - 1
+                
+                # 年化報酬率 = ( 累積報酬率 + 1 ) ^ (12/n) - 1
+                ann_ret = np.power(cum_ret + 1, 12 / n_months) - 1
+            else:
+                cum_ret, ann_ret = 0.0, 0.0
+        else:
+            cum_ret, ann_ret = 0.0, 0.0
+    else:
+        cum_ret, ann_ret = 0.0, 0.0
+
     # --- Sharpe Ratio ---
     daily_returns = portfolio_daily['Daily_Delta'] / INITIAL_CAPITAL
     if daily_returns.std() != 0:
@@ -251,6 +285,8 @@ def calculate_metrics_raw(df, strategy_path):
         'Final_Equity': final_equity,
         'RCC_Raw': rcc,
         'REC_Raw': rec,
+        'Cum_Ret_Raw': cum_ret,
+        'Ann_Ret_Raw': ann_ret,
         'Sharpe_Raw': sharpe,
         'MDD_Raw': mdd_pct,
         'Total_Trades': n_trades,
@@ -350,40 +386,51 @@ def main():
 
     # --- CALCULATE BEST METRICS FOR CARDS ---
     if len(filtered_df) > 0:
+        best_cum = filtered_df.loc[filtered_df['Cum_Ret_Raw'].idxmax()]
+        best_ann = filtered_df.loc[filtered_df['Ann_Ret_Raw'].idxmax()]
         best_rcc = filtered_df.loc[filtered_df['RCC_Raw'].idxmax()]
-        best_rec = filtered_df.loc[filtered_df['REC_Raw'].idxmax()]
         best_shp = filtered_df.loc[filtered_df['Sharpe_Raw'].idxmax()]
         low_dd = filtered_df.loc[filtered_df['MDD_Raw'].idxmax()] 
     else:
-        best_rcc = best_rec = best_shp = low_dd = pd.Series({
-            'RCC_Raw': 0, 'REC_Raw': 0, 'Sharpe_Raw': 0, 'MDD_Raw': 0,
+        empty_series = pd.Series({
+            'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0, 
+            'Sharpe_Raw': 0, 'MDD_Raw': 0,
             'DATASET': '-', 'SECTOR': '-', 'RE-ENTRY': '-',
             'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-'
         })
+        best_cum = best_ann = best_rcc = best_shp = low_dd = empty_series
 
     def make_desc(row): return f"{row['DATASET']} · {row['SECTOR']} · {row['RE-ENTRY']} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}"
 
     # --- METRIC CARDS ---
     st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     
     c1.markdown(f"""
-        <div class="metric-card card-green">
-            <div class="card-title">BEST RCC (Committed)</div>
-            <div class="card-value val-green">{best_rcc['RCC_Raw']:.2%}</div>
-            <div class="card-desc">{make_desc(best_rcc)}</div>
+        <div class="metric-card card-purple">
+            <div class="card-title">BEST CUMULATIVE</div>
+            <div class="card-value val-purple">{best_cum['Cum_Ret_Raw']:.2%}</div>
+            <div class="card-desc">{make_desc(best_cum)}</div>
         </div>
     """, unsafe_allow_html=True)
     
     c2.markdown(f"""
         <div class="metric-card card-blue">
-            <div class="card-title">BEST REC (Engaged)</div>
-            <div class="card-value val-blue">{best_rec['REC_Raw']:.2%}</div>
-            <div class="card-desc">{make_desc(best_rec)}</div>
+            <div class="card-title">BEST ANNUALIZED</div>
+            <div class="card-value val-blue">{best_ann['Ann_Ret_Raw']:.2%}</div>
+            <div class="card-desc">{make_desc(best_ann)}</div>
         </div>
     """, unsafe_allow_html=True)
     
     c3.markdown(f"""
+        <div class="metric-card card-green">
+            <div class="card-title">BEST RCC</div>
+            <div class="card-value val-green">{best_rcc['RCC_Raw']:.2%}</div>
+            <div class="card-desc">{make_desc(best_rcc)}</div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    c4.markdown(f"""
         <div class="metric-card card-orange">
             <div class="card-title">BEST SHARPE</div>
             <div class="card-value val-orange">{best_shp['Sharpe_Raw']:.2f}</div>
@@ -391,7 +438,7 @@ def main():
         </div>
     """, unsafe_allow_html=True)
     
-    c4.markdown(f"""
+    c5.markdown(f"""
         <div class="metric-card card-red">
             <div class="card-title">LOWEST DRAWDOWN</div>
             <div class="card-value val-red">{low_dd['MDD_Raw']:.2%}</div>
@@ -418,6 +465,8 @@ def main():
     # Prepare Display DataFrame
     display_df = filtered_df.copy()
     display_df['FINAL EQUITY'] = display_df['Final_Equity']
+    display_df['CUM. RETURN %'] = display_df['Cum_Ret_Raw']
+    display_df['ANN. RETURN %'] = display_df['Ann_Ret_Raw']
     display_df['RCC %'] = display_df['RCC_Raw']
     display_df['REC %'] = display_df['REC_Raw']
     display_df['SHARPE'] = display_df['Sharpe_Raw']
@@ -425,7 +474,7 @@ def main():
     display_df['TOTAL TRADES'] = display_df['Total_Trades'].apply(lambda x: f"{int(x):,}")
 
     cols = ['DATASET', 'SECTOR', 'RE-ENTRY', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 
-            'FINAL EQUITY', 'RCC %', 'REC %', 'SHARPE', 'MAX DRAWDOWN %', 'TOTAL TRADES']
+            'FINAL EQUITY', 'CUM. RETURN %', 'ANN. RETURN %', 'RCC %', 'REC %', 'SHARPE', 'MAX DRAWDOWN %', 'TOTAL TRADES']
     display_df = display_df[cols]
 
     def apply_color(val, color):
@@ -433,12 +482,16 @@ def main():
     
     styled_df = display_df.style.format({
         'FINAL EQUITY': '${:,.2f}',
+        'CUM. RETURN %': '{:.2%}',
+        'ANN. RETURN %': '{:.2%}',
         'RCC %': '{:.2%}',
         'REC %': '{:.2%}',
         'SHARPE': '{:.2f}',
         'MAX DRAWDOWN %': '{:.2%}'
     })\
     .map(lambda x: apply_color(x, '#f8fafc'), subset=['FINAL EQUITY'])\
+    .map(lambda x: apply_color(x, '#c084fc'), subset=['CUM. RETURN %'])\
+    .map(lambda x: apply_color(x, '#38bdf8'), subset=['ANN. RETURN %'])\
     .map(lambda x: apply_color(x, '#4ade80'), subset=['RCC %'])\
     .map(lambda x: apply_color(x, '#60a5fa'), subset=['REC %'])\
     .map(lambda x: apply_color(x, '#fb923c'), subset=['SHARPE'])\
