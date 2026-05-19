@@ -191,19 +191,45 @@ def calculate_metrics_raw(strategy_path):
         # 精準偵測換向與平倉
         direction_change = df['Position'] != df['Prev_Pos']
         exit_mask = direction_change & (df['Prev_Pos'] != 0)
-        n_exits = exit_mask.sum()
+        n_exits_total = exit_mask.sum()
         
         last_rows = df.groupby(['Ticker_A', 'Ticker_B']).tail(1)
-        open_positions = (last_rows['Position'] != 0).sum()
-        n_entries = n_exits + open_positions
+        n_forced_close = (last_rows['Position'] != 0).sum()
+        n_entries = n_exits_total + n_forced_close
         
         if 'Status' in df.columns:
             n_stop_loss = df[exit_mask]['Status'].astype(str).str.contains('stop|sl|停損', case=False, na=False).sum()
+            n_normal_exits = n_exits_total - n_stop_loss
         else:
             n_stop_loss = -1
+            n_normal_exits = n_exits_total
+            
+        # 計算淨收益(Gross Profit)與淨損失(Gross Loss) - 嚴謹狀態機寫法
+        if 'Daily_Delta' in df.columns:
+            # 建立狀態機 ID：只要部位改變，狀態 ID 就累加
+            state_change = df['Position'] != df['Prev_Pos']
+            df['State_ID'] = state_change.groupby([df['Ticker_A'], df['Ticker_B']]).cumsum()
+            
+            # 昨天的狀態決定了今天的 Daily_Delta 歸屬 (確保平倉當日的損益歸屬於前一天的持倉狀態)
+            df['Prev_State_ID'] = df.groupby(['Ticker_A', 'Ticker_B'])['State_ID'].shift(1).fillna(0)
+            
+            # 取出所有產生損益的日子 (昨天有持倉，或今日有獨立損益)
+            active_mask = (df['Prev_Pos'] != 0) | (df['Daily_Delta'] != 0)
+            
+            if active_mask.any():
+                trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'Prev_State_ID'])['Daily_Delta'].sum()
+                gross_profit = float(trade_pnls[trade_pnls > 0].sum())
+                gross_loss = float(trade_pnls[trade_pnls < 0].sum())
+            else:
+                gross_profit = gross_loss = 0.0
+        else:
+            gross_profit = gross_loss = 0.0
+            
     else:
-        n_traded = n_entries = n_exits = 0
+        n_traded = n_entries = n_normal_exits = 0
         n_stop_loss = -1
+        n_forced_close = 0
+        gross_profit = gross_loss = 0.0
         
     c_pair = c_period / top_n_int if top_n_int > 0 else c_period
     engaged_capital = n_traded * c_pair
@@ -214,7 +240,8 @@ def calculate_metrics_raw(strategy_path):
         'METHOD': method, 'TOP N': top_n, 'STOP LOSS %': sl_pct, 'Z-WINDOW': zwin,
         'Final_Equity': final_equity, 'RCC_Raw': rcc, 'REC_Raw': rec,
         'Cum_Ret_Raw': cum_ret, 'Ann_Ret_Raw': ann_ret, 'Sharpe_Raw': sharpe, 'MDD_Raw': mdd_pct,
-        'Entries': n_entries, 'Exits': n_exits, 'Stop_Losses': n_stop_loss,
+        'Entries': n_entries, 'Exits': n_normal_exits, 'Stop_Losses': n_stop_loss, 'Forced_Closes': n_forced_close,
+        'Gross_Profit': gross_profit, 'Gross_Loss': gross_loss,
         '_path': strategy_path
     }
 
@@ -301,92 +328,94 @@ def render_deep_dive(target_row):
         )
         
         sel_pair_row = pair_event.selection.rows
-        if sel_pair_row:
-            t_a = pair_stats.iloc[sel_pair_row[0]]['Stock A']
-            t_b = pair_stats.iloc[sel_pair_row[0]]['Stock B']
-            
-            st.markdown("---")
-            st.markdown(f"##### 3. Trade Visualizer: {t_a} vs {t_b} (Period: {sel_period_str})")
-            
-            pair_full = period_df[(period_df['Ticker_A'] == t_a) & (period_df['Ticker_B'] == t_b)].copy()
-            pair_full = pair_full.sort_values('Date')
-            
-            fig_p = make_subplots(specs=[[{"secondary_y": True}]])
-            
-            if 'Price_A' in pair_full.columns and 'Price_B' in pair_full.columns and not pair_full['Price_A'].isna().all():
-                fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=pair_full['Price_A'], name=f"{t_a} Price", line=dict(color='rgba(96, 165, 250, 0.6)', width=2)), secondary_y=False)
-                fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=pair_full['Price_B'], name=f"{t_b} Price", line=dict(color='rgba(251, 211, 141, 0.6)', width=2)), secondary_y=True)
-                fig_p.update_yaxes(title_text=f"{t_a} Price", secondary_y=False)
-                fig_p.update_yaxes(title_text=f"{t_b} Price", secondary_y=True)
-                marker_y_col = 'Price_A'
-            else:
-                if 'Daily_Delta' not in pair_full.columns: pair_full['Daily_Delta'] = 0.0
-                pair_full['Cum_PnL'] = pair_full['Daily_Delta'].cumsum()
-                fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=pair_full['Cum_PnL'], name="Cumulative Return ($)", line=dict(color='rgba(74, 222, 128, 0.6)', width=2)), secondary_y=False)
-                fig_p.update_yaxes(title_text="Cumulative Return ($)", secondary_y=False)
-                marker_y_col = 'Cum_PnL'
+        
+    # 將繪圖區移出 col_p2 以實現滿版顯示
+    if sel_pair_row:
+        t_a = pair_stats.iloc[sel_pair_row[0]]['Stock A']
+        t_b = pair_stats.iloc[sel_pair_row[0]]['Stock B']
+        
+        st.markdown("---")
+        st.markdown(f"##### 3. Trade Visualizer: {t_a} vs {t_b} (Period: {sel_period_str})")
+        
+        pair_full = period_df[(period_df['Ticker_A'] == t_a) & (period_df['Ticker_B'] == t_b)].copy()
+        pair_full = pair_full.sort_values('Date')
+        
+        fig_p = make_subplots(specs=[[{"secondary_y": True}]])
+        
+        if 'Price_A' in pair_full.columns and 'Price_B' in pair_full.columns and not pair_full['Price_A'].isna().all():
+            fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=pair_full['Price_A'], name=f"{t_a} Price", line=dict(color='rgba(96, 165, 250, 0.6)', width=2)), secondary_y=False)
+            fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=pair_full['Price_B'], name=f"{t_b} Price", line=dict(color='rgba(251, 211, 141, 0.6)', width=2)), secondary_y=True)
+            fig_p.update_yaxes(title_text=f"{t_a} Price", secondary_y=False)
+            fig_p.update_yaxes(title_text=f"{t_b} Price", secondary_y=True)
+            marker_y_col = 'Price_A'
+        else:
+            if 'Daily_Delta' not in pair_full.columns: pair_full['Daily_Delta'] = 0.0
+            pair_full['Cum_PnL'] = pair_full['Daily_Delta'].cumsum()
+            fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=pair_full['Cum_PnL'], name="Cumulative Return ($)", line=dict(color='rgba(74, 222, 128, 0.6)', width=2)), secondary_y=False)
+            fig_p.update_yaxes(title_text="Cumulative Return ($)", secondary_y=False)
+            marker_y_col = 'Cum_PnL'
 
-            holding_pos = 0 
-            start_date = None
+        holding_pos = 0 
+        start_date = None
+        
+        long_x, long_y, short_x, short_y = [], [], [], []
+        tp_x, tp_y, sl_x, sl_y = [], [], [], []
+        
+        for idx, row in pair_full.iterrows():
+            pos = row['Position']
+            date = row['Date']
+            y_val = row[marker_y_col]
+            status = str(row.get('Status', '')).lower()
             
-            long_x, long_y, short_x, short_y = [], [], [], []
-            tp_x, tp_y, sl_x, sl_y = [], [], [], []
-            
-            for idx, row in pair_full.iterrows():
-                pos = row['Position']
-                date = row['Date']
-                y_val = row[marker_y_col]
-                status = str(row.get('Status', '')).lower()
+            if pos != holding_pos:
+                if holding_pos != 0 and (pos == 0 or np.sign(pos) != np.sign(holding_pos)):
+                    end_date = date
+                    if 'stop' in status or 'sl' in status or '停損' in status:
+                        sl_x.append(date); sl_y.append(y_val)
+                    else:
+                        tp_x.append(date); tp_y.append(y_val)
+                        
+                    if 'Daily_Delta' in pair_full.columns:
+                        pnl = pair_full.loc[(pair_full['Date'] >= start_date) & (pair_full['Date'] <= end_date), 'Daily_Delta'].sum()
+                    else:
+                        pnl = 0
+                        
+                    f_color = "rgba(74, 222, 128, 0.15)" if pnl > 0 else "rgba(248, 113, 113, 0.15)"
+                    fig_p.add_vrect(
+                        x0=start_date, x1=end_date, fillcolor=f_color,
+                        opacity=1, layer="below", line_width=0,
+                        annotation_text=f"{'Win' if pnl>0 else 'Loss'}", annotation_position="top left", annotation_font_color="white"
+                    )
+                    holding_pos = 0
                 
-                if pos != holding_pos:
-                    if holding_pos != 0 and (pos == 0 or np.sign(pos) != np.sign(holding_pos)):
-                        end_date = date
-                        if 'stop' in status or 'sl' in status or '停損' in status:
-                            sl_x.append(date); sl_y.append(y_val)
-                        else:
-                            tp_x.append(date); tp_y.append(y_val)
-                            
-                        if 'Daily_Delta' in pair_full.columns:
-                            pnl = pair_full.loc[(pair_full['Date'] >= start_date) & (pair_full['Date'] <= end_date), 'Daily_Delta'].sum()
-                        else:
-                            pnl = 0
-                            
-                        f_color = "rgba(74, 222, 128, 0.15)" if pnl > 0 else "rgba(248, 113, 113, 0.15)"
-                        fig_p.add_vrect(
-                            x0=start_date, x1=end_date, fillcolor=f_color,
-                            opacity=1, layer="below", line_width=0,
-                            annotation_text=f"{'Win' if pnl>0 else 'Loss'}", annotation_position="top left", annotation_font_color="white"
-                        )
-                        holding_pos = 0
-                    
-                    if pos != 0 and holding_pos == 0:
-                        holding_pos = pos
-                        start_date = date
-                        if pos > 0:
-                            long_x.append(date); long_y.append(y_val)
-                        else:
-                            short_x.append(date); short_y.append(y_val)
+                if pos != 0 and holding_pos == 0:
+                    holding_pos = pos
+                    start_date = date
+                    if pos > 0:
+                        long_x.append(date); long_y.append(y_val)
+                    else:
+                        short_x.append(date); short_y.append(y_val)
 
-            if holding_pos != 0:
-                end_date = pair_full['Date'].iloc[-1]
-                if 'Daily_Delta' in pair_full.columns:
-                    pnl = pair_full.loc[(pair_full['Date'] >= start_date) & (pair_full['Date'] <= end_date), 'Daily_Delta'].sum()
-                else:
-                    pnl = 0
-                f_color = "rgba(74, 222, 128, 0.15)" if pnl > 0 else "rgba(248, 113, 113, 0.15)"
-                fig_p.add_vrect(x0=start_date, x1=end_date, fillcolor=f_color, opacity=1, layer="below", line_width=0)
-            
-            if long_x: fig_p.add_trace(go.Scatter(x=long_x, y=long_y, mode='markers', name='Buy Long', marker=dict(symbol='triangle-up', size=14, color='#4ade80', line=dict(width=1, color='#0e1117'))), secondary_y=False)
-            if short_x: fig_p.add_trace(go.Scatter(x=short_x, y=short_y, mode='markers', name='Sell Short', marker=dict(symbol='triangle-down', size=14, color='#f87171', line=dict(width=1, color='#0e1117'))), secondary_y=False)
-            if tp_x: fig_p.add_trace(go.Scatter(x=tp_x, y=tp_y, mode='markers', name='Take Profit / Close', marker=dict(symbol='circle', size=12, color='#60a5fa', line=dict(width=1, color='#0e1117'))), secondary_y=False)
-            if sl_x: fig_p.add_trace(go.Scatter(x=sl_x, y=sl_y, mode='markers', name='Stop Loss', marker=dict(symbol='x', size=10, color='#fbd38d', line=dict(width=2.5, color='#fbd38d'))), secondary_y=False)
+        if holding_pos != 0:
+            end_date = pair_full['Date'].iloc[-1]
+            if 'Daily_Delta' in pair_full.columns:
+                pnl = pair_full.loc[(pair_full['Date'] >= start_date) & (pair_full['Date'] <= end_date), 'Daily_Delta'].sum()
+            else:
+                pnl = 0
+            f_color = "rgba(74, 222, 128, 0.15)" if pnl > 0 else "rgba(248, 113, 113, 0.15)"
+            fig_p.add_vrect(x0=start_date, x1=end_date, fillcolor=f_color, opacity=1, layer="below", line_width=0)
+        
+        if long_x: fig_p.add_trace(go.Scatter(x=long_x, y=long_y, mode='markers', name='Buy Long', marker=dict(symbol='triangle-up', size=14, color='#4ade80', line=dict(width=1, color='#0e1117'))), secondary_y=False)
+        if short_x: fig_p.add_trace(go.Scatter(x=short_x, y=short_y, mode='markers', name='Sell Short', marker=dict(symbol='triangle-down', size=14, color='#f87171', line=dict(width=1, color='#0e1117'))), secondary_y=False)
+        if tp_x: fig_p.add_trace(go.Scatter(x=tp_x, y=tp_y, mode='markers', name='Take Profit / Close', marker=dict(symbol='circle', size=12, color='#60a5fa', line=dict(width=1, color='#0e1117'))), secondary_y=False)
+        if sl_x: fig_p.add_trace(go.Scatter(x=sl_x, y=sl_y, mode='markers', name='Stop Loss', marker=dict(symbol='x', size=10, color='#fbd38d', line=dict(width=2.5, color='#fbd38d'))), secondary_y=False)
 
-            fig_p.update_layout(
-                template="plotly_dark", plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
-                hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=0, r=0, t=30, b=0)
-            )
-            st.plotly_chart(fig_p, width='stretch')
+        fig_p.update_layout(
+            template="plotly_dark", plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
+            hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
+        st.plotly_chart(fig_p, width='stretch')
 
 def main():
     st.markdown('<div class="blue-subtitle">QUANTITATIVE PERFORMANCE DATA</div>', unsafe_allow_html=True)
@@ -435,7 +464,8 @@ def main():
     else:
         empty_series = pd.Series({
             'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0, 
-            'Sharpe_Raw': 0, 'MDD_Raw': 0, 'Entries': 0, 'Exits': 0, 'Stop_Losses': 0,
+            'Sharpe_Raw': 0, 'MDD_Raw': 0, 'Entries': 0, 'Exits': 0, 'Stop_Losses': 0, 'Forced_Closes': 0,
+            'Gross_Profit': 0.0, 'Gross_Loss': 0.0,
             'DATASET': '-', 'RE-ENTRY': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-'
         })
         best_cum = best_ann = best_rcc = best_shp = low_dd = empty_series
@@ -466,18 +496,21 @@ def main():
     display_df['ENTRIES (Count)'] = display_df['Entries'].apply(lambda x: f"{int(x):,}")
     display_df['EXITS (Count)'] = display_df['Exits'].apply(lambda x: f"{int(x):,}")
     display_df['STOP LOSSES (Count)'] = display_df['Stop_Losses'].apply(lambda x: f"{int(x):,}" if x >= 0 else "N/A")
+    display_df['FORCED CLOSES (Count)'] = display_df['Forced_Closes'].apply(lambda x: f"{int(x):,}")
+    display_df['GROSS PROFIT ($)'] = display_df['Gross_Profit'].apply(lambda x: f"${x:,.2f}")
+    display_df['GROSS LOSS ($)'] = display_df['Gross_Loss'].apply(lambda x: f"${x:,.2f}")
 
     cols = ['DATASET', 'RE-ENTRY', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 
             'FINAL EQUITY ($)', 'CUM. RETURN (%)', 'ANN. RETURN (%)', 'RCC (%)', 'REC (%)', 'SHARPE', 'MAX DRAWDOWN (%)', 
-            'ENTRIES (Count)', 'EXITS (Count)', 'STOP LOSSES (Count)']
+            'ENTRIES (Count)', 'EXITS (Count)', 'STOP LOSSES (Count)', 'FORCED CLOSES (Count)', 'GROSS PROFIT ($)', 'GROSS LOSS ($)']
     
     df_styled = display_df[cols].style.format({
         'CUM. RETURN (%)': '{:.2%}', 'ANN. RETURN (%)': '{:.2%}',
         'RCC (%)': '{:.2%}', 'REC (%)': '{:.2%}', 'SHARPE': '{:.2f}', 'MAX DRAWDOWN (%)': '{:.2%}'
-    }).map(lambda _: 'color: #4ade80; font-weight: bold;', subset=['CUM. RETURN (%)']) \
+    }).map(lambda _: 'color: #4ade80; font-weight: bold;', subset=['CUM. RETURN (%)', 'GROSS PROFIT ($)']) \
       .map(lambda _: 'color: #60a5fa; font-weight: bold;', subset=['ANN. RETURN (%)']) \
       .map(lambda _: 'color: #fbd38d; font-weight: bold;', subset=['SHARPE']) \
-      .map(lambda _: 'color: #f87171; font-weight: bold;', subset=['MAX DRAWDOWN (%)']) \
+      .map(lambda _: 'color: #f87171; font-weight: bold;', subset=['MAX DRAWDOWN (%)', 'GROSS LOSS ($)']) \
       .map(lambda _: 'color: #ffffff; font-weight: bold;', subset=['FINAL EQUITY ($)'])
 
     event = st.dataframe(
