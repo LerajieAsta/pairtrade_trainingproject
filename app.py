@@ -17,33 +17,33 @@ st.set_page_config(
 )
 
 # ==========================================
-# CUSTOM CSS FOR DARK THEME AESTHETICS
+# CUSTOM CSS FOR DYNAMIC THEME SUPPORT
 # ==========================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
     
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .stApp { background-color: #0e1117; }
     
     .main-title {
-        color: #ffffff; font-size: 2.5rem !important;
+        color: var(--text-color); font-size: 2.5rem !important;
         font-weight: 800; margin-bottom: 0.2rem; letter-spacing: -0.02em;
     }
-    .sub-title { color: #8b949e; font-size: 1rem; margin-bottom: 2rem; }
+    .sub-title { color: var(--text-color); opacity: 0.7; font-size: 1rem; margin-bottom: 2rem; }
     .blue-subtitle {
         color: #3b82f6; font-size: 0.8rem; font-weight: 600;
         text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;
     }
     
     div[data-testid="metric-container"] {
-        background-color: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
         border-radius: 12px; padding: 20px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
     div[data-testid="metric-container"] label {
-        color: #8b949e !important; font-weight: 600 !important; font-size: 0.85rem !important;
+        color: var(--text-color) !important; opacity: 0.8 !important; 
+        font-weight: 600 !important; font-size: 0.85rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -55,7 +55,6 @@ RESULTS_DIR = "results"
 INITIAL_CAPITAL = 10000.0
 
 def natural_sort_key(s):
-    """用於下拉選單的自然排序，使 '20' 排在 '5' 之後"""
     return [int(text) if text.isdigit() else str(text).lower() for text in re.split(r'(\d+)', str(s))]
 
 def scan_strategies(base_dir):
@@ -123,9 +122,19 @@ def extract_features_from_path(path):
     reentry = "NoReEntry" if "noreentry" in path_lower else "ReEntry" if "reentry" in path_lower else "Unknown"
     
     method = "Unknown"
-    if "ssd" in path_lower: method = "SSD"
-    elif "eg" in path_lower: method = "EG"
-    elif "hdbscan" in path_lower: method = "HDBSCAN"
+    if "ssd_basic" in path_lower:
+        method = "SSD (Basic)"
+    elif "ssd" in path_lower:
+        method = "SSD"
+    elif "eg" in path_lower:
+        method = "EG"
+    elif "hdbscan" in path_lower:
+        is_ae = "_ae_" in path_lower or "hdbscan_ae" in path_lower
+        is_pca = "_pca_" in path_lower or "hdbscan_pca" in path_lower
+        if is_ae:
+            method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
+        else:
+            method = "HDBSCAN (PCA)" if is_pca else "HDBSCAN (UMAP)"
 
     top_n = "Top 20"
     match_n = re.search(r'top(\d+)', path_lower)
@@ -188,7 +197,6 @@ def calculate_metrics_raw(strategy_path):
         n_traded = len(df[df['Position'] != 0].drop_duplicates(subset=['Ticker_A', 'Ticker_B']))
         df['Prev_Pos'] = df.groupby(['Ticker_A', 'Ticker_B'])['Position'].shift(1).fillna(0)
         
-        # 精準偵測換向與平倉
         direction_change = df['Position'] != df['Prev_Pos']
         exit_mask = direction_change & (df['Prev_Pos'] != 0)
         n_exits_total = exit_mask.sum()
@@ -204,16 +212,10 @@ def calculate_metrics_raw(strategy_path):
             n_stop_loss = -1
             n_normal_exits = n_exits_total
             
-        # 計算淨收益(Gross Profit)與淨損失(Gross Loss) - 嚴謹狀態機寫法
         if 'Daily_Delta' in df.columns:
-            # 建立狀態機 ID：只要部位改變，狀態 ID 就累加
             state_change = df['Position'] != df['Prev_Pos']
             df['State_ID'] = state_change.groupby([df['Ticker_A'], df['Ticker_B']]).cumsum()
-            
-            # 昨天的狀態決定了今天的 Daily_Delta 歸屬 (確保平倉當日的損益歸屬於前一天的持倉狀態)
             df['Prev_State_ID'] = df.groupby(['Ticker_A', 'Ticker_B'])['State_ID'].shift(1).fillna(0)
-            
-            # 取出所有產生損益的日子 (昨天有持倉，或今日有獨立損益)
             active_mask = (df['Prev_Pos'] != 0) | (df['Daily_Delta'] != 0)
             
             if active_mask.any():
@@ -258,7 +260,6 @@ def make_desc(row):
 
 @st.fragment
 def render_deep_dive(target_row):
-    """深度分析區塊 (使用 st.fragment 隔離重繪)"""
     st.markdown("---")
     st.markdown(f"### 🔍 Strategy Deep Dive: <span style='color:#3b82f6; font-size:1.5rem;'>{make_desc(target_row)}</span>", unsafe_allow_html=True)
     
@@ -329,7 +330,6 @@ def render_deep_dive(target_row):
         
         sel_pair_row = pair_event.selection.rows
         
-    # 將繪圖區移出 col_p2 以實現滿版顯示
     if sel_pair_row:
         t_a = pair_stats.iloc[sel_pair_row[0]]['Stock A']
         t_b = pair_stats.iloc[sel_pair_row[0]]['Stock B']
@@ -384,7 +384,7 @@ def render_deep_dive(target_row):
                     fig_p.add_vrect(
                         x0=start_date, x1=end_date, fillcolor=f_color,
                         opacity=1, layer="below", line_width=0,
-                        annotation_text=f"{'Win' if pnl>0 else 'Loss'}", annotation_position="top left", annotation_font_color="white"
+                        annotation_text=f"{'Win' if pnl>0 else 'Loss'}", annotation_position="top left", annotation_font_color="var(--text-color)"
                     )
                     holding_pos = 0
                 
@@ -405,13 +405,14 @@ def render_deep_dive(target_row):
             f_color = "rgba(74, 222, 128, 0.15)" if pnl > 0 else "rgba(248, 113, 113, 0.15)"
             fig_p.add_vrect(x0=start_date, x1=end_date, fillcolor=f_color, opacity=1, layer="below", line_width=0)
         
-        if long_x: fig_p.add_trace(go.Scatter(x=long_x, y=long_y, mode='markers', name='Buy Long', marker=dict(symbol='triangle-up', size=14, color='#4ade80', line=dict(width=1, color='#0e1117'))), secondary_y=False)
-        if short_x: fig_p.add_trace(go.Scatter(x=short_x, y=short_y, mode='markers', name='Sell Short', marker=dict(symbol='triangle-down', size=14, color='#f87171', line=dict(width=1, color='#0e1117'))), secondary_y=False)
-        if tp_x: fig_p.add_trace(go.Scatter(x=tp_x, y=tp_y, mode='markers', name='Take Profit / Close', marker=dict(symbol='circle', size=12, color='#60a5fa', line=dict(width=1, color='#0e1117'))), secondary_y=False)
+        # 移除了強制深色的外框線，使用透明邊界 (rgba(0,0,0,0))
+        if long_x: fig_p.add_trace(go.Scatter(x=long_x, y=long_y, mode='markers', name='Buy Long', marker=dict(symbol='triangle-up', size=14, color='#4ade80', line=dict(width=1, color='rgba(0,0,0,0)'))), secondary_y=False)
+        if short_x: fig_p.add_trace(go.Scatter(x=short_x, y=short_y, mode='markers', name='Sell Short', marker=dict(symbol='triangle-down', size=14, color='#f87171', line=dict(width=1, color='rgba(0,0,0,0)'))), secondary_y=False)
+        if tp_x: fig_p.add_trace(go.Scatter(x=tp_x, y=tp_y, mode='markers', name='Take Profit / Close', marker=dict(symbol='circle', size=12, color='#60a5fa', line=dict(width=1, color='rgba(0,0,0,0)'))), secondary_y=False)
         if sl_x: fig_p.add_trace(go.Scatter(x=sl_x, y=sl_y, mode='markers', name='Stop Loss', marker=dict(symbol='x', size=10, color='#fbd38d', line=dict(width=2.5, color='#fbd38d'))), secondary_y=False)
 
+        # 移除強制寫死的深色背景，使用 Streamlit 預設的主題相容設定
         fig_p.update_layout(
-            template="plotly_dark", plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
             hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=0, r=0, t=30, b=0)
         )
@@ -510,8 +511,7 @@ def main():
     }).map(lambda _: 'color: #4ade80; font-weight: bold;', subset=['CUM. RETURN (%)', 'GROSS PROFIT ($)']) \
       .map(lambda _: 'color: #60a5fa; font-weight: bold;', subset=['ANN. RETURN (%)']) \
       .map(lambda _: 'color: #fbd38d; font-weight: bold;', subset=['SHARPE']) \
-      .map(lambda _: 'color: #f87171; font-weight: bold;', subset=['MAX DRAWDOWN (%)', 'GROSS LOSS ($)']) \
-      .map(lambda _: 'color: #ffffff; font-weight: bold;', subset=['FINAL EQUITY ($)'])
+      .map(lambda _: 'color: #f87171; font-weight: bold;', subset=['MAX DRAWDOWN (%)', 'GROSS LOSS ($)'])
 
     event = st.dataframe(
         df_styled, width='stretch', hide_index=True, height=350,
@@ -541,10 +541,10 @@ def main():
                     name=desc, line=dict(width=2, color=colors[i % len(colors)])
                 ))
                 
+        # 移除強制寫死的深色背景，使用 Streamlit 預設的主題相容設定
         fig_eq.update_layout(
-            template="plotly_dark", xaxis_title="Date", yaxis_title="Account Equity ($)",
-            hovermode="x unified", plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            xaxis_title="Date", yaxis_title="Account Equity ($)",
+            hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         st.plotly_chart(fig_eq, width='stretch')
 
