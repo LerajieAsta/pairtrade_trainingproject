@@ -42,8 +42,8 @@ class ProgressAwareStdout:
         self.total_rolls = total_rolls
         self.start_time = time.time()
         
-        # 用於匹配策略中輸出的 "處理中：第 XX 期"
-        self.pattern = re.compile(r"處理中[：:]\s*(?:第\s*)?(\d+)\s*期")
+        # 用於匹配策略中輸出的 "處理中：第 XX 期" 或 "▶ 第 XX 期"
+        self.pattern = re.compile(r"(?:處理中[：:]|▶)\s*(?:處理中[：:])?\s*(?:第\s*)?(\d+)\s*期")
 
     def write(self, s):
         self.log_file.write(s)
