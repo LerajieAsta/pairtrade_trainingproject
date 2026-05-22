@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+src/__init__.py
+src/pairtrade_trainingproject.egg-info/PKG-INFO
+src/pairtrade_trainingproject.egg-info/SOURCES.txt
+src/pairtrade_trainingproject.egg-info/dependency_links.txt
+src/pairtrade_trainingproject.egg-info/top_level.txt

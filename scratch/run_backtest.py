@@ -33,9 +33,9 @@ def run_notebook(notebook_path, reduce_method="umap", is_ae=False):
     code_str = "".join(code_lines)
     
     # ── 1. 修改為極簡網格參數，以利於在 10 秒內跑完回測 ──
-    code_str = code_str.replace("TOP_N_LIST         = [1, 5, 10, 20]", "TOP_N_LIST         = [1]")
-    code_str = code_str.replace("STOP_LOSS_LIST     = [0, 0.05, 0.1, 0.15]", "STOP_LOSS_LIST     = [0.05]")
-    code_str = code_str.replace("ZSCORE_WINDOW_LIST = [0, 20, 40, 60]", "ZSCORE_WINDOW_LIST = [20]")
+    # code_str = code_str.replace("TOP_N_LIST         = [1, 5, 10, 20]", "TOP_N_LIST         = [1]")
+    # code_str = code_str.replace("STOP_LOSS_LIST     = [0, 0.05, 0.1, 0.15]", "STOP_LOSS_LIST     = [0.05]")
+    # code_str = code_str.replace("ZSCORE_WINDOW_LIST = [0, 20, 40, 60]", "ZSCORE_WINDOW_LIST = [20]")
     
     # ── 2. 動態覆寫降維參數 ──
     if "reduce_method=getattr(self, \"reduce_method\", \"umap\")" in code_str:

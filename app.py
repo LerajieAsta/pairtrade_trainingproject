@@ -247,13 +247,31 @@ def calculate_metrics_raw(strategy_path):
         '_path': strategy_path
     }
 
-@st.cache_data(show_spinner=False)
 def build_master_dataframe(strategies):
     records = []
-    for s in strategies:
+    total = len(strategies)
+    if total == 0:
+        return pd.DataFrame()
+        
+    progress_bar = st.progress(0.0)
+    status_text = st.empty()
+    
+    for i, s in enumerate(strategies):
+        pct = float((i + 1) / total)
+        progress_bar.progress(pct)
+        
+        # 格式化顯示名稱，更為美觀
+        short_name = s.split('/')[-1] if '/' in s else s
+        status_text.markdown(f"📊 **Compiling Metrics** ({i+1}/{total}): `{short_name}`")
+        
         res = calculate_metrics_raw(s)
-        if res: records.append(res)
+        if res: 
+            records.append(res)
+            
+    progress_bar.empty()
+    status_text.empty()
     return pd.DataFrame(records)
+
 
 def make_desc(row): 
     return f"{row['DATASET']} · {row['RE-ENTRY']} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}"
