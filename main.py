@@ -403,6 +403,8 @@ def main():
         "zscore_clip": 10.0,
         "min_spread_std": 1e-6,
         "min_tickers_for_pairing": 2,
+        "use_dynamic_stop": False,
+        "dynamic_stop_z": 3.0,
         
         # 統一網格搜尋參數：所有策略調用相同參數以進行公平、科學的績效比較
         "top_n_list": [5, 10, 20],              # 統一挑選的最優配對組數 (Top N)
@@ -446,6 +448,7 @@ def main():
             "sub_dir": f"HDBSCAN_UMAP_{reentry_suffix}",
             "params": {
                 **base_params,
+                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
                 "reduce_method": "umap",               # 降維演算法類型。建議: ["umap", "pca"] (umap保留局部非線性拓撲佳, pca速度極快)
                 "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數。建議: [5, 30] (過大會導致分群極少，過小則群體細碎且多噪聲)
                 "hdbscan_min_samples": 5,              # HDBSCAN鄰域核心點樣本數。建議: [1, 10] (控制噪聲判定；越大分群越保守，噪聲越多但群集越純)
@@ -464,9 +467,10 @@ def main():
             "sub_dir": f"HDBSCAN_PCA_{reentry_suffix}",
             "params": {
                 **base_params,
+                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
                 "reduce_method": "pca",                # 降維演算法類型。建議: ["umap", "pca"] (pca速度極快，主要抓取最大方差方向)
                 "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數。建議: [5, 30] (控制分群規模，決定最少多少檔股票能成一組群集)
-                "hdbscan_min_samples": 5,              # HDBSCAN鄰域核心點樣本數。建議: [1, 10] (數值越小群集邊緣越寬鬆，數值越大則分群要求越精準)
+                "hdbscan_min_samples": 5,              # HDBSCAN鄰域核心點樣本數. 建議: [1, 10] (數值越小群集邊緣越寬鬆，數值越大則分群要求越精準)
                 "hdbscan_metric": "euclidean",         # 距離度量指標。建議: ["euclidean", "cosine"]
                 "umap_n_components": 8,                # UMAP降維目標空間特徵維度 (此PCA模式下不被調用)
                 "umap_n_neighbors": 20,                # UMAP拓撲計算之鄰近點個數 (此PCA模式下不被調用)
@@ -482,6 +486,7 @@ def main():
             "sub_dir": f"HDBSCAN_AE_UMAP_{reentry_suffix}",
             "params": {
                 **base_params,
+                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
                 "reduce_method": "umap",               # 降維演算法類型。建議: ["umap", "pca"] (在自編碼器壓縮後的特徵空間再降維)
                 "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數。建議: [5, 30]
                 "hdbscan_min_samples": 2,              # HDBSCAN鄰域核心點樣本數。建議: [1, 10]
@@ -500,6 +505,7 @@ def main():
             "sub_dir": f"HDBSCAN_AE_PCA_{reentry_suffix}",
             "params": {
                 **base_params,
+                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
                 "reduce_method": "pca",                # 降維演算法類型。建議: ["umap", "pca"] (在自編碼器壓縮後使用PCA進行正交方差最大化降維)
                 "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數。建議: [5, 30]
                 "hdbscan_min_samples": 2,              # HDBSCAN鄰域核心點樣本數。建議: [1, 10]

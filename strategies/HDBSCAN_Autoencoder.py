@@ -96,11 +96,13 @@ class MLPAutoencoder(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, 64),
             nn.Tanh(),
+            nn.Dropout(0.3),  # 引入隨機遮蔽去噪
             nn.Linear(64, latent_dim)
         )
         self.decoder = nn.Sequential(
             nn.Linear(latent_dim, 64),
             nn.Tanh(),
+            nn.Dropout(0.3),
             nn.Linear(64, input_dim)
         )
     def forward(self, x):
@@ -108,11 +110,12 @@ class MLPAutoencoder(nn.Module):
         decoded = self.decoder(latent)
         return latent, decoded
 
-def train_autoencoder(X_train, latent_dim=8, epochs=100, lr=0.01):
+def train_autoencoder(X_train, latent_dim=8, epochs=30, lr=0.005):
     tensor_x = torch.tensor(X_train, dtype=torch.float32)
     input_dim = X_train.shape[1]
     model = MLPAutoencoder(input_dim, latent_dim)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    # 引入 weight_decay 進行 L2 正則化，防止高頻噪聲過擬合
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     criterion = nn.MSELoss()
     
     model.train()
@@ -344,6 +347,26 @@ class Formation:
                         rejected_count += 1
                         continue
 
+                    # Ornstein-Uhlenbeck 均值復歸半衰期過濾
+                    dy = np.diff(best_resid)
+                    y_lag = best_resid[:-1]
+                    n_dy = len(dy)
+                    x_mat = np.column_stack([np.ones(n_dy), y_lag])
+                    try:
+                        coeffs, _, _, _ = np.linalg.lstsq(x_mat, dy, rcond=None)
+                        lambda_val = coeffs[1]
+                    except Exception:
+                        lambda_val = 0.0
+
+                    if lambda_val >= 0.0:
+                        rejected_count += 1
+                        continue
+                    
+                    halflife = -np.log(2) / lambda_val
+                    if halflife < 2.0 or halflife > 60.0:
+                        rejected_count += 1
+                        continue
+
                     passed_count += 1
                     spread_mean = float(np.mean(best_resid))
                     spread_std  = float(np.std(best_resid, ddof=1)) if len(best_resid) > 1 else 0.0
@@ -448,6 +471,8 @@ class Trading:
         allow_reentry: bool = False,
         zscore_clip: float = 10.0,
         min_spread_std: float = 1e-6,
+        use_dynamic_stop: bool = False,
+        dynamic_stop_z: float = 3.0,
     ):
         self.price_df        = price_df.copy()
         self.trade_dates     = trade_dates
@@ -461,6 +486,8 @@ class Trading:
         self.allow_reentry   = allow_reentry
         self.zscore_clip     = zscore_clip
         self.min_spread_std  = min_spread_std
+        self.use_dynamic_stop = use_dynamic_stop
+        self.dynamic_stop_z  = dynamic_stop_z
         self.period_pnl: float = 0.0
 
     def _execute_entry(self, state, z, p_a, p_b, hedge_ratio):
@@ -619,7 +646,10 @@ class Trading:
                 exit_fee = (abs(state.shares_a) * p_a + abs(state.shares_b) * p_b) * self.friction_rate
                 cur_tpnl = raw_unr - state.trade_entry_fee - exit_fee
 
-                if self.stop_loss_pct > 0 and (-cur_tpnl / self.capital_per_pair) >= self.stop_loss_pct:
+                is_cap_stop = self.stop_loss_pct > 0 and (-cur_tpnl / self.capital_per_pair) >= self.stop_loss_pct
+                is_z_stop = self.use_dynamic_stop and abs(z) > self.dynamic_stop_z
+
+                if is_cap_stop or is_z_stop:
                     self._execute_close(state, cur_tpnl, stop_loss=True)
                     tpnl, status = cur_tpnl, "STOP_LOSS_TRIGGERED"
                 elif (state.position == -1 and z <= self.exit_z) or (state.position == 1 and z >= -self.exit_z):
@@ -826,6 +856,8 @@ class RollingBacktester:
         adf_pvalue_threshold: float,   # 0.01=保守 / 0.05=積極
         output_dir: Path,
         reduce_method: str = "umap",
+        use_dynamic_stop: bool = False,
+        dynamic_stop_z: float = 3.0,
     ):
         self.__dict__.update(locals())
         self.__dict__.pop("self")
@@ -909,6 +941,8 @@ class RollingBacktester:
                     stop_loss_pct=sl, entry_z=self.entry_z, exit_z=self.exit_z,
                     zscore_window=z_win, allow_reentry=self.allow_reentry,
                     zscore_clip=self.zscore_clip, min_spread_std=self.min_spread_std,
+                    use_dynamic_stop=getattr(self, "use_dynamic_stop", False),
+                    dynamic_stop_z=getattr(self, "dynamic_stop_z", 3.0),
                 )
 
                 trade_log_df, period_pnl = trading.run(ts_str, te_str)
