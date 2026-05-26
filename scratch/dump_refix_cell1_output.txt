@@ -1,0 +1,750 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import matplotlib.dates as mdates
+from matplotlib.patches import FancyArrowPatch
+from IPython.display import display
+import warnings
+warnings.filterwarnings('ignore')
+
+# ─────────────────────────────────────────────
+#  字型設定（支援中文）
+# ─────────────────────────────────────────────
+import matplotlib.font_manager as fm
+
+def _find_cjk_font():
+    candidates = [
+        'Microsoft JhengHei', 'Microsoft YaHei',
+        'SimHei', 'SimSun', 'NSimSun',
+        'PingFang TC', 'PingFang SC',
+        'Noto Sans CJK TC', 'Noto Sans CJK SC',
+        'WenQuanYi Micro Hei', 'AR PL UMing TW',
+        'TW-Kai', 'TW-Sung',
+    ]
+    available = {f.name for f in fm.fontManager.ttflist}
+    for c in candidates:
+        if c in available:
+            return c
+    return None
+
+_cjk = _find_cjk_font()
+if _cjk:
+    plt.rcParams['font.family'] = [_cjk, 'DejaVu Sans']
+    print(f"✅ 使用字型：{_cjk}")
+else:
+    plt.rcParams['font.family'] = ['DejaVu Sans']
+    print("⚠️  找不到中文字型，中文標籤將顯示為方塊。請安裝字型後重試。")
+plt.rcParams['axes.unicode_minus'] = False
+STYLE = {
+    'bg':       '#0D1117',
+    'panel':    '#161B22',
+    'border':   '#30363D',
+    'text':     '#E6EDF3',
+    'subtext':  '#8B949E',
+    'green':    '#3FB950',
+    'red':      '#F85149',
+    'yellow':   '#D29922',
+    'blue':     '#58A6FF',
+    'purple':   '#BC8CFF',
+    'orange':   '#FFA657',
+    'grid':     '#21262D',
+}
+
+# ─────────────────────────────────────────────
+#  1. 讀取資料
+# ─────────────────────────────────────────────
+price_file_path = r"D:\Unknown\Papper\Code\Ref_CODE\二十年股價.xlsx"
+df_prices = pd.read_excel(price_file_path, sheet_name="Sheet1")
+df_prices['Date'] = pd.to_datetime(df_prices['Date'])
+df_prices.set_index('Date', inplace=True)
+
+dates_file_path = r"D:\Unknown\Papper\Code\Ref_CODE\日期.xlsx"
+df_dates = pd.read_excel(dates_file_path, sheet_name="Sheet1")
+
+# ─────────────────────────────────────────────
+#  2. 核心函式
+# ─────────────────────────────────────────────
+
+def calculate_daily_spread(stock_pairs, data):
+    spread = pd.DataFrame(index=data.index)
+    for _, row in stock_pairs.iterrows():
+        s1, s2 = row['Stock1'], row['Stock2']
+        pair = f"{s1}-{s2}"
+        if s1 in data.columns and s2 in data.columns:
+            spread[pair] = data[s1] - data[s2]
+    return spread
+
+
+def generate_trade_signals(price_diff, mean_spread, std_spread):
+    upper = mean_spread + 2 * std_spread
+    lower = mean_spread - 2 * std_spread
+    df = pd.DataFrame(index=price_diff.index)
+    df['spread'] = price_diff
+    df['spread_prev'] = df['spread'].shift(1)
+    df['signal1'] = 0
+    df['position1'] = 0
+
+    for t in df.index[1:]:
+        prev = df.at[t, 'spread_prev']
+        curr = df.at[t, 'spread']
+        pos_prev = df.at[df.index[df.index.get_loc(t) - 1], 'position1']
+        if pos_prev == 0:
+            if prev > upper and curr <= upper:
+                df.at[t, 'signal1'] = -1
+            elif prev < lower and curr >= lower:
+                df.at[t, 'signal1'] = 1
+        else:
+            if pos_prev == -1 and curr >= mean_spread:
+                df.at[t, 'signal1'] = 1
+            elif pos_prev == 1 and curr <= mean_spread:
+                df.at[t, 'signal1'] = -1
+        df.at[t, 'position1'] = pos_prev + df.at[t, 'signal1']
+
+    penult = df.index[-2]
+    last = df.index[-1]
+    if df.at[penult, 'position1'] != 0:
+        df.at[last, 'signal1'] = -df.at[penult, 'position1']
+        df.at[last, 'position1'] = 0
+
+    df['signal2'] = -df['signal1']
+    df['position2'] = -df['position1']
+    df['trade1'] = df['signal1']
+    df['trade2'] = df['signal2']
+    return df[['spread', 'position1', 'position2', 'trade1', 'trade2']]
+
+
+def generate_trade_records(signals, trade_data, initial_capital=100000, stop_loss_pct=0.10):
+    half_cap = initial_capital / 2
+    records = []
+    for pair in signals['pair'].unique():
+        sig = signals[signals['pair'] == pair]
+        s1, s2 = pair.split('-')
+        p1 = trade_data[s1]; p2 = trade_data[s2]
+        rec = pd.DataFrame(index=sig.index)
+        rec['trade1'] = sig['trade1']
+        rec['trade2'] = sig['trade2']
+        rec['price1'] = p1
+        rec['price2'] = p2
+        rec['cash1'] = np.nan; rec['cash2'] = np.nan
+        rec['holdings1'] = np.nan; rec['holdings2'] = np.nan
+        rec['total_value'] = np.nan
+        rec['stop_loss'] = 0
+
+        cash1 = cash2 = half_cap
+        hold1 = hold2 = 0.0
+        rec.iloc[0, rec.columns.get_loc('cash1')] = cash1
+        rec.iloc[0, rec.columns.get_loc('cash2')] = cash2
+        rec.iloc[0, rec.columns.get_loc('holdings1')] = hold1
+        rec.iloc[0, rec.columns.get_loc('holdings2')] = hold2
+        rec.iloc[0, rec.columns.get_loc('total_value')] = cash1 + cash2
+
+        for i in range(1, len(rec)):
+            t = rec.index[i]
+            t1 = rec.at[t, 'trade1']; t2 = rec.at[t, 'trade2']
+            pr1 = rec.at[t, 'price1']; pr2 = rec.at[t, 'price2']
+            if t1 != 0:
+                cash1 += -t1 * half_cap - abs(half_cap) * 0.001
+                hold1 = t1 * (half_cap / pr1)
+            if t2 != 0:
+                cash2 += -t2 * half_cap - abs(half_cap) * 0.001
+                hold2 = t2 * (half_cap / pr2)
+            total = cash1 + cash2 + hold1 * pr1 + hold2 * pr2
+            loss_pct = (initial_capital - total) / initial_capital
+            if loss_pct >= stop_loss_pct and (hold1 != 0 or hold2 != 0):
+                cash1 += hold1 * pr1; cash2 += hold2 * pr2
+                hold1 = hold2 = 0.0
+                rec.at[t, 'stop_loss'] = 1
+                total = cash1 + cash2
+            else:
+                rec.at[t, 'stop_loss'] = 0
+            rec.at[t, 'cash1'] = cash1; rec.at[t, 'cash2'] = cash2
+            rec.at[t, 'holdings1'] = hold1; rec.at[t, 'holdings2'] = hold2
+            rec.at[t, 'total_value'] = total
+        rec['pair'] = pair
+        records.append(rec)
+    return pd.concat(records)
+
+
+# ─────────────────────────────────────────────
+#  3. 績效指標計算函式
+# ─────────────────────────────────────────────
+
+def compute_nav_series(total_value_series, initial_capital=100000):
+    """將 total_value 轉為淨值（以1為基準）"""
+    return total_value_series / initial_capital
+
+
+def compute_max_drawdown(nav_series):
+    """最大回撤"""
+    rolling_max = nav_series.cummax()
+    drawdown = (nav_series - rolling_max) / rolling_max
+    return drawdown.min(), drawdown
+
+
+def compute_sharpe(daily_returns, risk_free_rate=0.02, trading_days=252):
+    """年化夏普比率"""
+    excess = daily_returns - risk_free_rate / trading_days
+    if excess.std() == 0:
+        return np.nan
+    return np.sqrt(trading_days) * excess.mean() / excess.std()
+
+
+def compute_calmar(annualized_return, max_drawdown):
+    """卡瑪比率"""
+    if max_drawdown == 0:
+        return np.nan
+    return annualized_return / abs(max_drawdown)
+
+
+def compute_sortino(daily_returns, risk_free_rate=0.02, trading_days=252):
+    """索提諾比率"""
+    excess = daily_returns - risk_free_rate / trading_days
+    downside = excess[excess < 0]
+    if len(downside) == 0 or downside.std() == 0:
+        return np.nan
+    return np.sqrt(trading_days) * excess.mean() / downside.std()
+
+
+def compute_win_rate(trade_pnl_list):
+    """勝率"""
+    if len(trade_pnl_list) == 0:
+        return np.nan
+    wins = sum(1 for p in trade_pnl_list if p > 0)
+    return wins / len(trade_pnl_list)
+
+
+def compute_profit_factor(trade_pnl_list):
+    """獲利因子"""
+    gains = sum(p for p in trade_pnl_list if p > 0)
+    losses = abs(sum(p for p in trade_pnl_list if p < 0))
+    if losses == 0:
+        return np.inf
+    return gains / losses
+
+
+def extract_trade_pnl(rec_df, initial_capital=100000):
+    """從交易記錄提取每筆交易盈虧"""
+    pnl = []
+    half = initial_capital / 2
+    in_trade = False
+    entry_val = initial_capital
+    for i, row in rec_df.iterrows():
+        if (row['trade1'] != 0 or row['trade2'] != 0) and not in_trade:
+            entry_val = row['total_value']
+            in_trade = True
+        elif (row['trade1'] != 0 or row['trade2'] != 0) and in_trade:
+            pnl.append(row['total_value'] - entry_val)
+            entry_val = row['total_value']
+    return pnl
+
+
+def full_performance_report(tr_records, initial_capital=100000, risk_free=0.02):
+    """計算所有配對的完整績效報告"""
+    results = []
+    for pair, grp in tr_records.groupby('pair'):
+        grp = grp.sort_index()
+        tv = grp['total_value'].ffill()
+
+        nav = compute_nav_series(tv, initial_capital)
+        daily_ret = tv.pct_change().dropna()
+        n_days = len(grp)
+        years = n_days / 252
+
+        total_ret = (tv.iloc[-1] - initial_capital) / initial_capital
+        ann_ret = (1 + total_ret) ** (1 / years) - 1 if years > 0 else 0
+        mdd_val, _ = compute_max_drawdown(nav)
+        sharpe = compute_sharpe(daily_ret, risk_free)
+        sortino = compute_sortino(daily_ret, risk_free)
+        calmar = compute_calmar(ann_ret, mdd_val)
+        pnl_list = extract_trade_pnl(grp, initial_capital)
+        win_rate = compute_win_rate(pnl_list)
+        profit_factor = compute_profit_factor(pnl_list)
+        n_trades = len(pnl_list)
+
+        results.append({
+            '配對': pair,
+            '總報酬率(%)': round(total_ret * 100, 2),
+            '年化報酬率(%)': round(ann_ret * 100, 2),
+            '最大回撤(%)': round(mdd_val * 100, 2),
+            '夏普比率': round(sharpe, 3) if not np.isnan(sharpe) else 'N/A',
+            '索提諾比率': round(sortino, 3) if not np.isnan(sortino) else 'N/A',
+            '卡瑪比率': round(calmar, 3) if not np.isnan(calmar) else 'N/A',
+            '勝率(%)': round(win_rate * 100, 1) if not np.isnan(win_rate) else 'N/A',
+            '獲利因子': round(profit_factor, 3) if profit_factor != np.inf else '∞',
+            '交易次數': n_trades,
+        })
+    return pd.DataFrame(results)
+
+
+# ─────────────────────────────────────────────
+#  4. 主迴圈
+# ─────────────────────────────────────────────
+final_20 = pd.DataFrame()
+all_tr_records = []       # 儲存所有輪次的交易記錄
+all_round_meta = []       # 每輪的元資料
+last_round_data = {}      # 最後一輪資料（供進出場圖使用）
+
+for idx, row in df_dates.iterrows():
+    fs = pd.to_datetime(row["形成期開始"])
+    fe = pd.to_datetime(row["形成期結束"])
+    ts = pd.to_datetime(row["交易期開始"])
+    te = pd.to_datetime(row["交易期結束"])
+
+    formation = df_prices.loc[fs:fe].ffill().bfill()
+    trade     = df_prices.loc[ts:te].ffill().bfill()
+
+    pair_fp  = f"D:/Unknown/Papper/Code/Ref_CODE/SSD配對結果/SSD配對結果({fs.strftime('%Y-%m-%d')}).xlsx"
+    df_pairs = pd.read_excel(pair_fp)
+    stock_pairs = df_pairs[["Stock1", "Stock2"]].head(20)
+
+    norm_f      = (1 + formation.pct_change().fillna(0)).cumprod()
+    spread_f    = calculate_daily_spread(stock_pairs, norm_f)
+    mean_spread = spread_f.mean()
+    std_spread  = spread_f.std(ddof=0)
+
+    norm_t   = trade.div(formation.iloc[0])
+    spread_t = calculate_daily_spread(stock_pairs, norm_t)
+
+    sigs = []
+    for _, r in stock_pairs.iterrows():
+        name   = f"{r['Stock1']}-{r['Stock2']}"
+        sig_df = generate_trade_signals(spread_t[name], mean_spread[name], std_spread[name])
+        sig_df["pair"] = name
+        sigs.append(sig_df)
+    all_signals = pd.concat(sigs)
+    tr_records  = generate_trade_records(all_signals, trade)
+
+    # 儲存本輪資料
+    tr_records['round'] = idx + 1
+    tr_records['ts'] = ts
+    tr_records['te'] = te
+    all_tr_records.append(tr_records)
+
+    # 月度報酬
+    tr_records["year_month"] = tr_records.index.to_period("M").astype(str)
+    all_months = pd.period_range(ts, te, freq="M").astype(str).tolist()
+
+    mdf = []
+    for pair, grp in tr_records.groupby("pair"):
+        for ym, g in grp.groupby("year_month"):
+            if not g[["trade1", "trade2"]].abs().any().any():
+                continue
+            sv = g["total_value"].iloc[0]
+            ev = g["total_value"].iloc[-1]
+            mdf.append({"pair": pair, "year_month": ym, "ret": (ev - sv) / sv})
+    mdf = pd.DataFrame(mdf)
+
+    def avg_ret(pairs):
+        return (
+            mdf[mdf["pair"].isin(pairs)]
+              .groupby("year_month")["ret"]
+              .mean()
+              .reindex(all_months, fill_value=0)
+              .reset_index()
+              .rename(columns={"ret": "avg_monthly_return"})
+        )
+
+    pairs20 = stock_pairs.apply(lambda x: f"{x['Stock1']}-{x['Stock2']}", axis=1).tolist()
+    a20     = avg_ret(pairs20)
+    label   = f"第{idx+1}輪"
+    final_20 = pd.concat([
+        final_20,
+        pd.DataFrame([a20["avg_monthly_return"].values], index=[label], columns=all_months)
+    ])
+
+    # 儲存最後一輪資料供作圖
+    if idx == len(df_dates) - 1:
+        last_round_data = {
+            'tr_records':   tr_records,
+            'all_signals':  all_signals,
+            'trade':        trade,
+            'stock_pairs':  stock_pairs,
+            'mean_spread':  mean_spread,
+            'std_spread':   std_spread,
+            'spread_t':     spread_t,
+        }
+    all_round_meta.append({'round': idx + 1, 'ts': ts, 'te': te, 'pairs': pairs20})
+
+final_20.loc["等權平均"] = final_20.mean(axis=0)
+
+# ─────────────────────────────────────────────
+#  5. 整合所有輪次的淨值序列（前20對等權）
+# ─────────────────────────────────────────────
+INITIAL_CAPITAL = 100000
+
+combined_tv = []
+for rdf in all_tr_records:
+    pairs20 = all_round_meta[rdf['round'].iloc[0] - 1]['pairs']
+    sub = rdf[rdf['pair'].isin(pairs20)].copy()
+    daily_avg = sub.groupby(sub.index)['total_value'].mean()
+    combined_tv.append(daily_avg)
+
+combined_tv = pd.concat(combined_tv).sort_index()
+combined_tv = combined_tv[~combined_tv.index.duplicated(keep='last')]
+combined_nav = combined_tv / INITIAL_CAPITAL
+
+# ─────────────────────────────────────────────
+#  6. 全局績效指標
+# ─────────────────────────────────────────────
+combined_daily_ret = combined_nav.pct_change().dropna()
+total_days = len(combined_nav)
+years = total_days / 252
+total_ret = combined_nav.iloc[-1] - 1
+ann_ret   = (1 + total_ret) ** (1 / years) - 1 if years > 0 else 0
+mdd_val, mdd_series = compute_max_drawdown(combined_nav)
+sharpe    = compute_sharpe(combined_daily_ret)
+sortino   = compute_sortino(combined_daily_ret)
+calmar    = compute_calmar(ann_ret, mdd_val)
+vol       = combined_daily_ret.std() * np.sqrt(252)
+
+summary_stats = {
+    '總報酬率':     f"{total_ret*100:.2f}%",
+    '年化報酬率':   f"{ann_ret*100:.2f}%",
+    '年化波動度':   f"{vol*100:.2f}%",
+    '最大回撤':     f"{mdd_val*100:.2f}%",
+    '夏普比率':     f"{sharpe:.3f}",
+    '索提諾比率':   f"{sortino:.3f}",
+    '卡瑪比率':     f"{calmar:.3f}",
+    '回測天數':     f"{total_days}",
+    '回測年數':     f"{years:.1f}",
+}
+
+# ─────────────────────────────────────────────
+#  7. 個別配對績效報告
+# ─────────────────────────────────────────────
+all_tr_combined = pd.concat(all_tr_records)
+perf_df = full_performance_report(all_tr_combined, INITIAL_CAPITAL)
+
+print("=" * 70)
+print("  全局績效摘要（前20對等權平均）")
+print("=" * 70)
+for k, v in summary_stats.items():
+    print(f"  {k:<12}: {v}")
+print()
+print("=== 各配對績效報告 ===")
+display(perf_df)
+print()
+print("=== 前20對月度 REC ===")
+display(final_20)
+
+# ─────────────────────────────────────────────
+#  8. 主視覺化 Dashboard
+# ─────────────────────────────────────────────
+
+def styled_ax(ax, title='', xlabel='', ylabel=''):
+    ax.set_facecolor(STYLE['panel'])
+    ax.tick_params(colors=STYLE['subtext'], labelsize=8)
+    for spine in ax.spines.values():
+        spine.set_edgecolor(STYLE['border'])
+    ax.yaxis.label.set_color(STYLE['subtext'])
+    ax.xaxis.label.set_color(STYLE['subtext'])
+    ax.title.set_color(STYLE['text'])
+    ax.grid(True, color=STYLE['grid'], linewidth=0.5, linestyle='--', alpha=0.7)
+    if title:  ax.set_title(title, fontsize=10, fontweight='bold', pad=8)
+    if xlabel: ax.set_xlabel(xlabel, fontsize=8)
+    if ylabel: ax.set_ylabel(ylabel, fontsize=8)
+
+
+fig = plt.figure(figsize=(20, 24), facecolor=STYLE['bg'])
+fig.suptitle('配對交易策略 ─ 完整績效報告', fontsize=18, color=STYLE['text'],
+             fontweight='bold', y=0.98)
+
+gs = gridspec.GridSpec(5, 3, figure=fig, hspace=0.45, wspace=0.35,
+                       top=0.95, bottom=0.04, left=0.06, right=0.97)
+
+# ── 8-1. 淨值曲線（跨2欄） ──────────────────
+ax_nav = fig.add_subplot(gs[0, :2])
+styled_ax(ax_nav, title='📈 策略淨值曲線（前20對等權平均）', ylabel='淨值')
+ax_nav.plot(combined_nav.index, combined_nav.values,
+            color=STYLE['blue'], linewidth=1.5, label='策略淨值')
+ax_nav.axhline(1.0, color=STYLE['border'], linewidth=0.8, linestyle='--')
+ax_nav.fill_between(combined_nav.index, combined_nav.values, 1,
+                    where=combined_nav.values >= 1,
+                    alpha=0.15, color=STYLE['green'])
+ax_nav.fill_between(combined_nav.index, combined_nav.values, 1,
+                    where=combined_nav.values < 1,
+                    alpha=0.15, color=STYLE['red'])
+ax_nav.legend(fontsize=8, facecolor=STYLE['panel'], labelcolor=STYLE['text'],
+              edgecolor=STYLE['border'])
+ax_nav.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+ax_nav.xaxis.set_major_locator(mdates.YearLocator())
+plt.setp(ax_nav.get_xticklabels(), rotation=30)
+
+# ── 8-2. 績效摘要方塊 ──────────────────────
+ax_sum = fig.add_subplot(gs[0, 2])
+ax_sum.set_facecolor(STYLE['panel'])
+ax_sum.axis('off')
+ax_sum.set_title('📊 績效摘要', fontsize=10, fontweight='bold',
+                 color=STYLE['text'], pad=8)
+
+keys   = list(summary_stats.keys())
+vals   = list(summary_stats.values())
+colors_val = []
+for k, v in summary_stats.items():
+    if '%' in v:
+        num = float(v.replace('%',''))
+        if k in ['最大回撤']:
+            colors_val.append(STYLE['red'] if num < 0 else STYLE['green'])
+        else:
+            colors_val.append(STYLE['green'] if num > 0 else STYLE['red'])
+    elif any(c in k for c in ['比率']):
+        try:
+            num = float(v)
+            colors_val.append(STYLE['green'] if num > 0 else STYLE['red'])
+        except:
+            colors_val.append(STYLE['text'])
+    else:
+        colors_val.append(STYLE['blue'])
+
+y_pos = np.linspace(0.92, 0.05, len(keys))
+for i, (k, v, c) in enumerate(zip(keys, vals, colors_val)):
+    ax_sum.text(0.02, y_pos[i], k, transform=ax_sum.transAxes,
+                fontsize=8.5, color=STYLE['subtext'], va='center')
+    ax_sum.text(0.98, y_pos[i], v, transform=ax_sum.transAxes,
+                fontsize=9, color=c, va='center', ha='right', fontweight='bold')
+    if i < len(keys) - 1:
+        ax_sum.plot([0.01, 0.99], [y_pos[i] - 0.05, y_pos[i] - 0.05],
+                    color=STYLE['border'], linewidth=0.4,
+                    transform=ax_sum.transAxes, clip_on=False)
+for spine in ax_sum.spines.values():
+    spine.set_edgecolor(STYLE['border'])
+
+# ── 8-3. 最大回撤圖（跨2欄） ──────────────
+ax_dd = fig.add_subplot(gs[1, :2])
+styled_ax(ax_dd, title='📉 最大回撤', ylabel='回撤幅度')
+ax_dd.fill_between(mdd_series.index, mdd_series.values, 0,
+                   color=STYLE['red'], alpha=0.5)
+ax_dd.plot(mdd_series.index, mdd_series.values,
+           color=STYLE['red'], linewidth=0.8)
+ax_dd.axhline(mdd_val, color=STYLE['yellow'], linewidth=1, linestyle='--',
+              label=f'最大回撤 {mdd_val*100:.2f}%')
+ax_dd.legend(fontsize=8, facecolor=STYLE['panel'], labelcolor=STYLE['text'],
+             edgecolor=STYLE['border'])
+ax_dd.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x*100:.1f}%'))
+ax_dd.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+ax_dd.xaxis.set_major_locator(mdates.YearLocator())
+plt.setp(ax_dd.get_xticklabels(), rotation=30)
+
+# ── 8-4. 滾動夏普比率（右欄）──────────────
+ax_sh = fig.add_subplot(gs[1, 2])
+styled_ax(ax_sh, title='夏普比率（滾動60日）', ylabel='夏普比率')
+rolling_sharpe = combined_daily_ret.rolling(60).apply(
+    lambda x: np.sqrt(252) * x.mean() / x.std() if x.std() > 0 else np.nan)
+ax_sh.plot(rolling_sharpe.index, rolling_sharpe.values,
+           color=STYLE['purple'], linewidth=1)
+ax_sh.axhline(0, color=STYLE['border'], linewidth=0.8, linestyle='--')
+ax_sh.fill_between(rolling_sharpe.index, rolling_sharpe.values, 0,
+                   where=rolling_sharpe.values >= 0,
+                   alpha=0.2, color=STYLE['green'])
+ax_sh.fill_between(rolling_sharpe.index, rolling_sharpe.values, 0,
+                   where=rolling_sharpe.values < 0,
+                   alpha=0.2, color=STYLE['red'])
+ax_sh.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.setp(ax_sh.get_xticklabels(), rotation=30)
+
+# ── 8-5. 月度報酬熱力圖 ──────────────────
+ax_hm = fig.add_subplot(gs[2, :])
+styled_ax(ax_hm, title='月度報酬率矩陣（各輪次）')
+hm_data = final_20.drop("等權平均", errors='ignore')
+hm_arr  = hm_data.values.astype(float)
+im = ax_hm.imshow(hm_arr, aspect='auto', cmap='RdYlGn',
+                  vmin=-0.05, vmax=0.05)
+ax_hm.set_yticks(range(len(hm_data.index)))
+ax_hm.set_yticklabels(hm_data.index, fontsize=7, color=STYLE['text'])
+step = max(1, len(hm_data.columns) // 20)
+ax_hm.set_xticks(range(0, len(hm_data.columns), step))
+ax_hm.set_xticklabels(hm_data.columns[::step], fontsize=6,
+                       color=STYLE['text'], rotation=45, ha='right')
+plt.colorbar(im, ax=ax_hm, fraction=0.015, pad=0.01,
+             label='月報酬率').ax.yaxis.label.set_color(STYLE['subtext'])
+
+# ── 8-6. 各配對總報酬率橫條圖 ────────────
+ax_bar = fig.add_subplot(gs[3, :2])
+styled_ax(ax_bar, title='各配對總報酬率', xlabel='總報酬率(%)')
+perf_sorted = perf_df.sort_values('總報酬率(%)')
+colors_bar  = [STYLE['green'] if v >= 0 else STYLE['red']
+               for v in perf_sorted['總報酬率(%)']]
+bars = ax_bar.barh(perf_sorted['配對'], perf_sorted['總報酬率(%)'],
+                   color=colors_bar, alpha=0.85, height=0.65)
+ax_bar.axvline(0, color=STYLE['border'], linewidth=0.8)
+ax_bar.tick_params(axis='y', labelsize=6.5)
+for bar, val in zip(bars, perf_sorted['總報酬率(%)']):
+    ax_bar.text(val + (0.1 if val >= 0 else -0.1), bar.get_y() + bar.get_height()/2,
+                f'{val:.1f}%', va='center', ha='left' if val >= 0 else 'right',
+                fontsize=6, color=STYLE['text'])
+
+# ── 8-7. 夏普比率分布 ────────────────────
+ax_shdist = fig.add_subplot(gs[3, 2])
+styled_ax(ax_shdist, title='夏普比率分布', xlabel='夏普比率', ylabel='頻率')
+sh_vals = perf_df['夏普比率'].replace('N/A', np.nan).astype(float).dropna()
+ax_shdist.hist(sh_vals, bins=15, color=STYLE['purple'], alpha=0.75,
+               edgecolor=STYLE['bg'])
+ax_shdist.axvline(sh_vals.mean(), color=STYLE['yellow'], linewidth=1.5,
+                  linestyle='--', label=f'均值 {sh_vals.mean():.2f}')
+ax_shdist.legend(fontsize=7, facecolor=STYLE['panel'], labelcolor=STYLE['text'],
+                 edgecolor=STYLE['border'])
+
+# ── 8-8. 每日報酬分布 ────────────────────
+ax_retdist = fig.add_subplot(gs[4, 0])
+styled_ax(ax_retdist, title='每日報酬分布', xlabel='日報酬率', ylabel='頻率')
+ax_retdist.hist(combined_daily_ret.values, bins=50,
+                color=STYLE['blue'], alpha=0.75, edgecolor=STYLE['bg'])
+ax_retdist.axvline(0, color=STYLE['border'], linewidth=0.8, linestyle='--')
+ax_retdist.axvline(combined_daily_ret.mean(), color=STYLE['green'],
+                   linewidth=1.5, linestyle='--',
+                   label=f'均值 {combined_daily_ret.mean()*100:.3f}%')
+ax_retdist.legend(fontsize=7, facecolor=STYLE['panel'], labelcolor=STYLE['text'],
+                  edgecolor=STYLE['border'])
+ax_retdist.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x*100:.1f}%'))
+
+# ── 8-9. 滾動波動度 ──────────────────────
+ax_vol = fig.add_subplot(gs[4, 1])
+styled_ax(ax_vol, title='滾動波動度（60日年化）', ylabel='年化波動度')
+rolling_vol = combined_daily_ret.rolling(60).std() * np.sqrt(252)
+ax_vol.plot(rolling_vol.index, rolling_vol.values,
+            color=STYLE['orange'], linewidth=1)
+ax_vol.fill_between(rolling_vol.index, rolling_vol.values, 0,
+                    alpha=0.2, color=STYLE['orange'])
+ax_vol.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x*100:.1f}%'))
+ax_vol.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.setp(ax_vol.get_xticklabels(), rotation=30)
+
+# ── 8-10. 水下曲線（Underwater）────────────
+ax_uw = fig.add_subplot(gs[4, 2])
+styled_ax(ax_uw, title='水下曲線（回撤時間分析）', ylabel='回撤深度')
+ax_uw.fill_between(mdd_series.index, mdd_series.values, 0,
+                   color=STYLE['red'], alpha=0.6)
+ax_uw.axhline(mdd_val, color=STYLE['yellow'], linewidth=0.8, linestyle='--')
+ax_uw.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{x*100:.1f}%'))
+ax_uw.xaxis.set_major_formatter(mdates.DateFormatter('%Y'))
+plt.setp(ax_uw.get_xticklabels(), rotation=30)
+
+plt.savefig('pair_trading_dashboard.png', dpi=150, bbox_inches='tight',
+            facecolor=STYLE['bg'])
+plt.show()
+print("✅ 主儀表板已儲存：pair_trading_dashboard.png")
+
+
+# ─────────────────────────────────────────────
+#  9. 前20組：價格走勢 + 進出場點位
+# ─────────────────────────────────────────────
+
+def plot_pair_entry_exit(tr_records, trade_data, stock_pairs,
+                         spread_t, mean_spread, std_spread,
+                         round_label='最後一輪', initial_capital=100000):
+    """
+    為每個配對繪製：
+      上方：兩支股票的標準化價格走勢 + 進出場箭頭
+      下方：價差走勢 + 上下軌 + 均值
+    """
+    pairs = stock_pairs.apply(lambda x: f"{x['Stock1']}-{x['Stock2']}", axis=1).tolist()
+    n = len(pairs)
+    cols = 2
+    rows = n  # 每個pair佔一大行，每大行分上下子圖
+
+    fig = plt.figure(figsize=(22, rows * 5), facecolor=STYLE['bg'])
+    fig.suptitle(f'配對交易 ─ {round_label} 前{n}對：價格走勢與進出場點位',
+                 fontsize=15, color=STYLE['text'], fontweight='bold', y=1.001)
+
+    outer = gridspec.GridSpec(rows, cols, figure=fig,
+                              hspace=0.55, wspace=0.35,
+                              top=0.995, bottom=0.02,
+                              left=0.05, right=0.97)
+
+    for i, pair in enumerate(pairs):
+        row_i = i // cols
+        col_i = i % cols
+        inner = gridspec.GridSpecFromSubplotSpec(
+            2, 1, subplot_spec=outer[row_i, col_i],
+            height_ratios=[2, 1], hspace=0.05)
+
+        ax_price = fig.add_subplot(inner[0])
+        ax_spread = fig.add_subplot(inner[1], sharex=ax_price)
+
+        s1, s2 = pair.split('-')
+
+        # ── 標準化價格 ──────────────────────────
+        p1 = trade_data[s1] / trade_data[s1].iloc[0]
+        p2 = trade_data[s2] / trade_data[s2].iloc[0]
+
+        styled_ax(ax_price, title=f'{pair}')
+        ax_price.plot(p1.index, p1.values, color=STYLE['blue'],
+                      linewidth=1.2, label=s1, alpha=0.9)
+        ax_price.plot(p2.index, p2.values, color=STYLE['orange'],
+                      linewidth=1.2, label=s2, alpha=0.9)
+
+        # ── 進出場箭頭 ──────────────────────────
+        rec = tr_records[tr_records['pair'] == pair]
+        entry_up   = rec[(rec['trade1'] == 1)  & (rec['position1'].shift(1).fillna(0) == 0)]
+        entry_down = rec[(rec['trade1'] == -1) & (rec['position1'].shift(1).fillna(0) == 0)]
+        exit_dates = rec[(rec['trade1'] != 0)  & (rec['position1'] == 0)]
+
+        y_range = max(p1.max(), p2.max()) - min(p1.min(), p2.min())
+        arrow_h = y_range * 0.06
+
+        for dt in entry_up.index:
+            y = min(p1.loc[dt] if dt in p1.index else p1.iloc[-1],
+                    p2.loc[dt] if dt in p2.index else p2.iloc[-1])
+            ax_price.annotate('', xy=(dt, y + arrow_h), xytext=(dt, y),
+                              arrowprops=dict(arrowstyle='->', color=STYLE['green'],
+                                             lw=1.5))
+        for dt in entry_down.index:
+            y = max(p1.loc[dt] if dt in p1.index else p1.iloc[0],
+                    p2.loc[dt] if dt in p2.index else p2.iloc[0])
+            ax_price.annotate('', xy=(dt, y - arrow_h), xytext=(dt, y),
+                              arrowprops=dict(arrowstyle='->', color=STYLE['red'],
+                                             lw=1.5))
+        for dt in exit_dates.index:
+            y = (p1.loc[dt] + p2.loc[dt]) / 2 if dt in p1.index else p1.mean()
+            ax_price.axvline(dt, color=STYLE['yellow'], linewidth=0.8,
+                             linestyle=':', alpha=0.7)
+
+        ax_price.legend(fontsize=7, facecolor=STYLE['panel'],
+                        labelcolor=STYLE['text'], edgecolor=STYLE['border'],
+                        loc='upper left')
+        ax_price.set_ylabel('標準化價格', fontsize=7, color=STYLE['subtext'])
+        plt.setp(ax_price.get_xticklabels(), visible=False)
+
+        # ── 價差走勢 ────────────────────────────
+        styled_ax(ax_spread, ylabel='價差')
+        sp = spread_t[pair]
+        mu = mean_spread[pair]
+        sd = std_spread[pair]
+        upper = mu + 2 * sd
+        lower = mu - 2 * sd
+
+        ax_spread.plot(sp.index, sp.values, color=STYLE['purple'],
+                       linewidth=1, alpha=0.9, label='價差')
+        ax_spread.axhline(mu,    color=STYLE['text'],   linewidth=0.8,
+                          linestyle='--', alpha=0.6, label='均值')
+        ax_spread.axhline(upper, color=STYLE['red'],    linewidth=0.8,
+                          linestyle=':', alpha=0.7, label='+2σ')
+        ax_spread.axhline(lower, color=STYLE['green'],  linewidth=0.8,
+                          linestyle=':', alpha=0.7, label='-2σ')
+        ax_spread.fill_between(sp.index, lower, upper,
+                               alpha=0.07, color=STYLE['purple'])
+        ax_spread.legend(fontsize=6, facecolor=STYLE['panel'],
+                         labelcolor=STYLE['text'], edgecolor=STYLE['border'],
+                         ncol=4, loc='upper right')
+        ax_spread.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+        ax_spread.xaxis.set_major_locator(mdates.AutoDateLocator())
+        plt.setp(ax_spread.get_xticklabels(), rotation=25, fontsize=6)
+
+    plt.savefig('pair_entry_exit.png', dpi=130, bbox_inches='tight',
+                facecolor=STYLE['bg'])
+    plt.show()
+    print("✅ 進出場圖已儲存：pair_entry_exit.png")
+
+
+# 使用最後一輪資料繪圖
+if last_round_data:
+    plot_pair_entry_exit(
+        tr_records    = last_round_data['tr_records'],
+        trade_data    = last_round_data['trade'],
+        stock_pairs   = last_round_data['stock_pairs'],
+        spread_t      = last_round_data['spread_t'],
+        mean_spread   = last_round_data['mean_spread'],
+        std_spread    = last_round_data['std_spread'],
+        round_label   = f"第{len(df_dates)}輪",
+    )

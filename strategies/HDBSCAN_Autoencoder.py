@@ -170,6 +170,7 @@ class Formation:
         # ADF p 值門檻
         adf_max_lags: int = 1,
         adf_pvalue_threshold: float = 0.05,   # 0.01=保守 / 0.05=積極
+        max_sector_ratio: float = 0.3,
     ):
         self.price_df = price_df.copy()
         self.form_start = form_start
@@ -177,6 +178,7 @@ class Formation:
         self.top_n      = top_n
         self.sector_mapping = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
+        self.max_sector_ratio = max_sector_ratio
 
         self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
         self.hdbscan_min_samples      = hdbscan_min_samples
@@ -420,7 +422,23 @@ class Formation:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        selected = eg_df.head(self.top_n).copy()
+        if getattr(self, "max_sector_ratio", 0) > 0:
+            max_pairs_per_sector = max(1, int(self.top_n * self.max_sector_ratio))
+            sector_counts = {}
+            diversified_records = []
+            for _, row in eg_df.iterrows():
+                sec = row["Sector"]
+                if sec not in sector_counts:
+                    sector_counts[sec] = 0
+                if sector_counts[sec] < max_pairs_per_sector:
+                    diversified_records.append(row)
+                    sector_counts[sec] += 1
+                if len(diversified_records) >= self.top_n:
+                    break
+            selected = pd.DataFrame(diversified_records).copy()
+        else:
+            selected = eg_df.head(self.top_n).copy()
+            
         selected["Rank"] = range(1, len(selected) + 1)
 
         # 附加 log 統計量（供 Trading 期使用）
@@ -473,6 +491,8 @@ class Trading:
         min_spread_std: float = 1e-6,
         use_dynamic_stop: bool = False,
         dynamic_stop_z: float = 3.0,
+        portfolio_stop_loss_pct: float = 0.10,
+        use_vol_adjust: bool = False,
     ):
         self.price_df        = price_df.copy()
         self.trade_dates     = trade_dates
@@ -488,6 +508,8 @@ class Trading:
         self.min_spread_std  = min_spread_std
         self.use_dynamic_stop = use_dynamic_stop
         self.dynamic_stop_z  = dynamic_stop_z
+        self.portfolio_stop_loss_pct = portfolio_stop_loss_pct
+        self.use_vol_adjust  = use_vol_adjust
         self.period_pnl: float = 0.0
 
     def _execute_entry(self, state, z, p_a, p_b, hedge_ratio):
@@ -548,7 +570,13 @@ class Trading:
         if self.zscore_window == 0:
             spread   = log_a - ols_alpha - hedge_ratio * log_b
             safe_std = max(form_spread_std, self.min_spread_std)
-            zscore   = np.clip((spread - form_spread_mean) / safe_std, -self.zscore_clip, self.zscore_clip)
+            if getattr(self, "use_vol_adjust", False):
+                roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+            else:
+                adjusted_std = safe_std
+            zscore   = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
             beta_series  = pd.Series(hedge_ratio, index=common_idx)
             alpha_series = pd.Series(ols_alpha,   index=common_idx)
         else:
@@ -576,7 +604,13 @@ class Trading:
 
             spread     = log_a - roll_alpha_s - roll_beta_s * log_b
             safe_std_s = np.maximum(roll_std_s, self.min_spread_std)
-            zscore     = np.clip((spread - roll_mean_s) / safe_std_s, -self.zscore_clip, self.zscore_clip)
+            if getattr(self, "use_vol_adjust", False):
+                roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                adjusted_std = np.maximum(safe_std_s * vol_factor, self.min_spread_std)
+            else:
+                adjusted_std = safe_std_s
+            zscore     = np.clip((spread - roll_mean_s) / adjusted_std, -self.zscore_clip, self.zscore_clip)
             beta_series  = roll_beta_s
             alpha_series = roll_alpha_s
 
@@ -745,6 +779,57 @@ class Trading:
         if not dfs:
             return pd.DataFrame(), 0.0
 
+        # ---- 實作後置投資組合總體止損斷路器 ----
+        if getattr(self, "portfolio_stop_loss_pct", 0) > 0:
+            temp_df = pd.concat(dfs, ignore_index=True)
+            total_cap = self.capital_per_pair * len(dfs)
+            daily_cum_pnl = temp_df.groupby("Date")["Cumulative_PnL"].sum()
+            
+            cutoff_date = None
+            for date_val, pnl_val in daily_cum_pnl.items():
+                if pnl_val / total_cap <= -self.portfolio_stop_loss_pct:
+                    cutoff_date = date_val
+                    break
+            
+            if cutoff_date is not None:
+                new_dfs = []
+                for df in dfs:
+                    df = df.copy()
+                    before_mask = df["Date"] < cutoff_date
+                    at_mask = df["Date"] == cutoff_date
+                    after_mask = df["Date"] > cutoff_date
+                    
+                    df_before = df[before_mask]
+                    
+                    df_at = df[at_mask].copy()
+                    final_realized = 0.0
+                    if not df_at.empty:
+                        row_at = df_at.iloc[0]
+                        final_realized = row_at["Cumulative_PnL"]
+                        if row_at["Position"] != 0:
+                            df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOP_TRIGGERED"
+                            df_at.loc[df_at.index, "Position"] = 0
+                            df_at.loc[df_at.index, "Unrealized_PnL"] = 0.0
+                            df_at.loc[df_at.index, "Trade_PnL"] = row_at["Trade_PnL"]
+                        else:
+                            if row_at["Status"] not in ("STOPPED", "STOP_LOSS_TRIGGERED", "EXIT"):
+                                df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOPPED"
+                            final_realized = row_at["Realized_PnL"]
+                            
+                    df_after = df[after_mask].copy()
+                    if not df_after.empty:
+                        df_after.loc[df_after.index, "Position"] = 0
+                        df_after.loc[df_after.index, "Unrealized_PnL"] = 0.0
+                        df_after.loc[df_after.index, "Realized_PnL"] = final_realized
+                        df_after.loc[df_after.index, "Cumulative_PnL"] = final_realized
+                        df_after.loc[df_after.index, "Status"] = "STOPPED"
+                        df_after.loc[df_after.index, "Trade_PnL"] = 0.0
+                        df_after.loc[df_after.index, "Daily_Delta"] = 0.0
+                        
+                    new_dfs.append(pd.concat([df_before, df_at, df_after], ignore_index=True))
+                dfs = new_dfs
+        # ----------------------------------------------
+
         log_df = pd.concat(dfs, ignore_index=True)
         period_daily = log_df.groupby("Date")["Daily_Delta"].sum()
         self.period_pnl = float(period_daily.sum()) if not period_daily.empty else 0.0
@@ -858,16 +943,21 @@ class RollingBacktester:
         reduce_method: str = "umap",
         use_dynamic_stop: bool = False,
         dynamic_stop_z: float = 3.0,
+        max_sector_ratio: float = 0.3,
+        portfolio_stop_loss_pct: float = 0.10,
+        use_vol_adjust: bool = False,
+        use_vol_adjust_list: list = None,
     ):
         self.__dict__.update(locals())
         self.__dict__.pop("self")
         self.output_dir = output_dir
 
     def run(self, price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping):
+        self.use_vol_adjust_list = getattr(self, "use_vol_adjust_list", None) or [False]
         max_concurrent = self.trading_window // self.rolling_step
         states = {}
-        for n, sl, z_win in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list):
-            states[(n, sl, z_win)] = {
+        for n, sl, z_win, vol_adj in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list, self.use_vol_adjust_list):
+            states[(n, sl, z_win, vol_adj)] = {
                 "logs":  [],
                 "slots": [{"avail_idx": 0, "capital": self.initial_capital / max_concurrent}
                           for _ in range(max_concurrent)],
@@ -916,15 +1006,16 @@ class RollingBacktester:
                 adf_max_lags=self.adf_max_lags,
                 adf_pvalue_threshold=self.adf_pvalue_threshold,
                 reduce_method=getattr(self, "reduce_method", "umap"),
+                max_sector_ratio=getattr(self, "max_sector_ratio", 0.3),
             )
             max_selected_pairs = formation.run()
 
             if max_selected_pairs.empty:
                 continue
 
-            for n, sl, z_win in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list):
+            for n, sl, z_win, vol_adj in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list, self.use_vol_adjust_list):
                 selected_pairs = max_selected_pairs.head(n)
-                state  = states[(n, sl, z_win)]
+                state  = states[(n, sl, z_win, vol_adj)]
                 slots  = state["slots"]
 
                 free_slots = [i for i, s in enumerate(slots) if s["avail_idx"] <= trade_start_idx]
@@ -943,6 +1034,8 @@ class RollingBacktester:
                     zscore_clip=self.zscore_clip, min_spread_std=self.min_spread_std,
                     use_dynamic_stop=getattr(self, "use_dynamic_stop", False),
                     dynamic_stop_z=getattr(self, "dynamic_stop_z", 3.0),
+                    portfolio_stop_loss_pct=getattr(self, "portfolio_stop_loss_pct", 0.10),
+                    use_vol_adjust=vol_adj,
                 )
 
                 trade_log_df, period_pnl = trading.run(ts_str, te_str)
@@ -957,12 +1050,13 @@ class RollingBacktester:
 
     def _export_results(self, states):
         print("\n✅ 回測完成！正在匯出交易紀錄...")
-        for (n, sl, z_win), state in states.items():
+        for (n, sl, z_win, vol_adj), state in states.items():
             if state["logs"]:
                 full_log = pd.concat(state["logs"], ignore_index=True)
                 sl_str   = f"SL{int(sl*100)}" if sl > 0 else "SL0"
                 rm_str   = getattr(self, "reduce_method", "umap").upper()
-                filename = f"HDBSCAN_AE_{rm_str}_TradeLogs_Top{n}_{sl_str}_ZWin{z_win}.csv"
+                vol_str  = "VolAdj" if vol_adj else "NoVolAdj"
+                filename = f"HDBSCAN_AE_{rm_str}_TradeLogs_Top{n}_{sl_str}_ZWin{z_win}_{vol_str}.csv"
                 filepath = self.output_dir / filename
                 full_log.to_csv(filepath, index=False)
                 print(f"  - 已輸出: {filename} (共 {len(full_log)} 筆紀錄)")

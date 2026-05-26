@@ -121,6 +121,14 @@ def extract_features_from_path(path):
     dataset = "Full" if "full" in path_lower else "Current" if "current" in path_lower else "Unknown"
     reentry = "NoReEntry" if "noreentry" in path_lower else "ReEntry" if "reentry" in path_lower else "Unknown"
     
+    # 全域提取 VolAdj 屬性
+    if "novoladj" in path_lower:
+        voladj = "NoVolAdj"
+    elif "voladj" in path_lower:
+        voladj = "VolAdj"
+    else:
+        voladj = "N/A"
+    
     method = "Unknown"
     if "ssd_basic" in path_lower:
         method = "SSD (Basic)"
@@ -129,12 +137,15 @@ def extract_features_from_path(path):
     elif "eg" in path_lower:
         method = "EG"
     elif "hdbscan" in path_lower:
-        is_ae = "_ae_" in path_lower or "hdbscan_ae" in path_lower
-        is_pca = "_pca_" in path_lower or "hdbscan_pca" in path_lower
-        if is_ae:
-            method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
+        if "multifactor" in path_lower:
+            method = "HDBSCAN (MF)"
         else:
-            method = "HDBSCAN (PCA)" if is_pca else "HDBSCAN (UMAP)"
+            is_ae = "_ae_" in path_lower or "hdbscan_ae" in path_lower
+            is_pca = "_pca_" in path_lower or "hdbscan_pca" in path_lower
+            if is_ae:
+                method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
+            else:
+                method = "HDBSCAN (PCA)" if is_pca else "HDBSCAN (UMAP)"
 
     top_n = "Top 20"
     match_n = re.search(r'top(\d+)', path_lower)
@@ -148,14 +159,14 @@ def extract_features_from_path(path):
     match_zwin = re.search(r'zwin(\d+)', path_lower)
     if match_zwin: zwin = match_zwin.group(1)
         
-    return dataset, reentry, method, top_n, sl_pct, zwin
+    return dataset, reentry, voladj, method, top_n, sl_pct, zwin
 
 @st.cache_data(show_spinner=False)
 def calculate_metrics_raw(strategy_path):
     df = load_data(strategy_path)
     if df.empty: return None
 
-    dataset, reentry, method, top_n, sl_pct, zwin = extract_features_from_path(strategy_path)
+    dataset, reentry, voladj, method, top_n, sl_pct, zwin = extract_features_from_path(strategy_path)
     top_n_int = int(top_n.replace('Top ', '')) if 'Top' in top_n else 20
     c_period = INITIAL_CAPITAL
     
@@ -238,7 +249,7 @@ def calculate_metrics_raw(strategy_path):
     rec = final_pnl / engaged_capital if engaged_capital > 0 else 0
 
     return {
-        'DATASET': dataset, 'RE-ENTRY': reentry,
+        'DATASET': dataset, 'RE-ENTRY': reentry, 'VOL ADJ': voladj,
         'METHOD': method, 'TOP N': top_n, 'STOP LOSS %': sl_pct, 'Z-WINDOW': zwin,
         'Final_Equity': final_equity, 'RCC_Raw': rcc, 'REC_Raw': rec,
         'Cum_Ret_Raw': cum_ret, 'Ann_Ret_Raw': ann_ret, 'Sharpe_Raw': sharpe, 'MDD_Raw': mdd_pct,
@@ -274,7 +285,8 @@ def build_master_dataframe(strategies):
 
 
 def make_desc(row): 
-    return f"{row['DATASET']} · {row['RE-ENTRY']} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}"
+    vol_part = f" · {row['VOL ADJ']}" if 'VOL ADJ' in row and row['VOL ADJ'] != 'N/A' else ""
+    return f"{row['DATASET']} · {row['RE-ENTRY']}{vol_part} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}"
 
 @st.fragment
 def render_deep_dive(target_row):
@@ -455,19 +467,21 @@ def main():
         return
 
     st.markdown("### Filters")
-    f_col1, f_col2, f_col3 = st.columns(3)
+    f_col1, f_col2, f_col3, f_col4 = st.columns(4)
     with f_col1: sel_dataset = st.selectbox("DATASET", ["All"] + sorted(master_df['DATASET'].unique(), key=natural_sort_key))
     with f_col2: sel_reentry = st.selectbox("RE-ENTRY", ["All"] + sorted(master_df['RE-ENTRY'].unique(), key=natural_sort_key))
-    with f_col3: sel_method = st.selectbox("METHOD", ["All"] + sorted(master_df['METHOD'].unique(), key=natural_sort_key))
+    with f_col3: sel_voladj = st.selectbox("VOL ADJ", ["All"] + sorted(master_df['VOL ADJ'].unique(), key=natural_sort_key))
+    with f_col4: sel_method = st.selectbox("METHOD", ["All"] + sorted(master_df['METHOD'].unique(), key=natural_sort_key))
     
-    f_col4, f_col5, f_col6 = st.columns(3)
-    with f_col4: sel_topn = st.selectbox("TOP N", ["All"] + sorted(master_df['TOP N'].unique(), key=natural_sort_key))
-    with f_col5: sel_sl = st.selectbox("STOP LOSS %", ["All"] + sorted(master_df['STOP LOSS %'].unique(), key=natural_sort_key))
-    with f_col6: sel_zwin = st.selectbox("Z-WINDOW", ["All"] + sorted(master_df['Z-WINDOW'].unique(), key=natural_sort_key))
+    f_col5, f_col6, f_col7 = st.columns(3)
+    with f_col5: sel_topn = st.selectbox("TOP N", ["All"] + sorted(master_df['TOP N'].unique(), key=natural_sort_key))
+    with f_col6: sel_sl = st.selectbox("STOP LOSS %", ["All"] + sorted(master_df['STOP LOSS %'].unique(), key=natural_sort_key))
+    with f_col7: sel_zwin = st.selectbox("Z-WINDOW", ["All"] + sorted(master_df['Z-WINDOW'].unique(), key=natural_sort_key))
 
     filtered_df = master_df.copy()
     if sel_dataset != "All": filtered_df = filtered_df[filtered_df['DATASET'] == sel_dataset]
     if sel_reentry != "All": filtered_df = filtered_df[filtered_df['RE-ENTRY'] == sel_reentry]
+    if sel_voladj != "All": filtered_df = filtered_df[filtered_df['VOL ADJ'] == sel_voladj]
     if sel_method != "All": filtered_df = filtered_df[filtered_df['METHOD'] == sel_method]
     if sel_topn != "All": filtered_df = filtered_df[filtered_df['TOP N'] == sel_topn]
     if sel_sl != "All": filtered_df = filtered_df[filtered_df['STOP LOSS %'] == sel_sl]
@@ -485,7 +499,7 @@ def main():
             'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0, 
             'Sharpe_Raw': 0, 'MDD_Raw': 0, 'Entries': 0, 'Exits': 0, 'Stop_Losses': 0, 'Forced_Closes': 0,
             'Gross_Profit': 0.0, 'Gross_Loss': 0.0,
-            'DATASET': '-', 'RE-ENTRY': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-'
+            'DATASET': '-', 'RE-ENTRY': '-', 'VOL ADJ': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-'
         })
         best_cum = best_ann = best_rcc = best_shp = low_dd = empty_series
 
@@ -505,35 +519,136 @@ def main():
 
     display_df = filtered_df.copy().sort_values(by='Ann_Ret_Raw', ascending=False).reset_index(drop=True)
 
-    display_df['FINAL EQUITY ($)'] = display_df['Final_Equity'].apply(lambda x: f"${x:,.2f}")
+    display_df['FINAL EQUITY ($)'] = display_df['Final_Equity']
     display_df['CUM. RETURN (%)'] = display_df['Cum_Ret_Raw']
     display_df['ANN. RETURN (%)'] = display_df['Ann_Ret_Raw']
     display_df['RCC (%)'] = display_df['RCC_Raw']
     display_df['REC (%)'] = display_df['REC_Raw']
     display_df['SHARPE'] = display_df['Sharpe_Raw']
     display_df['MAX DRAWDOWN (%)'] = display_df['MDD_Raw']
-    display_df['ENTRIES (Count)'] = display_df['Entries'].apply(lambda x: f"{int(x):,}")
-    display_df['EXITS (Count)'] = display_df['Exits'].apply(lambda x: f"{int(x):,}")
+    display_df['ENTRIES (Count)'] = display_df['Entries']
+    display_df['EXITS (Count)'] = display_df['Exits']
     display_df['STOP LOSSES (Count)'] = display_df['Stop_Losses'].apply(lambda x: f"{int(x):,}" if x >= 0 else "N/A")
-    display_df['FORCED CLOSES (Count)'] = display_df['Forced_Closes'].apply(lambda x: f"{int(x):,}")
-    display_df['GROSS PROFIT ($)'] = display_df['Gross_Profit'].apply(lambda x: f"${x:,.2f}")
-    display_df['GROSS LOSS ($)'] = display_df['Gross_Loss'].apply(lambda x: f"${x:,.2f}")
+    display_df['FORCED CLOSES (Count)'] = display_df['Forced_Closes']
+    display_df['GROSS PROFIT ($)'] = display_df['Gross_Profit']
+    display_df['GROSS LOSS ($)'] = display_df['Gross_Loss']
 
-    cols = ['DATASET', 'RE-ENTRY', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 
+    # ------------------------------------------
+    # CONTROLS FOR DYNAMIC COLUMN DISPLAY
+    # ------------------------------------------
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        expand_config = st.toggle("顯示完整參數欄位 (Separate Config Columns)", value=False, help="預設將參數合併為單一 Strategic Config 欄位以節省空間。開啟此選項可分開顯示各參數欄位。")
+    with col_t2:
+        show_detailed_metrics = st.toggle("顯示詳細效能指標 (Detailed Metrics)", value=False, help="預設只顯示最關鍵的核心效能指標（Final Equity, Ann. Return, Sharpe, Max Drawdown）。開啟此選項可顯示更多詳細指標與交易計數。")
+
+    display_df['STRATEGY CONFIG'] = display_df.apply(make_desc, axis=1)
+
+    # 決定顯示欄位
+    if expand_config:
+        config_cols = ['DATASET', 'RE-ENTRY', 'VOL ADJ', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW']
+    else:
+        config_cols = ['STRATEGY CONFIG']
+
+    if show_detailed_metrics:
+        metrics_cols = [
             'FINAL EQUITY ($)', 'CUM. RETURN (%)', 'ANN. RETURN (%)', 'RCC (%)', 'REC (%)', 'SHARPE', 'MAX DRAWDOWN (%)', 
-            'ENTRIES (Count)', 'EXITS (Count)', 'STOP LOSSES (Count)', 'FORCED CLOSES (Count)', 'GROSS PROFIT ($)', 'GROSS LOSS ($)']
+            'ENTRIES (Count)', 'EXITS (Count)', 'STOP LOSSES (Count)', 'FORCED CLOSES (Count)', 'GROSS PROFIT ($)', 'GROSS LOSS ($)'
+        ]
+    else:
+        metrics_cols = [
+            'FINAL EQUITY ($)', 'ANN. RETURN (%)', 'SHARPE', 'MAX DRAWDOWN (%)'
+        ]
+
+    cols = config_cols + metrics_cols
+
+    # 動態格式化與著色，避免 subset KeyError
+    all_formats = {
+        'FINAL EQUITY ($)': '${:,.2f}',
+        'CUM. RETURN (%)': '{:.2%}', 
+        'ANN. RETURN (%)': '{:.2%}',
+        'RCC (%)': '{:.2%}', 
+        'REC (%)': '{:.2%}', 
+        'SHARPE': '{:.2f}', 
+        'MAX DRAWDOWN (%)': '{:.2%}',
+        'ENTRIES (Count)': '{:,.0f}',
+        'EXITS (Count)': '{:,.0f}',
+        'FORCED CLOSES (Count)': '{:,.0f}',
+        'GROSS PROFIT ($)': '${:,.2f}',
+        'GROSS LOSS ($)': '${:,.2f}'
+    }
+    active_formats = {k: v for k, v in all_formats.items() if k in cols}
     
-    df_styled = display_df[cols].style.format({
-        'CUM. RETURN (%)': '{:.2%}', 'ANN. RETURN (%)': '{:.2%}',
-        'RCC (%)': '{:.2%}', 'REC (%)': '{:.2%}', 'SHARPE': '{:.2f}', 'MAX DRAWDOWN (%)': '{:.2%}'
-    }).map(lambda _: 'color: #4ade80; font-weight: bold;', subset=['CUM. RETURN (%)', 'GROSS PROFIT ($)']) \
-      .map(lambda _: 'color: #60a5fa; font-weight: bold;', subset=['ANN. RETURN (%)']) \
-      .map(lambda _: 'color: #fbd38d; font-weight: bold;', subset=['SHARPE']) \
-      .map(lambda _: 'color: #f87171; font-weight: bold;', subset=['MAX DRAWDOWN (%)', 'GROSS LOSS ($)'])
+    df_styled = display_df[cols].style.format(active_formats)
+    
+    # 數值正負著色函數 (正數綠字、負數紅字)
+    def color_by_value(val):
+        try:
+            numeric_val = float(val)
+            if numeric_val > 0:
+                return 'color: #4ade80; font-weight: bold;'
+            elif numeric_val < 0:
+                return 'color: #f87171; font-weight: bold;'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    # 帳戶權益著色函數 (以 10000 初始資金為基準)
+    def color_equity(val):
+        try:
+            numeric_val = float(val)
+            if numeric_val > 10000.0:
+                return 'color: #4ade80; font-weight: bold;'
+            elif numeric_val < 10000.0:
+                return 'color: #f87171; font-weight: bold;'
+        except (ValueError, TypeError):
+            pass
+        return ''
+
+    # 套用著色
+    if 'FINAL EQUITY ($)' in cols:
+        df_styled = df_styled.map(color_equity, subset=['FINAL EQUITY ($)'])
+
+    value_color_cols = [
+        'CUM. RETURN (%)', 'ANN. RETURN (%)', 'RCC (%)', 'REC (%)', 
+        'SHARPE', 'MAX DRAWDOWN (%)', 'GROSS PROFIT ($)', 'GROSS LOSS ($)'
+    ]
+    for col in value_color_cols:
+        if col in cols:
+            df_styled = df_styled.map(color_by_value, subset=[col])
+
+    # 精美欄位配置，自訂最佳寬度
+    column_config = {
+        "STRATEGY CONFIG": st.column_config.TextColumn("Strategy Config 🛠️", width="large"),
+        "DATASET": st.column_config.TextColumn("Dataset 📁", width="small"),
+        "RE-ENTRY": st.column_config.TextColumn("Re-Entry 🔄", width="small"),
+        "VOL ADJ": st.column_config.TextColumn("Vol Adj ⚡", width="small"),
+        "METHOD": st.column_config.TextColumn("Method 🧮", width="medium"),
+        "TOP N": st.column_config.TextColumn("Top N 🏆", width="small"),
+        "STOP LOSS %": st.column_config.TextColumn("Stop Loss 📉", width="small"),
+        "Z-WINDOW": st.column_config.TextColumn("Z-Win ⏱️", width="small"),
+        
+        "FINAL EQUITY ($)": st.column_config.TextColumn("Final Equity 💰", width="small"),
+        "CUM. RETURN (%)": st.column_config.TextColumn("Cum. Return 📈", width="small"),
+        "ANN. RETURN (%)": st.column_config.TextColumn("Ann. Return ⚡", width="small"),
+        "RCC (%)": st.column_config.TextColumn("RCC 📊", width="small"),
+        "REC (%)": st.column_config.TextColumn("REC 📈", width="small"),
+        "SHARPE": st.column_config.TextColumn("Sharpe 📊", width="small"),
+        "MAX DRAWDOWN (%)": st.column_config.TextColumn("Max DD ⚠️", width="small"),
+        
+        "ENTRIES (Count)": st.column_config.TextColumn("Entries 🔑", width="small"),
+        "EXITS (Count)": st.column_config.TextColumn("Exits 🚪", width="small"),
+        "STOP LOSSES (Count)": st.column_config.TextColumn("Stop Losses 🚨", width="small"),
+        "FORCED CLOSES (Count)": st.column_config.TextColumn("Forced Closes 🛡️", width="small"),
+        "GROSS PROFIT ($)": st.column_config.TextColumn("Gross Profit 🟢", width="small"),
+        "GROSS LOSS ($)": st.column_config.TextColumn("Gross Loss 🔴", width="small"),
+    }
+    active_config = {k: v for k, v in column_config.items() if k in cols}
 
     event = st.dataframe(
         df_styled, width='stretch', hide_index=True, height=350,
-        on_select="rerun", selection_mode="multi-row"
+        on_select="rerun", selection_mode="multi-row",
+        column_config=active_config
     )
 
     selected_rows = event.selection.rows

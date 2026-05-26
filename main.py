@@ -31,6 +31,79 @@ DB_PROFILES = {
     },
 }
 
+def get_module_mtime(module_path):
+    """精準取得策略模組實體檔案的修改時間，以便偵測代碼編輯"""
+    import importlib.util
+    try:
+        spec = importlib.util.find_spec(module_path)
+        if spec and spec.origin:
+            return os.path.getmtime(spec.origin)
+    except Exception:
+        pass
+    return 0.0
+
+def check_strategy_completed(config, db_path):
+    """
+    智慧判定策略是否已經完整回測過。
+    條件：
+    1. 目錄下存在 backtest_completed.json 標記檔
+    2. 當時使用的 db_path 與其 mtime 與目前一致（防資料庫更新）
+    3. 當時使用的 strategy_module_mtime 與目前一致（防策略代碼修改）
+    4. 回測的網格參數與目前一致（防參數修改）
+    """
+    import json
+    output_dir = config["output_dir"]
+    mark_path = os.path.join(output_dir, "backtest_completed.json")
+    if not os.path.exists(mark_path):
+        return False
+        
+    try:
+        with open(mark_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        # 1. 檢查資料庫路徑與其修改時間是否相符
+        if data.get("db_path") != db_path:
+            return False
+        current_db_mtime = os.path.getmtime(db_path) if os.path.exists(db_path) else 0.0
+        if abs(data.get("db_mtime", 0.0) - current_db_mtime) > 1.0: # 容差 1 秒
+            return False
+            
+        # 2. 檢查策略模組代碼是否被修改過
+        current_module_mtime = get_module_mtime(config["module"])
+        if abs(data.get("strategy_module_mtime", 0.0) - current_module_mtime) > 1.0:
+            return False
+            
+        # 3. 檢查回測網格參數是否一致
+        if data.get("strategy_params") != config["params"]:
+            return False
+            
+        return True
+    except Exception:
+        return False
+
+def write_completion_mark(output_dir, db_path, module_path, params):
+    """回測成功後寫入標記檔，記錄資料庫、策略代碼與參數狀態，作為斷點續傳依據"""
+    import json
+    import time
+    mark_path = os.path.join(output_dir, "backtest_completed.json")
+    try:
+        db_mtime = os.path.getmtime(db_path) if os.path.exists(db_path) else 0.0
+        module_mtime = get_module_mtime(module_path)
+        
+        info = {
+            "db_path": db_path,
+            "db_mtime": db_mtime,
+            "strategy_module_mtime": module_mtime,
+            "strategy_params": params,
+            "completed_at": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        os.makedirs(output_dir, exist_ok=True)
+        with open(mark_path, "w", encoding="utf-8") as f:
+            json.dump(info, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        sys.stderr.write(f"\n⚠️ 寫入完成標記檔失敗: {e}\n")
+
 class ProgressAwareStdout:
     def __init__(self, log_filepath, progress_dict, strategy_name, total_rolls):
         log_dir = os.path.dirname(log_filepath)
@@ -138,6 +211,11 @@ def worker_task(strategy_config, price_pivot, all_dates, total_days, local_first
             output_dir=output_dir
         )
         
+        # 寫入斷點續傳完畢標記檔
+        db_path = strategy_config.get("db_path")
+        if db_path:
+            write_completion_mark(output_dir, db_path, module_path, params)
+            
         elapsed = time.time() - start_time
         # 回報成功狀態
         progress_dict[name] = {
@@ -185,9 +263,9 @@ def draw_dashboard(progress_dict, strategies_config, main_start_time, output_roo
     sys.stdout.write(f"\033[{total_lines}A")
     
     width = 100
-    print("\033[95m" + "═" * width + "\033[0m")
-    print("        \033[93;1m🚀 量化交易配對回測多行程即時監控儀表板 (High-Performance Core Engine) 🚀\033[0m")
-    print("\033[95m" + "═" * width + "\033[0m")
+    print("\033[95m" + "═" * width + "\033[0m\033[K")
+    print("        \033[93;1m🚀 量化交易配對回測多行程即時監控儀表板 (High-Performance Core Engine) 🚀\033[0m\033[K")
+    print("\033[95m" + "═" * width + "\033[0m\033[K")
     
     # 統計狀態
     total = len(strategies_config)
@@ -210,8 +288,8 @@ def draw_dashboard(progress_dict, strategies_config, main_start_time, output_roo
             failed += 1
             
     elapsed = time.time() - main_start_time
-    print(f"  📊 \033[1m回測進度\033[0m | 總任務數: {total:<2} | 運行中: \033[96m{running:<2}\033[0m | 成功: \033[92m{success:<2}\033[0m | 失敗: \033[91m{failed:<2}\033[0m | 總引擎耗時: {elapsed:.1f} 秒")
-    print("\033[90m" + "─" * width + "\033[0m")
+    print(f"  📊 \033[1m回測進度\033[0m | 總任務數: {total:<2} | 運行中: \033[96m{running:<2}\033[0m | 成功: \033[92m{success:<2}\033[0m | 失敗: \033[91m{failed:<2}\033[0m | 總引擎耗時: {elapsed:.1f} 秒\033[K")
+    print("\033[90m" + "─" * width + "\033[0m\033[K")
     
     # 印出每個策略
     for config in strategies_config:
@@ -261,12 +339,12 @@ def draw_dashboard(progress_dict, strategies_config, main_start_time, output_roo
             
         # 格式化輸出，對齊寬度
         short_name = name[:30]
-        print(f"  {status_str:<19} | {short_name:<30} | {bar} {pct:>3}% ({prog:<5}) | {eta_str:<8} | \033[93m{task_elapsed:>5.1f}s\033[0m | \033[37m{msg[:25]:<25}\033[0m")
+        print(f"  {status_str:<19} | {short_name:<30} | {bar} {pct:>3}% ({prog:<5}) | {eta_str:<8} | \033[93m{task_elapsed:>5.1f}s\033[0m | \033[37m{msg[:25]:<25}\033[0m\033[K")
         
-    print("\033[90m" + "─" * width + "\033[0m")
+    print("\033[90m" + "─" * width + "\033[0m\033[K")
     log_dir_desc = f"{output_root}/logs" if output_root else "./results/current/logs"
-    print(f"  📁 詳細策略日誌(stdout/stderr)重導向至: \033[36m{log_dir_desc}/策略名稱.log\033[0m")
-    print("\033[95m" + "═" * width + "\033[0m")
+    print(f"  📁 詳細策略日誌(stdout/stderr)重導向至: \033[36m{log_dir_desc}/策略名稱.log\033[0m\033[K")
+    print("\033[95m" + "═" * width + "\033[0m\033[K")
     sys.stdout.flush()
 
 def parse_args():
@@ -303,6 +381,12 @@ def parse_args():
         action="store_true",
         default=False,
         help="允許停損後再進場 (預設為 False，輸出後綴為 _NoReEntry；若啟用則為 _ReEntry)"
+    )
+    parser.add_argument(
+        "--use-vol-adjust",
+        action="store_true",
+        default=False,
+        help="啟用 Z-Score 波動率調節 (預設為 False，輸出後綴為 _NoVolAdj；若啟用則為 _VolAdj)"
     )
     parser.add_argument(
         "--dry-run",
@@ -344,6 +428,60 @@ def select_db_profile_interactive():
             print("\n\n⚠️ 使用者中止，程式結束。")
             sys.exit(0)
 
+def select_reentry_interactive():
+    """終端互動選單，讓使用者用數字鍵選擇是否開啟停損後再進場"""
+    print("\n請選擇是否允許停損後再進場 (Allow Re-entry)：\n")
+    print("  [1] 關閉 (No Re-entry) - 觸發停損後本期不再進場 (預設)")
+    print("  [2] 開啟 (Allow Re-entry) - 觸發停損後，若信號符合可再次進場")
+    
+    while True:
+        try:
+            choice = input("\n請輸入編號 (1-2, 直接Enter預設為1): ").strip()
+            if not choice:
+                print("✅ 已選擇：關閉 (No Re-entry)")
+                return False
+            idx = int(choice)
+            if idx == 1:
+                print("✅ 已選擇：關閉 (No Re-entry)")
+                return False
+            elif idx == 2:
+                print("✅ 已選擇：開啟 (Allow Re-entry)")
+                return True
+            else:
+                print("❌ 無效輸入，請輸入 1 或 2。")
+        except ValueError:
+            print("❌ 無效輸入，請輸入 1 或 2。")
+        except KeyboardInterrupt:
+            print("\n\n⚠️ 使用者中止，程式結束。")
+            sys.exit(0)
+
+def select_vol_adjust_interactive():
+    """終端互動選單，讓使用者用數字鍵選擇是否開啟 Z-Score 波動率調節"""
+    print("\n請選擇是否開啟 Z-Score 波動率調節 (Vol Adj)：\n")
+    print("  [1] 關閉 (No Vol Adj) - 使用基準滾動 Z-Score (預設)")
+    print("  [2] 開啟 (Allow Vol Adj) - 引入波動率縮放因子調節開倉門檻")
+    
+    while True:
+        try:
+            choice = input("\n請輸入編號 (1-2, 直接Enter預設為1): ").strip()
+            if not choice:
+                print("✅ 已選擇：關閉 (No Vol Adj)")
+                return False
+            idx = int(choice)
+            if idx == 1:
+                print("✅ 已選擇：關閉 (No Vol Adj)")
+                return False
+            elif idx == 2:
+                print("✅ 已選擇：開啟 (Allow Vol Adj)")
+                return True
+            else:
+                print("❌ 無效輸入，請輸入 1 或 2。")
+        except ValueError:
+            print("❌ 無效輸入，請輸入 1 或 2。")
+        except KeyboardInterrupt:
+            print("\n\n⚠️ 使用者中止，程式結束。")
+            sys.exit(0)
+
 def resolve_paths(args):
     """根據 CLI 參數或互動選單解析 DB 路徑與輸出根目錄"""
     # 修正：對稱性檢查，--db-path 與 --output-root 必須同時指定或省略，防範靜默落入互動模式
@@ -372,6 +510,18 @@ def main():
     args = parse_args()
     DB_PATH, OUTPUT_ROOT = resolve_paths(args)
     
+    # 決定是否以互動方式選擇 allow_reentry
+    # 當沒有指定 --db 且沒有指定 --db-path 時（代表完全為無參數互動模式），且 CLI 沒有給出 --allow-reentry，我們才提問
+    allow_reentry = args.allow_reentry
+    if args.db is None and args.db_path is None and not args.allow_reentry:
+        allow_reentry = select_reentry_interactive()
+        
+    # 決定是否以互動方式選擇 use_vol_adjust
+    # 當沒有指定 --db 且沒有指定 --db-path 時（代表完全為無參數互動模式），且 CLI 沒有給出 --use-vol-adjust，我們才提問
+    use_vol_adjust = args.use_vol_adjust
+    if args.db is None and args.db_path is None and not args.use_vol_adjust:
+        use_vol_adjust = select_vol_adjust_interactive()
+    
     # 優化：提前檢查資料庫檔案是否存在，避免 DataProcessor 拋出模糊的資料連結錯誤
     if not os.path.exists(DB_PATH):
         print(f"❌ [錯誤] 找不到資料庫檔案：{DB_PATH}")
@@ -399,23 +549,28 @@ def main():
         "fee_rate": 0.001,
         "slippage_rate": 0.001,
         "initial_capital": 10000,
-        "allow_reentry": args.allow_reentry,
+        "allow_reentry": allow_reentry,
         "zscore_clip": 10.0,
         "min_spread_std": 1e-6,
         "min_tickers_for_pairing": 2,
         "use_dynamic_stop": False,
         "dynamic_stop_z": 3.0,
+        "max_sector_ratio": 0.3,
+        "portfolio_stop_loss_pct": 0.10,
+        "use_vol_adjust": use_vol_adjust,
         
         # 統一網格搜尋參數：所有策略調用相同參數以進行公平、科學的績效比較
         "top_n_list": [5, 10, 20],              # 統一挑選的最優配對組數 (Top N)
         "stop_loss_list": [0, 0.05, 0.15],     # 統一停損比例限制 (0 代表不停損)
-        "zscore_window_list": [0, 20, 60]      # 統一 Z-Score 滾動天數視窗 (0 代表累積視窗)
+        "zscore_window_list": [0, 20, 60],      # 統一 Z-Score 滾動天數視窗 (0 代表累積視窗)
+        "use_vol_adjust_list": [use_vol_adjust] # 網格搜尋參數，用以直接比對原本與波動調節之優劣
     }
     
     # 依據 allow_reentry 的設定動態決定目錄命名後綴
     reentry_suffix = "ReEntry" if base_params.get("allow_reentry", False) else "NoReEntry"
     
     print(f"🔄 允許再進場 (allow_reentry) : {base_params['allow_reentry']} (輸出後綴: {reentry_suffix})", flush=True)
+    print(f"⚡ 波動率調節 (use_vol_adjust) : {base_params['use_vol_adjust']}", flush=True)
     
     # 動態產生各策略的 output_dir 與 log_path
     strategies_raw = [
@@ -517,6 +672,20 @@ def main():
                 "adf_max_lags": 1,                     # 配對篩選時共整合ADF檢定最大滯後期數。建議: [1, 5]
                 "adf_pvalue_threshold": 0.01           # 配對共整合顯著水準門檻。建議: [0.01, 0.05]
             }
+        },
+        {
+            "name": "HDBSCAN MultiFactor",
+            "module": "strategies.HDBSCAN_MultiFactor",
+            "sub_dir": f"HDBSCAN_MultiFactor_{reentry_suffix}",
+            "params": {
+                **base_params,
+                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
+                "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數
+                "hdbscan_min_samples": 2,              # HDBSCAN鄰域核心點樣本數
+                "hdbscan_metric": "euclidean",         # 距離度量指標
+                "adf_max_lags": 1,                     # 配對篩選時共整合ADF檢定最大滯後期數
+                "adf_pvalue_threshold": 0.01           # 配對共整合顯著水準門檻
+            }
         }
     ]
     
@@ -531,7 +700,8 @@ def main():
             "module": raw["module"],
             "output_dir": f"{OUTPUT_ROOT}/{raw['sub_dir']}",
             "log_path": f"{log_dir}/{safe_name}.log",
-            "params": raw["params"]
+            "params": raw["params"],
+            "db_path": DB_PATH
         })
         
     # 優化：統一預先建立所有策略輸出子目錄，防止子行程寫入資料時拋出目錄不存在錯誤
@@ -619,32 +789,58 @@ def main():
     
     results = []
     
-    # 使用 ProcessPoolExecutor 分發任務
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(
-                worker_task,
-                config,
-                price_pivot,
-                all_dates,
-                total_days,
-                local_first_trade_idx,
-                sector_mapping,
-                progress_dict
-            ): config for config in strategies_config
-        }
-        
-        # 阻塞等待所有任務執行完畢
-        for future in concurrent.futures.as_completed(futures):
-            strat_config = futures[future]
-            strat_name = strat_config["name"]
-            try:
-                res = future.result()
-                results.append(res)
-            except Exception as exc:
-                results.append({"name": strat_name, "status": "FAILED", "elapsed": 0.0, "error": str(exc)})
-            finally:
-                gc.collect()
+    # ── 3. 智慧斷點續傳：篩選哪些策略已完整跑完，哪些需要真正執行 ─────────────────
+    strategies_to_run = []
+    for config in strategies_config:
+        if check_strategy_completed(config, DB_PATH):
+            # 已經完整跑過了，直接更新進度字典為 SUCCESS，並標記為已跳過
+            progress_dict[config["name"]] = {
+                "status": "SUCCESS",
+                "progress": "完成",
+                "pct": 100,
+                "msg": "✨ 已跳過 (偵測到已有完整回測結果)",
+                "elapsed": 0.0
+            }
+            results.append({
+                "name": config["name"],
+                "status": "SUCCESS",
+                "elapsed": 0.0,
+                "error": None
+            })
+        else:
+            strategies_to_run.append(config)
+            
+    # 重新計算並行進程數以防 OOM
+    if strategies_to_run:
+        max_workers = args.workers or min(len(strategies_to_run), os.cpu_count() or 4)
+    
+    # 使用 ProcessPoolExecutor 分發真正需要執行的任務
+    if strategies_to_run:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(
+                    worker_task,
+                    config,
+                    price_pivot,
+                    all_dates,
+                    total_days,
+                    local_first_trade_idx,
+                    sector_mapping,
+                    progress_dict
+                ): config for config in strategies_to_run
+            }
+            
+            # 阻塞等待所有任務執行完畢
+            for future in concurrent.futures.as_completed(futures):
+                strat_config = futures[future]
+                strat_name = strat_config["name"]
+                try:
+                    res = future.result()
+                    results.append(res)
+                except Exception as exc:
+                    results.append({"name": strat_name, "status": "FAILED", "elapsed": 0.0, "error": str(exc)})
+                finally:
+                    gc.collect()
                 
     # 停止背景渲染
     stop_dashboard_event.set()
@@ -672,7 +868,7 @@ def main():
     print("                     📊 [5/5] 回測執行績效總結報告 (Summary) 📊", flush=True)
     print("="*80, flush=True)
     print(f" 所有策略並行回測總耗時 : {total_elapsed:.2f} 秒 (約 {total_elapsed/60:.2f} 分鐘)", flush=True)
-    print(f" 平行加速比效果極佳，大幅縮短整體網格搜尋時間！\n", flush=True)
+    
     
     print(f"{'策略名稱':<45} | {'執行狀態':<10} | {'執行時間 (秒)':<12} | {'錯誤訊息'}", flush=True)
     print("-" * 88, flush=True)

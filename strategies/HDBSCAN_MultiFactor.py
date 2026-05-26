@@ -1,22 +1,9 @@
-
-
 # ======================================================================
 """
-HDBSCAN 分群配對交易滾動回測系統 (交易明細版)
-核心功能：以 HDBSCAN 對形成期特徵向量進行密度分群，從同群內挑選最優配對，
+HDBSCAN 分群配對交易滾動回測系統 (交易明細版) - 時序多因子特徵空間版
+核心功能：以 6 大穩健金融因子作為分群特徵空間，跳過降維步驟，
+          直接以 HDBSCAN 密度分群，從同群內挑選最優配對，
           結合 Engle-Granger OLS Spread 建構 Z-Score 執行配對交易。
-
-改寫基礎：SSD / EG 配對交易滾動回測系統
-核心差異：
-  - Formation：
-      Step 1 → 擷取每支股票的多維特徵向量（動量、波動率、自相關、統計矩）
-      Step 2 → UMAP 降維（常開，針對 S&P500 規模最佳化）至低維嵌入空間
-      Step 3 → HDBSCAN 密度分群，過濾噪音點（label = -1）
-      Step 4 → 同產業 × 同群落 雙重篩選，執行 EG 共整合檢定
-              ADF p 值門檻：保守模式 < 1%，積極模式 < 5%
-              依 ADF 統計量升序選 top_n 配對，輸出含 ADF_Stat / ADF_PValue
-  - Trading：與 EG 版完全相同（OLS Spread + Z-Score）
-  - DataProcessor / RollingBacktester：架構沿用，新增 HDBSCAN / ADF p 值參數
 """
 
 import sqlite3
@@ -29,7 +16,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.stattools import adfuller
 
-# HDBSCAN 與 UMAP（需安裝：umap-learn，且支援 sklearn.cluster 原生 HDBSCAN 作為後備）
+# HDBSCAN
 try:
     import hdbscan
     HDBSCAN_LIB = "hdbscan"
@@ -39,13 +26,6 @@ except ImportError:
         HDBSCAN_LIB = "sklearn"
     except ImportError:
         raise ImportError("請先安裝 scikit-learn >= 1.3.0 或 hdbscan：pip install scikit-learn hdbscan")
-
-try:
-    import umap
-    UMAP_AVAILABLE = True
-except ImportError:
-    UMAP_AVAILABLE = False
-    print("⚠️ umap-learn 未安裝，將跳過 UMAP 降維，直接以原始特徵向量執行 HDBSCAN。")
 
 from sklearn.preprocessing import StandardScaler
 
@@ -71,12 +51,6 @@ def _ols(y: np.ndarray, x: np.ndarray) -> tuple[float, float, np.ndarray]:
 def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
     """
     ADF 檢定（no constant），同時回傳 (統計量, p 值)。
-    失敗時回傳 (0.0, 1.0)，代表無法拒絕單根假設（最差情況）。
-
-    p 值解讀：
-      < 0.01 → 保守 (conservative)：強力拒絕單根，共整合顯著
-      < 0.05 → 積極 (aggressive) ：一般顯著水準
-      ≥ 0.05 → 不顯著，不納入配對池
     """
     if len(resid) < max_lags + 5:
         return 0.0, 1.0
@@ -87,92 +61,17 @@ def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
         return 0.0, 1.0
 
 
-def _extract_features(log_price: np.ndarray) -> np.ndarray:
-    """
-    從對數價格序列萃取多維特徵向量，用於 HDBSCAN 分群。
-
-    特徵清單（共 13 維）：
-      動量類（4）：5日、21日、63日、126日 對數報酬率
-      波動率類（3）：21日、63日 滾動波動率，及全期波動率
-      自相關類（3）：lag-1、lag-5、lag-21 報酬自相關
-      統計矩類（3）：全期偏態、峰態、Hurst 指數近似值
-    """
-    ret = np.diff(log_price)
-    n   = len(ret)
-
-    def safe_ret(window):
-        if n >= window:
-            return float(log_price[-1] - log_price[-window])
-        return 0.0
-
-    def roll_vol(window):
-        if n >= window:
-            return float(np.std(ret[-window:], ddof=1))
-        return float(np.std(ret, ddof=1)) if n > 1 else 0.0
-
-    def autocorr(lag):
-        if n <= lag:
-            return 0.0
-        x1, x2 = ret[:-lag], ret[lag:]
-        if len(x1) < 2:
-            return 0.0
-        try:
-            return float(np.corrcoef(x1, x2)[0, 1])
-        except Exception:
-            return 0.0
-
-    def hurst_approx():
-        """R/S 分析近似 Hurst 指數（簡化版，分 4 段）"""
-        if n < 20:
-            return 0.5
-        rs_list = []
-        for seg_len in [n // 4, n // 2, n]:
-            if seg_len < 4:
-                continue
-            seg = ret[:seg_len]
-            mean_seg = np.mean(seg)
-            deviate  = np.cumsum(seg - mean_seg)
-            rs = (np.max(deviate) - np.min(deviate)) / (np.std(seg, ddof=1) + 1e-8)
-            rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
-        if len(rs_list) < 2:
-            return 0.5
-        xs, ys = zip(*rs_list)
-        try:
-            h = float(np.polyfit(xs, ys, 1)[0])
-        except Exception:
-            h = 0.5
-        return np.clip(h, 0.0, 1.0)
-
-    vol_all  = float(np.std(ret, ddof=1)) if n > 1 else 0.0
-    skew_all = float(pd.Series(ret).skew()) if n > 2 else 0.0
-    kurt_all = float(pd.Series(ret).kurt()) if n > 3 else 0.0
-
-    features = np.array([
-        safe_ret(5),   safe_ret(21),  safe_ret(63),  safe_ret(126),  # 動量
-        roll_vol(21),  roll_vol(63),  vol_all,                        # 波動率
-        autocorr(1),   autocorr(5),   autocorr(21),                  # 自相關
-        skew_all,      kurt_all,      hurst_approx(),                 # 統計矩
-    ], dtype=np.float64)
-
-    # 處理 NaN / Inf
-    features = np.where(np.isfinite(features), features, 0.0)
-    return features
-
 # ══════════════════════════════════════════════════════════════════════════════
-# Class 1：Formation（形成期模組）- HDBSCAN 版本
+# Class 1：Formation（形成期模組）- 多因子特徵空間 HDBSCAN 版本
 # ══════════════════════════════════════════════════════════════════════════════
 
 class Formation:
     """
-    形成期四步驟：
-      1. 特徵萃取  → 每支股票 13 維特徵向量（標準化後）
-      2. UMAP 降維 → 常開（S&P500 約 500 支股票，13 維 → umap_n_components 維）
+    形成期四步驟（時序多因子特徵空間版）：
+      1. 特徵萃取  → 每支股票提取 6 大金融時序因子（標準化後）
+      2. 降維跳過  → 不降維，直接使用 6 維因子特徵矩陣
       3. HDBSCAN   → 密度分群，自動決定群數，噪音點（label=-1）排除
-      4. 同產業 × 同群落 雙重篩選 → EG 共整合，ADF p 值門檻過濾後依統計量升序選 top_n
-
-    ADF p 值門檻說明：
-      adf_pvalue_threshold = 0.01  → 保守 (conservative)：僅接受 1% 顯著水準
-      adf_pvalue_threshold = 0.05  → 積極 (aggressive)  ：接受 5% 顯著水準
+      4. 同產業 × 同群落 雙重篩選 → EG 共整合，ADF p 值門檻過濾後依統計量升序選 top_n（含行業分散限制）
     """
 
     def __init__(
@@ -185,22 +84,20 @@ class Formation:
         min_tickers_for_pairing: int = 2,
         # HDBSCAN 參數
         hdbscan_min_cluster_size: int = 3,     # 最小群落大小
-        hdbscan_min_samples: int = 1,          # 核心點最小鄰居數（越小 → 越少噪音）
+        hdbscan_min_samples: int = 1,          # 核心點最小鄰居數
         hdbscan_metric: str = "euclidean",     # 距離度量
-        # 降維方法：'umap' 或 'pca'
-        reduce_method: str = "umap",
-        # UMAP 參數（S&P500 規模下常開）
-        umap_n_components: int = 5,            # 降維目標維度
+        # 降維參數（接口保留但跳過）
+        reduce_method: str = "none",
+        umap_n_components: int = 5,
         umap_n_neighbors: int = 15,
         umap_min_dist: float = 0.1,
         umap_random_state: int = 42,
         # ADF p 值門檻
         adf_max_lags: int = 1,
-        adf_pvalue_threshold: float = 0.05,   # 0.01=保守 / 0.05=積極
+        adf_pvalue_threshold: float = 0.05,
         max_sector_ratio: float = 0.3,
     ):
         self.price_df = price_df.copy()
-        self.max_sector_ratio = max_sector_ratio
         self.form_start = form_start
         self.form_end   = form_end
         self.top_n      = top_n
@@ -211,65 +108,74 @@ class Formation:
         self.hdbscan_min_samples      = hdbscan_min_samples
         self.hdbscan_metric           = hdbscan_metric
 
-        self.reduce_method = reduce_method.lower()
-        if self.reduce_method == "umap" and not UMAP_AVAILABLE:
-            raise RuntimeError("umap-learn 未安裝，請執行：pip install umap-learn")
-        self.umap_n_components = umap_n_components
-        self.umap_n_neighbors  = umap_n_neighbors
-        self.umap_min_dist     = umap_min_dist
-        self.umap_random_state = umap_random_state
-
+        self.reduce_method = "none"
         self.adf_max_lags           = adf_max_lags
-        self.adf_pvalue_threshold   = adf_pvalue_threshold   # 0.01=保守 / 0.05=積極
+        self.adf_pvalue_threshold   = adf_pvalue_threshold
+        self.max_sector_ratio       = max_sector_ratio
 
         self.selected_pairs: pd.DataFrame = pd.DataFrame()
-        self.cluster_labels_: dict = {}     # ticker → cluster_label（供外部查閱）
+        self.cluster_labels_: dict = {}
 
     # ── Step 1：特徵萃取與標準化 ─────────────────────────────────────────────
     def _build_feature_matrix(self) -> tuple[np.ndarray, list[str]]:
         log_prices = np.log(self.price_df)
         tickers    = log_prices.columns.tolist()
 
+        returns_df = log_prices.diff().dropna()
+        if returns_df.empty or len(returns_df.columns) < 2:
+            return np.empty((0, 0)), []
+
+        market_returns = returns_df.mean(axis=1).values
         feat_rows, valid_tickers = [], []
+        t_indices = np.arange(len(log_prices))
+
         for ticker in tickers:
-            series = log_prices[ticker].values
-            if len(series) < 30 or not np.all(np.isfinite(series)):
+            prices = log_prices[ticker].values
+            if len(prices) < 30 or not np.all(np.isfinite(prices)):
                 continue
-            feat_rows.append(_extract_features(series))
+
+            ticker_ret = returns_df[ticker].values
+
+            # --- 1. Market Beta ---
+            cov_mat = np.cov(ticker_ret, market_returns)
+            beta = cov_mat[0, 1] / (cov_mat[1, 1] + 1e-12) if cov_mat[1, 1] > 1e-12 else 0.0
+
+            # --- 2. Volatility ---
+            vol = np.std(ticker_ret, ddof=1) if len(ticker_ret) > 1 else 0.0
+
+            # --- 3. Skewness ---
+            skew = float(pd.Series(ticker_ret).skew())
+
+            # --- 4. Kurtosis ---
+            kurt = float(pd.Series(ticker_ret).kurt())
+
+            # --- 5. Trend Slope ---
+            try:
+                x_mat = np.column_stack([np.ones(len(prices)), t_indices])
+                coeffs, _, _, _ = np.linalg.lstsq(x_mat, prices, rcond=None)
+                slope = float(coeffs[1])
+            except Exception:
+                slope = 0.0
+
+            # --- 6. Idiosyncratic Volatility ---
+            try:
+                alpha, beta_val, resid = _ols(ticker_ret, market_returns)
+                idio_vol = np.std(resid, ddof=1) if len(resid) > 1 else 0.0
+            except Exception:
+                idio_vol = vol
+
+            feats = np.array([beta, vol, skew, kurt, slope, idio_vol], dtype=np.float64)
+            feats = np.where(np.isfinite(feats), feats, 0.0)
+
+            feat_rows.append(feats)
             valid_tickers.append(ticker)
 
         if not feat_rows:
             return np.empty((0, 0)), []
 
-        X = np.vstack(feat_rows)                    # (n_stocks, n_features)
-        X = StandardScaler().fit_transform(X)        # 標準化
+        X = np.vstack(feat_rows)
+        X = StandardScaler().fit_transform(X)
         return X, valid_tickers
-
-    # ── Step 2：UMAP 降維（S&P500 規模下常開）────────────────────────────────
-    def _umap_reduce(self, X: np.ndarray) -> np.ndarray:
-        n_stocks = X.shape[0]
-        n_comp   = min(self.umap_n_components, n_stocks - 1)
-        n_neigh  = min(self.umap_n_neighbors,  n_stocks - 1)
-        if n_comp < 1 or n_neigh < 1:
-            return X
-        reducer = umap.UMAP(
-            n_components  = n_comp,
-            n_neighbors   = n_neigh,
-            min_dist      = self.umap_min_dist,
-            random_state  = self.umap_random_state,
-            low_memory    = True,
-        )
-        return reducer.fit_transform(X)
-
-    # ── Step 2.5：PCA 降維（穩健性對照）─────────────────────────────────────
-    def _pca_reduce(self, X: np.ndarray) -> np.ndarray:
-        from sklearn.decomposition import PCA
-        n_stocks = X.shape[0]
-        n_comp   = min(self.umap_n_components, n_stocks - 1)
-        if n_comp < 1:
-            return X
-        pca = PCA(n_components=n_comp, random_state=self.umap_random_state)
-        return pca.fit_transform(X)
 
     # ── Step 3：HDBSCAN 分群 ────────────────────────────────────────────────
     def _hdbscan_cluster(self, X: np.ndarray) -> np.ndarray:
@@ -289,26 +195,13 @@ class Formation:
                 n_jobs           = -1,
             )
         clusterer.fit(X)
-        return clusterer.labels_   # -1 = 噪音
+        return clusterer.labels_
 
     # ── Step 4：同產業 × 同群落 雙重篩選 + EG 共整合 ──────────────────────────
     def _cointegration_within_clusters(
         self, tickers: list[str], labels: np.ndarray
     ) -> pd.DataFrame:
-        """
-        篩選邏輯：
-          A. 同產業（sector_mapping 必須提供，Unknown 一律排除）
-          B. 同 HDBSCAN 群落（label != -1）
-          滿足 A ∩ B 才進行 EG 共整合。
-
-        ADF p 值門檻（adf_pvalue_threshold）：
-          0.01 → 保守：僅接受殘差在 1% 水準下顯著定態
-          0.05 → 積極：接受殘差在 5% 水準下顯著定態
-          p 值 ≥ 門檻者直接排除，不進入配對池。
-        """
-        log_prices    = np.log(self.price_df[tickers])
-        ticker_to_idx = {t: i for i, t in enumerate(tickers)}
-
+        log_prices = np.log(self.price_df[tickers])
         unique_labels = set(labels) - {-1}
         if not unique_labels:
             print("  [Formation] HDBSCAN 未找到任何有效群落（全為噪音點）。")
@@ -320,28 +213,21 @@ class Formation:
               f"ADF p 值門檻 = {self.adf_pvalue_threshold:.2f} "
               f"({'保守 1%' if self.adf_pvalue_threshold <= 0.01 else '積極 5%'})")
 
-        # 建立 ticker → (sector, cluster_label) 對照表
         ticker_meta: dict[str, tuple[str, int]] = {}
         for t, lbl in zip(tickers, labels):
             sector = self.sector_mapping.get(t.upper(), "Unknown")
             ticker_meta[t] = (sector, int(lbl))
 
-        # 按 (sector, cluster_label) 分組，同時排除 Unknown 與噪音
         group_map: dict[tuple[str, int], list[str]] = {}
         for t, (sec, lbl) in ticker_meta.items():
             if sec == "Unknown" or lbl == -1:
                 continue
             group_map.setdefault((sec, lbl), []).append(t)
 
-        # 排除成員數不足的群組
         valid_groups = {k: v for k, v in group_map.items() if len(v) >= self.min_tickers_for_pairing}
-
         if not valid_groups:
             print("  [Formation] 同產業 × 同群落後無有效配對組合。")
             return pd.DataFrame()
-
-        total_group_count = len(valid_groups)
-        print(f"  [Formation] 有效 (產業, 群落) 組合：{total_group_count} 組")
 
         eg_records = []
         passed_count = 0
@@ -354,14 +240,12 @@ class Formation:
                     tb    = group_tickers[j]
                     log_b = log_prices[tb].values
 
-                    # EG 正反兩方向，取 p 值較小（共整合較顯著）的方向
                     al_ab, be_ab, re_ab = _ols(log_a, log_b)
                     stat_ab, pval_ab = _adf_stat(re_ab, self.adf_max_lags)
 
                     al_ba, be_ba, re_ba = _ols(log_b, log_a)
                     stat_ba, pval_ba = _adf_stat(re_ba, self.adf_max_lags)
 
-                    # 選 p 值較小的方向（p 值更小 = 更顯著 = 更傾向定態）
                     if pval_ab <= pval_ba:
                         best_stat, best_pval = stat_ab, pval_ab
                         best_alpha, best_beta, best_resid = al_ab, be_ab, re_ab
@@ -371,12 +255,10 @@ class Formation:
                         best_alpha, best_beta, best_resid = al_ba, be_ba, re_ba
                         best_a, best_b = tb, ta
 
-                    # p 值門檻過濾（核心篩選邏輯）
                     if best_pval >= self.adf_pvalue_threshold:
                         rejected_count += 1
                         continue
 
-                    # Ornstein-Uhlenbeck 均值復歸半衰期過濾
                     dy = np.diff(best_resid)
                     y_lag = best_resid[:-1]
                     n_dy = len(dy)
@@ -408,7 +290,7 @@ class Formation:
                         "Ticker_A":      best_a,
                         "Ticker_B":      best_b,
                         "ADF_Stat":      round(best_stat,   6),
-                        "ADF_PValue":    round(best_pval,   6),   # ← 新增 p 值欄位
+                        "ADF_PValue":    round(best_pval,   6),
                         "Hedge_Ratio":   round(best_beta,   6),
                         "OLS_Alpha":     round(best_alpha,  6),
                         "Spread_Mean":   round(spread_mean, 6),
@@ -425,23 +307,17 @@ class Formation:
 
     # ── 主流程 ──────────────────────────────────────────────────────────────
     def run(self) -> pd.DataFrame:
-        # Step 1：特徵萃取
         X, valid_tickers = self._build_feature_matrix()
         if len(valid_tickers) < self.min_tickers_for_pairing:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        # Step 2：降維 (UMAP 或 PCA)
-        if self.reduce_method == "pca":
-            X_embed = self._pca_reduce(X)
-        else:
-            X_embed = self._umap_reduce(X)
+        # MultiFactor 策略跳過降維步驟，直接使用原始時序特徵矩陣
+        X_embed = X
 
-        # Step 3：HDBSCAN 分群
         labels = self._hdbscan_cluster(X_embed)
         self.cluster_labels_ = dict(zip(valid_tickers, labels.tolist()))
 
-        # Step 4：同產業 × 同群落 EG 共整合
         eg_df = self._cointegration_within_clusters(valid_tickers, labels)
         if eg_df.empty:
             self.selected_pairs = pd.DataFrame()
@@ -466,7 +342,6 @@ class Formation:
 
         selected["Rank"] = range(1, len(selected) + 1)
 
-        # 附加 log 統計量（供 Trading 期使用）
         log_prices  = np.log(self.price_df)
         mean_prices = log_prices.mean()
         std_prices  = log_prices.std()
@@ -479,8 +354,9 @@ class Formation:
         self.selected_pairs = selected
         return self.selected_pairs
 
+
 # ══════════════════════════════════════════════════════════════════════════════
-# Class 2：Trading（交易期模組）- 與 EG 版完全相同
+# Class 2：Trading（交易期模組）
 # ══════════════════════════════════════════════════════════════════════════════
 
 @dataclass(slots=True)
@@ -695,7 +571,6 @@ class Trading:
                             "STOPPED", 0.0, 0, 0.0)
                 continue
 
-            # 冷卻解除
             if   state.cooldown_dir == -1 and z <= self.exit_z:  state.cooldown_dir = 0
             elif state.cooldown_dir ==  1 and z >= -self.exit_z: state.cooldown_dir = 0
 
@@ -746,7 +621,6 @@ class Trading:
                     )
                 break
 
-        # 期末強制平倉
         if state.position != 0 and out_status:
             if out_status[-1] not in ("EXIT", "STOP_LOSS_TRIGGERED", "PERIOD_END_EXIT", "STOPPED"):
                 p_a_last, p_b_last = float(pa_arr[-1]), float(pb_arr[-1])
@@ -860,78 +734,9 @@ class Trading:
         self.period_pnl = float(period_daily.sum()) if not period_daily.empty else 0.0
         return log_df, self.period_pnl
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Class 3：DataProcessor（與原版相同）
-# ══════════════════════════════════════════════════════════════════════════════
-
-class DataProcessor:
-    def __init__(self, db_path: str, table_name: str = "daily_prices"):
-        self.db_path, self.table_name = db_path, table_name
-
-    def load_sector_mapping(self, info_table, ticker_col="ticker", sector_col="sector") -> dict:
-        try:
-            conn = sqlite3.connect(self.db_path)
-            df   = pd.read_sql_query(f"SELECT {ticker_col}, {sector_col} FROM {info_table}", conn)
-            conn.close()
-            mapping = {
-                str(k).strip().upper(): str(v).strip()
-                for k, v in zip(df[ticker_col], df[sector_col])
-                if pd.notna(k) and pd.notna(v)
-            }
-            print(f"✅ 成功載入產業分類表 '{info_table}'，共取得 {len(mapping)} 檔標的分類。")
-            return mapping
-        except Exception as e:
-            print(f"⚠️ 無法載入產業分類表：{e}，退回全市場模式。")
-            return {}
-
-    def prepare_backtest_data(self, backtest_start, backtest_end, formation_window):
-        conn   = sqlite3.connect(self.db_path)
-        raw_df = pd.read_sql_query(
-            f"SELECT Date AS date, Symbol AS ticker, COALESCE(Adj_Close, Close) AS price "
-            f"FROM {self.table_name} WHERE COALESCE(Adj_Close, Close) IS NOT NULL ORDER BY Date ASC", conn
-        )
-        conn.close()
-
-        raw_df["date"]  = pd.to_datetime(raw_df["date"])
-        raw_df["price"] = pd.to_numeric(raw_df["price"], errors="coerce")
-        raw_df.dropna(subset=["price"], inplace=True)
-        raw_df = raw_df[raw_df["price"] > 0]
-
-        price_pivot = (
-            raw_df.pivot_table(index="date", columns="ticker", values="price", aggfunc="last")
-            .sort_index()
-        )
-        price_pivot = price_pivot.loc[:, price_pivot.isnull().mean() < 0.20].ffill(limit=5)
-        price_pivot.dropna(axis=1, thresh=int(len(price_pivot) * 0.9), inplace=True)
-
-        def _safe_parse(d_str, is_end=False):
-            if not d_str: return None
-            try:
-                dt = pd.to_datetime(str(d_str).strip())
-                if is_end and len(str(d_str).strip()) == 7:
-                    return dt + pd.offsets.MonthEnd(0)
-                return dt
-            except Exception:
-                return None
-
-        bt_start_ts   = _safe_parse(backtest_start)
-        bt_end_ts     = _safe_parse(backtest_end, is_end=True)
-        all_dates     = price_pivot.index.tolist()
-        start_indices = [i for i, d in enumerate(all_dates) if d >= bt_start_ts] if bt_start_ts else []
-        first_idx     = start_indices[0] if start_indices else 0
-
-        data_slice_start = all_dates[max(0, first_idx - formation_window)] if bt_start_ts else price_pivot.index[0]
-        data_slice_end   = bt_end_ts if bt_end_ts else price_pivot.index[-1]
-        price_pivot      = price_pivot.loc[data_slice_start:data_slice_end]
-
-        sliced_dates      = price_pivot.index.tolist()
-        new_start_indices = [i for i, d in enumerate(sliced_dates) if d >= bt_start_ts] if bt_start_ts else []
-        local_first_idx   = new_start_indices[0] if new_start_indices else formation_window
-
-        return price_pivot, sliced_dates, len(price_pivot), max(local_first_idx, formation_window)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Class 4：RollingBacktester（HDBSCAN 版）
+# Class 3：RollingBacktester
 # ══════════════════════════════════════════════════════════════════════════════
 
 class RollingBacktester:
@@ -952,20 +757,17 @@ class RollingBacktester:
         zscore_clip: float,
         min_spread_std: float,
         min_tickers_for_pairing: int,
-        # HDBSCAN 參數
         hdbscan_min_cluster_size: int,
         hdbscan_min_samples: int,
         hdbscan_metric: str,
-        # UMAP 參數（常開）
-        umap_n_components: int,
-        umap_n_neighbors: int,
-        umap_min_dist: float,
-        umap_random_state: int,
-        # EG + ADF p 值參數
-        adf_max_lags: int,
-        adf_pvalue_threshold: float,   # 0.01=保守 / 0.05=積極
-        output_dir: Path,
-        reduce_method: str = "umap",
+        umap_n_components: int = 5,
+        umap_n_neighbors: int = 15,
+        umap_min_dist: float = 0.1,
+        umap_random_state: int = 42,
+        adf_max_lags: int = 1,
+        adf_pvalue_threshold: float = 0.05,
+        output_dir: Path = None,
+        reduce_method: str = "none",
         use_dynamic_stop: bool = False,
         dynamic_stop_z: float = 3.0,
         portfolio_stop_loss_pct: float = 0.10,
@@ -989,7 +791,7 @@ class RollingBacktester:
             }
 
         roll_start_indices = list(range(local_first_trade_idx, total_days - self.trading_window + 1, self.rolling_step))
-        print(f"\n🚀 開始 HDBSCAN Grid Search，共 {len(roll_start_indices)} 期，每期 {len(states)} 種參數組合...")
+        print(f"\n🚀 開始 HDBSCAN MultiFactor Grid Search，共 {len(roll_start_indices)} 期，每期 {len(states)} 種參數組合...")
 
         for roll_idx, trade_start_idx in enumerate(roll_start_indices):
             form_start_idx = trade_start_idx - self.formation_window
@@ -1014,7 +816,6 @@ class RollingBacktester:
             fe_str = str(all_dates[form_end_idx - 1])[:10]
             print(f"  ▶ 第 {roll_idx+1:02d} 期 (交易: {ts_str} ~ {te_str})")
 
-            # ── HDBSCAN 形成期（以最大 top_n 計算一次，後續切片）
             formation = Formation(
                 price_df=form_data,
                 form_start=fs_str, form_end=fe_str,
@@ -1024,13 +825,8 @@ class RollingBacktester:
                 hdbscan_min_cluster_size=self.hdbscan_min_cluster_size,
                 hdbscan_min_samples=self.hdbscan_min_samples,
                 hdbscan_metric=self.hdbscan_metric,
-                umap_n_components=self.umap_n_components,
-                umap_n_neighbors=self.umap_n_neighbors,
-                umap_min_dist=self.umap_min_dist,
-                umap_random_state=self.umap_random_state,
                 adf_max_lags=self.adf_max_lags,
                 adf_pvalue_threshold=self.adf_pvalue_threshold,
-                reduce_method=getattr(self, "reduce_method", "umap"),
                 max_sector_ratio=getattr(self, "max_sector_ratio", 0.3),
             )
             max_selected_pairs = formation.run()
@@ -1079,7 +875,7 @@ class RollingBacktester:
             if state["logs"]:
                 full_log = pd.concat(state["logs"], ignore_index=True)
                 sl_str   = f"SL{int(sl*100)}" if sl > 0 else "SL0"
-                rm_str   = getattr(self, "reduce_method", "umap").upper()
+                rm_str   = "MULTIFACTOR"
                 vol_str  = "VolAdj" if vol_adj else "NoVolAdj"
                 filename = f"HDBSCAN_{rm_str}_TradeLogs_Top{n}_{sl_str}_ZWin{z_win}_{vol_str}.csv"
                 filepath = self.output_dir / filename
@@ -1087,97 +883,13 @@ class RollingBacktester:
                 print(f"  - 已輸出: {filename} (共 {len(full_log)} 筆紀錄)")
         print(f"\n📁 所有交易紀錄已成功儲存至: {self.output_dir}")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 主程式
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-
-# ======================================================================
-# 原 Main 區塊被自動化註釋解耦如下：
-# if __name__ == "__main__":
-
-#     # --- 1. 路徑設定 ---
-#     DB_PATH, TABLE_NAME          = r"../data/sp500_Current.db", "Daily_Prices"
-#     BACKTEST_START, BACKTEST_END = "2000-01", "2025-12"
-#     INFO_TABLE_NAME              = "Constituents"
-#     TICKER_COL_NAME, SECTOR_COL_NAME = "Symbol", "GICS_Sector"
-
-#     ALLOW_REENTRY = False
-#     OUTPUT_DIR    = Path(r"../results/current/HDBSCAN_NoReEntry")
-#     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-#     # --- 2. 網格搜尋參數 ---
-#     TOP_N_LIST         = [1, 5, 10, 20]
-#     STOP_LOSS_LIST     = [0, 0.05, 0.1, 0.15]
-#     ZSCORE_WINDOW_LIST = [0, 20, 40, 60]
-
-#     ENTRY_Z, EXIT_Z                                  = 2.0, 0.0
-#     FORMATION_WINDOW, TRADING_WINDOW, ROLLING_STEP   = 252, 126, 21
-
-#     # --- 3. HDBSCAN 參數 ---
-#     HDBSCAN_MIN_CLUSTER_SIZE = 10        # 最小群落大小（建議 3~10）
-#     HDBSCAN_MIN_SAMPLES      = 2        # 核心點最小鄰居數（越小 → 越少噪音點）
-#     HDBSCAN_METRIC           = "euclidean"
-
-#     # --- 4. UMAP 參數（S&P500 規模下常開，不可關閉）---
-#     UMAP_N_COMPONENTS = 8               # 13 維特徵 → 5 維嵌入（建議 3~8）
-#     UMAP_N_NEIGHBORS  = 20              # 局部拓樸鄰居數（建議 10~30）
-#     UMAP_MIN_DIST     = 0.1             # 嵌入點最小距離（越小 → 群落越緊密）
-#     UMAP_RANDOM_STATE = 42
-
-#     # --- 5. ADF p 值門檻（核心篩選參數）---
-#     # 說明：對同產業 × 同群落配對的 OLS 殘差執行 ADF 單根檢定
-#     #   保守模式：ADF_PVALUE_THRESHOLD = 0.01  → 僅接受 1% 顯著水準（配對數較少但品質高）
-#     #   積極模式：ADF_PVALUE_THRESHOLD = 0.05  → 接受 5% 顯著水準（配對數較多但較寬鬆）
-#     ADF_MAX_LAGS           = 1
-#     ADF_PVALUE_THRESHOLD   = 0.01       # ← 改為 0.01 即切換至保守模式
-
-#     # --- 6. 交易成本 ---
-#     FEE_RATE               = 0.001
-#     SLIPPAGE_RATE          = 0.001
-#     INITIAL_CAPITAL        = 10_000
-#     MIN_TICKERS_FOR_PAIRING = 2
-#     ZSCORE_CLIP            = 10.0
-#     MIN_SPREAD_STD         = 1e-6
-
-#     # --- 7. 資料前處理 ---
-#     processor      = DataProcessor(db_path=DB_PATH, table_name=TABLE_NAME)
-#     sector_mapping = processor.load_sector_mapping(INFO_TABLE_NAME, TICKER_COL_NAME, SECTOR_COL_NAME)
-
-#     price_pivot, all_dates, total_days, local_first_trade_idx = processor.prepare_backtest_data(
-#         BACKTEST_START, BACKTEST_END, FORMATION_WINDOW
-#     )
-
-#     # --- 8. 啟動回測引擎 ---
-#     engine = RollingBacktester(
-#         top_n_list=TOP_N_LIST, stop_loss_list=STOP_LOSS_LIST, zscore_window_list=ZSCORE_WINDOW_LIST,
-#         entry_z=ENTRY_Z, exit_z=EXIT_Z,
-#         formation_window=FORMATION_WINDOW, trading_window=TRADING_WINDOW, rolling_step=ROLLING_STEP,
-#         fee_rate=FEE_RATE, slippage_rate=SLIPPAGE_RATE, initial_capital=INITIAL_CAPITAL,
-#         allow_reentry=ALLOW_REENTRY, zscore_clip=ZSCORE_CLIP, min_spread_std=MIN_SPREAD_STD,
-#         min_tickers_for_pairing=MIN_TICKERS_FOR_PAIRING,
-#         hdbscan_min_cluster_size=HDBSCAN_MIN_CLUSTER_SIZE,
-#         hdbscan_min_samples=HDBSCAN_MIN_SAMPLES,
-#         hdbscan_metric=HDBSCAN_METRIC,
-#         umap_n_components=UMAP_N_COMPONENTS,
-#         umap_n_neighbors=UMAP_N_NEIGHBORS,
-#         umap_min_dist=UMAP_MIN_DIST,
-#         umap_random_state=UMAP_RANDOM_STATE,
-#         adf_max_lags=ADF_MAX_LAGS,
-#         adf_pvalue_threshold=ADF_PVALUE_THRESHOLD,
-#         output_dir=OUTPUT_DIR,
-#     )
-
-#     engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 標準化策略進入點接口 (Unified Strategy Entry Point)
 # ══════════════════════════════════════════════════════════════════════════════
 def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir):
     """
-    標準化調用接口，接受外部傳入的價格資料與回測參數，完全解耦資料載入 I/O
+    標準化調用接口，完全解耦資料載入 I/O
     """
     import inspect
     from pathlib import Path
@@ -1185,11 +897,9 @@ def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sect
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    # 獲取 RollingBacktester 的 __init__ 參數列表
     init_sig = inspect.signature(RollingBacktester.__init__)
     valid_params = {}
     
-    # 動態將外部 params 對應並過濾為該策略 RollingBacktester 支援的參數
     for param_name, param in init_sig.parameters.items():
         if param_name in ('self', 'output_dir'):
             continue
@@ -1200,13 +910,11 @@ def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sect
             
     print(f"[{Path(__file__).stem.upper()}] 正在初始化 RollingBacktester...")
     
-    # 初始化回測引擎
     engine = RollingBacktester(
         output_dir=out_dir,
         **valid_params
     )
     
-    # 執行回測
     print(f"[{Path(__file__).stem.upper()}] 正在啟動滾動回測...")
     engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
     print(f"[{Path(__file__).stem.upper()}] 回測執行完畢。")

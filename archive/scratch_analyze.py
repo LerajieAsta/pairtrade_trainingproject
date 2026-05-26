@@ -29,9 +29,10 @@ def load_data(strategy_path):
     if not os.path.exists(file_path): return pd.DataFrame()
     
     try:
-        # 只讀取需要的欄位
+        # 只讀取我們需要的欄位，且指定 dtypes 以加快讀取速度並降低記憶體使用
         target_cols = ['Date', 'Position', 'Ticker_A', 'Ticker_B', 'Daily_Delta', 'Status']
         
+        # 由於原始 CSV 欄位可能包含空白，先偵測欄位名
         sample = pd.read_csv(file_path, nrows=0)
         original_header = sample.columns.tolist()
         clean_header = [str(c).strip() for c in original_header]
@@ -72,13 +73,10 @@ def extract_features_from_path(path):
     dataset = "Full" if "full" in path_lower else "Current" if "current" in path_lower else "Unknown"
     reentry = "NoReEntry" if "noreentry" in path_lower else "ReEntry" if "reentry" in path_lower else "Unknown"
     
-    is_mf = "multifactor" in path_lower
+    method = "Unknown"
     is_ae = "_ae_" in path_lower or "hdbscan_ae" in path_lower
     is_pca = "_pca_" in path_lower or "hdbscan_pca" in path_lower
-    
-    if is_mf:
-        method = "HDBSCAN (MultiFactor)"
-    elif is_ae:
+    if is_ae:
         method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
     else:
         method = "HDBSCAN (PCA)" if is_pca else "HDBSCAN (UMAP)"
@@ -95,15 +93,13 @@ def extract_features_from_path(path):
     match_zwin = re.search(r'zwin(\d+)', path_lower)
     if match_zwin: zwin = int(match_zwin.group(1))
         
-    vol_adj = "VolAdj" if "voladj" in path_lower and "novoladj" not in path_lower else "NoVolAdj"
-        
-    return dataset, reentry, method, top_n, sl_pct, zwin, vol_adj
+    return dataset, reentry, method, top_n, sl_pct, zwin
 
 def calculate_metrics_raw(strategy_path):
     df = load_data(strategy_path)
     if df.empty: return None
 
-    dataset, reentry, method, top_n, sl_pct, zwin, vol_adj = extract_features_from_path(strategy_path)
+    dataset, reentry, method, top_n, sl_pct, zwin = extract_features_from_path(strategy_path)
     
     if 'Daily_Delta' in df.columns:
         portfolio_daily = df.groupby('Date')['Daily_Delta'].sum().reset_index()
@@ -137,6 +133,7 @@ def calculate_metrics_raw(strategy_path):
     else:
         cum_ret = ann_ret = sharpe = mdd_pct = 0
 
+    # 勝率與每筆交易的額外統計
     win_rate = 0.0
     profit_factor = 0.0
     total_trades = 0
@@ -187,7 +184,6 @@ def calculate_metrics_raw(strategy_path):
         'Top_N': top_n,
         'Stop_Loss': sl_pct,
         'Z_Window': zwin,
-        'Vol_Adjust': vol_adj,
         'Final_Equity': final_equity,
         'Cum_Ret': cum_ret,
         'Ann_Ret': ann_ret,
@@ -214,14 +210,16 @@ def main():
     print("正在掃描 HDBSCAN 交易日誌...")
     strategies = scan_strategies(RESULTS_DIR)
     total_tasks = len(strategies)
-    print(f"找到 {total_tasks} 個 HDBSCAN 策略參數組合。啟動平行分析...")
+    print(f"找到 {total_tasks} 個 HDBSCAN 策略參數組合。啟動 ProcessPoolExecutor 進行多進程平行分析...")
     
     records = []
     
+    # 利用 CPU 核心數進行平行化
     max_workers = min(os.cpu_count() or 4, 12)
     print(f"並行工作行程數 (Workers): {max_workers}")
     
     with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有任務
         futures = {executor.submit(process_single, s): (i, s) for i, s in enumerate(strategies)}
         
         for future in concurrent.futures.as_completed(futures):
@@ -240,7 +238,7 @@ def main():
     df.to_csv("scratch/hdbscan_metrics_summary.csv", index=False)
     print("已將所有明細存檔至 scratch/hdbscan_metrics_summary.csv")
     
-    # 進行分組統計並印出
+    # 進行一些高級分組統計並印出
     print("\n" + "="*80)
     print("                 🏆 各 HDBSCAN 策略之最優參數組合 (依 Sharpe Ratio 排序) 🏆")
     print("="*80)
@@ -251,12 +249,12 @@ def main():
         print(f"  🔥 最佳 Sharpe: {best_row['Sharpe']:.2f}")
         print(f"  📈 年化報酬率 : {best_row['Ann_Ret']:.2%}")
         print(f"  📉 最大回撤   : {best_row['MDD']:.2%}")
-        print(f"  🛠️ 最佳參數組合: Top_N={best_row['Top_N']}, SL={best_row['Stop_Loss']:.0%}, Z_Window={best_row['Z_Window']}, Vol_Adjust={best_row['Vol_Adjust']}")
+        print(f"  🛠️ 最佳參數組合: Top_N={best_row['Top_N']}, SL={best_row['Stop_Loss']:.0%}, Z_Window={best_row['Z_Window']}")
         print(f"  📊 交易次數   : {best_row['Total_Trades']} | 勝率: {best_row['Win_Rate']:.2%} | 獲利因子: {best_row['Profit_Factor']:.2f}")
 
-    # 橫向對比 HDBSCAN 策略的平均表現 (Current 數據集)
+    # 橫向對比四種 HDBSCAN 策略的平均表現 (Current 數據集)
     print("\n" + "="*80)
-    print("             📊 所有 HDBSCAN 策略平均表現對比 (Current 數據集) 📊")
+    print("             📊 四種 HDBSCAN 策略平均表現對比 (Current 數據集) 📊")
     print("="*80)
     current_df = df[df['Dataset'] == 'Current']
     if not current_df.empty:
@@ -276,26 +274,29 @@ def main():
             'Profit_Factor': '平均獲利因子'
         })
         print(method_stats.to_string())
-
-    # 波動度調節 (Vol_Adjust) 的效益分析
+        
+    # 橫向對比四種 HDBSCAN 策略的平均表現 (Full 數據集)
     print("\n" + "="*80)
-    print("          📈 波動度自適應調節 (Vol_Adjust) 效益分析 (Current) 📈")
+    print("             📊 四種 HDBSCAN 策略平均表現對比 (Full 數據集) 📊")
     print("="*80)
-    if not current_df.empty:
-        vol_stats = current_df.groupby('Vol_Adjust').agg({
+    full_df = df[df['Dataset'] == 'Full']
+    if not full_df.empty:
+        method_stats_full = full_df.groupby('Method').agg({
             'Sharpe': 'mean',
             'Ann_Ret': 'mean',
             'MDD': 'mean',
+            'Total_Trades': 'mean',
             'Win_Rate': 'mean',
             'Profit_Factor': 'mean'
         }).rename(columns={
             'Sharpe': '平均 Sharpe',
             'Ann_Ret': '平均年化報酬',
             'MDD': '平均最大回撤',
+            'Total_Trades': '平均交易次數',
             'Win_Rate': '平均勝率',
             'Profit_Factor': '平均獲利因子'
         })
-        print(vol_stats.to_string())
+        print(method_stats_full.to_string())
 
     # 分析參數對績效的影響
     print("\n" + "="*80)
