@@ -1,3 +1,5 @@
 quarto render your_file.ipynb
 
 quarto render ssd.ipynb
+
+quarto render analysis.ipynb --to revealjs --preview
