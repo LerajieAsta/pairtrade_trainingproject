@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="analysis_files/libs/clipboard/clipboard.min.js"></script>
+<script src="analysis_files/libs/quarto-html/tabby.min.js"></script>
+<script src="analysis_files/libs/quarto-html/popper.min.js"></script>
+<script src="analysis_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="analysis_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="analysis_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="analysis_files/libs/quarto-html/quarto-syntax-highlighting-7f8f88aac4f3542376d5c11b86a4c14d.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.9.37">
+
+  <meta name="author" content="李伯修">
+  <meta name="dcterms.date" content="2026-05-27">
+  <title>配對交易策略實作與回測</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="analysis_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="analysis_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+  </style>
+  <link rel="stylesheet" href="analysis_files/libs/revealjs/dist/theme/quarto-c1fcdc6f320a47e1e2b0fbd44ddc47dd.css">
+  <link href="analysis_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="analysis_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="analysis_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="analysis_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+  
+  <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" class="quarto-title-block center">
+  <h1 class="title">配對交易策略實作與回測</h1>
+  <p class="subtitle">以 S&amp;P 500 為例</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+李伯修 
+</div>
+</div>
+</div>
+
+  <p class="date">2026-05-27</p>
+</section>
+<section id="資金配置與避險原則-capital-allocation-hedging" class="slide level2 scrollable">
+<h2>💰 資金配置與避險原則 (Capital Allocation &amp; Hedging)</h2>
+<p>本回測框架中，所有配對交易策略均嚴格遵循以下資金配置與避險權重原則，這也是計算 <strong>RCC</strong> 與 <strong>REC</strong> 的基礎學術底層：</p>
+<ol type="1">
+<li><strong>等資金多組合分配 (Portfolio Equal-Weighting)</strong>：
+<ul>
+<li>設定投資組合總初始虛擬本金為 <span class="math inline">\(C_{Total} = \$10,000\)</span>。</li>
+<li>根據策略篩選出的最優配對數 <span class="math inline">\(N_{pair}\)</span> (即 <code>Top N</code>)，將資金等權重分配至各交易組，單一組的分配金額限制為： <span class="math display">\[C_{pair} = \frac{C_{Total}}{N_{pair}}\]</span></li>
+</ul></li>
+<li><strong>避險比例 (Hedge Ratio) 與多空市值分配</strong>：
+<ul>
+<li>對於每一對 Pair A (因變數) 與 Pair B (自變數)，以迴歸係數 <span class="math inline">\(\beta_t\)</span> (Hedge Ratio) 進行市值對沖配置： <span class="math display">\[Weight_A = \frac{1.0}{1.0 + |\beta_t|}, \quad Weight_B = \frac{|\beta_t|}{1.0 + |\beta_t|}\]</span></li>
+<li><strong>美元中性避險</strong>：當 Z-Score 觸發進場訊號時，做多 A 市值 <span class="math inline">\(C_{pair} \cdot Weight_A\)</span>，同時做空 B 市值 <span class="math inline">\(C_{pair} \cdot Weight_B\)</span> (或反向配置)，保證組合的 Beta 中性與初始美元中性。</li>
+</ul></li>
+</ol>
+</section>
+<section id="策略概覽與對照表" class="slide level2">
+<h2>📌 策略概覽與對照表</h2>
+<div class="smaller">
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">策略檔案</th>
+<th style="text-align: left;">策略名稱</th>
+<th style="text-align: left;">形成期篩選核心機制</th>
+<th style="text-align: left;">避險比例 (Hedge Ratio) 計算</th>
+<th style="text-align: left;">交易期核心特色</th>
+<th style="text-align: left;">學術依據與 <code>ref/</code> 對應文獻</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong><a href="file:///d:/Unknown/Papper/Code/strategies/ssd_basic.py">ssd_basic.py</a></strong></td>
+<td style="text-align: left;"><strong>經典 SSD 距離法</strong></td>
+<td style="text-align: left;">累積總回報指數的平方歐氏距離 (SSD)</td>
+<td style="text-align: left;">固定為 1.0 (等額配置)</td>
+<td style="text-align: left;">傳統 Z-Score 突破交易</td>
+<td style="text-align: left;">Gatev et al.&nbsp;(2006)<br><code>2006-Pairs Trading Performance...pdf</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong><a href="file:///d:/Unknown/Papper/Code/strategies/ssd.py">ssd.py</a></strong></td>
+<td style="text-align: left;"><strong>進階 SSD 與 OLS 斜率法</strong></td>
+<td style="text-align: left;">Z-Score 標準化對數價格的 SSD</td>
+<td style="text-align: left;">靜態/滾動 OLS 斜率 <span class="math inline">\(\beta\)</span></td>
+<td style="text-align: left;">OLS 避險市值中性配置<br>OLS 殘差滾動 Z-Score</td>
+<td style="text-align: left;">OLS 殘差理論與統計套利綜述<br><code>2006-A New Approach to Modeling...pdf</code><br><code>2015-Statistical arbitrage pairs...pdf</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong><a href="file:///d:/Unknown/Papper/Code/strategies/eg.py">eg.py</a></strong></td>
+<td style="text-align: left;"><strong>Engle-Granger 共整合法</strong></td>
+<td style="text-align: left;">相關性快篩 + 雙向 EG 共整合檢定 (ADF <span class="math inline">\(p &lt; 0.01\)</span>)</td>
+<td style="text-align: left;">靜態 OLS 共整合係數 <span class="math inline">\(\beta\)</span></td>
+<td style="text-align: left;"><strong>Optimal Double Stopping</strong> 訊號<br>進場防假突破機制<br>停損永久冷凍</td>
+<td style="text-align: left;">Engle and Granger (1987)<br><code>2014-Pairs trading and selection...pdf</code><br><code>2015-Statistical arbitrage pairs...pdf</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong><a href="file:///d:/Unknown/Papper/Code/strategies/HDBSCAN.py">HDBSCAN.py</a></strong></td>
+<td style="text-align: left;"><strong>HDBSCAN 多維特徵分群</strong></td>
+<td style="text-align: left;">13維特徵 + UMAP 降維 + HDBSCAN 分群<br>同群落 × 同產業 EG 共整合 + OU 半衰期過濾</td>
+<td style="text-align: left;">靜態/滾動 OLS 共整合係數 <span class="math inline">\(\beta\)</span></td>
+<td style="text-align: left;">波動度動態調整 Z-Score<br><strong>投資組合總體止損斷路器</strong></td>
+<td style="text-align: left;">無監督學習分群配對與 OU 過程<br><code>2021-Pairs Trading via Unsupervised...pdf</code><br><code>2008-Optimal Pairs Trading...pdf</code></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong><a href="file:///d:/Unknown/Papper/Code/strategies/HDBSCAN_Autoencoder.py">HDBSCAN_Autoencoder.py</a></strong></td>
+<td style="text-align: left;"><strong>Autoencoder 深度表徵分群</strong></td>
+<td style="text-align: left;">收益率序列 + PyTorch Autoencoder 深度特徵<br>UMAP 降維 + HDBSCAN 分群<br>同群落 × 同產業 EG 共整合 + OU 半衰期過濾</td>
+<td style="text-align: left;">靜態/滾動 OLS 共整合係數 <span class="math inline">\(\beta\)</span></td>
+<td style="text-align: left;">波動度動態調整 Z-Score<br><strong>投資組合總體止損斷路器</strong></td>
+<td style="text-align: left;">深度自編碼器與機器學習配對<br><code>2021-Pairs Trading via Unsupervised...pdf</code><br><code>2018-配對交易與機器學習在台灣...pdf</code><br><code>2021-透過機器學習及標記技術...pdf</code></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong><a href="file:///d:/Unknown/Papper/Code/strategies/HDBSCAN_MultiFactor.py">HDBSCAN_MultiFactor.py</a></strong></td>
+<td style="text-align: left;"><strong>時序多因子特徵分群</strong></td>
+<td style="text-align: left;">6大金融因子空間 + 直接 HDBSCAN 分群<br>同群落 × 同產業 EG 共整合 + OU 半衰期過濾</td>
+<td style="text-align: left;">靜態/滾動 OLS 共整合係數 <span class="math inline">\(\beta\)</span></td>
+<td style="text-align: left;">波動度動態調整 Z-Score<br><strong>投資組合總體止損斷路器</strong></td>
+<td style="text-align: left;">金融因子空間配對<br><code>2021-In Search of Pairs using Firm...pdf</code><br>CAPM 模型 (Sharpe 1964)</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section>
+<section id="經典-ssd" class="title-slide slide level1 center">
+<h1>1️⃣ 經典 SSD</h1>
+
+</section>
+<section id="經典-ssdformation-形成期" class="slide level2 scrollable">
+<h2>1️⃣ 經典 SSD：Formation 形成期</h2>
+<p>經典 SSD 策略是配對交易最為經典的「距離法」實現。其核心思想是尋找在歷史形成期中價格走勢最為貼合的股票對。步驟如下：</p>
+<ol type="1">
+<li><strong>價格正規化</strong>：將形成期內的股價序列 <span class="math inline">\(P_{i, t}\)</span> 轉換為<strong>累積總回報指數</strong> <span class="math inline">\(P_{i, t}^{norm}\)</span>。將形成期首日價格歸一化為 <span class="math inline">\(1.0\)</span>： <span class="math display">\[P_{i, t}^{norm} = \frac{P_{i, t}}{P_{i, 0}}\]</span></li>
+<li><strong>計算平方差之和 (SSD)</strong>：在同一個 GICS 產業分類中，計算兩兩股票 <span class="math inline">\(A\)</span> 與 <span class="math inline">\(B\)</span> 在歸一化價格序列上的平方歐氏距離： <span class="math display">\[SSD_{A, B} = \sum_{t=1}^{T_{Form}} \left( P_{A, t}^{norm} - P_{B, t}^{norm} \right)^2\]</span></li>
+<li><strong>配對選擇</strong>：將產業內所有可能配對的 <span class="math inline">\(SSD\)</span> 按升序排序，選擇最小的前 <span class="math inline">\(N\)</span> 組配對（<code>top_n</code>）作為交易標的。在距離法中，避險比例固定為 <span class="math inline">\(\beta = 1.0\)</span>，即等權重美元中性配置（Dollar Weighting）。</li>
+</ol>
+</section>
+<section id="經典-ssdtrading-交易期" class="slide level2 scrollable">
+<h2>1️⃣ 經典 SSD：Trading 交易期</h2>
+<ol type="1">
+<li><strong>計算價差與 Z-Score</strong>：
+<ul>
+<li><strong>無滾動均值去中心化 (<code>zscore_window == 0</code>)</strong>：以形成期計算出的價差均值 <span class="math inline">\(\mu_{Spread, Form}\)</span> 與標準差 <span class="math inline">\(\sigma_{Spread, Form}\)</span> 來計算交易期的 <span class="math inline">\(Z_t\)</span>： <span class="math display">\[Spread_t = P_{A, t}^{norm} - P_{B, t}^{norm}\]</span> <span class="math display">\[Z_t = \frac{Spread_t - \mu_{Spread, Form}}{\sigma_{Spread, Form}}\]</span></li>
+<li><strong>滾動去中心化 (<code>zscore_window &gt; 0</code>)</strong>：採用交易期滾動視窗 <span class="math inline">\(W\)</span> 的均值與標準差，避險比例鎖定為 <span class="math inline">\(1.0\)</span>： <span class="math display">\[Spread_t = P_{A, t}^{norm} - SMA\left(P_A^{norm} - P_B^{norm}, W\right)_t - P_{B, t}^{norm}\]</span> <span class="math display">\[Z_t = \frac{Spread_t}{\sigma_{Spread, W, t}}\]</span></li>
+</ul></li>
+<li><strong>交易訊號與停損</strong>：
+<ul>
+<li><strong>做空價差</strong>：當 <span class="math inline">\(Z_t &gt; EntryZ\)</span> 且配對不在冷卻期時，進場：<span class="math inline">\(Position = -1\)</span>。</li>
+<li><strong>做多價差</strong>：當 <span class="math inline">\(Z_t &lt; -EntryZ\)</span> 且配對不在冷卻期時，進場：<span class="math inline">\(Position = 1\)</span>。</li>
+<li><strong>平倉</strong>：多頭當 <span class="math inline">\(Z_t \ge -ExitZ\)</span> 平倉；空頭當 <span class="math inline">\(Z_t \le ExitZ\)</span> 平倉。</li>
+<li><strong>停損與冷卻</strong>：單次交易虧損比例達 <code>stop_loss_pct</code> 強制平倉。若 <code>allow_reentry = False</code> 永久冷凍；若 <code>allow_reentry = True</code> 則記錄冷卻方向 <code>cooldown_dir</code> 直到 <span class="math inline">\(Z\)</span> 回歸零軸才解除。</li>
+</ul></li>
+</ol>
+</section>
+<section id="經典-ssd學術理論與-ref-依據" class="slide level2">
+<h2>1️⃣ 經典 SSD：學術理論與 ref/ 依據</h2>
+<ul>
+<li><strong>文獻依據</strong>：<strong>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006)</strong>. <em>“Pairs Trading: Performance of a Relative-Value Arbitrage Rule”</em>。</li>
+<li><strong>對應 ref/ 內檔案</strong>：<a href="file:///d:/Unknown/Papper/Code/ref/2006-Pairs%20Trading%20Performance%20of%20a%20Relative-Value%20Arbitrage%20Rule.pdf"><code>2006-Pairs Trading Performance of a Relative-Value Arbitrage Rule.pdf</code></a>。</li>
+<li><strong>依據說明</strong>：此策略完全對應 Gatev et al.&nbsp;(2006) 論文中的第一天歸一化（Cumulative Total Returns Index normalized to 1.0 on the first day of the formation period）以及最小平方差總和（SSD）配對選擇法。論文中使用 2.0 倍標準差作為進場門檻，並在價差回歸均值時平倉，此公式完全體現在程式碼的 <code>Formation</code> 與 <code>Trading</code> 類中。</li>
+</ul>
+</section></section>
+<section>
+<section id="進階-ssd" class="title-slide slide level1 center">
+<h1>2️⃣ 進階 SSD</h1>
+
+</section>
+<section id="進階-ssdformation-形成期" class="slide level2 scrollable">
+<h2>2️⃣ 進階 SSD：Formation 形成期</h2>
+<p>相較於傳統等權重 SSD 策略，進階 SSD 策略引入了<strong>對數價格變換</strong>與 <strong>OLS 迴歸係數</strong>，以實現市值非對稱的中性避險配置。步驟如下：</p>
+<ol type="1">
+<li><strong>對數轉換與 Z-Score 標準化</strong>：首先將形成期的價格序列 <span class="math inline">\(P_{i, t}\)</span> 轉換為對數價格，並進行 Z-Score 標準化（去中心化與方差歸一）： <span class="math display">\[P_{i, t}^{norm} = \frac{\ln(P_{i, t}) - \mu_{\ln(P_i)}}{\sigma_{\ln(P_i)}}\]</span> 入其 <span class="math inline">\(\mu_{\ln(P_i)}\)</span> 與 <span class="math inline">\(\sigma_{\ln(P_i)}\)</span> 為形成期對數價格的均值與標準差。</li>
+<li><strong>計算 SSD</strong>：計算標準化後對數價格的平方歐氏距離 <span class="math inline">\(SSD_{A, B}\)</span>。</li>
+<li><strong>計算 Hedge Ratio (OLS 斜率 <span class="math inline">\(\beta\)</span>)</strong>：對於每個可能配對，以 <span class="math inline">\(B\)</span> 為自變數（自變數 <span class="math inline">\(X\)</span>），<span class="math inline">\(A\)</span> 為因變數（因變數 <span class="math inline">\(Y\)</span>），執行普通最小二乘法 (OLS) 迴歸： <span class="math display">\[P_{A, t}^{norm} = \alpha + \beta P_{B, t}^{norm} + \epsilon_t\]</span> <span class="math display">\[\beta = \frac{Cov\left(P_A^{norm}, P_B^{norm}\right)}{Var\left(P_B^{norm}\right)}\]</span> <span class="math display">\[Spread_t = P_{A, t}^{norm} - \beta P_{B, t}^{norm}\]</span> 計算 OLS 殘差 <span class="math inline">\(\epsilon_t\)</span>（即 <span class="math inline">\(Spread\)</span>）在形成期的均值 <span class="math inline">\(\mu_{Spread, Form}\)</span> 與標準差 <span class="math inline">\(\sigma_{Spread, Form}\)</span>。</li>
+</ol>
+</section>
+<section id="進階-ssdtrading-交易期" class="slide level2 scrollable">
+<h2>2️⃣ 進階 SSD：Trading 交易期</h2>
+<ol type="1">
+<li><strong>資金與部位分配</strong>：根據估計出的 <span class="math inline">\(\beta\)</span>（Hedge Ratio）進行市值分配： <span class="math display">\[Weight_A = \frac{1.0}{1.0 + |\beta|}, \quad Weight_B = \frac{|\beta|}{1.0 + |\beta|}\]</span></li>
+<li><strong>Z-Score 計算</strong>：
+<ul>
+<li><strong>固定視窗 (<code>zscore_window == 0</code>)</strong>：使用 Formation 期的 Spread 均值與標準差進行正規化。</li>
+<li><strong>滾動視窗 (<code>zscore_window &gt; 0</code>)</strong>：在交易期每個滾動視窗 <span class="math inline">\(W\)</span> 內重新計算 OLS 斜率 <span class="math inline">\(\beta_t\)</span>、截距 <span class="math inline">\(\alpha_t\)</span> 與價差： <span class="math display">\[\beta_t = \frac{Cov\left(P_A^{norm}, P_B^{norm}\right)_W}{Var\left(P_B^{norm}\right)_W}\]</span> <span class="math display">\[\alpha_t = SMA(P_A^{norm}, W)_t - \beta_t SMA(P_B^{norm}, W)_t\]</span> <span class="math display">\[Spread_t = P_{A, t}^{norm} - \alpha_t - \beta_t P_{B, t}^{norm}\]</span> 根據 OLS 理論，殘差標準差可利用協方差矩陣直接推導計算以提升運算效率： <span class="math display">\[\sigma_{\epsilon, t} = \sqrt{Var\left(P_A^{norm}\right)_W - \beta_t Cov\left(P_A^{norm}, P_B^{norm}\right)_W} = \sqrt{\sigma_{A, W, t}^2 - \beta_t \sigma_{AB, W, t}}\]</span> <span class="math display">\[Z_t = \frac{Spread_t}{\max\left(\sigma_{\epsilon, t}, min\_spread\_std\right)}\]</span></li>
+</ul></li>
+<li><strong>交易訊號</strong>：交易邏輯與 <code>ssd_basic.py</code> 相同，但進場時的資金分配完全基於時變的避險比例 <span class="math inline">\(\beta_t\)</span> 權重配置。</li>
+</ol>
+</section>
+<section id="進階-ssd學術理論與-ref-依據" class="slide level2 scrollable">
+<h2>2️⃣ 進階 SSD：學術理論與 ref/ 依據</h2>
+<ul>
+<li><strong>文獻依據</strong>：
+<ol type="1">
+<li><strong>Do, B., &amp; Faff, R. (2010)</strong>. <em>“Does Simple Pairs Trading Still Work?”</em>（對應 <a href="file:///d:/Unknown/Papper/Code/ref/2018-Does%20Simple%20Pairs%20Trading%20Still%20Work.pdf"><code>2018-Does Simple Pairs Trading Still Work.pdf</code></a>）。</li>
+<li><strong>Krauss, C. (2017)</strong>. <em>“Statistical arbitrage pairs trading strategies: Review and outlook”</em>（對應 <a href="file:///d:/Unknown/Papper/Code/ref/2015-Statistical%20arbitrage%20pairs%20trading%20strategies%20Review%20and%20outlook.pdf"><code>2015-Statistical arbitrage pairs trading strategies Review and outlook.pdf</code></a>）。</li>
+<li><strong>Elliott et al.&nbsp;(2005)</strong>. <em>“A New Approach to Modeling and Estimation for Pairs Trading”</em>（對應 <a href="file:///d:/Unknown/Papper/Code/ref/2006-A%20New%20Approach%20to%20Modeling%20and%20Estimation%20for%20Pairs%20Trading.pdf"><code>2006-A New Approach to Modeling and Estimation for Pairs Trading.pdf</code></a>）。</li>
+</ol></li>
+<li><strong>學術邏輯</strong>：相較於傳統距離法，將資產價格取對數並通過 OLS 估計 <span class="math inline">\(\beta\)</span> 是克服資產非平穩性與實現「貝塔中性」的標準做法。程式中 <span class="math inline">\(Var(Y - eta X) = Var(Y) - eta Cov(X,Y)\)</span> 的快速殘差標準差估計，是最小二乘迴歸的標準統計學公式，有效避免了生成殘差數組再求標準差的二次運算開銷。</li>
+</ul>
+</section></section>
+<section>
+<section id="engle-granger-共整合" class="title-slide slide level1 center">
+<h1>3️⃣ Engle-Granger 共整合</h1>
+
+</section>
+<section id="engle-granger-共整合formation-形成期" class="slide level2 scrollable">
+<h2>3️⃣ Engle-Granger 共整合：Formation 形成期</h2>
+<p>Engle-Granger 共整合策略是一種基於<strong>嚴謹計量經濟學理論</strong>的配對選擇方法。它要求配對股票的對數價格之間具有穩健的長期均衡關係。步驟如下：</p>
+<ol type="1">
+<li><strong>Pearson 相關係數快篩</strong>：僅保留相關性 <span class="math inline">\(\rho \ge 0.7\)</span> 的配對，保證同向走勢： <span class="math display">\[\rho = \frac{Cov\left(\ln(P_A), \ln(P_B)\right)}{\sigma_{\ln(P_A)} \sigma_{\ln(P_B)}}\]</span></li>
+<li><strong>雙向 OLS 迴歸與 ADF 殘差定態檢定</strong>：
+<ul>
+<li>進行雙向迴歸，計算避險比例（OLS 斜率 <span class="math inline">\(\beta\)</span>）與截距 <span class="math inline">\(\alpha\)</span>： <span class="math display">\[\ln(P_{A, t}) = \alpha + \beta \ln(P_{B, t}) + \epsilon_t\]</span> <span class="math display">\[\beta = \frac{Cov\left(\ln(P_A), \ln(P_B)\right)}{Var\left(\ln(P_B)\right)}, \quad Spread_t = \ln(P_{A, t}) - \alpha - \beta \ln(P_{B, t})\]</span></li>
+<li>對殘差序列 <span class="math inline">\(\epsilon_t\)</span>（即 Spread）進行無截距、無趨勢項的<strong>增強迪基-福勒 (ADF) 檢定</strong>： <span class="math display">\[\Delta \epsilon_t = \gamma \epsilon_{t-1} + \sum_{i=1}^{p} \varphi_i \Delta \epsilon_{t-i} + u_t\]</span> 檢定虛無假設 <span class="math inline">\(H_0: \gamma = 0\)</span> (存在單根，即無共整合)。若 <span class="math inline">\(p\text{-value} &lt; 0.01\)</span>，則確立共整合關係。</li>
+</ul></li>
+<li><strong>方向篩選與排序</strong>：選擇 <span class="math inline">\(p\text{-value}\)</span> 較小的方向為主迴歸，要求 <span class="math inline">\(\beta &gt; 0\)</span>，按 ADF 統計量由小到大排序選前 <span class="math inline">\(N\)</span> 組配對。</li>
+</ol>
+</section>
+<section id="engle-granger-共整合trading-交易期" class="slide level2 scrollable">
+<h2>3️⃣ Engle-Granger 共整合：Trading 交易期</h2>
+<ol type="1">
+<li><strong>Optimal Double Stopping 進場濾鏡</strong>：為了防範殘差序列的「假突破」與順向趨勢漫步風險，本策略採用了<strong>觸發後反向穿越建倉</strong>的二次確認機制：
+<ul>
+<li><strong>空手且未觸發狀態 (<code>armed == 0</code>)</strong>：
+<ul>
+<li>若 <span class="math inline">\(Z_t &gt; EntryZ\)</span> (預設 2.0)：觸發上軌，設置 <code>armed = -1</code> (準備做空)。</li>
+<li>若 <span class="math inline">\(Z_t &lt; -EntryZ\)</span> (預設 -2.0)：觸發下軌，設置 <code>armed = 1</code> (準備做多)。</li>
+</ul></li>
+<li><strong>已觸發上軌 (<code>armed == -1</code>)</strong>：
+<ul>
+<li>若 <span class="math inline">\(Z_t\)</span> 向下<strong>回落穿越門檻</strong>至 <span class="math inline">\(ExitZ &lt; Z_t &lt; EntryZ\)</span> 時，正式進場做空 A 做多 B：<span class="math inline">\(Position = -1\)</span>。</li>
+<li>若 <span class="math inline">\(Z_t\)</span> 直接回歸到零軸下方 (<span class="math inline">\(Z_t \le ExitZ\)</span>)，則重置 <code>armed = 0</code>（不進場）。</li>
+</ul></li>
+<li><strong>已觸發下軌 (<code>armed == 1</code>)</strong>：
+<ul>
+<li>若 <span class="math inline">\(Z_t\)</span> 向上<strong>回升穿越門檻</strong>至 <span class="math inline">\(-EntryZ &lt; Z_t &lt; ExitZ\)</span> 時，正式進場做多 A 做空 B：<span class="math inline">\(Position = 1\)</span>。</li>
+<li>若 <span class="math inline">\(Z_t\)</span> 直接回升到零軸上方 (<span class="math inline">\(Z_t \ge ExitZ\)</span>)，則重置 <code>armed = 0</code>。</li>
+</ul></li>
+</ul></li>
+<li><strong>部位配置與平倉</strong>：部位按 <span class="math inline">\(\beta\)</span> 避險比例分配。當 Z-Score 回歸到平倉帶門檻（<span class="math inline">\(ExitZ \pm ExitBuffer\)</span>）時平倉。</li>
+<li><strong>停損永久冷凍</strong>：當虧損達到停損門檻時強制平倉，並將 <code>is_stopped</code> 設為 <code>True</code>，<strong>本回測期內該配對永久停交易</strong>。因為共整合關係破裂代表長期均衡失效，不應重入。</li>
+</ol>
+</section>
+<section id="engle-granger-共整合學術理論與-ref-依據" class="slide level2 scrollable">
+<h2>3️⃣ Engle-Granger 共整合：學術理論與 ref/ 依據</h2>
+<ul>
+<li><strong>文獻依據</strong>：
+<ol type="1">
+<li><strong>Engle, R. F., &amp; Granger, C. W. (1987)</strong>. <em>“Co-integration and Error Correction: Representation, Estimation, and Testing”</em>。</li>
+<li><strong>Rad, H., Low, R. K. Y., &amp; Faff, R. (2016)</strong>. <em>“The profitability of pairs trading strategies: distance, cointegration, and copula methods”</em>（對應 <a href="file:///d:/Unknown/Papper/Code/ref/2016-The%20profitability%20of%20pairs%20trading%20strategies%20distance,%20cointegration,%20and%20copula%20methols.pdf"><code>2016-The profitability of pairs trading strategies distance, cointegration, and copula methols.pdf</code></a>）。</li>
+<li><strong>Puspaningrum et al.&nbsp;(2013)</strong>. <em>“Evaluation of pairs-trading strategy…”</em>（對應 <a href="file:///d:/Unknown/Papper/Code/ref/2009-Evaluation%20of%20pairs-trading%20strategy%20at%20the%20Brazilian%20financial%20market.pdf"><code>2009-Evaluation of pairs-trading strategy at the Brazilian financial market.pdf</code></a>）。</li>
+</ol></li>
+<li><strong>學術邏輯</strong>：此策略基於計量經濟學著名的 Engle-Granger 兩步共整合法。ADF 檢定不含常數與趨勢項，完美貼合殘差定態檢定的規範。Optimal Double Stopping 避險與建倉邏輯，來源於量化金融中解決 Ornstein-Uhlenbeck 過程交易時的最優停止時間問題，能極大地過濾市場在危機或重組時期的假突破訊號。</li>
+</ul>
+</section></section>
+<section>
+<section id="hdbscan-特徵分群" class="title-slide slide level1 center">
+<h1>4️⃣ HDBSCAN 特徵分群</h1>
+
+</section>
+<section id="hdbscan-特徵分群formation-形成期" class="slide level2 scrollable">
+<h2>4️⃣ HDBSCAN 特徵分群：Formation 形成期</h2>
+<p>此策略將無監督學習引入配對交易，利用股票歷史走勢的 13 維金融統計與動力學特徵，進行高維空間密度分群，篩選出物理特徵最為貼近的 Pairs。</p>
+<ol type="1">
+<li><strong>13維金融統計特徵工程</strong>：
+<ul>
+<li><strong>動量因子 (4維)</strong>：<span class="math inline">\(R_{Momentum, W} = \ln(P_t) - \ln(P_{t-W})\)</span> (<span class="math inline">\(W \in \{5, 21, 63, 126\}\)</span>)。</li>
+<li><strong>波動度因子 (3維)</strong>：21, 63 日及全期收益率標準差 <span class="math inline">\(\sigma_W\)</span>。</li>
+<li><strong>自相關因子 (3維)</strong>：一階、五階、廿一階自相關係數 <span class="math inline">\(\rho_k = \frac{Cov(R_t, R_{t-k})}{Var(R_t)}\)</span>。</li>
+<li><strong>統計矩因子 (2維)</strong>：收益率偏度 (Skewness) <span class="math inline">\(S\)</span> 與峰度 (Kurtosis) <span class="math inline">\(K\)</span>。</li>
+<li><strong>混沌動力學因子 (1維)</strong>：<strong>Hurst 指數</strong> <span class="math inline">\(H\)</span> 衡量時間序列持久性（若 <span class="math inline">\(H &gt; 0.5\)</span> 具趨勢持久性，若 <span class="math inline">\(H &lt; 0.5\)</span> 具均值復歸性）。藉由重標極差分析（R/S Analysis）： <span class="math display">\[\left(\frac{R}{S}\right)_k = C \cdot k^H \implies \ln\left(\frac{R}{S}\right)_k = H \ln(k) + \ln(C)\]</span></li>
+</ul></li>
+<li><strong>降維與分群</strong>：經 Z-Score 標準化後，利用 <strong>UMAP</strong> 將特徵空間降至 5 維，再執行 <strong>HDBSCAN</strong> 密度聚類。</li>
+<li><strong>均值復歸半衰期 (Half-life) 過濾</strong>：通過 EG 檢定後，將價差建模為 <strong>Ornstein-Uhlenbeck 過程</strong>： <span class="math display">\[d\epsilon_t = -\theta \epsilon_t dt + \sigma dW_t\]</span> 離散化為 AR(1) 迴歸模型：<span class="math inline">\(\Delta \epsilon_t = \alpha_1 + \lambda \epsilon_{t-1} + e_t\)</span>。若 <span class="math inline">\(\lambda &lt; 0\)</span>，則半衰期以 <span class="math inline">\(T_{1/2} = -\frac{\ln(2)}{\lambda}\)</span> 計算，限制 <span class="math inline">\(2.0 \le T_{1/2} \le 60.0\)</span> 天。</li>
+</ol>
+</section>
+<section id="hdbscan-特徵分群trading-交易期" class="slide level2 scrollable">
+<h2>4️⃣ HDBSCAN 特徵分群：Trading 交易期</h2>
+<p>本策略在 OLS 價差 Z-Score 基礎上，引入了<strong>動態波動度調整</strong>與<strong>投資組合總體止損斷路器</strong>：</p>
+<ol type="1">
+<li><strong>時變波動度調整因子 (Volatility Adjustment)</strong>：為了防範交易期市場波動率突增導致 Z-Score 異常鈍化或劇烈波動，以滾動 20 天的價差標準差對形成期標準差進行動態放大： <span class="math display">\[vol\_factor_t = \max\left(1.0, \frac{\sigma_{Spread, 20, t}}{\sigma_{Spread, Form}}\right)\]</span> <span class="math display">\[adjusted\_std_t = \max\left(\sigma_{Spread, Form} \cdot vol\_factor_t, min\_spread\_std\right)\]</span> <span class="math display">\[Z_t = \frac{Spread_t - \mu_{Spread, Form}}{adjusted\_std_t}\]</span></li>
+<li><strong>後置投資組合總體止損斷路器 (Portfolio Circuit Breaker)</strong>：在每日交易結束後，計算本期投資組合所有配對的總累計損益。一旦總虧損達到總分配資金的 <code>portfolio_stop_loss_pct</code>（如 10%），<strong>立即觸發全組合強制平倉，本期剩餘天數內全部配對永久停交易</strong>，鎖定最大尾部風險。</li>
+</ol>
+</section>
+<section id="hdbscan-特徵分群學術理論與-ref-依據" class="slide level2 scrollable">
+<h2>4️⃣ HDBSCAN 特徵分群：學術理論與 ref/ 依據</h2>
+<ul>
+<li><strong>文獻依據</strong>：
+<ol type="1">
+<li><strong>Hanoch, Y., &amp; Levy, H. (2021)</strong>. <em>“Pairs Trading via Unsupervised Learning”</em>（對應 <a href="file:///d:/Unknown/Papper/Code/ref/2021-Pairs%20Trading%20via%20Unsupervised%20Learning.pdf"><code>2021-Pairs Trading via Unsupervised Learning.pdf</code></a>）。</li>
+<li><strong>Stochastic Control &amp; Half-life</strong>：參考 <a href="file:///d:/Unknown/Papper/Code/ref/2008-Optimal%20Pairs%20Trading%20A%20Stochastic%20Control%20Approach.pdf"><code>2008-Optimal Pairs Trading A Stochastic Control Approach.pdf</code></a>。</li>
+</ol></li>
+<li><strong>學術邏輯</strong>：<code>2021-Pairs Trading via Unsupervised Learning.pdf</code> 系統性地闡述了利用高維統計特徵對股票進行特徵描述，並結合 UMAP 與密度聚類演算法（如 HDBSCAN）進行分群的完整框架。Ornstein-Uhlenbeck (O-U) 均值復歸半衰期公式 <span class="math inline">\(T_{1/2} = -\ln(2)/\lambda\)</span> 則是計量金融中衡量價差偏離均值後拉回速度的經典學術標準測度。</li>
+</ul>
+</section></section>
+<section>
+<section id="autoencoder-分群" class="title-slide slide level1 center">
+<h1>5️⃣ Autoencoder 分群</h1>
+
+</section>
+<section id="autoencoder-分群formation-形成期" class="slide level2 scrollable">
+<h2>5️⃣ Autoencoder 分群：Formation 形成期</h2>
+<p>與手動特徵工程不同，深度表徵策略直接將歷史形成期的<strong>日收益率時間序列</strong>視為極高維的特徵，利用深度學習中的<strong>去噪自編碼器 (Denoising Autoencoder)</strong> 進行非線性無監督表徵學習，自動壓縮並擷取深層潛在特徵。</p>
+<ol type="1">
+<li><strong>構建 PyTorch MLP 自編碼器</strong>：
+<ul>
+<li><strong>輸入維度</strong>：<span class="math display">\[d = T - 1\]</span> (其中 <span class="math inline">\(d\)</span> 為日收益率特徵數，已徹底消滅行內底線重疊 Bug)。</li>
+<li><strong>Denoising Encoder 潛在空間壓縮</strong>： <span class="math display">\[h = \tanh\left( W_1 X_i + b_1 \right)\]</span> <span class="math display">\[h_{drop} = \text{Dropout}\left( h, 0.3 \right)\]</span> <span class="math display">\[z = W_2 h_{drop} + b_2 \quad (z \in \mathbb{R}^8)\]</span> 將高維序列壓縮至 8 維深度潛在空間。藉由 Dropout 隨機遮蔽 30% 特徵強制網路學習股票共同波動的低維特徵。</li>
+<li><strong>Symmetric Decoder 重構</strong>： <span class="math display">\[\hat{h} = \tanh\left( W_3 z + b_3 \right)\]</span> <span class="math display">\[\hat{h}_{drop} = \text{Dropout}\left( \hat{h}, 0.3 \right)\]</span> <span class="math display">\[\hat{X}_i = W_4 \hat{h}_{drop} + b_4\]</span></li>
+</ul></li>
+<li><strong>損失函數與優化</strong>：利用 Adam 最小化 MSE 重構誤差並引入 L2 正則化（Weight Decay <span class="math inline">\(10^{-4}\)</span>）： <span class="math display">\[\mathcal{L}_{MSE} = \frac{1}{N}\sum_{i=1}^N \|X_i - \hat{X}_i\|^2 + \lambda \sum_{l=1}^4 \|W_l\|_F^2\]</span> 提取 8 維特徵 <span class="math inline">\(z\)</span> 作為降維與 HDBSCAN 分群的依據。</li>
+</ol>
+</section>
+<section id="autoencoder-分群trading-交易期" class="slide level2">
+<h2>5️⃣ Autoencoder 分群：Trading 交易期</h2>
+<p>交易期算法與 <code>HDBSCAN.py</code> 相同：</p>
+<ul>
+<li><strong>部位分配</strong>：雙端等市值中性配置。</li>
+<li><strong>波動度調整</strong>：基於 20 日價差滾動標準差的動態 Z-Score 公式： <span class="math display">\[vol\_factor_t = \max\left(1.0, \frac{\sigma_{Spread, 20, t}}{\sigma_{Spread, Form}}\right)\]</span> <span class="math display">\[adjusted\_std_t = \max\left(\sigma_{Spread, Form} \cdot vol\_factor_t, min\_spread\_std\right)\]</span> <span class="math display">\[Z_t = \frac{Spread_t - \mu_{Spread, Form}}{adjusted\_std_t}\]</span></li>
+<li><strong>投資組合總體止損斷路器</strong>：當本期投資組合總虧損達到本金的 <code>portfolio_stop_loss_pct</code>（如 10%）時，強制將所有部位平倉，且本期剩餘天數內全部配對永久停交易，防範極端系統性風險。</li>
+</ul>
+</section>
+<section id="autoencoder-分群學術理論與-ref-依據" class="slide level2 scrollable">
+<h2>5️⃣ Autoencoder 分群：學術理論與 ref/ 依據</h2>
+<ul>
+<li><strong>文獻依據</strong>：
+<ol type="1">
+<li><strong>Denoising Autoencoders</strong>：Vincent, P. et al.&nbsp;(2008). <em>“Extracting and composing robust features with denoising autoencoders”</em>。</li>
+<li><strong>機器學習與深度學習在台灣市場實證</strong>：
+<ul>
+<li><a href="file:///d:/Unknown/Papper/Code/ref/2018-配對交易與機器學習在台灣股票市場之應用.pdf"><code>2018-配對交易與機器學習在台灣股票市場之應用.pdf</code></a></li>
+<li><a href="file:///d:/Unknown/Papper/Code/ref/2021-透過機器學習及標記技術建構配對交易策略.pdf"><code>2021-透過機器學習及標記技術建構配對交易策略.pdf</code></a></li>
+</ul></li>
+<li><strong>Autoencoder for Feature Compression</strong>：參考 <a href="file:///d:/Unknown/Papper/Code/ref/2021-Pairs%20Trading%20via%20Unsupervised%20Learning.pdf"><code>2021-Pairs Trading via Unsupervised Learning.pdf</code></a>。</li>
+</ol></li>
+<li><strong>學術邏輯</strong>：在量化金融中，收益率序列維度極高且含有大量噪聲。去噪自編碼器（DAE）通過隨機遮蔽強制網路學習股票共同波動的低維本質表徵。台灣實證研究論文詳細展示了如何利用 Autoencoder 提取特徵，並結合共整合法以顯著提升台灣市場配對交易的超額回報。</li>
+</ul>
+</section></section>
+<section>
+<section id="多因子分群" class="title-slide slide level1 center">
+<h1>6️⃣ 多因子分群</h1>
+
+</section>
+<section id="多因子分群formation-形成期" class="slide level2 scrollable">
+<h2>6️⃣ 多因子分群：Formation 形成期</h2>
+<p>本策略捨棄了非線性的降維步驟（跳過 UMAP），直接在** 6 大經典金融時序多因子特徵空間**中進行 HDBSCAN 密度分群。這 6 大因子是學術界與業界公認刻畫個股系統性風險與特質風險的最核心指標：</p>
+<ol type="1">
+<li><strong>6大金融多因子時序特徵</strong>：
+<ul>
+<li><strong>市場貝塔 (Market Beta, <span class="math inline">\(\beta_{Market}\)</span>)</strong>：對市場整體回報的系統性風險敏感度（<span class="math inline">\(R_m\)</span> 為市場成分股日均回報）： <span class="math display">\[\beta_{Market} = \frac{Cov\left(R_i, R_m\right)}{Var\left(R_m\right)}\]</span></li>
+<li><strong>總波動率 (Total Volatility, <span class="math inline">\(\sigma_i\)</span>)</strong>：日回報率標準差，反映總風險。</li>
+<li><strong>收益偏度 (Skewness)</strong>：日回報偏度，刻畫收益分佈的不對稱性。</li>
+<li><strong>收益峰度 (Kurtosis)</strong>：日回報超額峰度，反映極端事件的肥尾風險。</li>
+<li><strong>趨勢斜率 (Trend Slope, <span class="math inline">\(\gamma_{Trend}\)</span>)</strong>：將對數價格對時間 <span class="math inline">\(t\)</span> 進行 OLS 迴歸得到長期趨勢斜率：<span class="math inline">\(\ln(P_{i, t}) = \alpha_{Trend} + \gamma_{Trend} \cdot t + u_t\)</span>。</li>
+<li><strong>特異波動率 (Idiosyncratic Volatility, <span class="math inline">\(\sigma_{Idio}\)</span>)</strong>：CAPM 迴歸殘差的標準差，反映個股特質風險： <span class="math display">\[R_{i, t} = \alpha_i + \beta_{Market} R_{m, t} + \epsilon_{i, t}\]</span> <span class="math display">\[\sigma_{Idio} = \sqrt{Var(\epsilon_i)}\]</span></li>
+</ul></li>
+<li><strong>分群與篩選</strong>：特徵標準化後<strong>跳過降維步驟</strong>，直接作為 HDBSCAN 輸入進行分群。後續進行<strong>同群落 × 同產業</strong>的 EG 共整合檢定與 O-U 半衰期過濾。</li>
+</ol>
+</section>
+<section id="多因子分群trading-交易期與學術依據" class="slide level2 scrollable">
+<h2>6️⃣ 多因子分群：Trading 交易期與學術依據</h2>
+<ol type="1">
+<li><strong>交易執行</strong>：與 <code>HDBSCAN.py</code> 相同。包含雙端等市值中性配置、20 日價差滾動波動度調整 Z-Score 系統，以及虧損達 10% 的後置投資組合總體止損斷路器。</li>
+<li><strong>文獻依據</strong>：
+<ul>
+<li><strong>Fundamentals &amp; Factors-based Pairing</strong>：參考 <a href="file:///d:/Unknown/Papper/Code/ref/2021-In%20Search%20of%20Pairs%20using%20Firm%20Fundamentals.pdf"><code>2021-In Search of Pairs using Firm Fundamentals.pdf</code></a>。</li>
+<li><strong>CAPM &amp; Market Beta</strong>：Sharpe, W. F. (1964). <em>“Capital Asset Prices: A Theory of Market Equilibrium under Conditions of Risk”</em>。</li>
+<li><strong>Idiosyncratic Volatility Theory</strong>：Ang, A. et al.&nbsp;(2006). <em>“The Cross-Section of Volatility and Expected Returns”</em>。</li>
+</ul></li>
+<li><strong>學術邏輯</strong>：利用 Beta、波動度、偏度、峰度以及特異波動率等因子特徵空間來進行股票聚類更具備經濟學直覺。因為具有相同貝塔、相似總波動率與特異波動率 of 股票，代表其背後承受了類似的宏觀經濟與行業微觀基本面衝擊，更容易在歷史價格偏離後實現均值復歸。</li>
+</ol>
+</section></section>
+<section>
+<section id="績效分析" class="title-slide slide level1 center">
+<h1>📈 績效分析</h1>
+
+</section>
+<section id="六大策略最優參數回測效能對比-實時更新" class="slide level2">
+<h2>📈 六大策略最優參數回測效能對比 (實時更新)</h2>
+<table style="width: 100%; border-collapse: collapse; font-family: 'Inter', 'Outfit', sans-serif; font-size: 0.52em; margin: 10px auto; text-align: center; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+<thead>
+<tr style="background-color: #1a365d; color: #ffffff; font-weight: 600; text-transform: uppercase;">
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+策略名稱 (Method)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+最佳參數組合 (Optimal Params)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+最終淨值 (Final Equity)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+年化報酬 (Ann. Return)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+最大回撤 (Max DD)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+夏普值 (Sharpe)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+RCC (%)
+</th>
+<th style="padding: 10px 8px; border: 1px solid #cbd5e1;">
+REC (%)
+</th>
+</tr>
+</thead>
+<tbody>
+<tr style="background-color: #ffffff;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; ">
+經典 SSD (Basic) (CURRENT)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 5, SL: 0%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$8,969.99
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.43%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-20.36%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-0.22
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-10.30%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.15%
+</td>
+</tr>
+<tr style="background-color: #f0f7ff; font-weight: bold; border: 2px solid #3182ce;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; color: #2b6cb0;">
+進階 SSD (OLS) 🌟 (CURRENT)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 10, SL: 0%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$12,040.28
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #38a169;">
++0.75%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-14.61%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+0.25
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #38a169;">
++20.40%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #38a169;">
++0.33%
+</td>
+</tr>
+<tr style="background-color: #ffffff;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; ">
+Engle-Granger 共整合 (CURRENT)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 10, SL: 5%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$1,485.88
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-7.34%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-94.33%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-0.79
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-85.14%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.48%
+</td>
+</tr>
+<tr style="background-color: #f8fafc;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; ">
+HDBSCAN (UMAP) (CURRENT)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 5, SL: 0%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$8,648.05
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.58%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-18.70%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-0.27
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-13.52%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.06%
+</td>
+</tr>
+<tr style="background-color: #ffffff;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; ">
+HDBSCAN (AE UMAP) (CURRENT)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 5, SL: 0%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$8,076.73
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.85%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-27.10%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-0.37
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-19.23%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.09%
+</td>
+</tr>
+<tr style="background-color: #f8fafc;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; ">
+HDBSCAN (MF) (CURRENT)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 20, SL: 0%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$8,236.91
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.77%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-20.49%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-0.72
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-17.63%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.11%
+</td>
+</tr>
+<tr style="background-color: #ffffff;">
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; ">
+Engle-Granger 共整合 (FULL)
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+Top 10, SL: 5%, ZWin: 0
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+$1,396.61
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-7.57%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-92.79%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0;">
+-0.73
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-86.03%
+</td>
+<td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: #e53e3e;">
+-0.47%
+</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>[!NOTE] <strong>RCC (Return on Capital Constraint)</strong>: 基於回測期分配總資金 $10,000 計算。 <strong>REC (Return on Engaged Capital)</strong>: 基於實際動用且對齊 Beta 避險權重的保證金資金計算。 *資料更新時間: 當前電腦編譯實時生成。</p>
+</blockquote>
+<div id="cell-28" class="cell" data-execution_count="4">
+<div class="cell-output cell-output-display">
+<iframe scrolling="no" width="100%" height="545px" src="iframe_figures/figure_4.html" frameborder="0" allowfullscreen=""></iframe>
+</div>
+</div>
+
+</section></section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="analysis_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="analysis_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="analysis_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="analysis_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': false,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: true,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: 'h.v',
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'default',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1600,
+
+        height: 900,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>
