@@ -35,3 +35,8 @@ dtaidistance
 vectorbt>=0.25.0            # 高效向量化回測引擎
 
 SQLAlchemy
+
+# 績效可視化與簡報工具
+
+streamlit>=1.30.0            # 績效比對 Dashboard 框架
+plotly>=5.18.0               # 互動式圖表繪製

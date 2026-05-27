@@ -90,31 +90,54 @@ def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
         return 0.0, 1.0
 
 
-class MLPAutoencoder(nn.Module):
-    def __init__(self, input_dim, latent_dim=8):
-        super(MLPAutoencoder, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.Tanh(),
-            nn.Dropout(0.3),  # 引入隨機遮蔽去噪
-            nn.Linear(64, latent_dim)
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(latent_dim, 64),
-            nn.Tanh(),
-            nn.Dropout(0.3),
-            nn.Linear(64, input_dim)
-        )
+class LSTMAutoencoder(nn.Module):
+    def __init__(self, seq_len, input_size=1, latent_dim=8, hidden_dim=32):
+        super(LSTMAutoencoder, self).__init__()
+        self.seq_len = seq_len
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+        self.hidden_dim = hidden_dim
+        
+        # Encoder
+        self.encoder_lstm = nn.LSTM(input_size, hidden_dim, batch_first=True)
+        self.encoder_fc = nn.Linear(hidden_dim, latent_dim)
+        self.dropout = nn.Dropout(0.3)  # 隨機去噪
+        
+        # Decoder
+        self.decoder_fc = nn.Linear(latent_dim, hidden_dim)
+        self.decoder_lstm = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.decoder_output = nn.Linear(hidden_dim, input_size)
+        
     def forward(self, x):
-        latent = self.encoder(x)
-        decoded = self.decoder(latent)
+        # x shape: (batch_size, seq_len, input_size)
+        
+        # Encoder phase
+        _, (hn, _) = self.encoder_lstm(x)
+        # hn shape: (1, batch_size, hidden_dim)
+        hn = hn[-1] # 取得最後一層的隱狀態
+        hn = self.dropout(hn)
+        latent = self.encoder_fc(hn) # (batch_size, latent_dim)
+        
+        # Decoder phase
+        dec_input = self.decoder_fc(latent) # (batch_size, hidden_dim)
+        dec_input = self.dropout(dec_input)
+        dec_input = dec_input.unsqueeze(1).repeat(1, self.seq_len, 1) # (batch_size, seq_len, hidden_dim)
+        
+        dec_out, _ = self.decoder_lstm(dec_input) # (batch_size, seq_len, hidden_dim)
+        decoded = self.decoder_output(dec_out) # (batch_size, seq_len, input_size)
+        decoded = decoded.squeeze(-1) # (batch_size, seq_len)
+        
         return latent, decoded
 
-def train_autoencoder(X_train, latent_dim=8, epochs=30, lr=0.005):
-    tensor_x = torch.tensor(X_train, dtype=torch.float32)
-    input_dim = X_train.shape[1]
-    model = MLPAutoencoder(input_dim, latent_dim)
-    # 引入 weight_decay 進行 L2 正則化，防止高頻噪聲過擬合
+def train_autoencoder(X_train, latent_dim=8, epochs=100, lr=0.01, hidden_dim=32):
+    # X_train shape: (n_stocks, seq_len)
+    n_stocks, seq_len = X_train.shape
+    
+    # LSTM 需要 (batch_size, seq_len, input_size) 的 3D 輸入，此處 input_size = 1
+    tensor_x = torch.tensor(X_train, dtype=torch.float32).unsqueeze(-1)
+    
+    model = LSTMAutoencoder(seq_len=seq_len, input_size=1, latent_dim=latent_dim, hidden_dim=hidden_dim)
+    # 引入 weight_decay 進行 L2 正則化，防止噪聲過擬合
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     criterion = nn.MSELoss()
     
@@ -122,7 +145,7 @@ def train_autoencoder(X_train, latent_dim=8, epochs=30, lr=0.005):
     for epoch in range(epochs):
         optimizer.zero_grad()
         latent, decoded = model(tensor_x)
-        loss = criterion(decoded, tensor_x)
+        loss = criterion(decoded, torch.tensor(X_train, dtype=torch.float32))
         loss.backward()
         optimizer.step()
         

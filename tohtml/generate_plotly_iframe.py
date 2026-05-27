@@ -1,8 +1,14 @@
 import os
+import sys
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
 from pathlib import Path
+
+# 強制 Windows 終端機使用 UTF-8 輸出並開啟 Line-buffering (即時刷屏)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
 # =======================================================================
 # 智慧型自適應路徑追溯 (Adaptive Path Escalation)

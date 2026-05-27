@@ -586,17 +586,7 @@ def main():
             "sub_dir": f"SSD_{reentry_suffix}",
             "params": base_params                  # 直接套用統一的 base_params
         },
-        {
-            "name": "EG Cointegration (Engle-Granger 共整合)",
-            "module": "strategies.eg",
-            "sub_dir": f"EG_{reentry_suffix}",
-            "params": {
-                **base_params,
-                "exit_buffer": 0.05,                   # 出場緩衝門檻，避免 spreads 微幅波動頻繁平倉
-                "adf_max_lags": 1,                     # Engle-Granger 第一階段 ADF 檢定之最大滯後期數
-                "p_value_threshold": 0.01              # 共整合 ADF 檢定的 p-value 顯著水準門檻
-            }
-        },
+
         {
             "name": "HDBSCAN Clustering + UMAP",
             "module": "strategies.HDBSCAN",

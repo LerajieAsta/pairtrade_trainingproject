@@ -32,7 +32,7 @@ echo [INFO] Starting Pairs Trading Comparison Dashboard...
 echo [INFO] If browser does not open automatically, go to: http://localhost:8501
 echo.
 
-streamlit run app.py
+Project\Scripts\python.exe -m streamlit run dashboard.py
 
 if not errorlevel 1 goto :EOF
 echo.

@@ -1,9 +1,15 @@
 import os
 import json
 import re
+import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
+
+# 強制 Windows 終端機使用 UTF-8 輸出並開啟 Line-buffering (即時刷屏)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
 # =======================================================================
 # 智慧型自適應路徑追溯 (Adaptive Path Escalation)
@@ -39,7 +45,7 @@ if not target_datasets:
 
 print(f"🔍 檢測到可用資料集: {target_datasets}。啟動【極速雙通道並行載入與動態指標計算】...")
 
-# 100% 精準復現 app.py 的底層指標計算函數 (無任何 Streamlit 依賴)
+# 100% 精準復現 dashboard.py 的底層指標計算函數 (無任何 Streamlit 依賴)
 def compute_metrics(csv_path, top_n):
     try:
         df = pd.read_csv(csv_path, usecols=["Date", "Daily_Delta", "Position", "Ticker_A", "Ticker_B"])
