@@ -374,6 +374,9 @@ class Trading:
         if len(valid_idx) == 0: 
             return pd.DataFrame()
         
+        # 複製未被 sliced 的完整 Z-Score 以提供足夠的歷史特徵緩衝
+        full_zscore = zscore.copy()
+        
         price_a = price_a.loc[valid_idx]
         price_b = price_b.loc[valid_idx]
         zscore = zscore.loc[valid_idx]
@@ -390,8 +393,8 @@ class Trading:
         beta_arr = beta_series.values
 
         # 為了能在 trading 期間取得完整的 10 天特徵歷史，我們使用 common_idx 上的 zscore 陣列
-        common_z_dict = {d: val for d, val in zip(common_idx, zscore.values)}
-        common_z_list = zscore.values.tolist()
+        common_z_dict = {d: val for d, val in zip(common_idx, full_zscore.values)}
+        common_z_list = full_zscore.values.tolist()
         common_date_to_idx = {d: i for i, d in enumerate(common_idx)}
 
         base_log = {
@@ -404,6 +407,37 @@ class Trading:
 
         state = PairState()
         
+        # 深度學習批次預測交易期所有日期的未來 Z-Score，消除迴圈內部 PyTorch 運算開銷
+        pred_z_futures = zscore_arr.copy()
+        if dl_model is not None:
+            X_trade = []
+            valid_feat_indices = []
+            for i in range(len(dates_arr)):
+                date = dates_arr[i]
+                c_idx = common_date_to_idx.get(date, -1)
+                if c_idx >= 9:
+                    hist = common_z_list[c_idx-9 : c_idx+1]
+                    feat = [
+                        hist[-1],
+                        hist[-1] - hist[-2],
+                        hist[-1] - hist[-4],
+                        hist[-1] - hist[-6],
+                        float(np.std(hist)),
+                        float(np.mean(hist[-5:]))
+                    ]
+                    X_trade.append(feat)
+                    valid_feat_indices.append(i)
+            
+            if X_trade:
+                X_trade_t = torch.tensor(X_trade, dtype=torch.float32)
+                with torch.no_grad():
+                    preds = dl_model(X_trade_t).squeeze(-1).numpy()
+                # 預先處理 shape issue (防範單一預測情況)
+                if preds.ndim == 0:
+                    preds = np.array([preds.item()])
+                for idx, val in zip(valid_feat_indices, preds):
+                    pred_z_futures[idx] = float(val)
+
         out_dates, out_pa, out_pb = [], [], []
         out_hr, out_z, out_pos = [], [], []
         out_unrealized, out_realized, out_cum = [], [], []
@@ -442,24 +476,8 @@ class Trading:
             elif state.cooldown_dir == 1 and z >= -self.exit_z:
                 state.cooldown_dir = 0
 
-            # 提取當前時間點的價差特徵，呼叫 DL 模型進行預測
-            pred_z_future = z # 預設為當前值
-            if dl_model is not None:
-                c_idx = common_date_to_idx.get(date, -1)
-                if c_idx >= 9:
-                    hist = common_z_list[c_idx-9 : c_idx+1]
-                    feat = [
-                        hist[-1],
-                        hist[-1] - hist[-2],
-                        hist[-1] - hist[-4],
-                        hist[-1] - hist[-6],
-                        float(np.std(hist)),
-                        float(np.mean(hist[-5:]))
-                    ]
-                    # 輸入特徵轉 Tensor
-                    feat_t = torch.tensor([feat], dtype=torch.float32)
-                    with torch.no_grad():
-                        pred_z_future = float(dl_model(feat_t).item())
+            # 取得預先計算之深度學習預測值
+            pred_z_future = float(pred_z_futures[i])
 
             # 持倉邏輯
             if state.position != 0:
@@ -652,7 +670,11 @@ class RollingBacktester:
                 "slots": [{"avail_idx": 0, "capital": self.initial_capital / max_concurrent} for _ in range(max_concurrent)]
             }
 
+        import os
         roll_start_indices = list(range(local_first_trade_idx, total_days - self.trading_window + 1, self.rolling_step))
+        if os.environ.get("TEST_MODE") == "1":
+            print("🧪 [TEST_MODE] 偵測到測試環境變數，僅執行前 3 期回測以進行快速驗證。")
+            roll_start_indices = roll_start_indices[:3]
         print(f"\n🚀 開始進行 Grid Search (SSD + DL)，共 {len(roll_start_indices)} 期，每期處理 {len(states)} 種參數組合...")
 
         for roll_idx, trade_start_idx in enumerate(roll_start_indices):
