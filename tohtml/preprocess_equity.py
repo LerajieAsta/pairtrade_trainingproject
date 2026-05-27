@@ -108,6 +108,7 @@ all_computed_metrics = {}
 optimal_params_map = {
     "SSD_Basic": {"file": "TradeLogs_Top5_SL0_ZWin0.csv", "top_n": 5, "label": "經典 SSD (Basic)", "params_str": "Top 5, SL: 0%, ZWin: 0"},
     "SSD_OLS": {"file": "TradeLogs_Top10_SL0_ZWin0.csv", "top_n": 10, "label": "進階 SSD (OLS) 🌟", "params_str": "Top 10, SL: 0%, ZWin: 0"},
+    "SSD_DL": {"file": "TradeLogs_Top5_SL0_ZWin0.csv", "top_n": 5, "label": "SSD + 深度學習交易 🚀", "params_str": "Top 5, SL: 0%, ZWin: 0"},
     "Engle_Granger": {"file": "EG_TradeLogs_Top10_SL5.csv", "top_n": 10, "label": "Engle-Granger 共整合", "params_str": "Top 10, SL: 5%, ZWin: 0"},
     "HDBSCAN_Handcrafted": {"file": "HDBSCAN_UMAP_TradeLogs_Top5_SL0_ZWin0_VolAdj.csv", "top_n": 5, "label": "HDBSCAN (UMAP)", "params_str": "Top 5, SL: 0%, ZWin: 0"},
     "HDBSCAN_Autoencoder": {"file": "HDBSCAN_AE_UMAP_TradeLogs_Top5_SL0_ZWin0_VolAdj.csv", "top_n": 5, "label": "HDBSCAN (AE UMAP)", "params_str": "Top 5, SL: 0%, ZWin: 0"},
@@ -123,6 +124,7 @@ for dataset in target_datasets:
     folders = {
         "SSD_Basic": base_dir / "SSD_Basic_ReEntry",
         "SSD_OLS": base_dir / "SSD_ReEntry",
+        "SSD_DL": base_dir / "SSD_DL_ReEntry",
         "Engle_Granger": base_dir / "EG_NoReEntry",
         "HDBSCAN_Handcrafted": base_dir / "HDBSCAN_UMAP_ReEntry",
         "HDBSCAN_Autoencoder": base_dir / "HDBSCAN_AE_UMAP_ReEntry",

@@ -586,6 +586,12 @@ def main():
             "sub_dir": f"SSD_{reentry_suffix}",
             "params": base_params                  # 直接套用統一的 base_params
         },
+        {
+            "name": "SSD Deep Learning (深度學習動態交易)",
+            "module": "strategies.ssd_dl_trading",
+            "sub_dir": f"SSD_DL_{reentry_suffix}",
+            "params": base_params                  # 直接套用統一的 base_params
+        },
 
         {
             "name": "HDBSCAN Clustering + UMAP",
