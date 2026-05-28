@@ -964,23 +964,52 @@ class RollingBacktester:
         adf_pvalue_threshold: float,   # 0.01=保守 / 0.05=積極
         output_dir: Path,
         reduce_method: str = "umap",
-        use_dynamic_stop: bool = False,
-        dynamic_stop_z: float = 3.0,
-        max_sector_ratio: float = 0.3,
-        portfolio_stop_loss_pct: float = 0.10,
-        use_vol_adjust: bool = False,
+        portfolio_stop_loss_pct_list: list = None,
+        max_sector_ratio_list: list = None,
+        dynamic_stop_z_list: list = None,
         use_vol_adjust_list: list = None,
     ):
-        self.__dict__.update(locals())
-        self.__dict__.pop("self")
+        self.top_n_list = top_n_list
+        self.stop_loss_list = stop_loss_list
+        self.zscore_window_list = zscore_window_list
+        self.entry_z = entry_z
+        self.exit_z = exit_z
+        self.formation_window = formation_window
+        self.trading_window = trading_window
+        self.rolling_step = rolling_step
+        self.fee_rate = fee_rate
+        self.slippage_rate = slippage_rate
+        self.initial_capital = initial_capital
+        self.allow_reentry = allow_reentry
+        self.zscore_clip = zscore_clip
+        self.min_spread_std = min_spread_std
+        self.min_tickers_for_pairing = min_tickers_for_pairing
+        
+        self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
+        self.hdbscan_min_samples = hdbscan_min_samples
+        self.hdbscan_metric = hdbscan_metric
+        self.umap_n_components = umap_n_components
+        self.umap_n_neighbors = umap_n_neighbors
+        self.umap_min_dist = umap_min_dist
+        self.umap_random_state = umap_random_state
+        self.adf_max_lags = adf_max_lags
+        self.adf_pvalue_threshold = adf_pvalue_threshold
         self.output_dir = output_dir
+        self.reduce_method = reduce_method
+
+        self.portfolio_stop_loss_pct_list = portfolio_stop_loss_pct_list or [0.0]
+        self.max_sector_ratio_list = max_sector_ratio_list or [0.0]
+        self.dynamic_stop_z_list = dynamic_stop_z_list or [0.0]
+        self.use_vol_adjust_list = use_vol_adjust_list or [False]
 
     def run(self, price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping):
-        self.use_vol_adjust_list = getattr(self, "use_vol_adjust_list", None) or [False]
         max_concurrent = self.trading_window // self.rolling_step
         states = {}
-        for n, sl, z_win, vol_adj in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list, self.use_vol_adjust_list):
-            states[(n, sl, z_win, vol_adj)] = {
+        for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
+            self.top_n_list, self.stop_loss_list, self.zscore_window_list,
+            self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
+        ):
+            states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)] = {
                 "logs":  [],
                 "slots": [{"avail_idx": 0, "capital": self.initial_capital / max_concurrent}
                           for _ in range(max_concurrent)],
@@ -1012,11 +1041,11 @@ class RollingBacktester:
             fe_str = str(all_dates[form_end_idx - 1])[:10]
             print(f"  ▶ 第 {roll_idx+1:02d} 期 (交易: {ts_str} ~ {te_str})")
 
-            # ── HDBSCAN 形成期（以最大 top_n 計算一次，後續切片）
+            # ── HDBSCAN 形成期（以最大 top_n * 5 計算一次以提供充足的配對池）
             formation = Formation(
                 price_df=form_data,
                 form_start=fs_str, form_end=fe_str,
-                top_n=max(self.top_n_list),
+                top_n=max(self.top_n_list) * 5,
                 sector_mapping=sector_mapping,
                 min_tickers_for_pairing=self.min_tickers_for_pairing,
                 hdbscan_min_cluster_size=self.hdbscan_min_cluster_size,
@@ -1029,16 +1058,40 @@ class RollingBacktester:
                 adf_max_lags=self.adf_max_lags,
                 adf_pvalue_threshold=self.adf_pvalue_threshold,
                 reduce_method=getattr(self, "reduce_method", "umap"),
-                max_sector_ratio=getattr(self, "max_sector_ratio", 0.3),
+                max_sector_ratio=0, # 在外部網格進行產業過濾
             )
             max_selected_pairs = formation.run()
 
             if max_selected_pairs.empty:
                 continue
 
-            for n, sl, z_win, vol_adj in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list, self.use_vol_adjust_list):
-                selected_pairs = max_selected_pairs.head(n)
-                state  = states[(n, sl, z_win, vol_adj)]
+            for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
+                self.top_n_list, self.stop_loss_list, self.zscore_window_list,
+                self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
+            ):
+                # 產業上限過濾與 top_n 擷取
+                if sec_ratio > 0:
+                    max_pairs_per_sector = max(1, int(n * sec_ratio))
+                    sector_counts = {}
+                    diversified_records = []
+                    for _, row in max_selected_pairs.iterrows():
+                        sec = row["Sector"]
+                        if sec not in sector_counts:
+                            sector_counts[sec] = 0
+                        if sector_counts[sec] < max_pairs_per_sector:
+                            diversified_records.append(row)
+                            sector_counts[sec] += 1
+                        if len(diversified_records) >= n:
+                            break
+                    selected_pairs = pd.DataFrame(diversified_records).copy()
+                else:
+                    selected_pairs = max_selected_pairs.head(n).copy()
+
+                if selected_pairs.empty:
+                    continue
+
+                selected_pairs["Rank"] = range(1, len(selected_pairs) + 1)
+                state  = states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)]
                 slots  = state["slots"]
 
                 free_slots = [i for i, s in enumerate(slots) if s["avail_idx"] <= trade_start_idx]
@@ -1055,9 +1108,9 @@ class RollingBacktester:
                     stop_loss_pct=sl, entry_z=self.entry_z, exit_z=self.exit_z,
                     zscore_window=z_win, allow_reentry=self.allow_reentry,
                     zscore_clip=self.zscore_clip, min_spread_std=self.min_spread_std,
-                    use_dynamic_stop=getattr(self, "use_dynamic_stop", False),
-                    dynamic_stop_z=getattr(self, "dynamic_stop_z", 3.0),
-                    portfolio_stop_loss_pct=getattr(self, "portfolio_stop_loss_pct", 0.10),
+                    use_dynamic_stop=(dyn_z > 0),
+                    dynamic_stop_z=dyn_z,
+                    portfolio_stop_loss_pct=p_stop,
                     use_vol_adjust=vol_adj,
                 )
 
@@ -1073,13 +1126,16 @@ class RollingBacktester:
 
     def _export_results(self, states):
         print("\n✅ 回測完成！正在匯出交易紀錄...")
-        for (n, sl, z_win, vol_adj), state in states.items():
+        for (n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj), state in states.items():
             if state["logs"]:
                 full_log = pd.concat(state["logs"], ignore_index=True)
                 sl_str   = f"SL{int(sl*100)}" if sl > 0 else "SL0"
                 rm_str   = getattr(self, "reduce_method", "umap").upper()
-                vol_str  = "VolAdj" if vol_adj else "NoVolAdj"
-                filename = f"HDBSCAN_AE_{rm_str}_TradeLogs_Top{n}_{sl_str}_ZWin{z_win}_{vol_str}.csv"
+                psl_str = f"PSL{int(p_stop*100)}" if p_stop > 0 else "PSL0"
+                msr_str = f"MSR{int(sec_ratio*100)}" if sec_ratio > 0 else "MSR0"
+                dsz_str = f"DSZ{int(dyn_z)}" if dyn_z > 0 else "DSZ0"
+                vol_str  = "VolAdj" if vol_adj else "NoVol"
+                filename = f"HDBSCAN_AE_{rm_str}_TradeLogs_Top{n}_{sl_str}_ZWin{z_win}_{psl_str}_{msr_str}_{dsz_str}_{vol_str}.csv"
                 filepath = self.output_dir / filename
                 full_log.to_csv(filepath, index=False)
                 print(f"  - 已輸出: {filename} (共 {len(full_log)} 筆紀錄)")

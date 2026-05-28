@@ -105,13 +105,13 @@ graph TD
 * **功能**：
   * **單次 I/O 加載**：在主進程中一次性讀取 SQLite 資料庫並進行 Pivot 矩陣轉換，避免子行程重複讀寫硬碟。
   * **多行程並行**：調用進程池並行執行六大策略的滾動回測。
-  * **網格優化**：針對 `Top N [5, 10, 20]`、`Stop Loss [0%, 5%, 15%]`、`Z-Window [0, 20, 60]` 進行科學網格搜尋。
+  * **網格優化**：針對 `Top N [5, 10, 20]`、`Stop Loss [0%, 5%, 15%]`、`Z-Window [0]` (固定為 0)、`PSL [0%, 10%, 20%]` (全域動態停損)、`MSR [0%, 3%]` (配對產業上限) 與 `DSZ [0, 3, 5]` (部位動態停損) 等 7 組參數進行科學網格搜尋與高效外部產業切片過濾。
   * **智慧斷點續傳**：自動檢測策略代碼、資料庫檔案與網格參數是否修改，若無變動則自動跳過，極速節省運算資源。
 
-#### 步驟 3：最優參數淨值合併與指標編譯 (`tohtml/preprocess_equity.py`)
+#### 步驟 3：最優參數淨值合併與指標編譯 (`preprocess_equity.py`)
 * **執行方法**：
   ```bash
-  python tohtml/preprocess_equity.py
+  python preprocess_equity.py
   ```
 * **功能**：
   * 自動掃描 `results/` 資料夾，篩選出六大策略的最佳參數組合。
@@ -149,17 +149,20 @@ Dashboard (`dashboard.py`) 與編譯器 (`preprocess_equity.py`) 是透過掃描
 
 | 特徵欄位 | 規則 (不分大小寫) | 範例與解析結果 |
 | :--- | :--- | :--- |
-| **DATASET** | 包含 `full` $\rightarrow$ `Full`<br>包含 `current` $\rightarrow$ `Current`<br>其他 $\rightarrow$ `Unknown` | `strategy_full_TradeLogs.csv` $\rightarrow$ **Full** |
+| **DATASET** | 包含 `full` $\rightarrow$ `Full`<br>包含 `current` $\rightarrow$ `Current`<br>包含 `quick_test` $\rightarrow$ `Quick_Test`<br>其他 $\rightarrow$ `Unknown` | `strategy_full_TradeLogs.csv` $\rightarrow$ **Full** |
 | **RE-ENTRY** | 包含 `noreentry` $\rightarrow$ `NoReEntry`<br>包含 `reentry` $\rightarrow$ `ReEntry`<br>其他 $\rightarrow$ `Unknown` | `SSD_noreentry_TradeLogs.csv` $\rightarrow$ **NoReEntry** |
-| **VOL ADJ** | 包含 `novoladj` $\rightarrow$ `NoVolAdj`<br>包含 `voladj` $\rightarrow$ `VolAdj`<br>其他 $\rightarrow$ `N/A` | `HDBSCAN_voladj_TradeLogs.csv` $\rightarrow$ **VolAdj** |
 | **METHOD** | 包含 `ssd_basic` $\rightarrow$ `SSD (Basic)`<br>包含 `ssd` $\rightarrow$ `SSD`<br>包含 `eg` $\rightarrow$ `EG`<br>包含 `hdbscan` 且 `multifactor` $\rightarrow$ `HDBSCAN (MF)` (MultiFactor)<br>包含 `hdbscan_ae_pca` 或包含 `_ae_` 且 `_pca_` $\rightarrow$ `HDBSCAN (AE PCA)`<br>包含 `hdbscan_ae` 或單純有 `_ae_` $\rightarrow$ `HDBSCAN (AE UMAP)`<br>包含 `hdbscan_pca` 或單純有 `_pca_` $\rightarrow$ `HDBSCAN (PCA)`<br>其他 `hdbscan` 相關 $\rightarrow$ `HDBSCAN (UMAP)` | `eg_reentry_TradeLogs.csv` $\rightarrow$ **EG**<br>`hdbscan_ae_pca_TradeLogs.csv` $\rightarrow$ **HDBSCAN (AE PCA)** |
-| **TOP N** | 正則匹配 `top(\d+)` | `top20` $\rightarrow$ **Top 20**（預設為 Top 20） |
-| **STOP LOSS %** | 正則匹配 `sl(\d+)` | `sl2` $\rightarrow$ **2%**（預設為 0%） |
-| **Z-WINDOW** | 正則匹配 `zwin(\d+)` | `zwin60` $\rightarrow$ **60**（預設為 0） |
+| **TOP N** | 正則匹配 `top(\d+)` | `top5` $\rightarrow$ **Top 5**（預設為 Top 20） |
+| **STOP LOSS %** | 正則匹配 `sl(\d+)` | `sl5` $\rightarrow$ **5%**（預設為 0%） |
+| **Z-WINDOW** | 正則匹配 `zwin(\d+)` | `zwin0` $\rightarrow$ **0**（固定為 0） |
+| **PSL % (全域停損)** | 正則匹配 `psl(\d+)` | `psl10` $\rightarrow$ **10%**（0% 為無全域停損） |
+| **MSR % (產業上限)** | 正則匹配 `msr(\d+)` | `msr3` $\rightarrow$ **3%**（0% 為無產業上限） |
+| **DSZ (動態停損)** | 正則匹配 `dsz(\d+)` | `dsz3` $\rightarrow$ **3.0**（0 為不停損） |
+| **VOL (波動度調節)** | 包含 `voladj` $\rightarrow$ `有`<br>包含 `novol` $\rightarrow$ `無` | `novol` $\rightarrow$ **無** |
 
 > 💡 **最佳命名格式建議**：
-> `results/[DATASET]/[METHOD]_[REENTRY]/TradeLogs_top[N]_sl[SL]_zwin[Z]_[VOLADJ].csv`
-> * 實例：`results/current/HDBSCAN_UMAP_ReEntry/HDBSCAN_UMAP_TradeLogs_Top5_SL0_ZWin0_VolAdj.csv`
+> `results/[DATASET]/[METHOD]_[REENTRY]/TradeLogs_top[N]_sl[SL]_zwin[Z]_psl[PSL]_msr[MSR]_dsz[DSZ]_[VOL].csv`
+> * 實例：`results/current/HDBSCAN_UMAP_NoReEntry/HDBSCAN_UMAP_TradeLogs_Top5_SL5_ZWin0_PSL10_MSR3_DSZ3_NoVol.csv`
 
 ### 3.2 CSV 必備欄位結構
 回測 CSV 檔案中，請務必包含並精確命名以下欄位：

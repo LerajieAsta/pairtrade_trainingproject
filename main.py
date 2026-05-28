@@ -553,24 +553,23 @@ def main():
         "zscore_clip": 10.0,
         "min_spread_std": 1e-6,
         "min_tickers_for_pairing": 2,
-        "use_dynamic_stop": False,
-        "dynamic_stop_z": 3.0,
-        "max_sector_ratio": 0.3,
-        "portfolio_stop_loss_pct": 0.10,
         "use_vol_adjust": use_vol_adjust,
         
         # 統一網格搜尋參數：所有策略調用相同參數以進行公平、科學的績效比較
         "top_n_list": [5, 10, 20],              # 統一挑選的最優配對組數 (Top N)
         "stop_loss_list": [0, 0.05, 0.15],     # 統一停損比例限制 (0 代表不停損)
-        "zscore_window_list": [0, 20, 60],      # 統一 Z-Score 滾動天數視窗 (0 代表累積視窗)
-        "use_vol_adjust_list": [use_vol_adjust] # 網格搜尋參數，用以直接比對原本與波動調節之優劣
+        "zscore_window_list": [0],              # 固定為 0 (累積視窗)
+        "use_vol_adjust_list": [use_vol_adjust], # 網格搜尋參數，用以直接比對原本與波動調節之優劣
+        "portfolio_stop_loss_pct_list": [0.0, 0.10, 0.20],  # 新增：全域動態停損[0,10,20] (0表示不停損)
+        "max_sector_ratio_list": [0.0, 0.03],               # 新增：配對產業上限[0,3%] (0表示無上限)
+        "dynamic_stop_z_list": [0.0, 3.0, 5.0]              # 新增：動態停損[0,3,5] (0表示不啟用)
     }
     
     # 依據 allow_reentry 的設定動態決定目錄命名後綴
     reentry_suffix = "ReEntry" if base_params.get("allow_reentry", False) else "NoReEntry"
     
-    print(f"🔄 允許再進場 (allow_reentry) : {base_params['allow_reentry']} (輸出後綴: {reentry_suffix})", flush=True)
-    print(f"⚡ 波動率調節 (use_vol_adjust) : {base_params['use_vol_adjust']}", flush=True)
+    print(f"🔄 允許再進場 (allow_reentry) : {base_params.get('allow_reentry', False)} (輸出後綴: {reentry_suffix})", flush=True)
+    print(f"⚡ 波動率調節 (use_vol_adjust) : {base_params.get('use_vol_adjust', False)}", flush=True)
     
     # 動態產生各策略的 output_dir 與 log_path
     strategies_raw = [
@@ -586,12 +585,12 @@ def main():
             "sub_dir": f"SSD_{reentry_suffix}",
             "params": base_params                  # 直接套用統一的 base_params
         },
-        {
-            "name": "SSD Deep Learning (深度學習動態交易)",
-            "module": "strategies.ssd_dl_trading",
-            "sub_dir": f"SSD_DL_{reentry_suffix}",
-            "params": base_params                  # 直接套用統一的 base_params
-        },
+        # {
+        #     "name": "SSD Deep Learning (深度學習動態交易)",
+        #     "module": "strategies.ssd_dl_trading",
+        #     "sub_dir": f"SSD_DL_{reentry_suffix}",
+        #     "params": base_params                  # 直接套用統一的 base_params
+        # },
 
         {
             "name": "HDBSCAN Clustering + UMAP",

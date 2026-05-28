@@ -8,7 +8,7 @@
 
 ### 1. 高效能多行程並行回測引擎 (`main.py`)
 * **智慧單次 I/O 設計**：主行程統一載入 SQLite 資料庫並完成 Pivot 矩陣轉換，子行程直接共用記憶體數據，根除硬碟讀寫瓶頸。
-* **網格搜尋優化**：針對配對組數 (Top N)、停損門檻 (Stop Loss) 與 Z-Score 滾動天數 (Z-Window) 自動進行網格計算與科學績效比對。
+* **網格搜尋優化**：針對配對組數 (Top N)、停損門檻 (Stop Loss)、Z-Score 滾動天數 (Z-Window 固定為 0)、全域動態停損 (PSL)、配對產業上限 (MSR) 與部位動態停損 (DSZ) 等 7 組參數自動進行網格搜尋與科學績效比對，並引進高效的外部產業上限過濾技術。
 * **智慧斷點續傳**：自動對比資料庫修改時間、策略代碼雜湊與網格參數，未變動之策略自動跳過，極速節省計算開銷。
 
 ### 2. 五大前沿配對交易策略 (`strategies/`)
@@ -75,7 +75,7 @@ python main.py --db sp500_Current --allow-reentry --workers 4
 ### 3. 指標編譯與 Notebook 表格注入
 當回測結束並在 `results/` 產生 CSV 檔案後，執行編譯程式：
 ```bash
-python tohtml/preprocess_equity.py
+python preprocess_equity.py
 ```
 這會自動提取六大策略的最優績效，合併淨值生成 `notebooks/equity_curves.csv`，並將最新績效 HTML 表格注入到 [notebooks/analysis.ipynb](file:///c:/Clark/YZU/Papper/Code/notebooks/analysis.ipynb) 中。
 

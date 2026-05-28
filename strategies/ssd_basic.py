@@ -167,7 +167,8 @@ class Trading:
     """負責在交易期 (Trading Period) 模擬配對交易並產生詳細交易紀錄"""
     def __init__(self, price_df: pd.DataFrame, trade_dates: pd.DatetimeIndex, selected_pairs: pd.DataFrame, capital_per_pair: float, 
                  fee_rate: float, slippage_rate: float, stop_loss_pct: float, entry_z: float, exit_z: float, zscore_window: int, allow_reentry: bool = False,
-                 zscore_clip: float = 10.0, min_spread_std: float = 1e-6):
+                 zscore_clip: float = 10.0, min_spread_std: float = 1e-6, use_dynamic_stop: bool = False, dynamic_stop_z: float = 3.0,
+                 portfolio_stop_loss_pct: float = 0.10, use_vol_adjust: bool = False):
         self.price_df = price_df.copy()
         self.trade_dates = trade_dates
         self.selected_pairs = selected_pairs
@@ -181,16 +182,18 @@ class Trading:
         self.allow_reentry = allow_reentry  
         self.zscore_clip = zscore_clip
         self.min_spread_std = min_spread_std
+        self.use_dynamic_stop = use_dynamic_stop
+        self.dynamic_stop_z = dynamic_stop_z
+        self.portfolio_stop_loss_pct = portfolio_stop_loss_pct
+        self.use_vol_adjust = use_vol_adjust
 
         self.period_pnl: float = 0.0
 
     def _execute_entry(self, state: PairState, z: float, p_a: float, p_b: float) -> tuple[bool, float]:
         """處理進場邏輯與資金分配 (1:1 等額市值中性 Dollar Weighting)"""
-        # 完全對應論文，1:1 等額資金配置
         v_a = self.capital_per_pair * 0.5
         v_b = self.capital_per_pair * 0.5
         
-        # Z-Score 超過門檻且不在冷卻期時進場
         if z > self.entry_z and state.cooldown_dir != -1:
             state.position = -1
             state.shares_a = -v_a / p_a
@@ -213,15 +216,13 @@ class Trading:
         state.realized_pnl += current_trade_pnl 
         
         if stop_loss:
-            if not self.allow_reentry:
-                state.is_stopped = True
-            else:
+            state.is_stopped = True if not self.allow_reentry else False
+            if self.allow_reentry:
                 state.cooldown_dir = state.position 
         else:
-            state.cooldown_dir = 0  
+            state.cooldown_dir = state.position  
                 
         state.position = 0
-        
         state.shares_a = 0.0
         state.shares_b = 0.0
         state.entry_price_a = 0.0
@@ -238,19 +239,21 @@ class Trading:
 
         if len(price_a) < 5: return pd.DataFrame()
 
-        # 累積總回報指數正規化 (第一天設為 1.0，以形成期首日價格 first_price 為分母)
         norm_p_a = price_a / (first_price_a if first_price_a > 1e-8 else 1.0)
         norm_p_b = price_b / (first_price_b if first_price_b > 1e-8 else 1.0)
         
-        # 計算 Z-Score
-        # 距離法中 Beta 鎖定為 1.0
         if self.zscore_window == 0:
             spread = norm_p_a - norm_p_b
             safe_std = max(form_spread_std, self.min_spread_std)
-            zscore = np.clip((spread - form_spread_mean) / safe_std, -self.zscore_clip, self.zscore_clip)
+            if getattr(self, "use_vol_adjust", False):
+                roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+            else:
+                adjusted_std = safe_std
+            zscore = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
             beta_series = pd.Series(1.0, index=common_idx)
         else:
-            # 滾動模式下亦鎖定 Beta = 1.0，但支持滾動去中心化
             roll_mean_a = norm_p_a.rolling(window=self.zscore_window).mean()
             roll_mean_b = norm_p_b.rolling(window=self.zscore_window).mean()
             roll_alpha = roll_mean_a - roll_mean_b
@@ -261,7 +264,13 @@ class Trading:
                 return pd.DataFrame()
             
             safe_std = np.maximum(roll_std, self.min_spread_std)
-            zscore = np.clip(spread / safe_std, -self.zscore_clip, self.zscore_clip)
+            if getattr(self, "use_vol_adjust", False):
+                roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+            else:
+                adjusted_std = safe_std
+            zscore = np.clip(spread / adjusted_std, -self.zscore_clip, self.zscore_clip)
             beta_series = pd.Series(1.0, index=common_idx)
 
         valid_idx = common_idx.intersection(self.trade_dates)
@@ -276,7 +285,6 @@ class Trading:
         zscore_arr = zscore.values
         pa_arr = price_a.values
         pb_arr = price_b.values
-        beta_arr = beta_series.values
 
         base_log = {
             "Period_Start": period_start, "Period_End": period_end,
@@ -296,7 +304,6 @@ class Trading:
             date = dates_arr[i]
             z = 0.0 if np.isnan(zscore_arr[i]) else zscore_arr[i]
             p_a, p_b = pa_arr[i], pb_arr[i]
-            c_beta = 1.0
 
             unrealized_pnl = 0.0
             closed_trade_pnl = 0.0 
@@ -331,7 +338,10 @@ class Trading:
                 
                 current_trade_pnl = raw_unrealized - state.trade_entry_fee - exit_fee_est
                 
-                if self.stop_loss_pct > 0 and (-current_trade_pnl / self.capital_per_pair) >= self.stop_loss_pct:
+                is_cap_stop = self.stop_loss_pct > 0 and (-current_trade_pnl / self.capital_per_pair) >= self.stop_loss_pct
+                is_z_stop = self.use_dynamic_stop and abs(z) > self.dynamic_stop_z
+
+                if is_cap_stop or is_z_stop:
                     self._execute_close(state, current_trade_pnl, stop_loss=True)
                     closed_trade_pnl = current_trade_pnl
                     current_status = "STOP_LOSS_TRIGGERED"
@@ -458,6 +468,57 @@ class Trading:
         if not dfs: 
             return pd.DataFrame(), 0.0
             
+        # ---- 實作後置投資組合總體止損斷路器 ----
+        if getattr(self, "portfolio_stop_loss_pct", 0) > 0:
+            temp_df = pd.concat(dfs, ignore_index=True)
+            total_cap = self.capital_per_pair * len(dfs)
+            daily_cum_pnl = temp_df.groupby("Date")["Cumulative_PnL"].sum()
+            
+            cutoff_date = None
+            for date_val, pnl_val in daily_cum_pnl.items():
+                if pnl_val / total_cap <= -self.portfolio_stop_loss_pct:
+                    cutoff_date = date_val
+                    break
+            
+            if cutoff_date is not None:
+                new_dfs = []
+                for df in dfs:
+                    df = df.copy()
+                    before_mask = df["Date"] < cutoff_date
+                    at_mask = df["Date"] == cutoff_date
+                    after_mask = df["Date"] > cutoff_date
+                    
+                    df_before = df[before_mask]
+                    
+                    df_at = df[at_mask].copy()
+                    final_realized = 0.0
+                    if not df_at.empty:
+                        row_at = df_at.iloc[0]
+                        final_realized = row_at["Cumulative_PnL"]
+                        if row_at["Position"] != 0:
+                            df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOP_TRIGGERED"
+                            df_at.loc[df_at.index, "Position"] = 0
+                            df_at.loc[df_at.index, "Unrealized_PnL"] = 0.0
+                            df_at.loc[df_at.index, "Trade_PnL"] = row_at["Trade_PnL"]
+                        else:
+                            if row_at["Status"] not in ("STOPPED", "STOP_LOSS_TRIGGERED", "EXIT"):
+                                df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOPPED"
+                            final_realized = row_at["Realized_PnL"]
+                            
+                    df_after = df[after_mask].copy()
+                    if not df_after.empty:
+                        df_after.loc[df_after.index, "Position"] = 0
+                        df_after.loc[df_after.index, "Unrealized_PnL"] = 0.0
+                        df_after.loc[df_after.index, "Realized_PnL"] = final_realized
+                        df_after.loc[df_after.index, "Cumulative_PnL"] = final_realized
+                        df_after.loc[df_after.index, "Status"] = "STOPPED"
+                        df_after.loc[df_after.index, "Trade_PnL"] = 0.0
+                        df_after.loc[df_after.index, "Daily_Delta"] = 0.0
+                        
+                    new_dfs.append(pd.concat([df_before, df_at, df_after], ignore_index=True))
+                dfs = new_dfs
+        # ----------------------------------------------
+
         log_df = pd.concat(dfs, ignore_index=True)
         period_daily_delta = log_df.groupby("Date")["Daily_Delta"].sum()
         self.period_pnl = float(period_daily_delta.sum()) if not period_daily_delta.empty else 0.0
@@ -544,7 +605,12 @@ class RollingBacktester:
                  entry_z: float, exit_z: float, formation_window: int, trading_window: int, rolling_step: int,
                  fee_rate: float, slippage_rate: float, initial_capital: float,
                  allow_reentry: bool, zscore_clip: float, min_spread_std: float,
-                 min_tickers_for_pairing: int, output_dir: Path):
+                 min_tickers_for_pairing: int, output_dir: Path,
+                 portfolio_stop_loss_pct_list: list = None,
+                 max_sector_ratio_list: list = None,
+                 dynamic_stop_z_list: list = None,
+                 use_vol_adjust_list: list = None,
+                 **kwargs):
         self.top_n_list = top_n_list
         self.stop_loss_list = stop_loss_list
         self.zscore_window_list = zscore_window_list
@@ -562,14 +628,24 @@ class RollingBacktester:
         self.min_tickers_for_pairing = min_tickers_for_pairing
         self.output_dir = output_dir
 
+        self.portfolio_stop_loss_pct_list = portfolio_stop_loss_pct_list or [0.0]
+        self.max_sector_ratio_list = max_sector_ratio_list or [0.0]
+        self.dynamic_stop_z_list = dynamic_stop_z_list or [0.0]
+        self.use_vol_adjust_list = use_vol_adjust_list or [False]
+
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
     def run(self, price_pivot: pd.DataFrame, all_dates: list, total_days: int, local_first_trade_idx: int, sector_mapping: dict):
         """執行網格搜索與滾動回測"""
-        # 建立網格狀態儲存器與資金槽 (Slots)
         max_concurrent = self.trading_window // self.rolling_step
         states = {}
 
-        for n, sl, z_win in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list):
-            states[(n, sl, z_win)] = {
+        for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
+            self.top_n_list, self.stop_loss_list, self.zscore_window_list,
+            self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
+        ):
+            states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)] = {
                 "logs": [], 
                 "slots": [{"avail_idx": 0, "capital": self.initial_capital / max_concurrent} for _ in range(max_concurrent)]
             }
@@ -604,12 +680,12 @@ class RollingBacktester:
             form_start_str, form_end_str = str(all_dates[form_start_idx])[:10], str(all_dates[form_end_idx - 1])[:10]
             print(f"  ▶ 處理中：第 {roll_idx+1:02d} 期 (交易: {trade_start_str} ~ {trade_end_str})")
 
-            # 進行配對篩選
+            # 進行配對篩選 (top_n 設為安全上限以供網格過濾)
             formation = Formation(
                 price_df=form_data, 
                 form_start=form_start_str, 
                 form_end=form_end_str, 
-                top_n=max(self.top_n_list), 
+                top_n=max(self.top_n_list) * 5, 
                 sector_mapping=sector_mapping,
                 min_tickers_for_pairing=self.min_tickers_for_pairing
             )
@@ -618,9 +694,33 @@ class RollingBacktester:
             if max_selected_pairs.empty: continue
 
             # 對所有參數組合進行交易模擬
-            for n, sl, z_win in itertools.product(self.top_n_list, self.stop_loss_list, self.zscore_window_list):
-                selected_pairs = max_selected_pairs.head(n)
-                state = states[(n, sl, z_win)]
+            for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
+                self.top_n_list, self.stop_loss_list, self.zscore_window_list,
+                self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
+            ):
+                # 產業上限過濾與 top_n 擷取
+                if sec_ratio > 0:
+                    max_pairs_per_sector = max(1, int(n * sec_ratio))
+                    sector_counts = {}
+                    diversified_records = []
+                    for _, row in max_selected_pairs.iterrows():
+                        sec = row["Sector"]
+                        if sec not in sector_counts:
+                            sector_counts[sec] = 0
+                        if sector_counts[sec] < max_pairs_per_sector:
+                            diversified_records.append(row)
+                            sector_counts[sec] += 1
+                        if len(diversified_records) >= n:
+                            break
+                    selected_pairs = pd.DataFrame(diversified_records).copy()
+                else:
+                    selected_pairs = max_selected_pairs.head(n).copy()
+
+                if selected_pairs.empty:
+                    continue
+
+                selected_pairs["Rank"] = range(1, len(selected_pairs) + 1)
+                state = states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)]
                 slots = state["slots"]
                 
                 # 分配可用資金槽
@@ -646,7 +746,11 @@ class RollingBacktester:
                     zscore_window=z_win,
                     allow_reentry=self.allow_reentry,
                     zscore_clip=self.zscore_clip,
-                    min_spread_std=self.min_spread_std
+                    min_spread_std=self.min_spread_std,
+                    use_dynamic_stop=(dyn_z > 0),
+                    dynamic_stop_z=dyn_z,
+                    portfolio_stop_loss_pct=p_stop,
+                    use_vol_adjust=vol_adj
                 )
                 
                 trade_log_df, period_pnl = trading.run(trade_start_str, trade_end_str)
@@ -663,16 +767,60 @@ class RollingBacktester:
     def _export_results(self, states: dict):
         """將每種參數組合的紀錄匯出為獨立 CSV"""
         print("\n✅ 回測完成！正在匯出交易紀錄檔案...")
-        for (n, sl, z_win), state in states.items():
+        for (n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj), state in states.items():
             if state["logs"]:
                 full_log_df = pd.concat(state["logs"], ignore_index=True)
                 sl_str = f"SL{int(sl*100)}" if sl > 0 else "SL0"
-                filename = f"TradeLogs_Top{n}_{sl_str}_ZWin{z_win}.csv"
+                psl_str = f"PSL{int(p_stop*100)}" if p_stop > 0 else "PSL0"
+                msr_str = f"MSR{int(sec_ratio*100)}" if sec_ratio > 0 else "MSR0"
+                dsz_str = f"DSZ{int(dyn_z)}" if dyn_z > 0 else "DSZ0"
+                vol_str = "VolAdj" if vol_adj else "NoVol"
+                filename = f"TradeLogs_Top{n}_{sl_str}_ZWin{z_win}_{psl_str}_{msr_str}_{dsz_str}_{vol_str}.csv"
                 filepath = self.output_dir / filename
                 full_log_df.to_csv(filepath, index=False)
                 print(f"  - 已輸出: {filename} (共 {len(full_log_df)} 筆紀錄)")
                 
         print(f"\n📁 所有交易紀錄已成功儲存至: {self.output_dir}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 標準化策略進入點接口 (Unified Strategy Entry Point)
+# ══════════════════════════════════════════════════════════════════════════════
+def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir):
+    """
+    標準化調用接口，接受外部傳入的價格資料與回測參數，完全解耦資料載入 I/O
+    """
+    import inspect
+    from pathlib import Path
+    
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 獲取 RollingBacktester 的 __init__ 參數列表
+    init_sig = inspect.signature(RollingBacktester.__init__)
+    valid_params = {}
+    
+    # 動態將外部 params 對應並過濾為該策略 RollingBacktester 支援的參數
+    for param_name, param in init_sig.parameters.items():
+        if param_name in ('self', 'output_dir'):
+            continue
+        if param_name in params:
+            valid_params[param_name] = params[param_name]
+        elif param.default is not inspect.Parameter.empty:
+            valid_params[param_name] = param.default
+            
+    print(f"[{Path(__file__).stem.upper()}] 正在初始化 RollingBacktester...")
+    
+    # 初始化回測引擎
+    engine = RollingBacktester(
+        output_dir=out_dir,
+        **valid_params
+    )
+    
+    # 執行回測
+    print(f"[{Path(__file__).stem.upper()}] 正在啟動滾動回測...")
+    engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
+    print(f"[{Path(__file__).stem.upper()}] 回測執行完畢。")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 主程式：自動參數網格搜尋 

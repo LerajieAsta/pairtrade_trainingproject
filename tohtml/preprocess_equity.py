@@ -5,11 +5,25 @@ import sys
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import glob
+import concurrent.futures
 
 # 強制 Windows 終端機使用 UTF-8 輸出並開啟 Line-buffering (即時刷屏)
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
+
+INITIAL_CAPITAL = 10000.0
+
+def get_csv_equity(csv_file):
+    try:
+        # 僅讀取 Daily_Delta 這欄以大幅節省記憶體與時間，並使用 float32 類型加速
+        df_temp = pd.read_csv(csv_file, usecols=["Daily_Delta"], dtype={"Daily_Delta": np.float32})
+        total_pnl = df_temp["Daily_Delta"].sum()
+        final_equity = INITIAL_CAPITAL + total_pnl
+        return csv_file, final_equity
+    except Exception:
+        return csv_file, -999999.0
 
 # =======================================================================
 # 智慧型自適應路徑追溯 (Adaptive Path Escalation)
@@ -43,9 +57,9 @@ if not target_datasets:
     print("❌ 未在 results/ 下找到 'current' 或 'full' 資料夾，請確認回測路徑結構！")
     exit(1)
 
-print(f"🔍 檢測到可用資料集: {target_datasets}。啟動【極速雙通道並行載入與動態指標計算】...")
+print(f"🔍 檢測到可用資料集: {target_datasets}。啟動【雙通道全動態最優參數掃描與指標計算】...")
 
-# 100% 精準復現 dashboard.py 的底層指標計算函數 (無任何 Streamlit 依賴)
+# 100% 精準復現底層指標計算函數 (無任何 Streamlit 依賴)
 def compute_metrics(csv_path, top_n):
     try:
         df = pd.read_csv(csv_path, usecols=["Date", "Daily_Delta", "Position", "Ticker_A", "Ticker_B"])
@@ -100,46 +114,110 @@ def compute_metrics(csv_path, top_n):
         print(f"   ⚠️ 指標計算失敗 ({csv_path.name}): {e}")
         return None
 
+# 從 CSV 檔名中利用正則表達式動態提取最優參數結構的函數
+def parse_params_from_filename(filename):
+    filename_lower = filename.lower()
+    
+    # 1. 匹配 Top N
+    match_top = re.search(r'top(\d+)', filename_lower)
+    top_n = int(match_top.group(1)) if match_top else 5
+    
+    # 2. 匹配 Stop Loss %
+    match_sl = re.search(r'sl(\d+)', filename_lower)
+    sl_pct = f"{match_sl.group(1)}%" if match_sl else "0%"
+    
+    # 3. 匹配 Zscore Window
+    match_zwin = re.search(r'zwin(\d+)', filename_lower)
+    zwin = match_zwin.group(1) if match_zwin else "0"
+    
+    params_str = f"Top {top_n}, SL: {sl_pct}, ZWin: {zwin}"
+    return top_n, params_str
+
+# 策略標籤定義 (動態表格展示用)
+strategy_meta_info = {
+    "SSD_Basic": {"label": "經典 SSD (Basic)"},
+    "SSD_OLS": {"label": "進階 SSD (OLS) 🌟"},
+    "SSD_DL": {"label": "SSD + 深度學習交易 🚀"},
+    "Engle_Granger": {"label": "Engle-Granger 共整合"},
+    "HDBSCAN_Handcrafted": {"label": "HDBSCAN (UMAP)"},
+    "HDBSCAN_Autoencoder": {"label": "HDBSCAN (AE UMAP)"},
+    "HDBSCAN_MultiFactor": {"label": "HDBSCAN (MF)"}
+}
+
 # 儲存最終合併的數據與計算好的指標
 merged_df = None
-all_computed_metrics = {}
-
-# 最佳參數組合映射
-optimal_params_map = {
-    "SSD_Basic": {"file": "TradeLogs_Top5_SL0_ZWin0.csv", "top_n": 5, "label": "經典 SSD (Basic)", "params_str": "Top 5, SL: 0%, ZWin: 0"},
-    "SSD_OLS": {"file": "TradeLogs_Top10_SL0_ZWin0.csv", "top_n": 10, "label": "進階 SSD (OLS) 🌟", "params_str": "Top 10, SL: 0%, ZWin: 0"},
-    "SSD_DL": {"file": "TradeLogs_Top5_SL0_ZWin0.csv", "top_n": 5, "label": "SSD + 深度學習交易 🚀", "params_str": "Top 5, SL: 0%, ZWin: 0"},
-    "Engle_Granger": {"file": "EG_TradeLogs_Top10_SL5.csv", "top_n": 10, "label": "Engle-Granger 共整合", "params_str": "Top 10, SL: 5%, ZWin: 0"},
-    "HDBSCAN_Handcrafted": {"file": "HDBSCAN_UMAP_TradeLogs_Top5_SL0_ZWin0_VolAdj.csv", "top_n": 5, "label": "HDBSCAN (UMAP)", "params_str": "Top 5, SL: 0%, ZWin: 0"},
-    "HDBSCAN_Autoencoder": {"file": "HDBSCAN_AE_UMAP_TradeLogs_Top5_SL0_ZWin0_VolAdj.csv", "top_n": 5, "label": "HDBSCAN (AE UMAP)", "params_str": "Top 5, SL: 0%, ZWin: 0"},
-    "HDBSCAN_MultiFactor": {"file": "HDBSCAN_MULTIFACTOR_TradeLogs_Top20_SL0_ZWin0_VolAdj.csv", "top_n": 20, "label": "HDBSCAN (MF)", "params_str": "Top 20, SL: 0%, ZWin: 0"}
-}
+all_computed_metrics = {} # {(dataset, strategy_key): {"metrics": dict, "params_str": str}}
 
 # 雙通道載入與動態指標計算
 for dataset in target_datasets:
-    print(f"\n📂 ==================== 正在處理 {dataset.upper()} 資料集 ====================")
+    print(f"\n📂 ==================== 正在全動態掃描 {dataset.upper()} 資料集 ====================")
     base_dir = results_dir / dataset
     
-    # 策略目錄映射
-    folders = {
-        "SSD_Basic": base_dir / "SSD_Basic_ReEntry",
-        "SSD_OLS": base_dir / "SSD_ReEntry",
-        "SSD_DL": base_dir / "SSD_DL_ReEntry",
-        "Engle_Granger": base_dir / "EG_NoReEntry",
-        "HDBSCAN_Handcrafted": base_dir / "HDBSCAN_UMAP_ReEntry",
-        "HDBSCAN_Autoencoder": base_dir / "HDBSCAN_AE_UMAP_ReEntry",
-        "HDBSCAN_MultiFactor": base_dir / "HDBSCAN_MultiFactor_ReEntry"
-    }
+    # 建立一個 dict 來收集每個 strategy_key 對應到的所有 CSV 檔案
+    strategy_csv_groups = {key: [] for key in strategy_meta_info.keys()}
     
-    for key, opt in optimal_params_map.items():
-        path = folders[key] / opt["file"]
-        if not path.exists():
-            print(f"   ⚠️ 跳過: 找不到 {key} ({opt['file']})")
+    # 用 Path.glob 遞迴搜尋所有 *.csv 檔案
+    all_csvs = list(base_dir.rglob("*.csv"))
+    
+    for csv_file in all_csvs:
+        # 排除日誌與 summary 檔案
+        if "logs" in csv_file.parts or csv_file.name.lower() == "summary.csv":
             continue
             
-        print(f"   🔄 正在合併並計算指標: {key} ({opt['file']})...")
+        # 智慧型判斷這份 CSV 屬於哪個策略
+        path_str = str(csv_file).lower()
+        filename_lower = csv_file.name.lower()
+        combined = f"{path_str} {filename_lower}"
         
-        df = pd.read_csv(path, usecols=["Date", "Daily_Delta"])
+        matched_key = None
+        if "ssd_basic" in combined:
+            matched_key = "SSD_Basic"
+        elif "ssd_dl" in combined:
+            matched_key = "SSD_DL"
+        elif "ssd" in combined:
+            matched_key = "SSD_OLS"  # 進階 SSD (OLS)
+        elif "eg_" in combined or "engle" in combined or "eg_no" in combined or "eg_re" in combined:
+            matched_key = "Engle_Granger"
+        elif "hdbscan" in combined:
+            if "ae" in combined or "autoencoder" in combined:
+                matched_key = "HDBSCAN_Autoencoder"
+            elif "multi" in combined or "mf" in combined or "factor" in combined:
+                matched_key = "HDBSCAN_MultiFactor"
+            else:
+                matched_key = "HDBSCAN_Handcrafted"
+        
+        if matched_key:
+            strategy_csv_groups[matched_key].append(csv_file)
+            
+    # 遍歷六大策略，挑選出該策略底下 Final Equity 最優的 CSV 進行指標計算與資產曲線合併
+    for key in strategy_meta_info.keys():
+        csv_files = strategy_csv_groups[key]
+        if not csv_files:
+            print(f"   ⚠️ 策略 {key} 未在 results/{dataset}/ 底下掃描到符合的 CSV 檔案，跳過。")
+            continue
+            
+        best_file = None
+        best_equity = -999999.0
+        
+        # 使用 ThreadPoolExecutor 並行讀取 CSV，榨乾多核心效能！
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            results_pool = executor.map(get_csv_equity, csv_files)
+            for csv_file, final_equity in results_pool:
+                if final_equity > best_equity:
+                    best_equity = final_equity
+                    best_file = csv_file
+                
+        if not best_file:
+            print(f"   ⚠️ 策略 {key} 下所有 CSV 讀取或計算失敗，跳過。")
+            continue
+            
+        # 動態從最優 CSV 檔名中解構參數
+        top_n, params_str = parse_params_from_filename(best_file.name)
+        print(f"   🏆 {key} 最佳回測檔案: {best_file.relative_to(results_dir)}")
+        print(f"      -> 參數解構: {params_str} (最終淨值: ${best_equity:,.2f})")
+        
+        # 1. 載入最佳 CSV 的 Daily_Delta 做時間序列合併
+        df = pd.read_csv(best_file, usecols=["Date", "Daily_Delta"])
         df["Date"] = pd.to_datetime(df["Date"])
         daily = df.groupby("Date")["Daily_Delta"].sum().reset_index()
         daily = daily.sort_values("Date").reset_index(drop=True)
@@ -153,10 +231,13 @@ for dataset in target_datasets:
         else:
             merged_df = pd.merge(merged_df, daily_equity, on="Date", how="outer")
             
-        # 計算該策略在此電腦的動態量化指標！
-        metrics = compute_metrics(path, opt["top_n"])
+        # 2. 計算該策略在此電腦的動態量化指標
+        metrics = compute_metrics(best_file, top_n)
         if metrics:
-            all_computed_metrics[(dataset, key)] = metrics
+            all_computed_metrics[(dataset, key)] = {
+                "metrics": metrics,
+                "params_str": params_str
+            }
 
 # 填補缺失值
 if merged_df is not None:
@@ -168,7 +249,7 @@ if merged_df is not None:
 primary_csv_path = notebooks_dir / "equity_curves.csv"
 os.makedirs(primary_csv_path.parent, exist_ok=True)
 merged_df.to_csv(primary_csv_path, index=False)
-print(f"\n🎉 主要數據儲存成功！路徑: {primary_csv_path}")
+print(f"\n🎉 成功生成最優資產淨值數據！路徑: {primary_csv_path}")
 
 if is_escalated:
     local_csv_path = Path("notebooks") / "equity_curves.csv"
@@ -207,11 +288,14 @@ def patch_notebook(nb_file):
     is_even = False
     
     for dataset_name in target_datasets:
-        for key, opt in optimal_params_map.items():
-            metrics = all_computed_metrics.get((dataset_name, key))
-            if not metrics:
+        for key, meta in strategy_meta_info.items():
+            entry = all_computed_metrics.get((dataset_name, key))
+            if not entry:
                 continue
                 
+            metrics = entry["metrics"]
+            params_str = entry["params_str"]
+            
             ann_color = "#38a169" if metrics["ann_ret"] >= 0 else "#e53e3e"
             rcc_color = "#38a169" if metrics["rcc"] >= 0 else "#e53e3e"
             rec_color = "#38a169" if metrics["rec"] >= 0 else "#e53e3e"
@@ -226,8 +310,8 @@ def patch_notebook(nb_file):
             is_even = not is_even
             
             tr_html = f"""    <tr style="{row_style}">
-      <td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; {text_color}">{opt["label"]} ({dataset_name.upper()})</td>
-      <td style="padding: 8px 6px; border: 1px solid #e2e8f0;">{opt["params_str"]}</td>
+      <td style="padding: 8px 6px; border: 1px solid #e2e8f0; font-weight: bold; text-align: left; {text_color}">{meta["label"]} ({dataset_name.upper()})</td>
+      <td style="padding: 8px 6px; border: 1px solid #e2e8f0;">{params_str}</td>
       <td style="padding: 8px 6px; border: 1px solid #e2e8f0;">${metrics["final_equity"]:,.2f}</td>
       <td style="padding: 8px 6px; border: 1px solid #e2e8f0; color: {ann_color};">{metrics["ann_ret"]*100:+.2f}%</td>
       <td style="padding: 8px 6px; border: 1px solid #e2e8f0;">{metrics["mdd"]*100:.2f}%</td>
@@ -283,3 +367,22 @@ def patch_notebook(nb_file):
 patch_notebook(notebooks_dir / "analysis.ipynb")
 if is_escalated:
     patch_notebook(Path("notebooks") / "analysis.ipynb")
+
+# =======================================================================
+# 4. 雙向同步寫入 - default_name.txt (Dual-Write Default Name Sync)
+# =======================================================================
+import datetime
+d = datetime.date.today()
+minguo_date = f"{d.year-1911}{d.month:02d}{d.day:02d}"
+
+primary_date_path = tmp_dir / "default_name.txt"
+os.makedirs(primary_date_path.parent, exist_ok=True)
+with open(primary_date_path, "w", encoding="utf-8") as df_f:
+    df_f.write(minguo_date)
+
+if is_escalated:
+    local_date_path = Path("tmp") / "default_name.txt"
+    os.makedirs(local_date_path.parent, exist_ok=True)
+    with open(local_date_path, "w", encoding="utf-8") as df_f:
+        df_f.write(minguo_date)
+    print(f"⚡ [雙向同步] 預設檔名同步複製至當前測試路徑: {local_date_path}")
