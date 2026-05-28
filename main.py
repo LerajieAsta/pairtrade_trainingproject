@@ -631,44 +631,6 @@ def main():
             }
         },
         {
-            "name": "HDBSCAN Autoencoder + UMAP",
-            "module": "strategies.HDBSCAN_Autoencoder",
-            "sub_dir": f"HDBSCAN_AE_UMAP_{reentry_suffix}",
-            "params": {
-                **base_params,
-                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
-                "reduce_method": "umap",               # 降維演算法類型。建議: ["umap", "pca"] (在自編碼器壓縮後的特徵空間再降維)
-                "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數。建議: [5, 30]
-                "hdbscan_min_samples": 2,              # HDBSCAN鄰域核心點樣本數。建議: [1, 10]
-                "hdbscan_metric": "euclidean",         # 距離度量指標。建議: ["euclidean", "manhattan"]
-                "umap_n_components": 5,                # UMAP降維目標空間特徵維度。建議: [3, 10] (將AE瓶頸層特徵再進行流形降維)
-                "umap_n_neighbors": 15,                # UMAP拓撲計算之鄰近點個數。建議: [5, 30] (控制局部聚類緊密程度)
-                "umap_min_dist": 0.1,                  # UMAP低維空間之點最小緊湊距離。建議: [0.001, 0.3]
-                "umap_random_state": 42,               # UMAP隨機數種子。確保自編碼器+流形降維結果一致可供穩定對比
-                "adf_max_lags": 1,                     # 配對篩選時共整合ADF檢定最大滯後期數。建議: [1, 5]
-                "adf_pvalue_threshold": 0.01           # 配對共整合顯著水準門檻。建議: [0.01, 0.05]
-            }
-        },
-        {
-            "name": "HDBSCAN Autoencoder + PCA",
-            "module": "strategies.HDBSCAN_Autoencoder",
-            "sub_dir": f"HDBSCAN_AE_PCA_{reentry_suffix}",
-            "params": {
-                **base_params,
-                "use_dynamic_stop": True,              # 啟用動態 Z-Score 止損
-                "reduce_method": "pca",                # 降維演算法類型。建議: ["umap", "pca"] (在自編碼器壓縮後使用PCA進行正交方差最大化降維)
-                "hdbscan_min_cluster_size": 10,        # HDBSCAN群集最少樣本數。建議: [5, 30]
-                "hdbscan_min_samples": 2,              # HDBSCAN鄰域核心點樣本數。建議: [1, 10]
-                "hdbscan_metric": "euclidean",         # 距離度量指標。建議: ["euclidean", "cosine"]
-                "umap_n_components": 5,                # UMAP降維目標空間特徵維度 (此PCA模式下不被調用)
-                "umap_n_neighbors": 15,                # UMAP拓撲計算之鄰近點個數 (此PCA模式下不被調用)
-                "umap_min_dist": 0.1,                  # UMAP低維空間之點最小緊湊距離 (此PCA模式下不被調用)
-                "umap_random_state": 42,               # UMAP隨機數種子 (此PCA模式下不被調用)
-                "adf_max_lags": 1,                     # 配對篩選時共整合ADF檢定最大滯後期數。建議: [1, 5]
-                "adf_pvalue_threshold": 0.01           # 配對共整合顯著水準門檻。建議: [0.01, 0.05]
-            }
-        },
-        {
             "name": "HDBSCAN MultiFactor",
             "module": "strategies.HDBSCAN_MultiFactor",
             "sub_dir": f"HDBSCAN_MultiFactor_{reentry_suffix}",

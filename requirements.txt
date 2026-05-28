@@ -20,7 +20,6 @@ pyarrow>=14.0.0             # 讀寫 Parquet 文件的高效引擎 (必需)
 scikit-learn>=1.3.0         # PCA, OPTICS, TimeSeriesSplit
 statsmodels>=0.14.0         # Cointegration Test (coint), OLS
 joblib>=1.3.0               # 並行處理 (Parallel processing)
-torch>=1.10.0
 umap-learn>=0.5.3            # UMAP 降維
 stable-baselines3>=2.0.0  # 強化學習框架
 gym>=0.26.0                # 強化學習環境接口

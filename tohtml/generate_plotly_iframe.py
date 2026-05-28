@@ -34,7 +34,6 @@ strategy_meta = {
     "SSD_OLS": {"label": "進階 SSD (OLS) 🌟", "color": "#60a5fa"},
     "Engle_Granger": {"label": "Engle-Granger 共整合", "color": "#f87171"},
     "HDBSCAN_Handcrafted": {"label": "HDBSCAN (UMAP)", "color": "#fbd38d"},
-    "HDBSCAN_Autoencoder": {"label": "HDBSCAN (AE UMAP)", "color": "#c084fc"},
     "HDBSCAN_MultiFactor": {"label": "HDBSCAN (MF)", "color": "#2b6cb0"}
 }
 

@@ -157,7 +157,6 @@ strategy_meta_info = {
     "SSD_DL": {"label": "SSD + 深度學習交易 🚀"},
     "Engle_Granger": {"label": "Engle-Granger 共整合"},
     "HDBSCAN_Handcrafted": {"label": "HDBSCAN (UMAP)"},
-    "HDBSCAN_Autoencoder": {"label": "HDBSCAN (AE UMAP)"},
     "HDBSCAN_MultiFactor": {"label": "HDBSCAN (MF)"}
 }
 
@@ -196,9 +195,7 @@ for dataset in target_datasets:
         elif "eg_" in combined or "engle" in combined or "eg_no" in combined or "eg_re" in combined:
             matched_key = "Engle_Granger"
         elif "hdbscan" in combined:
-            if "ae" in combined or "autoencoder" in combined:
-                matched_key = "HDBSCAN_Autoencoder"
-            elif "multi" in combined or "mf" in combined or "factor" in combined:
+            if "multi" in combined or "mf" in combined or "factor" in combined:
                 matched_key = "HDBSCAN_MultiFactor"
             else:
                 matched_key = "HDBSCAN_Handcrafted"
