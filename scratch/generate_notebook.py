@@ -1,9 +1,15 @@
-{
-  "cells": [
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+import json
+
+notebook_path = "notebooks/strategies_logic.ipynb"
+
+# 定義每個 cell
+cells = []
+
+# ==================== CELL 0: Title & Overview ====================
+cell_0 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "# 📊 S&P 500 Pairs Trading 策略交易邏輯與數學原理詳解\n",
         "\n",
         "## 📝 執行摘要與系統概述\n",
@@ -30,12 +36,15 @@
         "```\n",
         "\n",
         "---"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+    ]
+}
+cells.append(cell_0)
+
+# ==================== CELL 1: Shared Quantitative Framework ====================
+cell_1 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "## 🧠 一、 共享核心量化架構與部位風控機制\n",
         "\n",
         "本平台所有策略均建立在一個統一的統計框架與風控系統之上。在深入個別策略之前，必須先理解這些共用的數學公式與風險控制防線。\n",
@@ -75,33 +84,36 @@
         "1. **個股單筆停損 (`SL`)**：當特定交易配對的未實現虧損比例達到或超過 `stop_loss_pct`（以分配給該配對的資金為分母）時，強制執行平倉：\n",
         "   $$\\text{Loss Ratio} = -\\frac{\\text{Trade PnL}}{\\text{Capital per Pair}} \\ge \\text{stop\\_loss\\_pct}$$\n",
         "   若設定不允許重新進場，該配對在該期內將永久凍結 (`is_stopped = True`)。\n",
-        "2. **部位動態 Z-Score 偏離停損 (`DSZ`)**：當價差 Z-Score 絕對值偏離過大，例如 $|Z_t| > \\text{dynamic\\_stop\\_z}$（如 3.0 或 5.0）時，說明發生了結構性破裂 (Structural Break) 或極端非對稱基本面事件，系統將即刻啟動動態停損出場。(已確認無效)\n",
-        "3. **全域投資組合層級最大回撤停損 (`PSL`)**：當總資金累積每日虧損達到 `portfolio_stop_loss_pct` (如 10%) 時，觸發 PSL，**一鍵斬倉所有持倉配對**，重置所有插槽部位，並在剩餘回測期內凍結所有交易，以保護核心本金。(已確認無效)\n",
+        "2. **部位動態 Z-Score 偏離停損 (`DSZ`)**：當價差 Z-Score 絕對值偏離過大，例如 $|Z_t| > \\text{dynamic\\_stop\\_z}$（如 3.0 或 5.0）時，說明發生了結構性破裂 (Structural Break) 或極端非對稱基本面事件，系統將即刻啟動動態停損出場。\n",
+        "3. **全域投資組合層級最大回撤停損 (`PSL`)**：當總資金累積每日虧損達到 `portfolio_stop_loss_pct` (如 10%) 時，觸發 PSL，**一鍵斬倉所有持倉配對**，重置所有插槽部位，並在剩餘回測期內凍結所有交易，以保護核心本金。\n",
         "4. **產業分散化集中度上限 (`MSR`)**：為了防止配對標的過度集中在某一特定產業（例如金融或科技板塊），系統設定 `max_sector_ratio` 參數。每一期單一產業選入的配對對數上限為 $\\max(1, \\lfloor N \\cdot \\text{max\\_sector\\_ratio} \\rfloor)$，實現外部高度多元化。\n",
         "5. **方向性建倉冷卻機制 (Cooldown Period)**：平倉後（不論是正常平倉或停損且允許重新進場），系統會進入冷卻狀態。\n",
         "   - 若原先為做多 (Position = 1)，則必須等到 $Z_t \\ge -\\text{EXIT\\_Z}$ 才能解除冷卻，再次評估進場。\n",
         "   - 若原先為做空 (Position = -1)，則必須等到 $Z_t \\le \\text{EXIT\\_Z}$ 才能解除冷卻。\n",
         "6. **自適應波動率調節機制 (`VOL ADJ`)**：若近期市場波動度顯著放大，系統會計算 20 日滾動價差標準差，對形成期基礎標準差進行倍數乘積放大：\n",
         "   $$\\sigma_{adjusted} = \\sigma_{formation} \\times \\max\\left(1.0, \\frac{\\sigma_{roll20}}{\\sigma_{formation}}\\right)$$\n",
-        "   使 Z-Score 隨波動率自適應收縮，防止在市場無序劇烈動盪中頻繁觸發無效建倉訊號。(已確認無效)\n",
+        "   使 Z-Score 隨波動率自適應收縮，防止在市場無序劇烈動盪中頻繁觸發無效建倉訊號。\n",
         "\n",
         "### 1.6 核心績效評估指標\n",
         "- **最終權益值 (Final Equity)**：$\\text{Initial Capital} + \\text{Cumulative PnL}$\n",
         "- **年化報酬率 (Annualized Return, CAGR)**：幾何年化公式\n",
         "  $$\\text{Ann\\_Ret} = (1 + \\text{Cum\\_Ret})^{12 / n\\_{months}} - 1$$\n",
-        "- **夏普比率 (Sharpe Ratio)**：$$\\text{Sharpe} = \\sqrt{252} \\times \\frac{\\text{Mean}(R_{daily})}{\\text{Std}(R_{daily})}$$\n",
+        "- **夏普比率 (Sharpe Ratio)**：$\\text{Sharpe} = \\sqrt{252} \\times \\frac{\\text{Mean}(R_{daily})}{\\text{Std}(R_{daily})}$$\n",
         "- **原始資金約束報酬率 (RCC)**：以初始配置總資金為分母。 $\\text{RCC} = \\frac{\\text{Final PnL}}{\\text{Initial Capital}}$\n",
         "- **實際參與資金報酬率 (REC)**：以實際發生過建倉交易的配對所佔用的總資金為分母。 \n",
         "  $$\\text{REC} = \\frac{\\text{Final PnL}}{N_{traded} \\times C_{pair}}$$\n",
         "  其中 $C_{pair} = \\text{Initial Capital} / N$ 為分配給單一配對的資金限制。此指標更能反映策略的資金實際使用效率。\n",
         "\n",
         "---"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+    ]
+}
+cells.append(cell_1)
+
+# ==================== CELL 2: ssd_basic.py ====================
+cell_2 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "## 📏 二、 經典 SSD (Basic) 距離策略\n",
         "\n",
         "### 檔案位置：`strategies/ssd_basic.py`\n",
@@ -134,16 +146,19 @@
         "- **Z-Score 生成**：\n",
         "  - 若 `ZSCORE_WINDOW = 0` (固定參數模式)，則使用形成期計算出的價差均值 $\\mu_{form}$ 與標準差 $\\sigma_{form}$ 作為標準化中心：\n",
         "    $$Z_t = \\frac{\\text{Spread}_t - \\mu_{form}}{\\sigma_{form}}$$\n",
-        "  - 若 `ZSCORE_WINDOW > 0` (滾動視窗模式)，則使用交易期過去 $W$ 天的滾動價差均值 $\\mu_{roll, t}$ 與滾動價差標準差 $\\sigma_{roll, t}$ 作為中心：(已確認無效，固定為0)\n",
+        "  - 若 `ZSCORE_WINDOW > 0` (滾動視窗模式)，則使用交易期過去 $W$ 天的滾動價差均值 $\\mu_{roll, t}$ 與滾動價差標準差 $\\sigma_{roll, t}$ 作為中心：\n",
         "    $$Z_t = \\frac{\\text{Spread}_t - \\mu_{roll, t}}{\\sigma_{roll, t}}$$"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
+    ]
+}
+cells.append(cell_2)
+
+# ==================== CELL 3: ssd_basic.py key code ====================
+cell_3 = {
+    "cell_type": "code",
+    "execution_count": None,
+    "metadata": {},
+    "outputs": [],
+    "source": [
         "# strategies/ssd_basic.py 核心運算片段\n",
         "\n",
         "# 1. 形成期歐氏距離平方和 (SSD) 計算\n",
@@ -172,12 +187,15 @@
         "        safe_std = np.maximum(roll_std, min_spread_std)\n",
         "        zscore = spread / safe_std\n",
         "    return zscore\n"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+    ]
+}
+cells.append(cell_3)
+
+# ==================== CELL 4: ssd.py ====================
+cell_4 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "## 📈 三、 進階 SSD (OLS) 殘差滾動策略\n",
         "\n",
         "### 檔案位置：`strategies/ssd.py`\n",
@@ -223,14 +241,17 @@
         "  價差標準差使用滾動 OLS 殘差標準差估計：\n",
         "  $$\\sigma_{residual, t} = \\sqrt{\\max\\left(\\text{Var}_W(P'_A) - \\beta_t \\cdot \\text{Cov}_W(P'_A, P'_B), 0\\right)}$$\n",
         "  $$Z_t = \\frac{\\text{Spread}_t}{\\sigma_{residual, t}}$$"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
+    ]
+}
+cells.append(cell_4)
+
+# ==================== CELL 5: ssd.py key code ====================
+cell_5 = {
+    "cell_type": "code",
+    "execution_count": None,
+    "metadata": {},
+    "outputs": [],
+    "source": [
         "# strategies/ssd.py 核心統計過濾與動態 Z-Score 計算\n",
         "\n",
         "# 1. OLS 斜率 (Beta) 與殘差\n",
@@ -285,12 +306,15 @@
         "    \n",
         "    zscore = spread / safe_std\n",
         "    return zscore, roll_beta\n"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+    ]
+}
+cells.append(cell_5)
+
+# ==================== CELL 6: HDBSCAN.py ====================
+cell_6 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "## 🌐 四、 HDBSCAN + UMAP/PCA 密度分群策略\n",
         "\n",
         "### 檔案位置：`strategies/HDBSCAN.py`\n",
@@ -351,14 +375,17 @@
         "  $$Z_t = \\frac{\\text{Spread}_t - \\mu_{form}}{\\sigma_{form}}$$\n",
         "- 若 `ZSCORE_WINDOW > 0`：\n",
         "  在交易期滾動視窗 $W$ 內動態重新進行 $\\ln(P_A)$ 對 $\\ln(P_B)$ 的 OLS 迴歸得到動態 $\\alpha_t, \\beta_t$。價差及 Z-Score 計算與 `ssd.py` 的對數版本相同。"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
+    ]
+}
+cells.append(cell_6)
+
+# ==================== CELL 7: HDBSCAN.py key code ====================
+cell_7 = {
+    "cell_type": "code",
+    "execution_count": None,
+    "metadata": {},
+    "outputs": [],
+    "source": [
         "# strategies/HDBSCAN.py 核心特徵萃取與聚類流程\n",
         "\n",
         "# 1. 13維金融統計特徵萃取\n",
@@ -409,17 +436,20 @@
         "    )\n",
         "    labels = clusterer.fit_predict(X)\n",
         "    return labels\n"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+    ]
+}
+cells.append(cell_7)
+
+# ==================== CELL 8: HDBSCAN_MultiFactor.py ====================
+cell_8 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "## 📊 五、 HDBSCAN 金融多因子特徵空間策略\n",
         "\n",
         "### 檔案位置：`strategies/HDBSCAN_MultiFactor.py`\n",
         "\n",
-        "HDBSCAN 多因子策略是密度分群策略的變體。其核心思想是：不採用純時序統計指標或路徑作為分群特徵，而是使用**金融學與計量經濟學中具備強大學術根基的 6 大穩健因子**來構建特徵空間，並且**跳過降維步驟**直接進行聚類。\n",
+        "HDBSCAN 多因子策略是密度分群策略的變體。其核心思想是：不採用純時序統計指標或路徑作為分群特徵，而是使用**金融學與計量經濟學中具備強大學術根基的 6 大穩健因子**來構建特徵空間，並且**跳過 UMAP 降維步驟**直接進行聚類。\n",
         "\n",
         "### 5.1 形成期邏輯 (Formation Period)\n",
         "\n",
@@ -444,14 +474,17 @@
         "同產業 $\\times$ 同群落雙重篩選、Engle-Granger 共整合檢定、半衰期/Hurst過濾、避險比例加權資金配置，以及交易期固定/滾動 Z-Score 與部位管理，**均與 `HDBSCAN.py` 策略完全一致**。\n",
         "\n",
         "---"
-      ]
-    },
-    {
-      "cell_type": "code",
-      "execution_count": null,
-      "metadata": {},
-      "outputs": [],
-      "source": [
+    ]
+}
+cells.append(cell_8)
+
+# ==================== CELL 9: HDBSCAN_MultiFactor.py key code ====================
+cell_9 = {
+    "cell_type": "code",
+    "execution_count": None,
+    "metadata": {},
+    "outputs": [],
+    "source": [
         "# strategies/HDBSCAN_MultiFactor.py 6大金融因子特徵建構\n",
         "\n",
         "def build_6factor_features(log_prices, returns_df):\n",
@@ -496,12 +529,15 @@
         "        feat_rows.append(np.where(np.isfinite(feats), feats, 0.0))\n",
         "        \n",
         "    return feat_rows\n"
-      ]
-    },
-    {
-      "cell_type": "markdown",
-      "metadata": {},
-      "source": [
+    ]
+}
+cells.append(cell_9)
+
+# ==================== CELL 10: Comparison Table ====================
+cell_10 = {
+    "cell_type": "markdown",
+    "metadata": {},
+    "source": [
         "## 📊 六、 四大策略核心特徵與參數對比總結\n",
         "\n",
         "為了方便選擇最適合的策略，下表整理並對比了這 4 個策略的完整核心細項：\n",
@@ -526,28 +562,37 @@
         "4. **HDBSCAN 多因子 (`HDBSCAN_MultiFactor.py`)**：改以金融學術界公認的 6 大穩健因子（如市場 Beta、特異波動率等）作為特徵空間，免降維聚類，提供了最強的金融學解釋性與抗過擬合 (Overfitting) 能力。\n",
         "\n",
         "---"
-      ]
-    }
-  ],
-  "metadata": {
-    "kernelspec": {
-      "display_name": "Python 3 (ipykernel)",
-      "language": "python",
-      "name": "python3"
-    },
-    "language_info": {
-      "codemirror_mode": {
-        "name": "ipython",
-        "version": 3
-      },
-      "file_extension": ".py",
-      "mimetype": "text/x-python",
-      "name": "python",
-      "nbconvert_exporter": "python",
-      "pygments_lexer": "ipython3",
-      "version": "3.11.5"
-    }
-  },
-  "nbformat": 4,
-  "nbformat_minor": 2
+    ]
 }
+cells.append(cell_10)
+
+# 寫入檔案
+ipynb_content = {
+    "cells": cells,
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3 (ipykernel)",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "codemirror_mode": {
+                "name": "ipython",
+                "version": 3
+            },
+            "file_extension": ".py",
+            "mimetype": "text/x-python",
+            "name": "python",
+            "nbconvert_exporter": "python",
+            "pygments_lexer": "ipython3",
+            "version": "3.11.5"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 2
+}
+
+with open(notebook_path, "w", encoding="utf-8") as f:
+    json.dump(ipynb_content, f, ensure_ascii=False, indent=2)
+
+print("SUCCESS")

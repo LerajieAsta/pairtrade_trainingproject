@@ -722,10 +722,44 @@ def main() -> None:
             },
         },
         {
+            "name":    "HDBSCAN CrossSector (跨產業聚類)",
+            "module":  "strategies.HDBSCAN_CrossSector",
+            "sub_dir": f"HDBSCAN_CrossSector_{reentry_suffix}",
+            "params":  {
+                **base_params,
+                **hdbscan_common,
+                "reduce_method":     "umap",
+                "umap_n_components": 5,
+                "umap_n_neighbors":  40,
+                "umap_min_dist":     0.01,
+                "umap_random_state": 42,
+            },
+        },
+        {
             "name":    "HDBSCAN MultiFactor",
             "module":  "strategies.HDBSCAN_MultiFactor",
             "sub_dir": f"HDBSCAN_MultiFactor_{reentry_suffix}",
             "params":  {**base_params, **hdbscan_common},
+        },
+        {
+            "name":    "DTW Strategy (論文對照組)",
+            "module":  "strategies.dtw_strategy",
+            "sub_dir": f"DTW_{reentry_suffix}",
+            "params":  {
+                **base_params,
+                "method": "dtw",
+                "adf_pvalue_threshold": 0.01,
+            },
+        },
+        {
+            "name":    "SSD+DTW PCA Strategy (論文實驗組)",
+            "module":  "strategies.dtw_strategy",
+            "sub_dir": f"SSD_DTW_PCA_{reentry_suffix}",
+            "params":  {
+                **base_params,
+                "method": "ssd_dtw_pca",
+                "adf_pvalue_threshold": 0.01,
+            },
         },
     ]
 
