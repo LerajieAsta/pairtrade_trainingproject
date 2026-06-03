@@ -16,6 +16,34 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.stattools import adfuller
 
+def _compute_hurst(series: np.ndarray) -> float:
+    """R/S 分析近似 Hurst 指數"""
+    n = len(series)
+    if n < 20:
+        return 0.5
+    diffs = np.diff(series)
+    rs_list = []
+    for seg_len in [n // 4, n // 2, n]:
+        if seg_len < 4:
+            continue
+        seg = diffs[:seg_len]
+        mean_seg = np.mean(seg)
+        deviate = np.cumsum(seg - mean_seg)
+        std_val = np.std(seg, ddof=1)
+        if std_val < 1e-8:
+            std_val = 1e-8
+        rs = (np.max(deviate) - np.min(deviate)) / std_val
+        rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
+    if len(rs_list) < 2:
+        return 0.5
+    xs, ys = zip(*rs_list)
+    try:
+        h = float(np.polyfit(xs, ys, 1)[0])
+    except Exception:
+        h = 0.5
+    return float(np.clip(h, 0.0, 1.0))
+
+
 # HDBSCAN
 try:
     import hdbscan
@@ -179,23 +207,40 @@ class Formation:
 
     # ── Step 3：HDBSCAN 分群 ────────────────────────────────────────────────
     def _hdbscan_cluster(self, X: np.ndarray) -> np.ndarray:
-        min_cs = min(self.hdbscan_min_cluster_size, max(2, X.shape[0] // 5))
-        if HDBSCAN_LIB == "hdbscan":
-            clusterer = hdbscan.HDBSCAN(
-                min_cluster_size = min_cs,
-                min_samples      = self.hdbscan_min_samples,
-                metric           = self.hdbscan_metric,
-                core_dist_n_jobs = -1,
-            )
-        else:
-            clusterer = sklearn_HDBSCAN(
-                min_cluster_size = min_cs,
-                min_samples      = self.hdbscan_min_samples,
-                metric           = self.hdbscan_metric,
-                n_jobs           = -1,
-            )
-        clusterer.fit(X)
-        return clusterer.labels_
+        current_min_cs = self.hdbscan_min_cluster_size
+        current_min_samples = self.hdbscan_min_samples
+        
+        while current_min_cs >= 2:
+            min_cs = min(current_min_cs, max(2, X.shape[0] // 5))
+            min_samp = min(current_min_samples, min_cs - 1) if min_cs > 1 else 1
+            min_samp = max(1, min_samp)
+            
+            if HDBSCAN_LIB == "hdbscan":
+                clusterer = hdbscan.HDBSCAN(
+                    min_cluster_size = min_cs,
+                    min_samples      = min_samp,
+                    metric           = self.hdbscan_metric,
+                    core_dist_n_jobs = -1,
+                )
+            else:
+                clusterer = sklearn_HDBSCAN(
+                    min_cluster_size = min_cs,
+                    min_samples      = min_samp,
+                    metric           = self.hdbscan_metric,
+                    n_jobs           = -1,
+                )
+            labels = clusterer.fit_predict(X)
+            unique_labels = set(labels) - {-1}
+            if len(unique_labels) >= 1:
+                if current_min_cs != self.hdbscan_min_cluster_size:
+                    print(f"  [Formation] HDBSCAN parameter fallback succeeded with min_cluster_size={min_cs}, min_samples={min_samp}!")
+                return labels
+            
+            current_min_cs = current_min_cs // 2
+            current_min_samples = max(1, current_min_samples // 2)
+            
+        print("  [Formation] HDBSCAN failed to find any clusters even with min_cluster_size=2. Returning all noise.")
+        return np.full(X.shape[0], -1)
 
     # ── Step 4：同產業 × 同群落 雙重篩選 + EG 共整合 ──────────────────────────
     def _cointegration_within_clusters(
@@ -278,6 +323,12 @@ class Formation:
                         rejected_count += 1
                         continue
 
+                    # C. Hurst 指數篩選 (Hurst < 0.40，強烈均值回歸傾向)
+                    hurst = _compute_hurst(best_resid)
+                    if hurst >= 0.40:
+                        rejected_count += 1
+                        continue
+                    
                     passed_count += 1
                     spread_mean = float(np.mean(best_resid))
                     spread_std  = float(np.std(best_resid, ddof=1)) if len(best_resid) > 1 else 0.0
@@ -305,35 +356,75 @@ class Formation:
 
         return pd.DataFrame(eg_records).sort_values("ADF_Stat").reset_index(drop=True)
 
-    # ── 主流程 ──────────────────────────────────────────────────────────────
     def run(self) -> pd.DataFrame:
         X, valid_tickers = self._build_feature_matrix()
         if len(valid_tickers) < self.min_tickers_for_pairing:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        # MultiFactor 策略跳過降維步驟，直接使用原始時序特徵矩陣
-        X_embed = X
+        # 初始化一個全為噪音 (-1) 的 labels 陣列
+        labels = np.full(len(valid_tickers), -1, dtype=int)
+        ticker_to_idx = {t: i for i, t in enumerate(valid_tickers)}
 
-        labels = self._hdbscan_cluster(X_embed)
-        self.cluster_labels_ = dict(zip(valid_tickers, labels.tolist()))
+        # 按 GICS 產業別進行分組聚類
+        sector_to_tickers = {}
+        for t in valid_tickers:
+            sec = self.sector_mapping.get(t.upper(), "Unknown")
+            if sec != "Unknown":
+                sector_to_tickers.setdefault(sec, []).append(t)
 
+        global_cluster_counter = 0
+        self.cluster_labels_ = {}
+
+        # 逐產業執行 HDBSCAN 分群
+        for sector, sec_tickers in sorted(sector_to_tickers.items()):
+            n_sec = len(sec_tickers)
+            if n_sec < self.min_tickers_for_pairing:
+                continue
+
+            # 取得該產業股票的特徵子矩陣
+            sec_indices = [ticker_to_idx[t] for t in sec_tickers]
+            X_sec = X[sec_indices]
+
+            # HDBSCAN 分群
+            sec_labels = self._hdbscan_cluster(X_sec)
+
+            # 將局部 label 映射到全局唯一的 label
+            for t, lbl in zip(sec_tickers, sec_labels):
+                idx = ticker_to_idx[t]
+                if lbl != -1:
+                    labels[idx] = global_cluster_counter + lbl
+                    self.cluster_labels_[t] = global_cluster_counter + lbl
+                else:
+                    labels[idx] = -1
+                    self.cluster_labels_[t] = -1
+
+            unique_sec_labels = set(sec_labels) - {-1}
+            if unique_sec_labels:
+                global_cluster_counter += max(unique_sec_labels) + 1
+
+        # 確保 self.cluster_labels_ 包含所有 valid_tickers
+        for t in valid_tickers:
+            if t not in self.cluster_labels_:
+                self.cluster_labels_[t] = -1
+
+        # Step 4：同產業 × 同群落 EG 共整合
         eg_df = self._cointegration_within_clusters(valid_tickers, labels)
         if eg_df.empty:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
         if getattr(self, "max_sector_ratio", 0) > 0:
-            max_pairs_per_sector = max(1, int(self.top_n * self.max_sector_ratio))
-            sector_counts = {}
+            max_pairs_per_cluster = max(1, int(self.top_n * self.max_sector_ratio))
+            cluster_counts = {}
             diversified_records = []
             for _, row in eg_df.iterrows():
-                sec = row["Sector"]
-                if sec not in sector_counts:
-                    sector_counts[sec] = 0
-                if sector_counts[sec] < max_pairs_per_sector:
+                cluster_lbl = row["Cluster_Label"]
+                if cluster_lbl not in cluster_counts:
+                    cluster_counts[cluster_lbl] = 0
+                if cluster_counts[cluster_lbl] < max_pairs_per_cluster:
                     diversified_records.append(row)
-                    sector_counts[sec] += 1
+                    cluster_counts[cluster_lbl] += 1
                 if len(diversified_records) >= self.top_n:
                     break
             selected = pd.DataFrame(diversified_records).copy()
@@ -444,6 +535,11 @@ class Trading:
         else:
             state.cooldown_dir = state.position
         state.position = 0
+        state.shares_a = 0.0
+        state.shares_b = 0.0
+        state.entry_price_a = 0.0
+        state.entry_price_b = 0.0
+        state.trade_entry_fee = 0.0
 
     def _simulate_pair(
         self, period_start, period_end, sector, ticker_a, ticker_b, pair_rank,
@@ -590,7 +686,8 @@ class Trading:
                     self._execute_close(state, cur_tpnl, stop_loss=False)
                     tpnl, status = cur_tpnl, "EXIT"
                 else:
-                    unr    = raw_unr - state.trade_entry_fee
+                    exit_fee_est = (abs(state.shares_a) * p_a + abs(state.shares_b) * p_b) * self.friction_rate
+                    unr    = raw_unr - state.trade_entry_fee - exit_fee_est
                     status = "HOLDING"
             else:
                 if abs(z) > self.entry_z:
@@ -829,12 +926,13 @@ class RollingBacktester:
 
             form_data   = price_pivot.iloc[form_start_idx:form_end_idx]
             trade_data  = price_pivot.iloc[trade_start_idx:trade_end_idx]
-            valid_cols  = (form_data.isnull().sum() + trade_data.isnull().sum()) == 0
+            extended_start = max(0, trade_start_idx - max(self.zscore_window_list))
+            extended_data_raw = price_pivot.iloc[extended_start:trade_end_idx]
+            valid_cols  = (form_data.isnull().sum() + extended_data_raw.isnull().sum()) == 0
             form_data   = form_data.loc[:, valid_cols]
             trade_dates = trade_data.index
 
-            extended_start = max(0, trade_start_idx - max(self.zscore_window_list))
-            extended_data  = price_pivot.iloc[extended_start:trade_end_idx].loc[:, valid_cols]
+            extended_data  = extended_data_raw.loc[:, valid_cols]
 
             if form_data.shape[1] < 2 or trade_data.empty:
                 continue

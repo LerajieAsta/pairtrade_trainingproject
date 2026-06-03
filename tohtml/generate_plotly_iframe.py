@@ -32,9 +32,10 @@ df_eq["Date"] = pd.to_datetime(df_eq["Date"])
 strategy_meta = {
     "SSD_Basic": {"label": "經典 SSD (Basic)", "color": "#4ade80"},
     "SSD_OLS": {"label": "進階 SSD (OLS) 🌟", "color": "#60a5fa"},
-    "Engle_Granger": {"label": "Engle-Granger 共整合", "color": "#f87171"},
+    "Engle_Granger": {"label": "Engle-Granger 共整合", "color": "#a855f7"},
     "HDBSCAN_Handcrafted": {"label": "HDBSCAN (UMAP)", "color": "#fbd38d"},
-    "HDBSCAN_MultiFactor": {"label": "HDBSCAN (MF)", "color": "#2b6cb0"}
+    "HDBSCAN_MultiFactor": {"label": "HDBSCAN (MF)", "color": "#2b6cb0"},
+    "HDBSCAN_PCA": {"label": "HDBSCAN (PCA)", "color": "#f87171"}
 }
 
 has_current = any(col.endswith("_current") for col in df_eq.columns)

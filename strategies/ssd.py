@@ -17,6 +17,45 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import scipy.spatial.distance as ssd
+from statsmodels.tsa.stattools import adfuller
+
+def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
+    """ADF 檢定（no constant），同時回傳 (統計量, p 值)"""
+    if len(resid) < max_lags + 5:
+        return 0.0, 1.0
+    try:
+        result = adfuller(resid, maxlag=max_lags, regression="n", autolag=None)
+        return float(result[0]), float(result[1])
+    except Exception:
+        return 0.0, 1.0
+
+def _compute_hurst(series: np.ndarray) -> float:
+    """R/S 分析近似 Hurst 指數"""
+    n = len(series)
+    if n < 20:
+        return 0.5
+    diffs = np.diff(series)
+    rs_list = []
+    for seg_len in [n // 4, n // 2, n]:
+        if seg_len < 4:
+            continue
+        seg = diffs[:seg_len]
+        mean_seg = np.mean(seg)
+        deviate = np.cumsum(seg - mean_seg)
+        std_val = np.std(seg, ddof=1)
+        if std_val < 1e-8:
+            std_val = 1e-8
+        rs = (np.max(deviate) - np.min(deviate)) / std_val
+        rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
+    if len(rs_list) < 2:
+        return 0.5
+    xs, ys = zip(*rs_list)
+    try:
+        h = float(np.polyfit(xs, ys, 1)[0])
+    except Exception:
+        h = 0.5
+    return float(np.clip(h, 0.0, 1.0))
+
 
 # 忽略不必要的 Pandas/Numpy 警告以保持輸出整潔
 warnings.filterwarnings("ignore")
@@ -92,12 +131,10 @@ class Formation:
             idx = 0
             for i in range(len(sector_tickers)):
                 ticker_b = sector_tickers[i]
-                x_val = norm_vals[i]
                 var_x = var_diag[i]
                 
                 for j in range(i + 1, len(sector_tickers)):
                     ticker_a = sector_tickers[j]
-                    y_val = norm_vals[j]
                     
                     ssd_value = ssd_matrix[idx]
                     idx += 1
@@ -105,16 +142,9 @@ class Formation:
                     cov_xy = cov_matrix[i, j]
                     beta = cov_xy / var_x if var_x > 1e-8 else 0.0
                     
-                    spread = y_val - beta * x_val
-                    spread_mean = np.mean(spread)
-                    spread_std = np.std(spread, ddof=1) if len(spread) > 1 else 0.0
-                    
                     ssd_records.append({
-                        "Form_Start": self.form_start, "Form_End": self.form_end,
                         "Sector": sector, "Ticker_A": ticker_a, "Ticker_B": ticker_b,
-                        "SSD": round(ssd_value, 6), "Hedge_Ratio": round(beta, 4),
-                        "Spread_Mean": round(spread_mean, 6),
-                        "Spread_Std": round(spread_std, 6)
+                        "SSD": float(ssd_value), "Hedge_Ratio": float(beta),
                     })
 
         if skipped_unknown_count > 0:
@@ -122,8 +152,70 @@ class Formation:
 
         if not ssd_records: 
             return pd.DataFrame()
+
+        # 先按 SSD 升序排序
+        all_pairs_df = pd.DataFrame(ssd_records).sort_values("SSD").reset_index(drop=True)
+        
+        # 智慧型【先初篩再過濾】優化：
+        # 既然最後只需要 top_n，我們只需要對 SSD 最接近的前 top_n * 15 組候選配對進行慢速共整合和 Hurst 檢驗
+        # 這能將慢速統計擬合次數從 30,000+ 暴降至 ~300，速度直接飆升 30~50 倍！
+        candidates_limit = max(200, self.top_n * 15)
+        candidates = all_pairs_df.head(candidates_limit)
+        
+        filtered_records = []
+        for _, row in candidates.iterrows():
+            x_val = self.normalized_df[row["Ticker_B"]].values
+            y_val = self.normalized_df[row["Ticker_A"]].values
+            beta = row["Hedge_Ratio"]
             
-        return pd.DataFrame(ssd_records).sort_values("SSD").reset_index(drop=True)
+            spread = y_val - beta * x_val
+            
+            # A. ADF 共整合檢驗 (p-value < 0.05，過濾隨機漫步)
+            stat, pval = _adf_stat(spread, max_lags=1)
+            if pval >= 0.05:
+                continue
+                
+            # B. Ornstein-Uhlenbeck 半衰期過濾 (2.0 <= halflife <= 40.0 天)
+            dy = np.diff(spread)
+            y_lag = spread[:-1]
+            n_dy = len(dy)
+            x_mat = np.column_stack([np.ones(n_dy), y_lag])
+            try:
+                coeffs, _, _, _ = np.linalg.lstsq(x_mat, dy, rcond=None)
+                lambda_val = coeffs[1]
+            except Exception:
+                lambda_val = 0.0
+                
+            if lambda_val >= 0.0:
+                continue
+                
+            halflife = -np.log(2) / lambda_val
+            if halflife < 2.0 or halflife > 40.0:
+                continue
+                
+            # C. Hurst 指數篩選 (Hurst < 0.40，強均值回歸傾向)
+            hurst = _compute_hurst(spread)
+            if hurst >= 0.40:
+                continue
+                
+            spread_mean = np.mean(spread)
+            spread_std = np.std(spread, ddof=1) if len(spread) > 1 else 0.0
+            
+            filtered_records.append({
+                "Form_Start": self.form_start, "Form_End": self.form_end,
+                "Sector": row["Sector"], "Ticker_A": row["Ticker_A"], "Ticker_B": row["Ticker_B"],
+                "SSD": round(row["SSD"], 6), "Hedge_Ratio": round(beta, 4),
+                "Spread_Mean": round(spread_mean, 6),
+                "Spread_Std": round(spread_std, 6)
+            })
+            
+            if len(filtered_records) >= self.top_n * 5:
+                break
+
+        if not filtered_records:
+            return pd.DataFrame()
+            
+        return pd.DataFrame(filtered_records).sort_values("SSD").reset_index(drop=True)
 
     def select_pairs(self) -> pd.DataFrame:
         """選出 SSD 最小的前 N 組配對"""
@@ -594,9 +686,13 @@ class DataProcessor:
         
         # 建立 Pivot 價格矩陣
         price_pivot = raw_df.pivot_table(index="date", columns="ticker", values="price", aggfunc="last").sort_index()
-        # 移除遺失值超過 20% 的標的，並向前填補最多 5 天
-        price_pivot = price_pivot.loc[:, price_pivot.isnull().mean() < 0.20].ffill(limit=5)
-        # 移除同日遺失值超過 10% 的日期
+        # A. 移除遺失值超過 20% 的標的（欄位）
+        price_pivot = price_pivot.loc[:, price_pivot.isnull().mean() < 0.20]
+        # B. 向前填補最多 5 天（避免長缺口被不合理填補）
+        price_pivot = price_pivot.ffill(limit=5)
+        # C. 移除同日遺失值超過 10% 的日期（列）
+        price_pivot = price_pivot.loc[price_pivot.isnull().mean(axis=1) <= 0.10]
+        # D. 再次移除遺失值過多的標的（以目前長度的 90% 為門檻）
         price_pivot.dropna(axis=1, thresh=int(len(price_pivot) * 0.9), inplace=True)
         
         def _safe_parse(d_str, is_end=False):
@@ -818,41 +914,8 @@ class RollingBacktester:
 # ══════════════════════════════════════════════════════════════════════════════
 # 標準化策略進入點接口 (Unified Strategy Entry Point)
 # ══════════════════════════════════════════════════════════════════════════════
-def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir):
-    """
-    標準化調用接口，接受外部傳入的價格資料與回測參數，完全解耦資料載入 I/O
-    """
-    import inspect
-    from pathlib import Path
-    
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 獲取 RollingBacktester 的 __init__ 參數列表
-    init_sig = inspect.signature(RollingBacktester.__init__)
-    valid_params = {}
-    
-    # 動態將外部 params 對應並過濾為該策略 RollingBacktester 支援的參數
-    for param_name, param in init_sig.parameters.items():
-        if param_name in ('self', 'output_dir'):
-            continue
-        if param_name in params:
-            valid_params[param_name] = params[param_name]
-        elif param.default is not inspect.Parameter.empty:
-            valid_params[param_name] = param.default
-            
-    print(f"[{Path(__file__).stem.upper()}] 正在初始化 RollingBacktester...")
-    
-    # 初始化回測引擎
-    engine = RollingBacktester(
-        output_dir=out_dir,
-        **valid_params
-    )
-    
-    # 執行回測
-    print(f"[{Path(__file__).stem.upper()}] 正在啟動滾動回測...")
-    engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
-    print(f"[{Path(__file__).stem.upper()}] 回測執行完畢。")
+#
+# 注意：本檔案下方仍保留唯一的 `run_strategy` 實作；此處刪除重複定義以避免覆蓋/混淆。
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 主程式：自動參數網格搜尋 

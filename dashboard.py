@@ -67,8 +67,59 @@ def scan_strategies(base_dir):
                 strategies.append(rel_path.replace("\\", "/"))
     return sorted(strategies)
 
+def load_master_dataframe_from_db(db_path="results/result.db"):
+    if not os.path.exists(db_path):
+        return pd.DataFrame()
+    try:
+        import sqlite3
+        # 使用 URI 模式與 read-only 模式以確保即使資料庫被寫入鎖定也不會發生讀取崩潰
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
+        df = pd.read_sql_query("SELECT * FROM strategy_summaries", conn)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Error loading master DataFrame from database: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(show_spinner=False)
+def load_data_from_db(strategy_path, db_path="results/result.db"):
+    if not os.path.exists(db_path):
+        return pd.DataFrame()
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
+        query = """
+        SELECT Date, Position, Ticker_A, Ticker_B, Daily_Delta, Trade_PnL, Status, 
+               Hedge_Ratio, Price_A, Price_B, Days_Held, Period_Start, Period_End 
+        FROM trade_logs 
+        WHERE strategy_id = ?
+        """
+        df = pd.read_sql_query(query, conn, params=(strategy_path,))
+        conn.close()
+        
+        if df.empty:
+            return pd.DataFrame()
+            
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['Position'] = df['Position'].fillna(0).astype(int)
+        df['Days_Held'] = df['Days_Held'].fillna(0).astype(int)
+        df['Ticker_A'] = df['Ticker_A'].fillna('UNKNOWN').astype(str)
+        df['Ticker_B'] = df['Ticker_B'].fillna('UNKNOWN').astype(str)
+        df = df.sort_values(by=['Ticker_A', 'Ticker_B', 'Date']).reset_index(drop=True)
+        return df
+    except Exception as e:
+        st.error(f"Error loading trade logs for {strategy_path}: {e}")
+        return pd.DataFrame()
+
 @st.cache_data(show_spinner=False)
 def load_data(strategy_path):
+    # 先試著從 SQLite 資料庫載入
+    db_path = os.path.join(RESULTS_DIR, "result.db")
+    if os.path.exists(db_path):
+        df_db = load_data_from_db(strategy_path, db_path)
+        if not df_db.empty:
+            return df_db
+
     file_path = os.path.join(RESULTS_DIR, strategy_path)
     if not os.path.exists(file_path): return pd.DataFrame()
     
@@ -150,23 +201,39 @@ def extract_features_from_path(path):
     top_n = "Top 20"
     match_n = re.search(r'top(\d+)', path_lower)
     if match_n: top_n = f"Top {match_n.group(1)}"
-        
+
+    # ── 修正：先抓 PSL（組合停損），再用負向前瞻抓單配對 SL，避免 PSL 干擾 SL 解析 ──
     sl_pct = "0%"
-    match_sl = re.search(r'sl(\d+)', path_lower)
+    match_sl = re.search(r'(?<!p)sl(\d+)', path_lower)   # 不匹配 psl 前綴
     if match_sl: sl_pct = f"{match_sl.group(1)}%"
-        
+
     zwin = "0"
     match_zwin = re.search(r'zwin(\d+)', path_lower)
     if match_zwin: zwin = match_zwin.group(1)
-        
-    return dataset, reentry, voladj, method, top_n, sl_pct, zwin
+
+    # ── 新增：解析 PSL（全域組合停損 %）──
+    psl_pct = "0%"
+    match_psl = re.search(r'psl(\d+)', path_lower)
+    if match_psl: psl_pct = f"{match_psl.group(1)}%"
+
+    # ── 新增：解析 MSR（最大產業配對比例 %）──
+    msr_pct = "0%"
+    match_msr = re.search(r'msr(\d+)', path_lower)
+    if match_msr: msr_pct = f"{match_msr.group(1)}%"
+
+    # ── 新增：解析 DSZ（動態 Z 停損門檻）──
+    dsz_val = "0"
+    match_dsz = re.search(r'dsz(\d+)', path_lower)
+    if match_dsz: dsz_val = match_dsz.group(1)
+
+    return dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val
 
 @st.cache_data(show_spinner=False)
 def calculate_metrics_raw(strategy_path):
     df = load_data(strategy_path)
     if df.empty: return None
 
-    dataset, reentry, voladj, method, top_n, sl_pct, zwin = extract_features_from_path(strategy_path)
+    dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val = extract_features_from_path(strategy_path)
     top_n_int = int(top_n.replace('Top ', '')) if 'Top' in top_n else 20
     c_period = INITIAL_CAPITAL
     
@@ -251,6 +318,7 @@ def calculate_metrics_raw(strategy_path):
     return {
         'DATASET': dataset, 'RE-ENTRY': reentry, 'VOL ADJ': voladj,
         'METHOD': method, 'TOP N': top_n, 'STOP LOSS %': sl_pct, 'Z-WINDOW': zwin,
+        'PORT SL %': psl_pct, 'MAX SEC %': msr_pct, 'DYN Z': dsz_val,
         'Final_Equity': final_equity, 'RCC_Raw': rcc, 'REC_Raw': rec,
         'Cum_Ret_Raw': cum_ret, 'Ann_Ret_Raw': ann_ret, 'Sharpe_Raw': sharpe, 'MDD_Raw': mdd_pct,
         'Entries': n_entries, 'Exits': n_normal_exits, 'Stop_Losses': n_stop_loss, 'Forced_Closes': n_forced_close,
@@ -286,7 +354,10 @@ def build_master_dataframe(strategies):
 
 def make_desc(row): 
     vol_part = f" · {row['VOL ADJ']}" if 'VOL ADJ' in row and row['VOL ADJ'] != 'N/A' else ""
-    return f"{row['DATASET']} · {row['RE-ENTRY']}{vol_part} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}"
+    psl_part = f" · PSL {row['PORT SL %']}" if 'PORT SL %' in row and row['PORT SL %'] != '0%' else ""
+    msr_part = f" · MSR {row['MAX SEC %']}" if 'MAX SEC %' in row and row['MAX SEC %'] != '0%' else ""
+    dsz_part = f" · DSZ {row['DYN Z']}" if 'DYN Z' in row and row['DYN Z'] != '0' else ""
+    return f"{row['DATASET']} · {row['RE-ENTRY']}{vol_part} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}{psl_part}{msr_part}{dsz_part}"
 
 @st.fragment
 def render_deep_dive(target_row):
@@ -448,20 +519,194 @@ def render_deep_dive(target_row):
         )
         st.plotly_chart(fig_p, width='stretch')
 
+def render_pair_consistency():
+    db_path = os.path.join(RESULTS_DIR, "result.db")
+    st.markdown("### 🤝 股票對分析與一致性比對 (Pair Consistency Analysis)")
+    st.markdown("此工具讓您直接從資料庫查詢各策略所選出的股票對，並進行一致性與交集分析，無須掃描億級每日交易明細。")
+    
+    if not os.path.exists(db_path):
+        st.warning("找不到 SQLite 資料庫，請先執行歷史回填或回測以建立資料。")
+        return
+        
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
+        cursor = conn.cursor()
+        
+        # 檢查 strategy_pairs 表是否存在且有資料
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='strategy_pairs';")
+        if not cursor.fetchone():
+            st.info("資料庫中尚未建立 strategy_pairs 資料表，請先執行回補指令碼。")
+            conn.close()
+            return
+            
+        cursor.execute("SELECT count(*) FROM strategy_pairs;")
+        total_pairs = cursor.fetchone()[0]
+        if total_pairs == 0:
+            st.info("💡 股票配對表 (strategy_pairs) 目前為空。請稍候，背景回補程式正在提取配對紀錄。")
+            conn.close()
+            return
+            
+        st.markdown(f"**目前配對資料庫中共存有 `{total_pairs:,}` 筆獨特配對選擇紀錄。**")
+        
+        # 1. 策略配對明細 (Strategy Pair Details)
+        st.markdown("---")
+        st.markdown("#### 🔍 策略配對明細查詢")
+        
+        # 取得所有策略路徑
+        cursor.execute("SELECT DISTINCT strategy_id FROM strategy_pairs;")
+        all_strat_ids = sorted([row[0] for row in cursor.fetchall()])
+        
+        selected_strat = st.selectbox("選擇要查詢的策略 (Select Strategy ID)", all_strat_ids, key="sb_strat_details")
+        
+        if selected_strat:
+            pairs_query = """
+            SELECT Ticker_A as "股票 A", Ticker_B as "股票 B", Period_Start as "交易期起點", Period_End as "交易期終點", Hedge_Ratio as "避險比例", Sector as "產業板塊", Pair_Rank as "配對排名"
+            FROM strategy_pairs
+            WHERE strategy_id = ?
+            ORDER BY Period_Start DESC, Pair_Rank ASC
+            """
+            strat_pairs_df = pd.read_sql_query(pairs_query, conn, params=(selected_strat,))
+            st.markdown(f"該策略共選出 **{len(strat_pairs_df)}** 個滾動配對關係：")
+            st.dataframe(strat_pairs_df, use_container_width=True, hide_index=True)
+            
+        # 2. 策略配對交集比對 (Strategy Pair Intersection)
+        st.markdown("---")
+        st.markdown("#### 🤝 策略選股配對交集比對 (Strategy Pair Intersection)")
+        st.markdown("選取兩個策略，直接找出它們**共同選中的股票對（交集）**與各自獨有擁有的股票對，並顯示各自的交易期間 (年月日)。")
+        
+        col_venn1, col_venn2 = st.columns(2)
+        with col_venn1:
+            strat_a = st.selectbox("選擇第一個策略 (Strategy A)", all_strat_ids, index=0 if len(all_strat_ids) > 0 else None, key="sb_strat_a")
+        with col_venn2:
+            strat_b = st.selectbox("選擇第二個策略 (Strategy B)", all_strat_ids, index=1 if len(all_strat_ids) > 1 else 0, key="sb_strat_b")
+            
+        if strat_a and strat_b:
+            cursor.execute("SELECT DISTINCT Ticker_A, Ticker_B FROM strategy_pairs WHERE strategy_id = ?;", (strat_a,))
+            pairs_a = {f"{row[0]}-{row[1]}" for row in cursor.fetchall()}
+            
+            cursor.execute("SELECT DISTINCT Ticker_A, Ticker_B FROM strategy_pairs WHERE strategy_id = ?;", (strat_b,))
+            pairs_b = {f"{row[0]}-{row[1]}" for row in cursor.fetchall()}
+            
+            intersection = pairs_a.intersection(pairs_b)
+            union = pairs_a.union(pairs_b)
+            
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            col_m1.metric("Strategy A 總配對數", f"{len(pairs_a)}")
+            col_m2.metric("Strategy B 總配對數", f"{len(pairs_b)}")
+            col_m3.metric("🤝 共同交集配對", f"{len(intersection)}", f"{len(intersection)/len(union):.1%} 重合度" if len(union) > 0 else "0.0%")
+            col_m4.metric("📊 聯集總計配對", f"{len(union)}")
+            
+            if intersection:
+                st.markdown(f"##### 🤝 共同選出的股票對 ({len(intersection)})：")
+                
+                # 查詢 Strategy A 的所有明細
+                cursor.execute("""
+                    SELECT Ticker_A, Ticker_B, Period_Start, Period_End, Sector
+                    FROM strategy_pairs
+                    WHERE strategy_id = ?
+                """, (strat_a,))
+                rows_a = cursor.fetchall()
+                
+                # 查詢 Strategy B 的所有明細
+                cursor.execute("""
+                    SELECT Ticker_A, Ticker_B, Period_Start, Period_End
+                    FROM strategy_pairs
+                    WHERE strategy_id = ?
+                """, (strat_b,))
+                rows_b = cursor.fetchall()
+                
+                # 建立 A 期間與產業板塊字典
+                periods_a = {}
+                sectors = {}
+                for row in rows_a:
+                    pair_key = f"{row[0]}-{row[1]}"
+                    if pair_key in intersection:
+                        p_str = f"{row[2]} ~ {row[3]}"
+                        periods_a.setdefault(pair_key, []).append(p_str)
+                        sectors[pair_key] = row[4]
+                        
+                # 建立 B 期間字典
+                periods_b = {}
+                for row in rows_b:
+                    pair_key = f"{row[0]}-{row[1]}"
+                    if pair_key in intersection:
+                        p_str = f"{row[2]} ~ {row[3]}"
+                        periods_b.setdefault(pair_key, []).append(p_str)
+                
+                # 建立展示用的 DataFrame
+                intersection_rows = []
+                for p in sorted(list(intersection)):
+                    t_a, t_b = p.split("-")
+                    sector = sectors.get(p, "N/A")
+                    
+                    # 排序期間以確保時間先後順序
+                    p_list_a = sorted(list(set(periods_a.get(p, []))))
+                    p_list_b = sorted(list(set(periods_b.get(p, []))))
+                    
+                    p_str_a = ", ".join(p_list_a) if p_list_a else "-"
+                    p_str_b = ", ".join(p_list_b) if p_list_b else "-"
+                    
+                    intersection_rows.append({
+                        "股票 A": t_a,
+                        "股票 B": t_b,
+                        "產業板塊": sector,
+                        "Strategy A 交易期間 (年月日)": p_str_a,
+                        "Strategy B 交易期間 (年月日)": p_str_b
+                    })
+                    
+                intersection_df = pd.DataFrame(intersection_rows)
+                st.dataframe(intersection_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("兩個策略之間沒有共同選出的股票對。")
+                
+        conn.close()
+    except Exception as e:
+        st.error(f"Error rendering pair consistency analysis: {e}")
+
 def main():
+    # ── 模組導覽列 ───────────────────────────────────────
+    st.write("") # 留空
+    tab_selection = st.radio(
+        "選擇功能模組", 
+        ["📊 策略績效與回測比較 (Strategy Performance)", "🤝 股票對分析與一致性比對 (Pair Consistency Analysis)"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
+    
+    if "一致性比對" in tab_selection:
+        render_pair_consistency()
+        return
+
     st.markdown('<div class="blue-subtitle">QUANTITATIVE PERFORMANCE DATA</div>', unsafe_allow_html=True)
     st.markdown('<div class="main-title">Pairs Trading Comparison Dashboard</div>', unsafe_allow_html=True)
     
-    available_strategies = scan_strategies(RESULTS_DIR)
+    db_path = os.path.join(RESULTS_DIR, "result.db")
+    master_df = pd.DataFrame()
+    use_db = False
+    
+    if os.path.exists(db_path):
+        master_df = load_master_dataframe_from_db(db_path)
+        if not master_df.empty:
+            use_db = True
+            available_strategies = master_df['_path'].tolist()
+            
+    if not use_db:
+        available_strategies = scan_strategies(RESULTS_DIR)
+        
     st.markdown(f'<div class="sub-title">Full dataset: {len(available_strategies)} strategy combinations currently loaded.</div>', unsafe_allow_html=True)
     
     if not available_strategies:
         st.warning("No strategy logs found in the results directory.")
         return
         
-    with st.spinner("Compiling massive dataset metrics..."):
-        master_df = build_master_dataframe(available_strategies)
-        
+    if use_db:
+        # 已從 SQLite 資料庫極速載入完成
+        pass
+    else:
+        with st.spinner("Compiling massive dataset metrics..."):
+            master_df = build_master_dataframe(available_strategies)
+            
     if master_df.empty:
         st.error("Could not parse any valid strategy data.")
         return
@@ -473,10 +718,14 @@ def main():
     with f_col3: sel_voladj = st.selectbox("VOL ADJ", ["All"] + sorted(master_df['VOL ADJ'].unique(), key=natural_sort_key))
     with f_col4: sel_method = st.selectbox("METHOD", ["All"] + sorted(master_df['METHOD'].unique(), key=natural_sort_key))
     
-    f_col5, f_col6, f_col7 = st.columns(3)
+    f_col5, f_col6 = st.columns(2)
     with f_col5: sel_topn = st.selectbox("TOP N", ["All"] + sorted(master_df['TOP N'].unique(), key=natural_sort_key))
     with f_col6: sel_sl = st.selectbox("STOP LOSS %", ["All"] + sorted(master_df['STOP LOSS %'].unique(), key=natural_sort_key))
-    with f_col7: sel_zwin = st.selectbox("Z-WINDOW", ["All"] + sorted(master_df['Z-WINDOW'].unique(), key=natural_sort_key))
+
+    f_col8, f_col9, f_col10 = st.columns(3)
+    with f_col8: sel_psl = st.selectbox("PORT SL % (全域組合停損)", ["All"] + sorted(master_df['PORT SL %'].unique(), key=natural_sort_key))
+    with f_col9: sel_msr = st.selectbox("MAX SEC % (產業上限)", ["All"] + sorted(master_df['MAX SEC %'].unique(), key=natural_sort_key))
+    with f_col10: sel_dsz = st.selectbox("DYN Z (動態 Z 停損)", ["All"] + sorted(master_df['DYN Z'].unique(), key=natural_sort_key))
 
     filtered_df = master_df.copy()
     if sel_dataset != "All": filtered_df = filtered_df[filtered_df['DATASET'] == sel_dataset]
@@ -485,7 +734,9 @@ def main():
     if sel_method != "All": filtered_df = filtered_df[filtered_df['METHOD'] == sel_method]
     if sel_topn != "All": filtered_df = filtered_df[filtered_df['TOP N'] == sel_topn]
     if sel_sl != "All": filtered_df = filtered_df[filtered_df['STOP LOSS %'] == sel_sl]
-    if sel_zwin != "All": filtered_df = filtered_df[filtered_df['Z-WINDOW'] == sel_zwin]
+    if sel_psl != "All": filtered_df = filtered_df[filtered_df['PORT SL %'] == sel_psl]
+    if sel_msr != "All": filtered_df = filtered_df[filtered_df['MAX SEC %'] == sel_msr]
+    if sel_dsz != "All": filtered_df = filtered_df[filtered_df['DYN Z'] == sel_dsz]
 
     st.markdown("<br>", unsafe_allow_html=True)
     if len(filtered_df) > 0:
@@ -499,7 +750,8 @@ def main():
             'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0, 
             'Sharpe_Raw': 0, 'MDD_Raw': 0, 'Entries': 0, 'Exits': 0, 'Stop_Losses': 0, 'Forced_Closes': 0,
             'Gross_Profit': 0.0, 'Gross_Loss': 0.0,
-            'DATASET': '-', 'RE-ENTRY': '-', 'VOL ADJ': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-'
+            'DATASET': '-', 'RE-ENTRY': '-', 'VOL ADJ': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-',
+            'PORT SL %': '-', 'MAX SEC %': '-', 'DYN Z': '-'
         })
         best_cum = best_ann = best_rcc = best_shp = low_dd = empty_series
 
@@ -546,7 +798,7 @@ def main():
 
     # 決定顯示欄位
     if expand_config:
-        config_cols = ['DATASET', 'RE-ENTRY', 'VOL ADJ', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW']
+        config_cols = ['DATASET', 'RE-ENTRY', 'VOL ADJ', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 'PORT SL %', 'MAX SEC %', 'DYN Z']
     else:
         config_cols = ['STRATEGY CONFIG']
 
@@ -627,6 +879,9 @@ def main():
         "TOP N": st.column_config.TextColumn("Top N 🏆", width="small"),
         "STOP LOSS %": st.column_config.TextColumn("Stop Loss 📉", width="small"),
         "Z-WINDOW": st.column_config.TextColumn("Z-Win ⏱️", width="small"),
+        "PORT SL %": st.column_config.TextColumn("Port SL % 🛡️", width="small"),
+        "MAX SEC %": st.column_config.TextColumn("Max Sec % 🏭", width="small"),
+        "DYN Z": st.column_config.TextColumn("Dyn Z 🎯", width="small"),
         
         "FINAL EQUITY ($)": st.column_config.TextColumn("Final Equity 💰", width="small"),
         "CUM. RETURN (%)": st.column_config.TextColumn("Cum. Return 📈", width="small"),

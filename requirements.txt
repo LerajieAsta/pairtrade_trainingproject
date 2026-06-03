@@ -39,3 +39,4 @@ SQLAlchemy
 
 streamlit>=1.30.0            # 績效比對 Dashboard 框架
 plotly>=5.18.0               # 互動式圖表繪製
+psutil>=5.9.0                # 系統記憶體監控 (防止 OOM)
