@@ -9,17 +9,6 @@ rem 1. Check if virtual environment exists
 if exist "Project\Scripts\activate.bat" goto :VENV_OK
 
 echo [WARNING] Virtual environment 'Project' is missing or incomplete!
-echo [INFO] Please initialize the environment before starting the Dashboard.
-echo.
-set /p choice="Do you want to run setup.bat now? (Y/N): "
-if /i "%choice%"=="Y" goto :RUN_SETUP
-echo [INFO] Startup canceled.
-exit /b 0
-
-:RUN_SETUP
-call setup.bat
-if exist "Project\Scripts\activate.bat" goto :VENV_OK
-echo [ERROR] Virtual environment still missing. Aborting.
 pause
 exit /b 1
 
