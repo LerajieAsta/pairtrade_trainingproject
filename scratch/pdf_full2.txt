@@ -1,0 +1,2025 @@
+﻿Total pages: 41
+
+============================================================
+PAGE 1
+============================================================
+Pairs Trading via Unsupervised Learning
+Chulwoo Han? Zhaodong He Alenson Jun Wei Toh
+Durham University Durham University Nanyang Technological University
+April 28, 2021
+Abstract
+This paper develops a pairs trading strategy via unsupervised learning. Unlike conventional pairs
+trading strategies that identify pairs based on return time series, we identify pairs by incorporating
+firm characteristics as well as price information. Firm characteristics are revealed to provide im-
+portant information for pair identification and significantly improve the performance of the pairs
+trading strategy. Applied to the US stock market from January 1980 to December 2020, the
+long-short portfolio constructed via the agglomerative clustering earns a statistically significant
+annualized mean return of 24.8% and a Sharpe ratio of 2.69. The strategy remains profitable after
+accounting for transaction costs and removing stocks below 20% NYSE-size quantile. A host of
+robustness tests confirm that the results are not driven by data snooping.
+Keywords: Unsupervised learning; Pairs trading; k-means clustering; DBSCAN; Agglomerative
+clustering.
+JEL Classification: G11, G12.
+?Corresponding author.
+1
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 2
+============================================================
+1 Introduction
+1.1 Motivation
+Machine learning has gained momentum and been widely applied in various fields, including fi-
+nance, in recent years. It is estimated that 56% of hedge funds utilized machine learning in their
+investment decisions in 2018, as compared to only 20% in 2017 (Chahn, 2018). However, most of
+these applications are supervised learning-based, where they aim to predict returns, or reinforce-
+ment learning-based, which are used for selecting stocks for portfolio construction. In contrast,
+unsupervised learning is rarely used in the finance literature.
+Unsupervised learning, also known as clustering, classifies a set of data into a group if they
+exhibit more significant similarity to one another, as compared to data that are classified into
+other groups. Different clustering methods can give different clustering results with the same
+dataset due to the difference in their clustering algorithms, which are discussed in greater detail in
+Section 3. Unsupervised learning has several applications in finance, such as industry classification
+and portfolio construction. In this paper, we explore the feasibility of unsupervised learning for
+pairs trading. Stocks with similar characteristics can be classified into a cluster via unsupervised
+learning. These stocks are likely to have similar future price movement, and one can find arbitrage
+opportunitiesbyshortingoverpricedstocksandlongingunderpricedstockswithinthesamecluster.
+Existing pairs trading strategies typically identify pairs based on cointegration or some other
+time series related measurements (Gatev et al., 2006; Jacobs and Weber, 2015; Vidyamurthy, 2004;
+Rad et al., 2016; Huck, 2009, 2010). However, using only past price data can falsely identify
+spuriously correlated pairs that may not move in tandem in the future. Unsupervised learning
+allows us to identify similar stocks considering not only past price movement but also other firm
+characteristics. Stockswithsimilarcharacteristicsarebelievedtoco-movewithahigherprobability.
+1.2 Objectives
+This research aims to investigate the feasibility of unsupervised learning for finding potential pairs
+of stocks to construct a long-short portfolio. We propose a framework to identify clusters from high
+dimensional financial data and implement three popular clustering algorithms to construct pair
+portfolios for statistical arbitrage. We choose k-means clustering, density-based spatial clustering
+of applications with noise (DBSCAN), and agglomerative clustering as representatives of each
+category of clustering methods.
+The k-means clustering (MacQueen et al., 1967) is the pioneering and most popular clustering
+method, which assigns data points to various clusters by minimizing the within-cluster sum of
+squares (WCSS) between the centroids of the assigned clusters and the data points.
+DBSCAN (Ester et al., 1996) is a density-based clustering method, where clusters are identified
+based on a continuous region of high density and are separated from each other by a continuous
+region of low density. Unlike k-means clustering, which assigns all data points to clusters, the data
+1
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 3
+============================================================
+points in the low-density area are treated as outliers and are not assigned to any cluster.
+The agglomerative clustering (Johnson, 1967) is one of the most representative hierarchical
+clustering methods. It is known as a ?bottom-up? approach, where each data point is initially
+treated as a cluster on its own before being merged with other clusters as one moves up the
+hierarchy.
+Our clustering-based pairs trading strategy consists of two steps. In the first step, stocks are
+clusteredbasedontheirpastreturnsandcharacteristics. Stocksaregroupedtogetheriftheirprices
+moveintandemhistoricallyandhavesimilarcharacteristics. Weemployvariousfirmcharacteristics
+as they are believed to be forward-looking and reduce the chance of falsely identifying spuriously
+correlated pairs.
+Thesecondstepinvolvessettingupatradingrulebasedonthedivergenceofthepastone-month
+returns. Low (high) return stocks within the same cluster are deemed undervalued (overvalued),
+and a contrarian strategy is adopted by going long on the undervalued stocks and short on the
+overvalued stocks. More specifically, we open long and short positions if the return difference is
+greater than one cross-sectional standard deviation of the difference of past one-month returns.
+The long-short portfolio is rebalanced and reinvested at the end of every month.
+Pairs trading reduces the market risk and makes the trading strategy profitable with a minimal
+market beta. In practice, investors do not trade only one pair but trade multiple pairs to form a
+well-diversified long-short portfolio. Our strategy allows the investor to choose a desired number
+of stocks by adjusting the threshold for the return divergence.
+Applying clustering for pairs trading entails several difficulties and unexpected issues to be
+resolved. Firstly, clusters are unbalanced in their size. Some clusters have a sufficient number of
+stockstoformaportfolio, whereasotherclustershaveonlyaminimalnumberofstocks. Inextreme
+cases, there are clusters that consist of only two stocks. DBSCAN, in particular, tends to yield
+a single colossal cluster comprised of the majority of the stocks, while the remaining stocks are
+identified as outliers, which suggests that the high-dimensional data structure has one big cluster
+that is exceptionally dense, and the rest of the stocks are scattered elsewhere.
+Another issue is that some clustering methods, such as k-means clustering, assign all the stocks
+into clusters without identifying and excluding outliers. Hence, some of these clusters may contain
+dispersedoutliersthataregeometricallyfarfromtheirassignedgroupcentroids. Formingportfolios
+with such outliers will diminish profitability.
+To address these issues, we test the clustering methods varying the clustering parameters and
+examine the impact of the number of clusters on the strategy performance. We also propose a
+method to remove outliers when using the k-means clustering.
+1.3 Main Findings
+We test our strategies on the stocks listed in the US stock market during the sample period of
+December 1979 to November 2020. The out-of-sample period is from January 1980 to December
+2
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 4
+============================================================
+2020 as we form a portfolio at the end of each month and hold it for one month.
+Comparing the performance of the long-short portfolios constructed by the three clustering
+methods, we find that the agglomerative clustering significantly outperforms the others, attaining
+an annualised mean return of 24.8%, an annualised Sharpe ratio of 2.69, and a low maximum draw-
+down of 12.3%, which lasts only for two months. The k-means clustering and DBSCAN attain an
+annualisedSharperatioof2.34and2.04,respectively,exhibitingthegreatpotentialofunsupervised
+learning for pairs trading. They all outperform the S&P500 index and the conventional short-term
+reversal strategy significantly.
+Our strategies also discover a significant alpha. The agglomerative clustering-based portfolio
+produces an economically and statistically significant monthly alphas of 1.9%, when regressed on
+the Fama-French three factors, Fama-French three factors plus momentum and short-term reversal
+factors, Fama-French five factors, and q5 factors.
+When stocks are clustered using only price information, the performance diminishes consider-
+ably; theSharperatiodecreasesfrom2.34to1.76fork-meansclustering, 2.04to1.57forDBSCAN,
+and 2.69 to 1.44 for agglomerative clustering, and the differences are statistically significant. This
+result supports our hypothesis that firm characteristics play a non-trivial role in identifying pairs.
+We attempt to shed light on the black-box of the clustering methods and unveil sources of
+profitability. Wefindthatallthreeclusteringmethodsselectstocksmainlyfromthemanufacturing
+and financial sectors. This implies that the strategies are scalable as these are the sectors that
+contain the majority of the stocks in the market and they are usually larger firms. This also
+implies that firms in these sectors are more similar to each other within their respective sector and
+are more likely to move in tandem. Clusters are homogeneous in terms of industry, consisting of
+only one or few sectors. We also find that the long positions and short positions are often from
+differentsectors, whichimpliesthattheprofitdoesnotonlyresultfromthedivergenceofthestocks
+in the same industry but also from the divergence between sectors.
+The breakdown of the portfolios in size reveals that they choose more stocks from the upper
+half of the size deciles, which suggests that the profits are not driven by small-cap stocks.
+Several robustness tests are conducted to ensure that the results are not sensitive to parameters
+and not driven by data snooping. The robustness check reveals that our models perform robustly
+in different parameter settings.
+Excluding stocks below 20% NYSE-size quantile reduces the profitability of the strategies only
+slightly, suggesting that the profits are not driven by small-cap stocks, and the strategies are highly
+scalable for asset management firms and hedge funds that typically trade large positions.
+The turnover of the strategies is high at about 180%, which means half of the positions are
+replaced when the portfolio is rebalanced. This is mainly due to the nature of the contrarian
+strategy. Adding transaction costs lowers the Sharpe ratio, but the financial performance is still
+promising. The agglomerative strategy attains an annualised Sharpe ratio of 1.73 and a mean
+return of 15.9% after subtracting 20 basis point transaction costs.
+3
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 5
+============================================================
+Our strategies perform exceptionally well during a financial crisis. All three strategies perform
+robustly and significantly outperform the benchmarks during the 2007 financial crisis and the 2020
+market crash due to the COVID-19 pandemic.
+1.4 Contributions
+The contribution of this paper is twofold. Firstly, to our knowledge, this is one of the earliest
+attempts to apply unsupervised learning to pairs trading, which extends the empirical asset pricing
+literature. We offer a framework to identify pairs via clustering methods and construct portfolios
+from them. Unsupervised learning appears to extract helpful information from high-noise financial
+data and identify meaningful pairs. The long-short portfolios derived from the clusters are more
+profitable and less volatile compared to those from conventional pairs trading strategies. This
+result suggests that stocks? behaviour and characteristics should be considered more thoroughly
+when selecting pairs for pairs trading, rather than relying on the statistical measures used in
+traditional pairs trading strategies.
+Our study provides a big picture on how stock data in high-dimensional space are perceived
+through the eyes of the various clustering methods. The analysis of clustering characteristics shows
+that all clustering methods identify at least 60% of available stocks as outliers, implying more than
+half of the stocks are isolated and should not enter the pairs trading portfolios. For the remaining
+stocks, the k-means clustering and agglomerative clustering tend to form more than a hundred
+clusters of various sizes, whereas DBSCAN tends to form one enormous cluster that encompasses
+almostalltheremainingstocks, andanothertinyclustercontaininglessthantenstocksonaverage.
+Secondly, our study reveals the importance of firm-level characteristics in identifying pairs. Un-
+like traditional pairs trading strategies, unsupervised learning can incorporate information from
+firm characteristics as well as price-related information. In our study, it is found that adding
+firm characteristics reduces volatility and significantly improves the performance of the pairs trad-
+ing strategies. To the best of our knowledge, this paper is the first attempt to incorporate firm
+characteristics in pairs trading.
+This paper is organised as follows. Section 2 reviews existing pairs trading strategies in the
+literature as well as the financial applications of machine learning. Section 3 describes the data and
+feature generation process. It also details the working principle of the clustering methods and the
+trading algorithm. Section 4 presents the empirical results, including clustering behaviour, finan-
+cial performance, factor regression analysis, and sub-period analysis. Section 5 performs various
+robustness checks, and Section 6 concludes.
+2 Literature Review
+This paper contributes to the literature on statistical arbitrage by proposing new ways to construct
+pairstradingstrategies. Morebroadly, itextendstheliteratureonfinancialapplicationsofmachine
+4
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 6
+============================================================
+learning by employing unsupervised learning.
+2.1 Existing Pairs Trading Strategies
+Krauss (2017) classifies pairs trading strategies into four groups. The most mainstream approach is
+the cointegration approach, which involves the Engle and Granger (1987) cointegration test. Using
+this framework, Rad et al. (2016) implement a pairs trading strategy with time-varying trading
+costs. The strategy yields a mean monthly excess return of 33 basis points after transaction costs
+from 1962 to 2014. Intuitively, they discover that their pairs trading strategy is more profitable
+during a period of high volatility. Huck and Afawubo (2015) compare the cointegration method
+with the distance approach on the constituents of S&P500 and demonstrate that the cointegration
+method is stable and can generate profits consistently. They also address the meagre excess return
+of the distance approach after factoring in transaction costs. Clegg and Krauss (2018) extract
+pairs from the S&P500 constituents via partial cointegration. After including a mean-reverting
+component in the cointegration residuals, the portfolio yields an annualized return of more than
+12% after transaction costs from 1990 to 2015.
+The second approach is the distance approach, which identifies co-moving pairs based on a
+particular distance metric. Gatev et al. (2006) utilize the Euclidean squared distance between
+the normalized prices of securities to identify pairs and form a long-short portfolio. Positions are
+openedwhenthedistanceofapairisgreaterthantwostandarddeviationsofthehistoricaldistances
+between the pair. The positions are then closed when either mean-reversion occurs, or at the end
+of the trading period. This paper provides the main ideas and building blocks of pairs trading. Do
+and Faff (2010) extend the study of Gatev et al. (2006) to post 2008 financial crisis and discover
+that the strategy performs strongly during the recession period. The same study finds that pairs
+trading is more profitable for bank stocks. Jacobs and Weber (2015) extend the distance-based
+pairs trading strategy to 34 countries and discover that it is profitable in different markets, despite
+its varying performance with time.
+The next approach to pairs trading is the time-series approach. Cummins and Bucca (2012)
+adopt a novel time-series model to identify pairs in the oil market, with a focus on West Texas
+Intermediate (WTI), Brent, heating oil, and gas oil from 2003 to 2010. Their pairs trading strategy
+yields a mean daily return between 0.07% and 0.55% and a Sharpe ratio greater than 2, prior
+to transaction costs. However, contrary to other pairs trading strategies that are usually more
+profitableduringthe2008financialcrisis,thereturnsgeneratedfromthistime-seriesmodeldiminish
+during the recession. Elliott et al. (2005) propose another time-series approach for pairs trading
+based on the mean-reverting Gaussian Markov chain, but no backtesting is conducted on any
+market.
+Themostnovelandrelatableapproachtothisstudyistoconstructpairsviasupervisedlearning.
+Huck (2009, 2010) implement an ensemble method that combines an Elman neural networks, a
+5
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 7
+============================================================
+recurrentneuralnetwork,andELECTREIIItoidentifypairsfromtheS&P500constituentstocks.1
+When backtested from 1992 to 2006, the portfolio yields a weekly excess return of more than
+0.8%. Krauss et al. (2017) convert pairs trading into a supervised learning problem by feeding
+several features into machine learning algorithms (deep neural networks, gradient-boosted-trees,
+and random forests). They forecast the probability of stock prices? upward moving and construct
+a daily rebalanced portfolio by entering long positions in the stocks with the highest probabilities
+and short positions in the stocks with the lowest probabilities. From 1992 to 2015, an equally-
+weighted portfolio that ensembles the three machine learning methods yields a daily excess return
+of 0.45% prior to transaction costs. Huck (2019) adds more than 600 predictors to his machine
+learning models hoping that the learning algorithms can digest a large dataset and extract useful
+information from the extremely noisy data. Besides lagged returns, the feature set consists of
+time information, size of stocks, indices, commodity prices, and many frequently used risk factors.
+However, the positive excess return is negated by transaction costs, which implies that adding
+too many features may not boost the performance of machine learning-based pairs trading. Kim
+and Kim (2019) applly deep reinforcement learning on pairs trading, to determine the trading
+threshold and the stop-loss boundary dynamically and report promising results in comparison to a
+static boundary.
+There are other non-conventional methods to identify pairs for pairs trading strategies, which
+arelessfrequentlyusedintheliterature. AvellanedaandLee(2010)utilizetheprincipalcomponent
+analysis (PCA) on the exchange-traded funds (ETFs) listed in the US stock market and attain an
+annualized Sharpe ratio of 1.51 from 2003 to 2007. Rad et al. (2016) construct pairs based on a
+Copula method and gain a monthly excess return of 5 basis points after transaction costs, while
+Xie et al. (2016) demonstrate that the Copula method outperforms the distance approach in terms
+of average excess returns generated.
+2.2 Financial Applications of Unsupervised Learning
+Financialapplicationsofunsupervisedlearningarerelativelyrare. Forthedistance-basedclustering
+method, Nanda et al. (2010) develop a portfolio strategy using k-means clustering, followed by the
+Markowitz model to create a portfolio. Fung et al. (2002) use a modified k-means clustering to
+cluster news articles, with the goal of analyzing the impact of news articles on stock prices. Ta
+and Liu (2016) adopt k-means clustering as one of their clustering methods to cluster stocks listed
+on the Ho Chih Minh Stock Exchange and study the impact of foreign ownership on Vietnamese
+stocks? volatility.
+Yang et al. (2014) adopt DBSCAN to identify suspicious financial transactions. DBSCAN is
+also one of the three unsupervised clustering methods explored by Pavlidis et al. (2006) to cluster
+time series data before applying artificial neural networks to forecast daily foreign exchange spot
+rates. Bini and Mathew (2016) also use DBSCAN as one of their clustering algorithms to cluster
+1ELECTRE III is an outranking method based on the concept of fuzzy logic.
+6
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 8
+============================================================
+stock market data before applying regression models to forecast prices of the stocks listed on the
+National Stock Exchange of India.
+DoseandCincotti(2005)applycomplete-linkagglomerativeclusteringtothedailyclosingprices
+of the S&P500 constituents to create an index and an enhanced index tracking portfolio. Babu
+et al. (2012) apply agglomerative clustering on financial data before applying a recursive k-means
+clustering within the agglomerative clusters to predict the direction of stock prices.
+2.3 Financial Applications of Supervised Learning
+The volume of the literature on the financial application of machine learning has been blooming
+in recent years. Exceptional financial performances are reported when machine learning is applied
+to asset return prediction, which can be easily defined as a supervised learning problem. Using
+a classification tree, Moritz and Zimmermann (2016) develop a two-step portfolio sorting method
+and report significant financial performance. Messmer (2017) obtains significant excess returns by
+constructing a deep learning model with 68 firm characteristics as input features. Gu et al. (2020)
+conduct a comparative analysis of popular machine learning algorithms in the US stock market.
+They find that a deep neural network outperforms tree-based models and linear benchmarks, and
+the long-short portfolio obtained from the deep neural network achieves an annualized Sharpe ratio
+above 2.0. Han (2020) employs a deep neural network to predict the cross-section of stock returns
+in the US market and finds that the long-short portfolio strategy derived from the model can earn
+a Shape ratio greater than 2.5.
+Machine learning is also found to perform well in other asset classes. Lim et al. (2019) employ
+a deep neural network for time-series momentum and show that it performs robustly in the futures
+market. Bianchi et al. (2020) apply the methodology of Gu et al. (2020) to the US Treasury bond
+market and find machine learning-based strategies are profitable also in the bond market.
+3 Methodology
+3.1 Data Description and Prepossessing
+This section describes the procedure to generate and process the input features. The feature set
+consists of 48 momentum factors and 78 firm characteristics generated every month for the sample
+period from December 1979 to November 2020. The out-of-sample period is from January 1980 to
+December 2020.
+3.1.1 Data Sample
+The US equity market data available from the Center for Research in Security Prices (CRSP) are
+used for our empirical studies. All stocks with common shares (share code 10 or 11) listed on the
+New York Stock Exchange (NYSE), American Stock Exchange (AMEX), and Nasdaq (exchange
+7
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 9
+============================================================
+code 1, 2, and 3) are included. During the sample period, stocks must have a valid price on the
+portfolio formation date (at the end of the month t) and returns from t ? 48 to t. For stocks
+delisted from the exchanges, the delisted returns are computed using the method of Shumway and
+Warther (1999): should the delisted return with dividend is available in the CRSP delist file, it is
+used; otherwise, the delisted return is assumed to be -35% for NYSE and American stock exchange
+stocks, and -55% for Nasdaq stocks.
+3.1.2 Feature Generation
+The feature set consists of two parts. The first set comprises 48 price momentums, i.e., 1- to
+48-month price momentums. The other set consists of 78 firm characteristics chosen from Green
+et al. (2017). Stocks are clustered using the features available at the end of month t?1 and the
+previous one-month return is used to identify undervalued and overvalued stocks.
+Momentum features reflect the historical movement of stock prices and stocks with similar
+momentum features are expected to keep the similar pace in the future. Firm characteristics can
+reveal more information from accounting and asset pricing perspectives. A pair of stocks that
+have moved in tandem may diverge from each other in the future should they have distinct firm
+characteristics: we consider firm characteristics to be more forward-looking. This motivates us
+to use both momentum features and firm characteristics for clustering. A pairs trading strategy
+typically uses only prices or returns, and this is the first work that employs firm characteristics to
+identify pairs.
+Momentum features The i-month price momentum at the end of month t?1 is defined as the
+cumulative return from month t?i to t?2 for i > 1 and as the previous one-month return for
+i = 1:
+mom = r , i = 1,
+i t?1
+t?2 (1)
+(cid:89)
+mom = (r +1)?1, i ? 2,...,48,
+i j
+j=t?i
+where r denotes the return in month j.
+j
+Firm characteristics The78firmcharacteristicsarechosenfromthefirmcharacteristicsusedin
+Green et al. (2017), excluding the characteristics with missing values of more than 15%. They are
+listed in Table A, and their exact definitions can be found in Green et al. (2017) or the references
+therein. The firm characteristics are generated using the SAS code in Jeremiah Green?s website.2
+2https://sites.google.com/site/jeremiahrgreenacctg/home
+8
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 10
+============================================================
+3.1.3 Data Preprocessing
+Scaling data and performing PCA prior to unsupervised clustering is common in various clustering
+applications (Siraj et al., 2009; Chen et al., 2013; Sarmento and Horta, 2020). We first normalize
+features using their cross-sectional means and standard deviations to eliminate any skewed clus-
+tering. Unsupervised clustering methods usually cluster data points based on a certain distance
+measure and features with a higher magnitude, such as market capitalization, will have higher
+weightage in distance calculation without normalization. This would result in a skewed clustering,
+where stocks are clustered chiefly based on those features that have a higher magnitude by nature.
+Somefeaturesmustcontainmoreinformationthanothersfortheidentificationofsimilarstocks,
+but the distance measures assign the same weight to all features. Therefore, inputting the features
+directly into a clustering algorithm can dilute the information contained in important features. By
+applying PCA to the features and using the principal components as the input, we can emphasize
+those important features when clustering the stocks. Another benefit of PCA is to alleviate the
+curse of dimensionality. Clustering algorithms are resource-intensive, and reducing the feature
+dimension via PCA can save the computational cost significantly.3
+The principal components entered into clustering are determined so that the principal compo-
+nents explain at least 99% of the total variation. On average, 86 principal components out of 126
+are selected as input.
+3.2 Clustering Methods
+This section provides an in-depth discussion of the clustering algorithms we employ: k-means
+clustering, DBSCAN, and agglomerative clustering, which are representatives of partition-based,
+density-based, and hierarchical clustering, respectively. Clustering algorithms are unsupervised,
+which means they do not have the true values (labels) to target. Therefore, they do not require a
+large set of historical data to train and validate the model. By feeding the input data, clustering
+algorithms find meaningful groupings that cannot be conceived easily by the human brain.
+Unlike supervised learning models, e.g., deep learning or gradient boosting, which often require
+many hyperparameters, clustering algorithms require very few hyperparameters and there is little
+room for data snooping. We test the models with different hyperparameter values and assess their
+impact on the performance of the pairs trading strategy.
+3.2.1 k-Means Clustering
+The k-means clustering (MacQueen et al., 1967) is perhaps the most popular clustering method. It
+requires the number of clusters, K, to be first specified. It then identifies K centroids and groups
+3For example, the time complexity of k-means clustering for each iteration is O(KNM), where K is the number
+of clusters, N is the number of samples, and M is the feature dimension.
+9
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 11
+============================================================
+all data points to one of these clusters by minimizing the within-cluster sum of squares (WCSS)
+between data points and their respective centroids. The objective function is given by
+N K
+W = WCSS = (cid:88)(cid:88) w ik (cid:13) (cid:13)xi?? k (cid:13) (cid:13) 2 , (2)
+i=1 k=1
+where xi refers to i-th data point, ? the centroid of cluster k, w = 1 if xi belongs to cluster
+k ik
+k, otherwise w = 0, and N is the total number of data points. (cid:107)?(cid:107) denotes l norm.
+ik 2
+The k-means clustering is a two-step minimization problem. W is first minimized with respect
+to w while keeping ? fixed to update the assignment of data points to clusters (Equation (3)).
+ik k
+After that, W is minimized with respect to ? while keeping w fixed to recompute the centroids
+k ik
+(Equation (4)). The above steps are repeated until W is minimized.
+?
+(cid:13) (cid:13)
+w =
+?1 if k = argmin
+j
+(cid:13)xi?? j(cid:13)
+2 (3)
+ik
+?0 otherwise
+N
+?W = 2 (cid:88) w (cid:0) xi?? (cid:1) = 0
+ik k
+??
+k
+i=1 (4)
+(cid:80)N w xi
+? ? = i=1 ik
+k (cid:80)N
+w
+i=1 ik
+As k-means clustering assigns all data points into the specified number of clusters, it does not
+have the capability to identify outliers. Stocks that are located far from others are still assigned to
+the nearest centroid. Hence, we adopt and modify the method used by Hautam?aki et al. (2005) to
+identify these stocks and remove them from the asset pool.
+The procedure of removing outliers is as follows. For each data point, measure the distance
+to its respective centroid and also the distance to its nearest neighbour. Sort the distances to the
+nearest neighbour in ascending order and choose the distance at ? percentile as the threshold, (cid:15).
+Any stock whose distance to its centroid is greater than (cid:15) is regarded as an outlier and removed.
+The pseudo-code for this process is described in Algorithm 2 in the appendix. We set ? = 0.5, i.e.,
+identify a stock as an outlier when its distance to its centroid is greater than the median distance
+between nearest stocks.
+For the number of clusters, K = 5,10,50,100,500,1000, and 1500 are tested.
+3.2.2 DBSCAN
+The density-based spatial clustering of applications with noise (DBSCAN) identifies areas of high
+density in a high dimensional data space separated by regions of low-density (Ester et al., 1996). It
+has two parameters; the minimum number of data points per cluster, MinPts, and the maximum
+distance between data points, (cid:15), to be considered in the same cluster. Distance metrics such as
+10
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 12
+============================================================
+Manhattan (l norm), Euclidean (l norm), or Minkowski distance can be used to measure the
+1 2
+distance between data points.
+DBSCANfirstselectsanarbitrarydatapointasacorepoint. DatapointswithatleastMinPts
+neighbours within (cid:15) are considered for the core point. All neighbouring points within (cid:15) from a core
+point are clustered together with the core point, in a process called direct density reachable. Any
+neighboursoftheseneighbouringpoints within(cid:15)arealsoincluded in thesamecluster. Thisprocess
+is called density reachable. Non-core points in a cluster are called border points, and points in the
+same cluster are said to be density connected. Outliers or noises are points that are not density
+reachable from any of the core points, and are not assigned to any cluster (Schubert et al., 2017).
+The above process is repeated until all data points are visited. The pseudo-code of DBSCAN is
+described in Algorithm 3.
+Hyperparameter Selection Following Aggarwal et al. (2001), who demonstrate that l norm
+1
+providesmoresignificantandmeaningfulclusteringresultsforhigh-dimensionaldatasets,wechoose
+l norm as the distance metric for DBSCAN. Following Birant and Kut (2007), MinPts is set to
+1
+be the natural logarithm of the total number of data points N. The minimum distance (cid:15) is set as
+the ? percentile of the average distances to the nearest MinPts neighbour points. This method
+is recommended by Ester et al. (1996), who proposed DBSCAN. Elbatta (2012) and Rahmah and
+Sitanggang (2016) also adopt the same method to determine (cid:15). We use ? = 0.1,...,0.9 for the
+empirical analysis.
+3.2.3 Agglomerative Clustering
+Agglomerative clustering is a hierarchical clustering method and starts by treating individual data
+points as a cluster on its own before merging the clusters step by step until termination criteria
+are met (Gowda and Ravi, 1995). It requires the user to specify one of two hyperparameters: the
+number of clusters K or the maximum distance for clusters to be merged, (cid:15), known as linkage
+distance.
+Figure 1 illustrates the agglomerative clustering process. The six individual data points are
+initially treated as individual clusters. Their proximity to each other is calculated, and similar
+clusters are merged to form a new cluster (BC and DE), should their distance is less than (cid:15). This
+merging process is repeated until there are no more clusters whose distance to another cluster is
+less than (cid:15). If the distance between merged clusters is always below the specified (cid:15), eventually, all
+cluster are merged to form cluster ABCDEF. In general, the final clustering result consists of many
+small clusters, rather than a few giant clusters that contain most data points.
+Hyperparameter Selection In our empirical study, we specify the maximum distance (cid:15) rather
+than the number of clusters K, using a method similar to the method adopted for k-means clus-
+tering: (cid:15) is set as an ? percentile of the distances between a pair of nearest data points. We
+11
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 13
+============================================================
+Figure 1: Agglomerative clustering
+This figure presents a six-point dataset?s hierarchical structure, showing how the agglomerative clustering algorithm
+groups data points from individual data point to the final cluster that includes all the data points.
+implement agglomerative clustering with ? = 0.1,...,0.9. Similarly to DBSCAN, l norm is used
+1
+as the distance metric. For the linkage distance, i.e., the distance between a pair of clusters, we
+adopt the average linkage, which is defined as the average distance between the data points in one
+cluster and the data points in another cluster. For instance, if there are two clusters G and H with
+N and N data points, respectively, the average linkage distance between G and H is defined as
+G H
+follows:
+1 (cid:88)
+d (G,H) = ||xi?xj||. (5)
+average
+N ?N
+G H
+xi?G,xj?H
+3.3 Portfolio Formation and Trading Strategy
+Attheendofeachmonthduringthesampleperiod, weclusterthestocksusingoneoftheclustering
+methods described in the previous section. Through clustering, stocks are either assigned to a
+cluster or identified as an outlier.
+As we cluster stocks based on their price movements and firm characteristics up to month t?1,
+we expect the stocks in the same cluster that temporarily diverge from each other in month t to
+converge in the following month. Therefore, we detect pairs by examining the previous one-month
+return (mom ). Stocks with a lower mom are deemed undervalued and expected to rebound in
+1 1
+the following month. Conversely, stocks with a higher mom are deemed overvalued and expected
+1
+to revert in the following month.
+We sort the stocks within each cluster based on their respective mom , and pair the stock with
+1
+the highest mom with the stock with the lowest mom , the second-highest mom stock with the
+1 1 1
+12
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 14
+============================================================
+second-lowestmom stock,andsoforth. Wethenconstructanequally-weightedlong-shortportfolio
+1
+using the pairs whose mom difference is greater than the cross-sectional standard deviation of all
+1
+pairs? mom differences. It is possible for some clusters not to have any pairs that meet the trading
+1
+criterion if the mom differences of their pairs are not wide enough. We hold the positions for one
+1
+month and rebalance the portfolio at the end of each month. This cycle repeats until the end of
+the sample period.
+The clustering-based long-short portfolios are compared with two benchmarks; the S&P500
+indexandtheshort-termreversalportfolio. WeusetheS&P500indexincludingdividendsavailable
+from CRSP. For the short-term reversal portfolio, we sort all the stocks based on their mom , and
+1
+initiate long positions on the stocks in the first decile and short positions on the stocks in the
+bottom decile.
+4 Empirical Results
+This section presents the empirical results. We first summarize the clustering characteristics of
+each clustering method and then assess the financial performances of the pairs trading strategies
+from various perspectives. A host of robustness tests are conducted to ensure the findings are not
+driven by data snooping.
+Wetesteachclusteringmethodwithdifferentparametervaluesandusethebestperformingcase
+for the main results and later analyze the impact of the parameters on the strategy performance.
+For k-means clustering, the number of clusters K = 5,10,50,100,500,1000, and 1500 are tested
+and K = 500 is chosen for the main results as it gives the highest Sharpe ratio. For DBSCAN
+and agglomerative clustering, ? = 0.1,...,0.9 are tested, and ? = 0.1 is chosen for DBSCAN and
+? = 0.3 for agglomerative clustering for the same reason.
+4.1 Clustering Characteristics
+To give a big picture of how stocks are clustered, we analyze the clustering characteristics of the
+threeclusteringmethods. Thenumberofclustersvariessignificantlyacrosstheclusteringmethods.
+Table 1 and Figure 2 summarize the results.
+The k-means clustering forms an average of 129 clusters after removing outliers, with a range of
+80 to 165 clusters.4 The k-means clustering clusters average 1257 (39.8%) stocks every month and
+identifies the rest as outliers. Among the clustered stocks, average 63 (5.2%) stocks are contained
+in the largest cluster, and 51 (4.1%) stocks are contained in the second largest cluster. Figure 2
+shows that the number of clusters formed every month is consistent over the sample period. After
+applying the one standard deviation threshold, an average of 330 stocks remain and are used to
+form a long-short portfolio.
+4The number of clusters, K, is set to 500, but the outlier removing process eliminates some clusters whose data
+points are far from each other and the remaining clusters are less than 200.
+13
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 15
+============================================================
+In contrast to k-means clustering, DBSCAN tends to form one giant cluster and several small
+clusters, with an average of only two clusters every month. DBSCAN clusters only 376 (12.1%)
+stocks on average, and 88.0% of the stocks are deemed as outliers. The giant cluster comprises
+almost all the clustered stocks (88.9%), and the remaining clustered stocks are assigned to one to
+six mini clusters. On average, the DBSCAN strategy trades 75 stocks every month. Compared to
+k-means and DBSCAN, agglomerative clustering tends to form many small clusters (average 188),
+which comprises an average of 769 (24.6%) stocks. Figure 2 reveals that there are no giant clusters
+as observed in DBSCAN, and the number of clusters is rather consistent over the sample period.
+Agglomerative clustering trades average 126 (4.1%) stocks every month.
+4.2 Strategy Performance
+Table 2 reports the performances of the long-short portfolios constructed via the three clustering
+methods. The equally-weighted long-short portfolios outperform the S&P500 index and the bench-
+markreversalportfoliointermsofvariousfinancialperformanceindicators, revealingtheclustering
+methods? capability to form meaningful clusters and generate significant profits.
+Table 2 (a) reports the monthly return statistics of the clustering-based pairs trading strategies.
+It shows that the returns of the long portfolio from all three clustering methods is economically
+and statistically significant with the t-statistic greater than 7. The returns of the long-short port-
+folio, albeit smaller in magnitude, is even more significant with the t-statistic greater than 12. In
+particular, the agglomerative clustering yields the highest and most significant returns: 2.3% (t =
+8.95) for the long portfolio and 2.1% (t = 16.12) for the long-short portfolio.
+The mean returns of the long-short portfolios are greater than that of S&P500 and comparable
+to the mean return of the reversal portfolio. However, the long-short portfolios have significantly
+lower standard deviations.
+Figure 3 presents the monthly return distributions in a box plot. It is apparent that all the
+clustering-based trading strategies have a narrower range of returns and exhibit smaller downside
+returns than the benchmarks, indicating that the clustering-based strategies are less volatile and
+less likely to experience drastic drops in returns.
+Table 2 (b) reports annualized risk-return metrics. Five metrics are employed to assess the
+financial performance of the portfolios:
+? Sharpe ratio: Mean return
+standard deviation
+? Sortino ratio: Mean return
+Downside deviation
+? Profit factor: Gross profit
+Gross loss
+? Maximum drawdown (MDD): the maximum observed loss from a peak to a trough over the
+portfolio formation period
+14
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 16
+============================================================
+? Calmar ratio: Mean return
+MDD
+The results suggest that agglomerative clustering is the best performing clustering algorithm
+among the three clustering methods. The long-short portfolio has a high annualized mean excess
+returnof24.8%andaremarkablylowstandarddeviationof9.2%,resultinginthehighestannualized
+Sharpe ratio of 2.69. Other performance metrics also favour agglomerative clustering: e.g., it yields
+a low maximum drawdown of mere 12.3%. During the 41 years of out-of-sample period, there is
+not a single unprofitable year for the agglomerative clustering-based strategy.
+The long-short portfolio derived from k-means clustering also performs superbly, but has a
+slightly lower mean return (21.5%), compared to the one derived from agglomerative clustering,
+resulting in a Sharpe ratio of 2.34. Still, it significantly outperforms the benchmarks and suffers
+loss only in one year out of 41 years.
+DBSCAN appears to be the worst-performing among the clustering methods. It has the highest
+mean return of 25.6%, but due to the relatively high standard deviation of 12.6%, it has the lowest
+Sharpe ratio. Other performance metrics also suggest that it is the least favourable method: e.g.,
+the maximum drawdown is 14.9%, higher than those of k-means and agglomerative clustering.
+Nevertheless, it significantly outperforms the two benchmarks with an annualized Sharpe ratio of
+2.04. AnadvantageofDBSCANisthatitrequiresonaverageonly75stocks(38pairs)tobetraded
+every month, while the k-means and agglomerative clustering require more than 126 stocks to be
+traded every month.
+Figure 4 shows the log-scale cumulative returns of the strategies over the out-of-sample period.
+The graph reaffirms that the pairs trading strategy via agglomerative clustering performs best with
+the highest cumulative return. DBSCAN performs remarkably well after the financial crisis in
+2008 and yields a comparable cumulative return. The reversal portfolio performs exceptionally well
+before 2000, but its performance diminishes considerably thereafter. Remarkably, the portfolios
+constructed by the clustering methods perform even better during the financial crisis in 2008, when
+S&P500 and the reversal portfolio suffer a considerable loss.
+4.3 Effects of Firm Characteristics
+We hypothesize that the firm characteristics are forward-looking and would help clustering stocks
+and enhance the pairs trading strategies. To test the hypothesis, we repeat the same backtest using
+only the momentum features and compare the results with those reported earlier. Table 3 reports
+the results obtained from the clustering methods utilizing only the momentum features.
+All the clustering methods perform worse after excluding the firm characteristics in terms of
+the Sharpe ratio and other risk-adjusted performance metrics. Interestingly, they yield a similar
+magnitude of returns, but the returns are more volatile, resulting in lower Sharpe ratios. The mean
+returns of the long-short portfolios derived from k-means, DBSCAN, and agglomerative clustering
+are respectively 24.4%, 23.8%, and 24.1%, whereas they are respectively 21.5%, 25.6% and 24.8%
+15
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 17
+============================================================
+when the firm characteristics are included. In contrast, the Sharpe ratios are reduced from 2.34
+to 1.76 (k-means), 2.04 to 1.57 (DBSCAN), and 2.69 to 1.44 (agglomerative), and the differences
+are statistically significant with the t-statistic greater than 3 except for DBSCAN, whose t-statistic
+is 2.88. The maximum drawdown also increases substantially when the firm characteristics are
+excluded: e.g., the maximum drawdown of the agglomerative clustering increases from 12.3% to
+50.3%.
+The results above clearly suggest that the firm characteristics help identify similar stocks and
+enhance the performance of the pairs trading strategy. It is particularly notable that they reduce
+the volatility and downside risk substantially, making the strategy attractive to investors.
+4.4 Factor Regression
+Toexaminewhethersystematicriskfactorscanexplainthelong-shortportfolios?returns,weemploy
+fourfactormodelsandapplythemtotheequally-weightedportfoliosconstructedviaagglomerative
+clustering. Wefocusonagglomerativeclusteringasitdemonstratesthemostpromisingperformance
+amongtheclusteringalgorithms. ThefactormodelsconsideredareFamaandFrench(1996)?sthree-
+factor model (FF3), FF3 plus the momentum and the short-term reversal factors (FF3+2), Fama
+and French (2015)?s five-factor model, and Hou et al. (2020)?s q5 factor model. We include FF3+2
+since the feature set includes momentum features and the trading strategy is a contrarian strategy,
+which closely relates to the short-term reversal factor. The Fama-French factors are downloaded
+from Kenneth French?s website, and the q5 factors are downloaded from the global-q website. For
+the q5 factor model, the sample period ends in December 2019 as the site provides the factors only
+up to 2019. Table 4 reports the regression results.
+The long-short portfolio constructed from agglomerative clustering yields an economically and
+statistically significant monthly alpha of 1.9% (t = 14.16) when regressed against FF3. The market
+beta is also positive and significant, suggesting that the trading strategy is dollar-neutral but not
+risk-neutral. The factor loading on HML is positive and weakly significant, implying that it favours
+firms with a higher book-to-market ratio. The adjusted R2 from FF3 is 0.08.
+The FF3+2 appears to have the best explanatory power for the strategy with the adjusted R2
+of 0.28. Nevertheless, the strategy generates a significant alpha of 2.0% (t = 15.01), which is the
+most significant among the four factor models. A positive, significant loading on the market factor
+is observed again. In addition, the momentum and the short-term reversal factors are negative and
+positive, respectively, and statistically significant. The positive loading on the short-term reversal
+factor is expected as our strategy is essentially a short-term reversal strategy with a carefully
+selected trading asset pool.
+The FF5 and q5 models have a similar explanatory power to FF3, and the alpha remains
+economically and statistically significant. The profitability and investment factors do not appear
+to explain the returns of our strategy. The factors in q5 are also unable to explain the returns,
+suggesting that the significant return of the strategy is not a result of excessive risk taking.
+16
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 18
+============================================================
+4.5 Size and Industry Breakdown of the Clusters
+To investigate what drives the clustering-based pairs trading strategies? returns, we categorise the
+portfolios into size deciles and industry sectors. The results are summarised in Table 5, where the
+numbers are the average percentage of the stocks in each category.
+Table 5 (a) reports the average proportion of the stocks in each size decile. Decile 1 represents
+the smallest stocks, and decile 10 the largest stocks. All three clustering methods have a similar
+distribution of the stocks across size deciles and have the average size decile above 6.0. They select
+more than 10% of the stocks from each size decile above the median. This result corroborates
+the finding in Section 5 that the profits of the pairs trading strategies are not driven by small-cap
+stocks.
+Table5(b)categorisesallstocksintoelevenindustrysectorsusingtheNorthAmericanIndustry
+Classification System (NAICS).5 The last column (Market) represents the proportions of all the
+stocks in the US market.
+The k-means and agglomerative clustering have a similar distribution of the stocks across in-
+dustries and select stocks mainly from the manufacturing sector, followed by the financial sector.
+Their industry composition is also similar to the industry composition of the entire market. DB-
+SCAN, on the other hand, does not follow the distribution of the market, but prefers stocks from
+the financial sector, followed by the manufacturing sector. Having many stocks from the financial
+sector is in line with Do and Faff (2010), who find that bank stocks are the most profitable when
+it comes to pairs trading.
+Theaboveresultsimplythatthestocksintheseindustriesaremoresimilartoeachotherwithin
+their respective industry in terms of price movement and firm characteristics. Should any stock in
+these industries be overpriced or underpriced relative to the others in the same industry, its return
+is likely to revert back to the mean level offering a profit opportunity. Involving stocks mainly from
+these industries also explains why our clustering-based strategies remain profitable after excluding
+small-cap stocks: manufacturing and financial firms are usually large in market capitalisation.
+Thenumberofindustrieswithineachclusterrevealsthattheclustersarehomogeneousinterms
+of industry, consisting of stocks from only one or a few industries. The long-short portfolios con-
+structed from k-means, DBSCAN and agglomerative clustering respectively consist of 1.83, 3.47,
+and 1.32 industries, on average. The long and short portfolios individually consist of fewer indus-
+tries: average 1.32 industries for k-means clustering, 2.74 for DBSCAN, and 1.03 for agglomerative
+clustering. The smaller number of industries within each side indicates that the stocks in the long
+sideandthoseintheshortsideareoftenfromdifferentindustries,whichimpliesthattheprofitdoes
+not only result from the divergence of the stocks in the same industry but also from the divergence
+between industries.
+5https://www.naics.com/sic-codes-industry-drilldown/
+17
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 19
+============================================================
+4.6 Sub-period Analysis
+We divide the sample period into five sub-periods and examine the performance of the clustering
+algorithms in each of these sub-periods. The results are reported in Table 6.
+The first sub-period commences from January 1980 and ends in December 1999, prior to the
+widespreaduseofquantitativeandmachinelearningalgorithmsininvestment(Kraussetal.,2017).
+Eventhebenchmarkreversalportfolioperformssuperblyduringthisperiod,attaininganannualized
+mean return of 34.5% and a Sharpe ratio of 2.08. However, the portfolios constructed via k-
+meansandagglomerativeclusteringstilloutperformthebenchmarksignificantlyduringthisperiod:
+they attain annualized mean returns of 24.8% and 27.9%, and the Sharpe ratios of 3.52 and 4.14,
+respectively. DBSCAN yields a Sharpe ratio of 2.19, comparable to that of the reversal portfolio,
+but it has a lower maximum drawdown and higher Sortino ratio. Overall, all three clustering
+methods perform superbly during this period.
+The second sub-period ranges from January 2000 to December 2006, which coincides with the
+adventofquantitativeandmachinelearningalgorithmsforinvestment(Vidyamurthy,2004;Demp-
+ster and Leemans, 2006; Jae Won Lee, 2001). Cheaper and higher performing computing hardware
+acceleratedtheadoptionofquantitativeapproachesinthisperiod, allowingmorequantitativealgo-
+rithmstobeemployedforinvestment. Hence,itisnotsurprisingtoobserveadipintheperformance
+of all portfolios in this period compared to the previous period. Nevertheless, the clustering meth-
+ods still manage to yield annualized mean returns above 26% and Sharpe ratios above 2.2. These
+values are significantly higher than those of the benchmark reversal portfolio, which are 21.6% and
+0.51. DBSCAN performs particularly well in this period attaining an annualized mean return of
+35.6%, and a Sharpe ratio of 2.96.
+Thethirdsub-period,January2007toDecember2009,correspondstothefinancialcrisiscaused
+by the collapse of housing prices in the US and its recovery thereafter. All three clustering methods
+remain profitable during the financial crisis and fare better than the benchmark reversal portfolio,
+exceptforDBSCAN,whichperformscomparablytothebenchmark. Tooursurprise,agglomerative
+clustering performs superbly during the recession, with an annualized mean return of 25.1% and a
+Sharpe ratio of 1.90. Moreover, the maximum drawdown is mere 4.7%, which is significantly lower
+than those of the benchmarks; 50.2% for S&P500 and 21.2% for the reversal portfolio. This finding
+is in line with Do and Faff (2010) and Huck and Afawubo (2015), who find that pairs trading
+strategies perform better during a financial crisis.
+The fourth sub-period ranges from January 2010 to December 2019. We discover that the
+returns generated by k-means and agglomerative clustering deteriorate during this period: they
+earn an annualized mean return below 15%. This finding is in line with Clegg and Krauss (2018),
+Radetal.(2016), andKraussetal.(2017), whoobservethatpairstradingstrategiesgeneratelower
+returns in recent years due to the widespread use of quantitative and machine learning algorithms.
+Any market inefficiency is rapidly arbitraged away, eroding any potential profits to be generated.
+However, westillobserveasignificantamountof profits generatedbyDBSCANinthis period, with
+18
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 20
+============================================================
+an annualized mean return of 23.6% and a Sharpe ratio of 1.98. Agglomerative clustering attains
+a comparatively lower return of 13.6% and a Sharpe ratio of 1.75. The k-means clustering is found
+to be the worst-performing clustering method in this period, generating an annualized mean return
+of 12.9% and a Sharpe ratio of 1.72. Nevertheless, all three clustering methods outperform both
+benchmarks in terms of all metrics. The benchmark reversal portfolio underperforms S&P500 with
+a mean return of 3.7% and a Sharpe ratio of 0.23, suggesting that a na??ve reversal strategy can no
+longer generate profits.
+Thelastsub-periodistheyear2020whentheCOVID-19pandemicswepttheworld. Tocontain
+the spread of the virus, governments worldwide have implemented various degrees of lockdowns,
+whichhaveseverelydepressedtheglobaleconomy. Equitypricesplummetedwhilethestockmarket
+volatility skyrocketed to an unprecedented level, which surpassed what was observed during the
+global financial crisis in 2008, as well as the Great Depression in 1929 (Baker et al., 2020).
+The S&P500 index plunges by 19.4% till March 2020, while the reversal portfolio loses 15.9%
+in the same period. In contrast, the portfolios based on clustering fall by a much smaller magni-
+tude. The agglomerative clustering loses only 3.8%, and the other clustering methods also perform
+robustly with a maximum drawdown below 12%.
+During the recovery from April 2020 onward, S&P500 recovers all the losses incurred till March
+2020. The clustering-based strategies recover more rapidly and achieve significantly positive re-
+turns. DBSCAN performs particularly well generating a mean return higher than 50%. This result
+reaffirms the superiority and resilience of our strategies in a period of economic crisis.
+5 Robustness Check
+Giventheclusteringmethods?strongfinancialperformance,coupledwiththesilentreproachofdata
+snooping with machine learning algorithms, we perform a series of robustness check to ensure the
+performance is not sensitive to model parameters. Unlike many machine learning methods, which
+often involve dozens of parameters and have high degrees of freedom, the clustering algorithms
+have only few parameters, e.g., the number of clusters K for the k-means clustering and the
+outlier threshold ? for DBSCAN and agglomerative clustering, and there is not much room for
+data snooping. Besides the model parameters, we also check the robustness against firm size,
+transaction cost, and the number of principal components.
+5.1 Parameter Sensitivity of the Strategy
+Table 7 analyzes the sensitivity of the pairs trading strategies to the model parameters. We find
+that the strategies are robust across a wide range of parameter values.
+When we increase the number of clusters for k-means clustering from 5 to 1500, the number of
+clusters after removing outliers also increases. In contrast, the number of clustered stocks and the
+number of traded stocks decrease. This is because a larger K generates many tiny clusters whose
+19
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 21
+============================================================
+elementsdonotmeetthetradingcriteria. ThemeanreturnincreaseswithK asonlyasmallnumber
+of stocks that are closest to each other are paired and form the portfolio. Nevertheless, the Sharpe
+ratio does not exhibit a monotonic trend and has its highest value when K = 500. Achieving
+good performance requires a balance between selecting the most profitable pairs and increasing
+diversification. Overall, the strategy is robust to K, with the mean return ranging between 17.1%
+and 25.2% and the Sharpe ratio ranging between 1.50 and 2.34.
+DBSCAN clusters fewer stocks when ? decreases, i.e. when the maximum distance for a pair to
+be connected decreases. However, the number of clusters remains at two, except when ? = 0.9 that
+generates only one cluster. A smaller ? results in a portfolio with fewer stocks and yields higher
+returns and Sharpe ratio, and the best performance occurs when ? = 0.1, the minimum value we
+test. Decreasing ? below 0.1 may further improve the portfolio performance. The strategy based
+on DBSCAN appears to be more sensitive than the one from k-means clustering: the mean return
+ranges between 12.9% and 25.6% and the Sharpe ratio ranges between 0.87 and 2.04.
+Agglomerative clustering trades fewer stocks as the maximum distance for linkage decreases.
+Like in k-means clustering, selecting fewer stocks yields a higher return, but the Sharpe ratio starts
+to decrease when ? is smaller than 0.3. The performance varies rather widely, with the range of
+the mean return between 15.3% and 31.5% and the range of the Sharpe ratio between 1.27 and
+2.69. Still, the strategy earns a mean return of 15.3% and a Sharpe ratio of 1.27 even in the worst
+case (?=0.9), in which only a small portion of the stocks (16.5%) are removed as outliers, and the
+portfolio consists of almost 1000 stocks, on average.
+Overall, all three clustering methods perform robustly within a reasonable range of the param-
+eter values.
+5.2 Size Effects
+It might be that the returns generated by the clustering methods are attributed to illiquid, small-
+cap stocks. To assess the role of small-cap stocks, we repeat the empirical analysis after removing
+stocks with market capitalization smaller than the 10% or 20% NYSE-size quantile. Table 8 (rows
+?NYSE10? and ?NYSE20?) reports the results.
+Removing small-cap stocks lowers the mean return. However, it also reduces the volatility,
+and the Sharpe ratio declines only moderately when the stocks below 10% NYSE-size quantile are
+excluded: the Sharpe ratio is decreased from 2.34 to 2.30 for k-means clustering, 2.04 to 1.79 for
+DBSCAN, and 2.69 to 2.42 for agglomerative clustering. Excluding the stocks below 20% NYSE-
+size quantile does not deteriorate the performance further. The mean return and the Sharpe ratio
+remain almost at the same level and even increase for k-means clustering.
+Although small-cap stocks appear to have a certain extent of contribution to the strategies?
+profitability, the strategies can still generate significant profits when applied to relatively large
+stocks. This result reveals that the profits of the strategies are not a mere small-firm effect and
+they are scalable for large position sizes.
+20
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 22
+============================================================
+5.3 Value-Weighted Portfolio
+For the pairs trading strategy to work as intended, the stocks in a pair should be equally weighted,
+i.e., buyonestockandselltheotherforthesameamount. Asthepairstradingportfolioissimplya
+groupoflong-shortpairs,itshouldalsobeequallyweighted. Nevertheless,tofurtherinvestigatethe
+effectsoffirmsize,weconstructvalue-weightedpairstradingportfoliosandreporttheirperformance
+in Table 8 (row ?VW?). For a fair comparison, the reversal portfolio is also value-weighted.
+The value-weighted portfolios perform worse compared to their equally-weighted counterparts:
+the mean returns and Sharp ratios are approximately halved, which is in line with the findings of
+previous studies, e.g., Gu et al. (2020); Han (2020). Nevertheless, they still outperform the value-
+weightedreversalportfolioandS&P500, generatinghigherreturnsandSharperatios. Inparticular,
+the agglomerative clustering yields an annualized mean return of 13.4% and a Sharpe ratio of 1.09.
+In contrast, the S&P500 index and the reversal portfolio yield mean returns of 12.6% and 2.3% and
+Sharpe ratios of 0.84 and 0.09, respectively.
+5.4 Impact of Transaction Costs
+Our strategies are essentially a contrarian strategy and have a relatively high turnover (about
+180%). But they require rebalancing only once a month and transaction costs should have a
+limited impact. Table 8 (row ?10 bps? and ?20 bps?) presents the portfolios? risk-return metrics after
+taking transaction costs into account. The transaction cost is assumed to be either 10 or 20 basis
+points (bps) per side of the transaction.
+After factoring in 10 bps of transaction costs, the portfolio constructed via agglomerative clus-
+teringearnsanannualizedmeanreturnof20.4%andaSharperatioof2.23. DBSCANandk-means
+clustering earn annualized mean returns of 17.2% and 21.3% and annualized Sharpe ratios of 1.87
+and 1.70, respectively, which are still promising and higher than those of the benchmarks. Even
+with the conservatively assumed transaction cost of 20 bps, agglomerative clustering performs im-
+pressively, attaining an annualized mean return of 15.9% and a Sharpe ratio of 1.73. The k-means
+clustering and DBSCAN earn annualized mean returns of 12.8% and 16.7% and Sharpe ratios
+of 1.39 and 1.34, respectively, and outperform the benchmarks. These results suggest that our
+strategies are likely to remain profitable even when the transaction costs are relatively high.
+5.5 Trading Threshold
+Previously, we use one standard deviation of the past one-month return difference as a threshold
+to trigger pairs trading. Here, we test different thresholds and examine their impacts on portfolio
+performance. A larger threshold selects pairs that have diverged more significantly in the previous
+month and trades fewer stocks. Table 8 (row ?0.5 std?, ?1.5 std?, ?10%?, and ?20%?) reports the
+results from different thresholds.
+When the threshold is set to be 0.5 times the standard deviation (row ?0.5 std?), the stocks
+21
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 23
+============================================================
+traded are doubled, and the returns become lower while the Sharpe ratios change little. Raising
+the threshold to 1.5 times the standard deviation (row ?1.5 std?) increases the return but lowers
+the Sharpe ratio, which can be attributed to the reduced diversification effect. Still, our strategies
+outperform the benchmarks in both cases.
+Wealsotestacrudeapproachthatsimplychoosesacertainpercentileofthestocksfromthetop
+and the bottom. When the portfolio is formed by going long on the 10% lowest return stocks and
+short on the 10% highest return stocks within each cluster (row ?10%?), it obtains a high Sharpe
+ratio, but the return tends to be lower, with the exception of DBSCAN, which earns a similar level
+of return: the Sharpe ratios of k-means, DBSCAN, and agglomerative clustering are respectively
+2.25, 2.00, and 2.81, and the mean returns are 17.7%, 25.1%, and 12.7%. Choosing more extreme
+return stocks with a 5% threshold (row ?5%?) renders similar results.
+Choosing only a few pairs that have diverged significantly can yield a higher return, but the
+Sharpe ratio can deteriorate if the portfolio is not well diversified. A balance between the return
+and the volatility needs to be found. The result above suggests that the strategies perform robustly
+for a range of the threshold. It also suggests that determining the threshold dynamically based
+on the cross-sectional dispersion of the previous one-month return performs better than selecting
+a fixed proportion of the stocks.
+5.6 Number of Principal Components
+Table8(row?PCA95?and?PCA100?)reportsthesensitivityoftheclusteringmethodstothenumber
+of principal components. We choose the number of principal components so that they can explain
+95% or 100% of the variation. We use 100% since the objective of the PCA in our application is
+not to reduce the dimension but to transform the feature space so that the principal components
+rather than the raw features receive the same weight in the distance metric. On average, 63 out of
+126 principal components are selected at 95%, and 86 are selected at 99%.
+The results suggest that the pairs trading strategies are robust to the change of the number of
+principal components. Most risk-return metrics change only slightly with the number of principal
+components. Clusteringalgorithmsarenotoriouslyslowforalargesetofhigh-dimensionaldata,and
+choosing the principal components at a lower variance level, e.g., 95%, may save the computational
+costs significantly without sacrificing portfolio performance.
+6 Conclusion
+In this paper, we develop pairs trading strategies via unsupervised learning. We employ three
+clustering methods, i.e., k-means clustering, DBSCAN, and agglomerative clustering, and utilise
+the information from firm characteristics as well as past returns.
+We test our strategies on the US stock market during the period of January 1980 to December
+2020 and find all three strategies significantly outperform both the market and the short-term re-
+22
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 24
+============================================================
+versal benchmarks. The agglomerative clustering-based strategy appears to be the best performing
+strategy with an annualised mean excess return of 23.8% and an annualised Sharpe ratio of 2.69.
+It also has a low maximum drawdown of 12.3%, which lasts for only two months. Factor mod-
+els cannot explain the significant profits of the strategies. The strategies perform robustly during
+financial crises, such as the 2007 financial crisis and the 2020 market crash.
+Firm characteristics are revealed to be an important source of information in identifying pairs.
+Clustering stocks based on their characteristics as well as past returns significantly reduces the
+volatility and downside risk of the strategies and improves performance.
+The clustering methods select stocks mainly from the manufacturing and financial sectors and
+from mid- to large-cap deciles, making the strategies highly scalable. Each cluster consists of only
+one or few sectors, which implies that stocks in the same industry tend to behave in a similar
+manner. It appears that the profitability of the strategies are not only resulted from the divergence
+of the stocks in the same industry, but also from the divergence between different industries.
+A sub-period analysis and robustness tests reveal that the strategies perform robustly under
+different conditions and are not sensitive to changes of model parameter values.
+Inconclusion,clusteringstocksincorporatingtheinformationfromfirmcharacteristicsimproves
+the identification of stock pairs and the performance of the pairs trading strategy.
+23
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 25
+============================================================
+References
+Aggarwal,C.C.,Hinneburg,A.,Keim,D.A.,2001. Onthesurprisingbehaviorofdistancemetricsin
+high dimensional space, in: International conference on database theory, Springer. pp. 420?434.
+Avellaneda, M., Lee, J.H., 2010. Statistical arbitrage in the us equities market. Quantitative
+Finance 10, 761?782.
+Babu, M.S., Geethanjali, N., Satyanarayana, B., 2012. Clustering approach to stock market pre-
+diction. International Journal of Advanced Networking and Applications 3, 1281.
+Baker, S.R., Bloom, N., Davis, S.J., Kost, K.J., Sammon, M.C., Viratyosin, T., 2020. The un-
+precedented stock market impact of COVID-19. Technical Report. National Bureau of Economic
+Research.
+Bianchi, D., Bu?chner, M., Tamoni, A., 2020. Bond Risk Premiums with Machine Learning. The
+Review of Financial Studies .
+Bini, B., Mathew, T., 2016. Clustering and regression techniques for stock prediction. Procedia
+Technology 24, 1248?1255.
+Birant, D., Kut, A., 2007. St-dbscan: An algorithm for clustering spatial?temporal data. Data &
+Knowledge Engineering 60, 208?221.
+Chahn, 2018. Barclayhedge survey: Majority of hedge fund pros use AI/machine learning in
+investment strategies. Technical Note .
+Chen, S., Lach, J., Amft, O., Altini, M., Penders, J., 2013. Unsupervised activity clustering to
+estimate energy expenditure with a single body sensor, in: 2013 IEEE international conference
+on body sensor networks, IEEE. pp. 1?6.
+Clegg, M., Krauss, C., 2018. Pairs trading with partial cointegration. Quantitative Finance 18,
+121?138.
+Cummins, M., Bucca, A., 2012. Quantitative spread trading on crude oil and refined products
+markets. Quantitative Finance 12, 1857?1875.
+Dempster, M.A., Leemans, V., 2006. Anautomatedfxtradingsystemusingadaptivereinforcement
+learning. Expert Systems with Applications 30, 543?552.
+Do, B., Faff, R., 2010. Does simple pairs trading still work? Financial Analysts Journal 66, 83?95.
+Dose, C., Cincotti, S., 2005. Clustering of financial time series with application to index and
+enhanced index tracking portfolio. Physica A: Statistical Mechanics and its Applications 355,
+145?151.
+24
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 26
+============================================================
+Elbatta, M.N., 2012. An improvement for DBSCAN algorithm for best results in varied densities.
+Ph.D. thesis. The Islamic University-Gaza.
+Elliott, R.J., Van Der Hoek, J., Malcolm, W.P., 2005. Pairs trading. Quantitative Finance 5,
+271?276.
+Engle, R.F., Granger, C.W., 1987. Co-integration and error correction: representation, estimation,
+and testing. Econometrica , 251?276.
+Ester,M.,Kriegel,H.P.,Sander,J.,Xu,X.,1996. Adensity-basedalgorithmfordiscoveringclusters
+in large spatial databases with noise, in: Proceedings of the Second International Conference on
+Knowledge Discovery and Data Mining, AAAI Press. p. 226?231.
+Fama, E.F., French, K.R., 1996. Multifactor explanations of asset pricing anomalies. The Journal
+of Finance 51, 55?84.
+Fama, E.F., French, K.R., 2015. A five-factor asset pricing model. Journal of Financial Economics
+116, 1?22.
+Fung, G.P.C., Yu, J.X., Lam, W., 2002. News sensitive stock trend prediction, in: Pacific-Asia
+Conference on Knowledge Discovery and Data Mining, Springer. pp. 481?493.
+Gatev, E., Goetzmann, W.N., Rouwenhorst, K.G., 2006. Pairs trading: Performance of a relative-
+value arbitrage rule. The Review of Financial Studies 19, 797?827.
+Gowda, K.C., Ravi, T., 1995. Divisive clustering of symbolic objects using the concepts of both
+similarity and dissimilarity. Pattern recognition 28, 1277?1282.
+Green, J., Hand, J.R.M., Zhang, X.F., 2017. The characteristics that provide independent informa-
+tion about average U.S. monthly stock returns. The Review of Financial Studies 30, 4389?4436.
+Gu, S., Kelly, B., Xiu, D., 2020. Empirical asset pricing via machine learning. The Review of
+Financial Studies 33(5), 2223?2273.
+Han,C.,2020. Bimodalcharacteristicreturnsandpredictabilityenhancementviamachinelearning.
+Working Paper .
+Hautam?aki, V., Cherednichenko, S., K?arkk?ainen, I., Kinnunen, T., Fr?anti, P., 2005. Improving
+k-means by outlier removal, in: Scandinavian Conference on Image Analysis, Springer. pp. 978?
+987.
+Hou, K., Mo, H., Xue, C., Zhang, L., 2020. An augmented q-factor model with expected growth.
+Review of Finance .
+Huck, N., 2009. Pairs selection and outranking: An application to the S&P 100 index. European
+Journal of Operational Research 196, 819?825.
+25
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 27
+============================================================
+Huck, N., 2010. Pairs trading and outranking: The multi-step-ahead forecasting case. European
+Journal of Operational Research 207, 1702?1716.
+Huck, N., 2019. Large data sets and machine learning: Applications to statistical arbitrage. Euro-
+pean Journal of Operational Research 278, 330?342.
+Huck, N., Afawubo, K., 2015. Pairs trading and selection methods: is cointegration superior?
+Applied Economics 47, 599?613.
+Jacobs,H.,Weber,M.,2015. Onthedeterminantsofpairstradingprofitability. JournalofFinancial
+Markets 23, 75?97.
+Jae Won Lee, 2001. Stock price prediction using reinforcement learning, in: ISIE 2001. 2001 IEEE
+International Symposium on Industrial Electronics Proceedings (Cat. No.01TH8570), pp. 690?
+695 vol.1.
+Johnson, S.C., 1967. Hierarchical clustering schemes. Psychometrika 32, 241?254.
+Kim, T., Kim, H.Y., 2019. Optimizing the pairs-trading strategy using deep reinforcement learning
+with trading and stop-loss boundaries. Complexity 2019.
+Krauss, C., 2017. Statistical arbitrage pairs trading strategies: Review and outlook. Journal of
+Economic Surveys 31, 513?545.
+Krauss, C., Do, X.A., Huck, N., 2017. Deep neural networks, gradient-boosted trees, random
+forests: Statistical arbitrage on the S&P 500. European Journal of Operational Research 259,
+689?702.
+Ledoit, O., Wolf, M., 2008. Robust performance hypothesis testing with the sharpe ratio. Journal
+of Empirical Finance 15, 850?859.
+Lim, B., Zohren, S., Roberts, S., 2019. Enhancing time-series momentum strategies using deep
+neural networks. The Journal of Financial Data Science 1, 19?38.
+MacQueen, J., et al., 1967. Some methods for classification and analysis of multivariate observa-
+tions,in: ProceedingsofthefifthBerkeleysymposiumonmathematicalstatisticsandprobability,
+Oakland, CA, USA. pp. 281?297.
+Messmer,M.,2017. Deeplearningandthecross-sectionofexpectedreturns. EconometricModeling:
+Capital Markets - Asset Pricing eJournal .
+Moritz, B., Zimmermann, T., 2016. Tree-based conditional portfolio sorts: The relation between
+past and future stock returns. Working Paper .
+Nanda, S., Mahanty, B., Tiwari, M., 2010. Clustering indian stock market data for portfolio
+management. Expert Systems with Applications 37, 8793?8798.
+26
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 28
+============================================================
+Pavlidis, N.G., Plagianakos, V.P., Tasoulis, D.K., Vrahatis, M.N., 2006. Financial forecasting
+through unsupervised clustering and neural networks. Operational Research 6, 103?127.
+Rad, H., Low, R.K.Y., Faff, R., 2016. The profitability of pairs trading strategies: distance,
+cointegration and copula methods. Quantitative Finance 16, 1541?1558.
+Rahmah, N., Sitanggang, I.S., 2016. Determination of optimal epsilon (eps) value on dbscan
+algorithm to clustering data on peatland hotspots in sumatra, in: IOP Conference Series: Earth
+and Environmental Science, IOP Publishing. p. 012012.
+Sarmento, S.M., Horta, N., 2020. Enhancing a pairs trading strategy with the application of
+machine learning. Expert Systems with Applications 158, 113490.
+Schubert, E., Sander, J., Ester, M., Kriegel, H.P., Xu, X., 2017. Dbscan revisited, revisited: why
+and how you should (still) use dbscan. ACM Transactions on Database Systems (TODS) 42,
+1?21.
+Shumway, T., Warther, V.A., 1999. The delisting bias in crsp?s nasdaq data and its implications
+for the size effect. The Journal of Finance 54, 2361?2379.
+Siraj, M.M., Maarof, M.A., Hashim, S.Z.M., 2009. Intelligent clustering with pca and unsupervised
+learning algorithm in intrusion alert correlation, in: 2009 Fifth International Conference on
+Information Assurance and Security, IEEE. pp. 679?682.
+Ta, V.D., Liu, C.M., 2016. Stock market analysis using clustering techniques: the impact of
+foreign ownership on stock volatility in vietnam, in: Proceedings of the Seventh Symposium on
+Information and Communication Technology, pp. 99?106.
+Vidyamurthy, G., 2004. PairsTrading: quantitativemethodsandanalysis.volume217. JohnWiley
+& Sons.
+Xie, W., Liew, R.Q., Wu, Y., Zou, X., 2016. Pairs trading with copulas. The Journal of Trading
+11, 41?52.
+Yang,Y.,Lian,B.,Li,L.,Chen,C.,Li,P.,2014.Dbscanclusteringalgorithmappliedtoidentifysus-
+picious financial transactions, in: 2014 International Conference on Cyber-Enabled Distributed
+Computing and Knowledge Discovery, IEEE. pp. 60?65.
+27
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 29
+============================================================
+Table 1: Clustering characteristics
+Thistablereportstheclusteringresultsfromthek-meansclustering,DBSCAN,andagglomerativeclustering. Stocks
+are clustered every month during the test period from 1990.01 to 2020.12, and the reported values are time-series
+averages. The values in parentheses are the percentages against the total number of stocks.
+k-means DBSCAN Agglomerative
+Number of clusters 129 2 188
+Number of stocks in total 3157 3157 3157
+Number of stocks in clusters 1257 (39.78) 376 (12.05) 769 (24.58)
+Number of outliers 1900 (60.22) 2781 (87.95) 2388 (75.42)
+Number of stocks in the biggest cluster 63 (5.18) 336 (88.89) 107 (13.72)
+Number of stocks in the second biggest cluster 51 (4.13) 32 (8.74) 47 (6.09)
+Number of stocks in the third biggest cluster 45 (3.63) 6 (1.88) 29 (3.74)
+Number of stocks traded 330 (10.33) 75 (2.47) 126 (4.05)
+28
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 30
+============================================================
+Table 2: Strategy performance
+This table reports the performance of the equally-weighted pairs trading portfolios constructed via k-means, DB-
+SCAN, and agglomerative clustering. The test period is from 1980.01 to 2020.12. Panel (a) reports the summary
+statisticsofthemonthlyreturns, andpanel(b)reportsannualizedrisk-returnmetrics. Thet-statisticinpanel(a)is
+theNewey?Westt-statistic. Thet-statisticinpanel(b)teststhedifferenceoftheSharperatiofromtheSharperatio
+of the benchmark reversal portfolio. It is computed using the method of Ledoit and Wolf (2008). S&P500 denotes
+the S&P500 index with dividends and Reversal denotes the equally-weighted short-term reversal portfolio.
+(a)Monthlyreturnsummarystatistics
+k-means DBSCAN Agglomerative Benchmarks
+L S L-S L S L-S L S L-S S&P500 Reversal
+Mean 0.023 0.005 0.018 0.022 0.001 0.021 0.023 0.002 0.021 0.011 0.020
+Standarddeviation 0.059 0.048 0.027 0.052 0.043 0.036 0.054 0.045 0.027 0.044 0.070
+Standarderror 0.003 0.002 0.001 0.002 0.002 0.002 0.003 0.002 0.001 0.002 0.003
+t-statistic 7.905 2.056 14.280 8.999 0.267 12.842 8.951 1.116 16.115 5.275 6.362
+Min -0.285 -0.266 -0.079 -0.221 -0.291 -0.104 -0.240 -0.303 -0.087 -0.216 -0.363
+25% -0.007 -0.021 0.001 -0.006 -0.019 -0.001 -0.004 -0.018 0.004 -0.015 -0.011
+50% 0.024 0.009 0.015 0.022 0.004 0.017 0.023 0.005 0.019 0.014 0.014
+75% 0.052 0.034 0.031 0.052 0.024 0.038 0.050 0.028 0.035 0.037 0.042
+Max 0.330 0.198 0.174 0.211 0.145 0.180 0.311 0.193 0.160 0.135 0.800
+Skew -0.226 -0.818 1.044 -0.320 -1.218 0.762 -0.108 -1.162 0.854 -0.597 3.135
+Kurtosis 4.496 3.872 4.246 2.485 6.761 2.281 3.599 7.097 4.018 2.127 34.244
+(b)Annualizedrisk-returnmetrics
+k-means DBSCAN Agglomerative Benchmarks
+L S L-S L S L-S L S L-S S&P500 Reversal
+Meanreturn 0.272 0.056 0.215 0.263 0.007 0.256 0.277 0.029 0.248 0.126 0.239
+Standarddeviation 0.206 0.165 0.092 0.180 0.149 0.126 0.187 0.157 0.092 0.151 0.243
+Sharperatio 1.318 0.339 2.336 1.457 0.044 2.039 1.481 0.183 2.692 0.835 0.983
+t-statistic 9.036 5.365 10.070
+Downsidedeviation 0.158 0.133 0.046 0.131 0.127 0.063 0.139 0.134 0.048 0.112 0.141
+Sortinoratio 1.719 0.423 4.713 2.007 0.052 4.065 1.998 0.215 5.150 1.123 1.693
+Grossprofit 17.164 9.890 10.165 15.979 7.642 12.832 16.470 8.460 11.422 11.088 15.548
+Grossloss -6.032 -7.588 -1.334 -5.203 -7.371 -2.326 -5.110 -7.283 -1.239 -5.910 -5.755
+Profitfactor 2.846 1.303 7.618 3.071 1.037 5.517 3.223 1.162 9.218 1.876 2.702
+Profitableyears 36 29 40 37 23 40 36 25 41 34 33
+Unprofitableyears 5 12 1 4 18 1 5 16 0 7 8
+Maximumdrawdown -0.505 -0.580 -0.113 -0.481 -0.796 -0.149 -0.424 -0.595 -0.123 -0.502 -0.503
+Calmarratio 0.537 0.097 1.900 0.547 0.008 1.717 0.653 0.048 2.013 0.251 0.475
+Turnover 0.900 0.923 1.823 0.929 0.951 1.880 0.939 0.955 1.894
+29
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 31
+============================================================
+Table 3: Strategy performance without firm characteristics
+This table reports the performance of the equally-weighted pairs trading portfolios constructed via k-means, DB-
+SCAN, and agglomerative clustering utilizing only momentum features. The test period is from 1980.01 to 2020.12.
+Panel(a)reportsthesummarystatisticsofthemonthlyreturns,andpanel(b)reportsannualizedrisk-returnmetrics.
+Thet-statisticinpanel(a)istheNewey?Westt-statistic. Thet-statisticinpanel(b)teststhedifferenceoftheSharpe
+ratio from the corresponding Sharpe ratio in Table 2. It is computed using the method of Ledoit and Wolf (2008).
+(a)Monthlyreturnsummarystatistics
+k-means DBSCAN Agglomerative Benchmarks
+L S L-S L S L-S L S L-S S&P500 Reversal
+Mean 0.024 0.003 0.020 0.024 0.004 0.020 0.025 0.005 0.020 0.011 0.020
+Standarddeviation 0.074 0.053 0.040 0.070 0.054 0.044 0.081 0.060 0.048 0.044 0.070
+Standarderror 0.004 0.003 0.002 0.003 0.003 0.002 0.004 0.003 0.002 0.002 0.003
+t-statistic 6.657 1.291 10.610 7.297 1.688 9.454 6.341 1.575 8.736 5.275 6.362
+Min -0.359 -0.283 -0.159 -0.369 -0.464 -0.083 -0.332 -0.262 -0.229 -0.216 -0.363
+25% -0.015 -0.021 -0.001 -0.004 -0.015 -0.003 -0.013 -0.025 -0.003 -0.015 -0.011
+50% 0.020 0.007 0.016 0.021 0.006 0.014 0.020 0.003 0.016 0.014 0.014
+75% 0.057 0.030 0.034 0.047 0.025 0.037 0.056 0.030 0.037 0.037 0.042
+Max 0.460 0.323 0.282 0.615 0.388 0.395 0.510 0.374 0.282 0.135 0.800
+Skew 0.746 -0.119 1.237 1.840 -0.348 2.259 1.266 0.891 0.685 -0.597 3.135
+Kurtosis 7.295 5.663 7.257 17.883 20.097 13.615 7.650 6.598 6.507 2.127 34.244
+(b)Annualizedrisk-returnmetrics
+k-means DBSCAN Agglomerative Benchmarks
+L S L-S L S L-S L S L-S S&P500 Reversal
+Meanreturn 0.283 0.039 0.244 0.291 0.053 0.238 0.296 0.054 0.241 0.126 0.239
+Standarddeviation 0.256 0.182 0.139 0.244 0.188 0.152 0.282 0.208 0.167 0.151 0.243
+Sharperatio 1.105 0.214 1.757 1.195 0.281 1.571 1.049 0.260 1.442 0.835 0.983
+t-statistic 2.520 2.158 3.640 2.296 2.215 2.875 3.684 0.236 5.434
+Downsidedeviation 0.168 0.138 0.081 0.171 0.162 0.066 0.171 0.136 0.118 0.112 0.141
+Sortinoratio 1.688 0.283 2.997 1.703 0.327 3.591 1.733 0.399 2.045 1.123 1.693
+Grossprofit 18.956 9.884 12.507 17.544 9.051 12.733 19.923 10.972 13.550 11.088 15.548
+Grossloss -7.356 -8.281 -2.510 -5.603 -6.882 -2.960 -7.804 -8.749 -3.654 -5.910 -5.755
+Profitfactor 2.577 1.194 4.983 3.131 1.315 4.302 2.553 1.254 3.708 1.876 2.702
+Profitableyears 36 25 38 37 27 38 34 25 39 34 33
+Unprofitableyears 5 16 3 4 14 3 7 16 2 7 8
+Maximumdrawdown -0.536 -0.656 -0.227 -0.477 -0.624 -0.129 -0.489 -0.642 -0.503 -0.502 -0.503
+Calmarratio 0.528 0.060 1.075 0.611 0.085 1.846 0.604 0.084 0.480 0.251 0.475
+Turnover 0.857 0.932 1.789 0.932 0.981 1.913 0.908 0.967 1.875
+30
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 32
+============================================================
+Table 4: Factor regression
+Thistablereportsthefactorregressionresultsoftheequally-weightedpairstradingportfolioconstructedviaagglom-
+erativeclustering. FF3,FF3+2,FF5,andq5respectivelydenotetheFama-Frenchthreefactors,FF3plusmomentum
+and short-term reversal factors, Fama-French five factors, and Hou-Mo-Xue-Zhang q5 factors. The sample period
+is from 1980.01 to 2020.12 except for q5, for which the period ends in 2019.12. The values in parentheses are the
+Newey-West t-statistics.
+FF3 FF3+2 FF5 q5
+Intercept 0.019*** 0.020*** 0.019*** 0.019***
+(14.160) (15.009) (14.014) (12.355)
+Market 0.149*** 0.054 0.159*** 0.154***
+(3.853) (1.469) (4.302) (4.067)
+SMB 0.040 0.019
+(0.568) (0.418)
+HML 0.180** 0.085
+(2.158) (0.997)
+Momentum -0.125***
+(-2.822)
+Reversal 0.293***
+(4.847)
+SMB5 0.075
+(1.148)
+HML5 0.145
+(1.216)
+RMW5 0.095
+(1.059)
+CMA5 0.039
+(0.284)
+R ME 0.037
+(0.445)
+R IA 0.231***
+(2.723)
+R ROE -0.145*
+(-1.915)
+R EG 0.048
+(0.535)
+R2 0.086 0.285 0.092 0.103
+Adj. R2 0.080 0.277 0.083 0.093
+Num. obs. 492 492 492 480
+* p<0.10, ** p<0.05, and *** p<0.01
+31
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 33
+============================================================
+Table 5: Size and industry breakdown of the clusters
+This table reports the composition of the stocks traded under each clustering method during the test period from
+1980.01 to 2020.12. Panel (a) reports the percentage of the stocks in each size decile, where 1 (10) denotes the
+smallest(largest)stocks. Panel(b)reportstheindustrysectorcompositionofthestocks. Theindustryclassification
+is by the North American Industry Classification System (NAICS). The column Market denotes the composition of
+the entire market. The reported values are time-series averages over the sample period.
+(a)Sizedeciles
+k-means DBSCAN Agglomerative
+L S L-S L S L-S L S L-S
+10 9.82 11.71 10.77 14.31 16.21 15.26 11.68 13.47 12.57
+9 12.24 13.52 12.88 16.96 17.63 17.30 15.29 16.18 15.74
+8 12.47 13.78 13.13 15.66 15.63 15.65 15.17 15.69 15.43
+7 12.84 13.34 13.09 12.43 13.24 12.84 14.05 14.31 14.18
+6 12.27 12.38 12.32 10.99 10.82 10.91 12.33 12.27 12.30
+5 10.97 10.90 10.94 8.88 8.54 8.71 9.88 9.81 9.84
+4 9.94 9.09 9.52 7.80 7.43 7.62 8.59 8.05 8.32
+3 8.69 7.44 8.07 7.30 6.41 6.85 6.76 5.83 6.30
+2 7.02 5.46 6.24 4.60 3.56 4.08 4.80 3.64 4.22
+1 3.72 2.37 3.04 1.05 0.54 0.80 1.44 0.77 1.10
+Average 6.11 6.42 6.27 6.78 6.91 6.84 6.59 6.79 6.69
+(b)Industrybreakdown
+k-means DBSCAN Agglomerative Market
+L S L-S L S L-S L S L-S
+Manufacturing 47.59 47.39 47.49 27.89 26.83 27.36 42.99 42.81 42.90 43.56
+Finance,insurance,realestate 18.94 19.00 18.97 49.55 51.97 50.76 31.78 31.86 31.82 16.06
+Services 11.21 11.51 11.36 2.16 2.24 2.20 7.20 7.23 7.21 13.78
+Transportation,communications,utilities 8.22 8.02 8.12 15.95 14.72 15.33 8.84 8.86 8.85 8.79
+Retailtrade 5.69 5.84 5.76 1.25 1.23 1.24 3.64 3.72 3.68 6.51
+Wholesaletrade 3.33 3.41 3.37 1.10 1.04 1.07 2.49 2.43 2.46 3.97
+Mining 3.08 2.84 2.96 0.81 0.70 0.76 1.63 1.57 1.60 4.37
+Construction 0.93 0.91 0.92 0.32 0.44 0.38 0.69 0.68 0.68 1.26
+Nonclassifiableestablishments 0.70 0.75 0.72 0.67 0.58 0.63 0.50 0.58 0.54 1.23
+Agriculture,forestry,fishing 0.16 0.19 0.18 0.05 0.04 0.04 0.06 0.11 0.09 0.29
+Publicadministration(government) 0.02 0.02 0.02 0.00 0.00 0.00 0.00 0.01 0.01 0.02
+Numberofindustrieswithineachcluster 1.32 1.32 1.83 2.74 2.74 3.47 1.03 1.03 1.32
+32
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 34
+============================================================
+Table 6: Sub-period analysis
+This table reports sub-period performances of the equally-weighted pairs trading portfolios constructed via k-means
+clustering, DBSCAN, and agglomerative clustering. The sub-periods are defined in the table. The values are annu-
+alized where applicable.
+k-means DBSCAN Agglomerative S&P500 Reversal
+01/1980-12/1999
+Meanreturn 0.248 0.231 0.279 0.178 0.345
+Sharperatio 3.521 2.189 4.138 1.186 2.078
+Sortinoratio 9.429 4.019 12.260 1.585 3.325
+Profitfactor 17.918 5.467 28.955 2.452 7.493
+Maximumdrawdown -0.045 -0.082 -0.032 -0.296 -0.192
+Calmarratio 5.515 2.807 8.742 0.601 1.799
+01/2000-12/2006
+Meanreturn 0.268 0.356 0.296 0.023 0.216
+Sharperatio 2.276 2.964 2.558 0.162 0.510
+Sortinoratio 4.347 16.470 3.958 0.235 0.917
+Profitfactor 8.712 20.465 8.739 1.131 1.764
+Maximumdrawdown -0.079 -0.037 -0.123 -0.444 -0.406
+Calmarratio 3.400 9.671 2.402 0.052 0.532
+01/2007-12/2009
+Meanreturn 0.231 0.181 0.251 -0.035 0.165
+Sharperatio 1.690 0.891 1.904 -0.176 0.671
+Sortinoratio 4.740 2.189 3.944 -0.223 1.813
+Profitfactor 4.625 2.087 5.027 0.875 1.764
+Maximumdrawdown -0.061 -0.149 -0.047 -0.502 -0.212
+Calmarratio 3.820 1.210 5.331 -0.069 0.782
+01/2010-12/2019
+Meanreturn 0.129 0.236 0.136 0.135 0.037
+Sharperatio 1.716 1.977 1.753 1.086 0.232
+Sortinoratio 4.627 3.579 3.619 1.603 0.486
+Profitfactor 4.216 5.169 3.698 2.214 1.198
+Maximumdrawdown -0.076 -0.140 -0.091 -0.162 -0.260
+Calmarratio 1.703 1.684 1.499 0.835 0.141
+01/2020-12/2020
+Meanreturn 0.002 0.496 0.420 0.209 0.511
+Sharperatio 0.013 2.112 2.040 0.805 1.302
+Sortinoratio 0.028 6.020 8.433 1.379 3.421
+Profitfactor 1.011 5.958 6.191 1.777 3.389
+Maximumdrawdown -0.113 -0.059 -0.038 -0.194 -0.159
+Calmarratio 0.020 8.390 11.067 1.076 3.224
+33
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 35
+============================================================
+seigetarts
+eht
+fo
+ytivitisnes
+retemaraP
+:7
+elbaT
+ehT
+.seulav
+retemarap
+tnereffid
+htiw
+dohtem
+gniretsulc
+hcae
+morf
+detcurtsnoc
+oiloftrop
+trohs-gnol
+dethgiew-yllauqe
+eht
+fo
+ecnamrofrep
+eht
+stroper
+elbat
+sihT
+eht
+rof
+)?(
+selitnecrep
+tnereffid
+htiw
+detset
+era
+gniretsulc
+evitaremolgga
+dna
+NACSBD
+dna
+,)K(
+sretsulc
+fo
+srebmun
+tnereffid
+htiw
+detset
+si
+gniretsulc
+snaem-k
+.dlohserht
+reiltuo
+snaem-k)a(
+0051
+0001
+005
+001
+05
+01
+5
+K
+252.0
+842.0
+512.0
+891.0
+591.0
+971.0
+171.0
+nruternaeM
+926.1
+199.1
+633.2
+059.1
+898.1
+156.1
+994.1
+oitareprahS
+703.0-
+521.0-
+311.0-
+512.0-
+091.0-
+712.0-
+312.0-
+nwodwardmumixaM
+000.08
+000.431
+000.921
+000.25
+000.03
+000.8
+000.4
+sretsulcforebmuN
+)49.01(193
+)22.42(987
+)87.93(7521
+)83.94(3451
+)18.94(5551
+)99.94(1651
+)0.05(1651
+sretsulcniskcotsforebmuN
+)60.98(6672
+)87.57(8632
+)22.06(0091
+)26.05(4161
+)91.05(2061
+)10.05(6951
+)0.05(6951
+sreiltuoforebmuN
+)46.1(06
+)19.4(661
+)33.01(033
+)11.51(274
+)7.51(094
+)8.61(425
+)91.71(635
+dedartskcotsforebmuN
+NACSBD)b(
+9.0
+8.0
+7.0
+6.0
+5.0
+4.0
+3.0
+2.0
+1.0
+?
+921.0
+431.0
+831.0
+841.0
+841.0
+451.0
+371.0
+002.0
+652.0
+nruternaeM
+768.0
+459.0
+630.1
+241.1
+091.1
+823.1
+625.1
+367.1
+930.2
+oitareprahS
+233.0-
+582.0-
+832.0-
+242.0-
+791.0-
+602.0-
+361.0-
+641.0-
+941.0-
+nwodwardmumixaM
+1
+2
+2
+2
+2
+2
+2
+2
+2
+sretsulcforebmuN
+)2.29(8782
+)45.38(9062
+)65.47(8232
+)41.56(4302
+)14.55(9271
+)44.54(8141
+)20.53(2901
+)60.42(947
+)50.21(673
+sretsulcniskcotsforebmuN
+)8.7(972
+)64.61(845
+)44.52(928
+)68.43(3211
+)95.44(8241
+)65.45(9371
+)89.46(5602
+)49.57(8042
+)59.78(1872
+sreiltuoforebmuN
+)68.83(7121
+)76.33(3501
+)76.82(698
+)28.32(347
+)90.91(495
+)25.41(054
+)81.01(413
+)71.6(881
+)74.2(57
+dedartskcotsforebmuN
+evitaremolggA)c(
+9.0
+8.0
+7.0
+6.0
+5.0
+4.0
+3.0
+2.0
+1.0
+?
+351.0
+761.0
+181.0
+991.0
+512.0
+732.0
+842.0
+072.0
+513.0
+nruternaeM
+862.1
+765.1
+328.1
+271.2
+634.2
+186.2
+296.2
+044.2
+621.2
+oitareprahS
+691.0-
+581.0-
+791.0-
+921.0-
+231.0-
+301.0-
+321.0-
+711.0-
+232.0-
+nwodwardmumixaM
+161
+422
+252
+852
+742
+322
+881
+041
+08
+sretsulcforebmuN
+)64.38(6062
+)55.17(4322
+)48.06(1091
+)59.05(2951
+)47.14(4031
+)10.33(2301
+)85.42(967
+)84.61(515
+)43.8(062
+sretsulcniskcotsforebmuN
+)45.61(155
+)54.82(329
+)61.93(6521
+)50.94(5651
+)62.85(3581
+)99.66(5212
+)24.57(8832
+)25.38(2462
+)66.19(7982
+sreiltuoforebmuN
+)79.13(1001
+)85.42(967
+)96.81(485
+)48.31(234
+)98.9(803
+)66.6(702
+)50.4(621
+)21.2(56
+)47.0(32
+dedartskcotsforebmuN
+34
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 36
+============================================================
+Table 8: Robustness check
+This table reports the results from the robustness check in Section 5. ?NYSE10? (?NYSE20?) denotes the results
+after excluding stocks smaller than 10% (20%) NYSE-size quantile, and ?VW? denotes the value-weighted portfolio
+performance. ?10 bps? (?20 bps?) denotes the results after considering transaction costs of 10 (20) bps. ?0.5 std? (?1.5
+std?) denotes the results when the trading threshold is set to 0.5 (1.5) times the cross-sectional standard deviation,
+and?10%?(?5%?)denotestheresultswhentheportfoliosareconstructedfromthe10%(5%)highestandlowestreturn
+stocks. ?PCA95? (?PCA100?) denotes the results when the principal components are chosen so that they can explain
+95% (100%) of the variation. The test period is from 1980.01 to 2020.12.
+k-means DBSCAN Agglomerative Benchmarks
+L S L-S L S L-S L S L-S S&P500 Reversal
+NYSE10 MR 0.245 0.061 0.184 0.243 0.034 0.210 0.252 0.048 0.204 0.126 0.239
+SR 1.288 0.384 2.297 1.311 0.223 1.789 1.362 0.320 2.421 0.835 0.983
+MDD -0.473 -0.507 -0.068 -0.587 -0.561 -0.238 -0.454 -0.509 -0.077 -0.502 -0.503
+NYSE20 MR 0.225 0.063 0.163 0.236 0.044 0.193 0.240 0.055 0.185 0.126 0.239
+SR 1.212 0.395 2.026 1.314 0.295 1.578 1.355 0.367 2.293 0.835 0.983
+MDD -0.491 -0.522 -0.108 -0.502 -0.493 -0.256 -0.484 -0.515 -0.097 -0.502 -0.503
+VW MR 0.174 0.067 0.107 0.202 0.054 0.147 0.194 0.061 0.134 0.126 0.023
+SR 0.907 0.413 0.865 1.025 0.337 0.900 0.974 0.350 1.087 0.835 0.089
+MDD -0.540 -0.619 -0.265 -0.693 -0.565 -0.477 -0.601 -0.551 -0.241 -0.502 -0.747
+10bps MR 0.249 0.032 0.172 0.241 -0.017 0.213 0.254 0.004 0.204 0.126 0.239
+SR 1.208 0.196 1.868 1.334 -0.117 1.701 1.356 0.023 2.225 0.835 0.983
+MDD -0.524 -0.597 -0.121 -0.503 -0.878 -0.157 -0.446 -0.693 -0.132 -0.502 -0.503
+20bps MR 0.227 0.010 0.128 0.219 -0.040 0.167 0.231 -0.019 0.159 0.126 0.239
+SR 1.103 0.062 1.394 1.211 -0.270 1.343 1.235 -0.123 1.731 0.835 0.983
+MDD -0.541 -0.683 -0.151 -0.525 -0.936 -0.170 -0.467 -0.836 -0.143 -0.502 -0.503
+0.5std MR 0.243 0.078 0.165 0.222 0.054 0.168 0.241 0.065 0.176 0.126 0.239
+SR 1.317 0.504 2.482 1.353 0.382 1.865 1.423 0.443 2.997 0.835 0.983
+MDD -0.496 -0.564 -0.061 -0.483 -0.564 -0.131 -0.425 -0.542 -0.050 -0.502 -0.503
+1.5std MR 0.307 0.033 0.275 0.289 -0.019 0.308 0.318 0.017 0.301 0.126 0.239
+SR 1.334 0.180 2.098 1.363 -0.119 1.749 1.494 0.097 1.933 0.835 0.983
+MDD -0.492 -0.639 -0.146 -0.635 -0.889 -0.271 -0.400 -0.707 -0.477 -0.502 -0.503
+10% MR 0.249 0.072 0.177 0.255 0.004 0.251 0.216 0.089 0.127 0.126 0.239
+SR 1.300 0.456 2.249 1.394 0.028 1.997 1.308 0.604 2.808 0.835 0.983
+MDD -0.534 -0.591 -0.068 -0.514 -0.754 -0.197 -0.469 -0.546 -0.052 -0.502 -0.503
+5% MR 0.252 0.077 0.175 0.264 -0.019 0.284 0.215 0.092 0.122 0.126 0.239
+SR 1.256 0.461 2.068 1.313 -0.126 1.861 1.287 0.620 2.682 0.835 0.983
+MDD -0.556 -0.597 -0.082 -0.596 -0.858 -0.311 -0.471 -0.545 -0.058 -0.502 -0.503
+PCA95 MR 0.271 0.058 0.213 0.263 0.011 0.252 0.278 0.038 0.240 0.126 0.239
+SR 1.307 0.351 2.259 1.466 0.075 2.001 1.472 0.241 2.288 0.835 0.983
+MDD -0.495 -0.587 -0.156 -0.491 -0.773 -0.150 -0.445 -0.567 -0.231 -0.502 -0.503
+PCA100 MR 0.272 0.054 0.218 0.258 0.003 0.256 0.280 0.032 0.248 0.126 0.239
+SR 1.325 0.327 2.316 1.392 0.016 2.018 1.478 0.203 2.643 0.835 0.983
+MDD -0.491 -0.581 -0.141 -0.486 -0.850 -0.154 -0.449 -0.584 -0.096 -0.502 -0.503
+35
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 37
+============================================================
+160 1750 The first cluster
+The second cluster
+140 The rest
+1500
+120
+1250
+100
+1000
+80
+750
+60
+500
+40
+20 250
+0 0
+01-198
+0
+0 1-198
+0
+5 1-199
+0
+0 1-199
+0
+5 1-200
+0
+0 1-200
+0
+5 1-201
+0
+0 1-201
+0
+5 1-2020 01-198
+0
+0 1-198
+0
+5 1-199
+0
+0 1-199
+0
+5 1-200
+0
+0 1-200
+0
+5 1-201
+0
+0 1-201
+0
+5 1-2020
+(a)k-means
+7
+The first cluster
+6 500 The second cluster
+The rest
+5 400
+4
+300
+3
+200
+2
+100
+1
+0 0
+01-198
+0
+0 1-198
+0
+5 1-199
+0
+0 1-199
+0
+5 1-200
+0
+0 1-200
+0
+5 1-201
+0
+0 1-201
+0
+5 1-2020 01-198
+0
+0 1-198
+0
+5 1-199
+0
+0 1-199
+0
+5 1-200
+0
+0 1-200
+0
+5 1-201
+0
+0 1-201
+0
+5 1-2020
+(b)DBSCAN
+250 1000 The first cluster
+The second cluster
+The rest
+200 800
+150 600
+100 400
+50 200
+0 0
+01-198
+0
+0 1-198
+0
+5 1-199
+0
+0 1-199
+0
+5 1-200
+0
+0 1-200
+0
+5 1-201
+0
+0 1-201
+0
+5 1-2020 01-198
+0
+0 1-198
+0
+5 1-199
+0
+0 1-199
+0
+5 1-200
+0
+0 1-200
+0
+5 1-201
+0
+0 1-201
+0
+5 1-2020
+(c)Agglomerative
+Figure 2: Number of clusters and the number of stocks in the clusters
+This figure presents the number of clusters and the number of stocks in the clusters formed by k-means clustering,
+DBSCAN, and agglomerative clustering. The graphs on the left show the number of clusters and the graphs on the
+right show the number of stocks in the first two biggest clusters every month during the test period from 1980.01 to
+2020.12.
+36
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 38
+============================================================
+K-means
+DBSCAN
+Agglomerative
+SP500
+Reversal
+0.4 0.2 0.0 0.2 0.4 0.6 0.8
+Figure 3: Monthly return distribution
+This box plot presents the monthly return distributions of the equally-weighted pairs trading portfolios constructed
+via k-means clustering, DBSCAN, and agglomerative clustering during the test period from 1980.01 to 2020.12.
+10 K-means
+DBSCAN
+Agglomerative
+8 SP500
+Reversal
+6
+4
+2
+0
+0 5 0 5 0 5 0 5 0
+8 8 9 9 0 0 1 1 2
+9 9 9 9 0 0 0 0 0
+1 1 1 1 2 2 2 2 2
+Figure 4: Cumulative returns of pairs trading portfolios
+This figure presents the log-scale cumulative returns of the equally-weighted pairs trading portfolios constructed via
+k-means clustering, DBSCAN, and agglomerative clustering during the test period from 1980.01 to 2020.12.
+37
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 39
+============================================================
+A Appendix: Firm Characteristics
+Acronym Firmcharacteristic Acronym Firmcharacteristic
+absacc Absoluteaccruals invest Capitalexpendituresandinventory
+acc Workingcapitalaccruals IPO Newequityissue
+aeavol Abnormalearningsannouncementvolume lev Leverage
+age #yearssincefirstCompustatcoverage lgr Growthinlong-termdebt
+agr Assetgrowth maxret Maximumdailyreturn
+baspread Bid-askspread ms Financialstatementscore
+beta Beta mve Size
+betasq Betasquared mve ia Industry-adjustedsize
+bm Book-to-market nincr Numberofearningsincreases
+bm ia Industry-adjustedbooktomarket operprof Operatingprofitability
+cash Cashholdings pchcapx ia Industryadjusted%changeincapitalexpenditures
+cashdebt Cashflowtodebt pchcurrat %changeincurrentratio
+cashpr Cashproductivity pchdepr %changeindepreciation
+cfp Cashflowtopriceratio pchgm pchsale %changeingrossmargin-%changeinsales
+cfp ia Industry-adjustedcashflowtopriceratio pchquick %changeinquickratio
+chatoia Industry-adjustedchangeinassetturnover pchsale pchrect %changeinsales-%changeinA/R
+chcsho Changeinsharesoutstanding pctacc Percentaccruals
+chempia Industry-adjustedchangeinemployees pricedelay Pricedelay
+chinv Changeininventory ps Financialstatementsscore
+chmom Changein6-monthmomentum quick Quickratio
+chpmia Industry-adjustedchangeinprofitmargin rd R&Dincrease
+chtx Changeintaxexpense retvol Returnvolatility
+cinvest Corporateinvestment roaq Returnonassets
+convind Convertibledebtindicator roeq Returnonequity
+currat Currentratio roic Returnoninvestedcapital
+depr Depreciation/PP&E rsup Revenuesurprise
+divi Dividendinitiation salecash Salestocash
+divo Dividendomission salerec Salestoreceivables
+dolvol Dollartradingvolume securedind Secureddebtindicator
+dy Dividendtoprice sgr Salesgrowth
+ear Earningsannouncementreturn sin Sinstocks
+egr Growthincommonshareholderequity SP Salestoprice
+ep Earningstoprice std dolvol Volatilityofliquidity(dollartradingvolume)
+gma Grossprofitability std turn Volatilityofliquidity(shareturnover)
+herf Industrysalesconcentration sue Unexpectedquarterlyearnings
+hire Employeegrowthrate tang Debtcapacity/firmtangibility
+idiovol Idiosyncraticreturnvolatility tb Taxincometobookincome
+ill Illiquidity turn Shareturnover
+indmom Industrymomentum zerotrade Zerotradingdays
+Note: This table lists the 78 firm characteristics used in the study. Readers are referred to Green et al. (2017) and
+the references therein for the exact definitions.
+38
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 40
+============================================================
+B Clustering Algorithms
+Algorithm 1: k-means clustering
+Input: X: All sample points in month t
+K: Number of Clusters
+MaxIter: Maximum number of iterations
+Tol: tolerance for convergence
+Initialize centroids ? ?s at random points
+1 k
+for i in MaxIter do
+2
+for each sample point x in X do
+3
+Assign x to its nearest centroid
+4
+Update the centroids ? ?s
+5 k
+if the l norm of the difference in the cluster centroids of two consecutive iterations is smaller
+6 2
+than Tol then
+Break
+7
+Algorithm 2: Identification of outliers in k-means clustering
+Input: X: All sample points in month t
+?: Percentile to calculate (cid:15), the maximum distance to the centroid for a sample point to remain in
+its cluster
+? : The corresponding centroid of sample point x where x?X
+x
+Compute the l2 distances of every point to its corresponding centroid
+1
+(cid:15)= the ? percentile of the l2 distances
+2
+for each sample point x in X do
+3
+if ||x?? || >(cid:15) then
+4 x 2
+Mark x as outlier
+5
+39
+Electronic copy available at: https://ssrn.com/abstract=3860998
+
+============================================================
+PAGE 41
+============================================================
+Algorithm 3: DBSCAN
+Input: X: All sample points in month t
+MinPts: Minimum number of sample points per cluster
+(cid:15): Maximum distance between two samples for one to be considered the neighbourhood of the other
+C =0
+1
+for each unvisited sample point x in X do
+2
+Mark x as visited
+3
+NeighborPts = all points within (cid:15) from x
+4
+if size of NeighborPts<MinPts then
+5
+Mark x as NOISE
+6
+else
+7
+C = next cluster
+8
+Add x to C
+9
+for each point x(cid:48) in NeighborPts do
+10
+NeighborPts(cid:48) = all points within (cid:15) from x(cid:48)
+11
+if size of NeighborPts(cid:48) ? MinPts then
+12
+NeighborPts = NeighborPts ? NeighborPts?
+13
+Algorithm 4: Agglomerative clustering
+Input: X: All sample points in month t
+(cid:15): Maximum distance between two clusters for them to be merged
+1 Initialization: Treat all sample points as individual clusters
+2 while minimum distance between clusters < (cid:15) do
+3 Compute the distances between all clusters
+4 Merge the pair of clusters that has the minimum distance into a single cluster
+40
+Electronic copy available at: https://ssrn.com/abstract=3860998

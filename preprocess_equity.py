@@ -43,7 +43,8 @@ strategy_meta_info = {
     "SSD_OLS": {"label": "進階 SSD (OLS) 🌟", "color": "#60a5fa"},
     "HDBSCAN_Handcrafted": {"label": "HDBSCAN (UMAP)", "color": "#fbd38d"},
     "HDBSCAN_MultiFactor": {"label": "HDBSCAN (MF)", "color": "#2b6cb0"},
-    "HDBSCAN_PCA": {"label": "HDBSCAN (PCA)", "color": "#f87171"}
+    "HDBSCAN_PCA": {"label": "HDBSCAN (PCA)", "color": "#f87171"},
+    "Pure_DTW": {"label": "純 DTW (Notebook)", "color": "#a855f7"}
 }
 
 # 資料庫 METHOD 與策略 KEY 的映射
@@ -52,7 +53,8 @@ db_method_to_key = {
     "SSD": "SSD_OLS",
     "HDBSCAN (UMAP)": "HDBSCAN_Handcrafted",
     "HDBSCAN (MF)": "HDBSCAN_MultiFactor",
-    "HDBSCAN (PCA)": "HDBSCAN_PCA"
+    "HDBSCAN (PCA)": "HDBSCAN_PCA",
+    "Pure_DTW": "Pure_DTW"
 }
 
 def format_params(row):

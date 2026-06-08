@@ -104,16 +104,12 @@ def check_strategy_completed(config: dict, db_path: str) -> bool:
             return False
 
         # 4. SQLite 資料庫中確實存有數據
-        results_dir = Path("results").resolve()
-        try:
-            rel_dir = Path(output_dir).resolve().relative_to(results_dir).as_posix()
-        except ValueError:
-            # 【修正】無法計算相對路徑時，保守地重跑，避免 basename 誤匹配
-            return False
-
         db_file = "results/result.db"
         if not os.path.exists(db_file):
             return False
+
+        db_match_prefix = Path(output_dir).name
+        dataset_name = config.get("dataset_name", "Unknown")
 
         with sqlite3.connect(db_file) as conn:
             cursor = conn.cursor()
@@ -122,9 +118,11 @@ def check_strategy_completed(config: dict, db_path: str) -> bool:
             )
             if not cursor.fetchone():
                 return False
+            
+            # 使用更精準的 basename 前綴與資料集名稱進行比對，相容舊版的 'Unknown' 標籤
             cursor.execute(
-                "SELECT count(*) FROM strategy_summaries WHERE _path LIKE ?;",
-                (rel_dir + "/%",),
+                "SELECT count(*) FROM strategy_summaries WHERE _path LIKE ? AND (DATASET = ? OR DATASET = 'Unknown');",
+                (db_match_prefix + "/%", dataset_name),
             )
             if cursor.fetchone()[0] == 0:
                 return False
@@ -281,6 +279,9 @@ def worker_task(
             sector_mapping=sector_mapping,
             params=params,
             output_dir=output_dir,
+            db_method=strategy_config.get("db_method", "Unknown"),
+            dataset_name=strategy_config.get("dataset_name", "Unknown"),
+            db_path="results/result.db",
         )
 
         db_path = strategy_config.get("db_path")
@@ -334,6 +335,22 @@ def worker_task(
 _DASHBOARD_FIXED_LINES = 8
 
 
+def _visible_len(s: str) -> int:
+    """計算去除 ANSI Escape Code 後的可見字元長度"""
+    return len(re.sub(r"\033\[[^m]*m", "", s))
+
+
+def _pad_visible(s: str, width: int, align: str = "left") -> str:
+    """考慮 ANSI Escape Code 的可見長度進行填充對齊"""
+    v_len = _visible_len(s)
+    if v_len >= width:
+        return s
+    padding = " " * (width - v_len)
+    if align == "right":
+        return padding + s
+    return s + padding
+
+
 def draw_dashboard(
     progress_dict,
     strategies_config: list,
@@ -343,27 +360,26 @@ def draw_dashboard(
     """
     原地渲染終端監控儀表板。
     【修正 1】total_lines 使用常數 _DASHBOARD_FIXED_LINES，與實際 print 行數嚴格一致。
-    【修正 2】偵測終端寬度並截斷超長行，防止自動換行使行數估算失準。
-    【修正 3】新增 SKIPPED 狀態顯示，與 SUCCESS 區分。
+    【修正 2】使用 _pad_visible 解決含有 ANSI 碼導致對齊不均、進而超出終端寬度換行跳動的問題。
+    【修正 3】縮減欄位長度以適應標準 80-90 寬度終端，防止自動換行使行數估算失準。
     """
     n_strategies = len(strategies_config)
     total_lines  = n_strategies + _DASHBOARD_FIXED_LINES
 
     sys.stdout.write(f"\033[{total_lines}A")
 
-    # 取終端實際寬度，但不超過 100，避免窄視窗換行
+    # 寬度限制設為 85，適應標準終端防範換行
     try:
-        term_width = min(os.get_terminal_size().columns, 100)
+        term_width = min(os.get_terminal_size().columns, 85)
     except OSError:
-        term_width = 100
+        term_width = 85
 
     def line(s: str) -> None:
         """截斷至終端寬度並清除行尾殘留字元"""
-        # 移除 ANSI 碼後估算可見長度（簡化版）
         visible = re.sub(r"\033\[[^m]*m", "", s)
         if len(visible) > term_width:
-            # 保留可見字元在限制內（含 ANSI 碼），粗略截斷
-            s = s[:term_width + (len(s) - len(visible))]
+            # 粗略截斷，同時保留 ANSI Escape Code 的尾端重設
+            s = s[:term_width + (len(s) - len(visible))] + "\033[0m"
         print(f"{s}\033[K")
 
     line("\033[95m" + "═" * term_width + "\033[0m")
@@ -416,7 +432,7 @@ def draw_dashboard(
         else:
             status_str = f"\033[37m{status}\033[0m"
 
-        bar_width = 15
+        bar_width = 5
         completed = int(bar_width * pct / 100)
         bar       = "\033[94m" + "█" * completed + "\033[90m" + "░" * (bar_width - completed) + "\033[0m"
 
@@ -429,11 +445,17 @@ def draw_dashboard(
         else:
             eta_str = "---"
 
+        # 使用 _pad_visible 進行精準欄位對齊
+        status_pad = _pad_visible(status_str, 10)
+        name_pad   = _pad_visible(name[:15], 15)
+        bar_pad    = _pad_visible(bar, 5)
+        msg_pad    = _pad_visible(msg[:10], 10)
+
         line(
-            f"  {status_str:<19} | {name[:30]:<30} | "
-            f"{bar} {pct:>3}% ({prog:<5}) | "
+            f"  {status_pad} | {name_pad} | "
+            f"{bar_pad} {pct:>3}% ({prog:<5}) | "
             f"{eta_str:<8} | \033[93m{task_elapsed:>5.1f}s\033[0m | "
-            f"\033[37m{msg[:25]:<25}\033[0m"
+            f"\033[37m{msg_pad}\033[0m"
         )
 
     line("\033[90m" + "─" * term_width + "\033[0m")
@@ -678,87 +700,160 @@ def main() -> None:
         "hdbscan_metric":           "euclidean",
         "adf_max_lags":             1,
         "adf_pvalue_threshold":     0.01,
+        "min_corr":                 0.50,
+        "min_zero_crossings":       5,
     }
 
     strategies_raw = [
+        # 1. SSD Basic
         {
-            "name":    "SSD Basic (基本配對距離)",
+            "name":    f"SSD Basic {reentry_suffix}",
             "module":  "strategies.ssd_basic",
             "sub_dir": f"SSD_Basic_{reentry_suffix}",
-            "params":  base_params,
+            "db_method": "SSD (Basic)",
+            "params":  {
+                **base_params,
+            },
         },
+        # 2. SSD Rolling
         {
-            "name":    "SSD Rolling (優化殘差配對)",
+            "name":    f"SSD Rolling {reentry_suffix}",
             "module":  "strategies.ssd",
-            "sub_dir": f"SSD_{reentry_suffix}",
-            "params":  base_params,
+            "sub_dir": f"SSD_Rolling_{reentry_suffix}",
+            "db_method": "SSD (Rolling)",
+            "params":  {
+                **base_params,
+            },
         },
+        # 3. HDBSCAN SameSector UMAP
         {
-            "name":    "HDBSCAN Clustering + UMAP",
+            "name":    f"HDBSCAN SameSector UMAP {reentry_suffix}",
             "module":  "strategies.HDBSCAN",
-            "sub_dir": f"HDBSCAN_UMAP_{reentry_suffix}",
+            "sub_dir": f"HDBSCAN_SS_UMAP_{reentry_suffix}",
+            "db_method": "HDBSCAN (SS-UMAP)",
             "params":  {
                 **base_params,
                 **hdbscan_common,
-                "reduce_method":     "umap",
-                "umap_n_components": 5,
-                "umap_n_neighbors":  40,
-                "umap_min_dist":     0.01,
-                "umap_random_state": 42,
+                "umap_n_components":  5,
+                "umap_n_neighbors":   40,
+                "umap_min_dist":      0.01,
+                "umap_random_state":  42,
+                "reduce_method":      "umap",
+                "feature_mode":       "stats13",
             },
         },
+        # 4. HDBSCAN SameSector PCA
         {
-            "name":    "HDBSCAN Clustering + PCA",
+            "name":    f"HDBSCAN SameSector PCA {reentry_suffix}",
             "module":  "strategies.HDBSCAN",
-            "sub_dir": f"HDBSCAN_PCA_{reentry_suffix}",
+            "sub_dir": f"HDBSCAN_SS_PCA_{reentry_suffix}",
+            "db_method": "HDBSCAN (SS-PCA)",
             "params":  {
                 **base_params,
                 **hdbscan_common,
-                "reduce_method":     "pca",
-                "umap_n_components": 5,   # PCA 模式下不調用，保留供介面相容
-                "umap_n_neighbors":  40,
-                "umap_min_dist":     0.1,
-                "umap_random_state": 42,
+                "umap_n_components":  3,
+                "umap_n_neighbors":   40,
+                "umap_min_dist":      0.01,
+                "umap_random_state":  42,
+                "reduce_method":      "pca",
+                "feature_mode":       "stats13",
             },
         },
+        # 5. HDBSCAN MacroCluster UMAP
         {
-            "name":    "HDBSCAN CrossSector (跨產業聚類)",
-            "module":  "strategies.HDBSCAN_CrossSector",
-            "sub_dir": f"HDBSCAN_CrossSector_{reentry_suffix}",
+            "name":    f"HDBSCAN MacroCluster UMAP {reentry_suffix}",
+            "module":  "strategies.HDBSCAN_MacroCluster_UMAP",
+            "sub_dir": f"HDBSCAN_Macro_UMAP_{reentry_suffix}",
+            "db_method": "HDBSCAN (Macro-UMAP)",
             "params":  {
                 **base_params,
                 **hdbscan_common,
-                "reduce_method":     "umap",
-                "umap_n_components": 5,
-                "umap_n_neighbors":  40,
-                "umap_min_dist":     0.01,
-                "umap_random_state": 42,
+                "umap_n_components":  5,
+                "umap_n_neighbors":   40,
+                "umap_min_dist":      0.01,
+                "umap_random_state":  42,
+                "reduce_method":      "umap",
+                "feature_mode":       "stats13",
             },
         },
+        # 6. HDBSCAN CrossSector MF
         {
-            "name":    "HDBSCAN MultiFactor",
-            "module":  "strategies.HDBSCAN_MultiFactor",
-            "sub_dir": f"HDBSCAN_MultiFactor_{reentry_suffix}",
-            "params":  {**base_params, **hdbscan_common},
+            "name":    f"HDBSCAN CrossSector MF {reentry_suffix}",
+            "module":  "strategies.HDBSCAN_CrossSector_MultiFactor",
+            "sub_dir": f"HDBSCAN_CS_MF_{reentry_suffix}",
+            "db_method": "HDBSCAN (CS-MF)",
+            "params":  {
+                **base_params,
+                **hdbscan_common,
+                "use_mom1_filter": True,
+            },
         },
+        # 7. HDBSCAN CrossSector PCA
         {
-            "name":    "DTW Strategy (論文對照組)",
-            "module":  "strategies.dtw_strategy",
-            "sub_dir": f"DTW_{reentry_suffix}",
+            "name":    f"HDBSCAN CrossSector PCA {reentry_suffix}",
+            "module":  "strategies.HDBSCAN_CrossSector_PCA",
+            "sub_dir": f"HDBSCAN_CS_PCA_{reentry_suffix}",
+            "db_method": "HDBSCAN (CS-PCA)",
+            "params":  {
+                **base_params,
+                **hdbscan_common,
+                "umap_n_components":  3,
+                "umap_n_neighbors":   40,
+                "umap_min_dist":      0.01,
+                "umap_random_state":  42,
+                "reduce_method":      "pca",
+                "feature_mode":       "stats13",
+                "use_mom1_filter":    True,
+            },
+        },
+        # 8. HDBSCAN CrossSector UMAP
+        {
+            "name":    f"HDBSCAN CrossSector UMAP {reentry_suffix}",
+            "module":  "strategies.HDBSCAN_CrossSector_UMAP",
+            "sub_dir": f"HDBSCAN_CS_UMAP_{reentry_suffix}",
+            "db_method": "HDBSCAN (CS-UMAP)",
+            "params":  {
+                **base_params,
+                **hdbscan_common,
+                "umap_n_components":  5,
+                "umap_n_neighbors":   40,
+                "umap_min_dist":      0.01,
+                "umap_random_state":  42,
+                "reduce_method":      "umap",
+                "feature_mode":       "stats13",
+                "use_mom1_filter":    True,
+            },
+        },
+        # 9. Pure DTW (Notebook Ver)
+        {
+            "name":    "Pure DTW (Notebook Ver)",
+            "module":  "strategies.DTW_Pure_Notebook",
+            "sub_dir": f"Pure_DTW_{reentry_suffix}",
+            "db_method": "Pure_DTW",
+            "params":  {
+                **base_params,
+            },
+        },
+        # 10. DTW Cointegration Paper (DTW)
+        {
+            "name":    f"DTW Cointegration Paper DTW {reentry_suffix}",
+            "module":  "strategies.DTW_Cointegration_Paper",
+            "sub_dir": f"DTW_Paper_{reentry_suffix}",
+            "db_method": "DTW (Paper)",
             "params":  {
                 **base_params,
                 "method": "dtw",
-                "adf_pvalue_threshold": 0.01,
             },
         },
+        # 11. DTW Cointegration Paper (SSD+DTW PCA)
         {
-            "name":    "SSD+DTW PCA Strategy (論文實驗組)",
-            "module":  "strategies.dtw_strategy",
-            "sub_dir": f"SSD_DTW_PCA_{reentry_suffix}",
+            "name":    f"DTW Cointegration Paper SSD-DTW-PCA {reentry_suffix}",
+            "module":  "strategies.DTW_Cointegration_Paper",
+            "sub_dir": f"SSD_DTW_PCA_Paper_{reentry_suffix}",
+            "db_method": "SSD-DTW-PCA (Paper)",
             "params":  {
                 **base_params,
                 "method": "ssd_dtw_pca",
-                "adf_pvalue_threshold": 0.01,
             },
         },
     ]
@@ -768,19 +863,23 @@ def main() -> None:
     os.makedirs(log_dir, exist_ok=True)
 
     strategies_config = []
+    # 根據 DB_PATH 動態決定 dataset_name ("Current" 或 "Full")
+    dataset_name = "Current" if "Current" in str(DB_PATH) else "Full"
     for raw in strategies_raw:
         safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in raw["name"])
         strategies_config.append({
-            "name":       raw["name"],
-            "module":     raw["module"],
-            "output_dir": f"{OUTPUT_ROOT}/{raw['sub_dir']}",
-            "log_path":   f"{log_dir}/{safe_name}.log",
-            "params":     raw["params"],
-            "db_path":    DB_PATH,
+            "name":         raw["name"],
+            "module":       raw["module"],
+            "output_dir":   f"{OUTPUT_ROOT}/{raw['sub_dir']}",
+            "log_path":     f"{log_dir}/{safe_name}.log",
+            "params":       raw["params"],
+            "db_path":      DB_PATH,
+            "db_method":    raw.get("db_method", "Unknown"),
+            "dataset_name": dataset_name,
         })
 
-    for c in strategies_config:
-        os.makedirs(c["output_dir"], exist_ok=True)
+    # output_dir 延遲到策略實際執行時才建立（見 worker_task），
+    # 此處僅確保 log 目錄存在，避免預先產生大量空資料夾。
 
     # ── Dry-run ───────────────────────────────────────────────────────────
     if args.dry_run:
@@ -855,11 +954,13 @@ def main() -> None:
             print(f"  ● 排入執行：{config['name']}", flush=True)
 
     # ── 決定並行數（只設定一次）─────────────────────────────────────────
-    # 【修正】原程式在兩處設定 max_workers 且互相覆蓋，此版本統一在此決定。
-    # 預設值為 1（保守防 OOM）：price_pivot 會被 pickle 複製給每個子行程，
-    # RAM 消耗 = N × price_pivot 大小 + 各策略運算，多策略並行極易 OOM。
-    # 若 RAM 充裕，請透過 --workers N 明確指定並行數。
-    max_workers = args.workers if args.workers else 1
+    # ── 決定並行數 (max_workers) ─────────────────────────────────────────
+    # 預設並行數為 CPU 核心數的一半（最少為 2，最多為 4），維持效能同時防範 OOM。
+    # 若使用者有指定 --workers，則以 --workers 為準。
+    if args.workers is not None:
+        max_workers = args.workers
+    else:
+        max_workers = min(len(strategies_to_run), max(2, (os.cpu_count() or 4) // 2))
     max_mem_pct = args.max_mem_pct
 
     # ── 啟動儀表板 ───────────────────────────────────────────────────────

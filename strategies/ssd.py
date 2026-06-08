@@ -779,7 +779,7 @@ class RollingBacktester:
             }
 
         roll_start_indices = list(range(local_first_trade_idx, total_days - self.trading_window + 1, self.rolling_step))
-        print(f"\n🚀 開始進行 Grid Search，共 {len(roll_start_indices)} 期，每期處理 {len(states)} 種參數組合...")
+        print(f"\\n🚀 開始進行 Grid Search，共 {len(roll_start_indices)} 期，每期處理 {len(states)} 種參數組合...")
 
         # 執行滾動回測主迴圈
         for roll_idx, trade_start_idx in enumerate(roll_start_indices):
@@ -891,24 +891,60 @@ class RollingBacktester:
 
         # 迴圈結束後呼叫匯出功能
         self._export_results(states)
-
     def _export_results(self, states: dict):
-        """將每種參數組合的紀錄匯出為獨立 CSV"""
-        print("\n✅ 回測完成！正在匯出交易紀錄檔案...")
-        for (n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj), state in states.items():
+        """將每種參數組合的紀錄匯出為資料庫紀錄"""
+        from strategies.db_utils import export_df_to_db
+        print("\n✅ 回測完成！正在將交易紀錄寫入 SQLite 資料庫...")
+        for params_tuple, state in states.items():
             if state["logs"]:
-                full_log_df = pd.concat(state["logs"], ignore_index=True)
-                sl_str = f"SL{int(sl*100)}" if sl > 0 else "SL0"
-                psl_str = f"PSL{int(p_stop*100)}" if p_stop > 0 else "PSL0"
-                msr_str = f"MSR{int(sec_ratio*100)}" if sec_ratio > 0 else "MSR0"
-                dsz_str = f"DSZ{int(dyn_z)}" if dyn_z > 0 else "DSZ0"
-                vol_str = "VolAdj" if vol_adj else "NoVol"
-                filename = f"TradeLogs_Top{n}_{sl_str}_ZWin{z_win}_{psl_str}_{msr_str}_{dsz_str}_{vol_str}.csv"
-                filepath = self.output_dir / filename
-                full_log_df.to_csv(filepath, index=False)
-                print(f"  - 已輸出: {filename} (共 {len(full_log_df)} 筆紀錄)")
+                full_log_df = __import__('pandas').concat(state["logs"], ignore_index=True)
                 
-        print(f"\n📁 所有交易紀錄已成功儲存至: {self.output_dir}")
+                # 解構參數 (因為不同策略可能有不同參數數量，使用通用的 fallback 機制)
+                # ssd_basic 包含: (n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)
+                # HDBSCAN 包含: (n, sl, min_cluster_size, ...) 等等
+                # 我們統一把原本產生 filename 的邏輯簡化，因為現在 path_key 不用做 Regex
+                
+                # 自動生出一個 Unique Path Key
+                import uuid
+                n = params_tuple[0] if len(params_tuple) > 0 else 20
+                path_key = f"{self.output_dir.name}/TradeLogs_Top{n}_{uuid.uuid4().hex[:8]}.csv"
+                
+                # 建構這次網格的參數字典 (使用 getattr 動態讀取自 engine)
+                # 注意：其實 df_out 在 simulate_pair 時已經寫入了這些參數，我們在這裡可以讀取 df_out 的第一筆記錄做為參數 (這最準確！)
+                # 不過最安全的是傳入 dict，如果沒法完美解析 params_tuple，我們可以傳入 kwargs
+                
+                # 簡單暴力解：從 self 取出全部屬性當作 params 字典傳下去 (RollingBacktester 本來就有存！)
+                grid_params = {}
+                for key in dir(self):
+                    if not key.startswith('_') and not callable(getattr(self, key)):
+                        grid_params[key] = getattr(self, key)
+                        
+                # 為了確保 n 等參數更新為當前網格的參數：
+                grid_params["top_n"] = n
+                if len(params_tuple) >= 2: grid_params["stop_loss_pct"] = params_tuple[1]
+                if len(params_tuple) >= 3: 
+                    # 判斷第三個參數是 z_win 還是 min_cluster_size
+                    if hasattr(self, 'zscore_window_list'):
+                        grid_params["zscore_window"] = params_tuple[2]
+                    else:
+                        grid_params["min_cluster_size"] = params_tuple[2]
+
+                success = export_df_to_db(
+                    df=full_log_df,
+                    strategy_name=getattr(self, "db_method", "Unknown"),
+                    params=grid_params,
+                    dataset_name=getattr(self, "dataset_name", "Unknown"),
+                    path_key=path_key,
+                    db_path=getattr(self, "db_path", "results/result.db"),
+                    overwrite=True
+                )
+                
+                if success:
+                    print(f"  - 已成功寫入 DB: {path_key} (共 {len(full_log_df)} 筆紀錄)")
+                else:
+                    print(f"  - ⚠️ 寫入 DB 失敗: {path_key}")
+                
+        print(f"\\n📁 所有交易紀錄已成功寫入資料庫！")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -981,14 +1017,14 @@ class RollingBacktester:
 #         engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
 
 #     except Exception as e:
-#         print(f"\n❌ 執行發生錯誤：{e}")
+#         print(f"\\n❌ 執行發生錯誤：{e}")
 #         print("💡 提示: 請確認資料庫 `../data/sp500.db` 存在，且資料表格式符合預期。")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 標準化策略進入點接口 (Unified Strategy Entry Point)
 # ══════════════════════════════════════════════════════════════════════════════
-def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir):
+def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir, db_method='Unknown', dataset_name='Unknown', db_path='results/result.db'):
     """
     標準化調用接口，接受外部傳入的價格資料與回測參數，完全解耦資料載入 I/O
     """
@@ -1016,6 +1052,9 @@ def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sect
     # 初始化回測引擎
     engine = RollingBacktester(
         output_dir=out_dir,
+        db_method=db_method,
+        dataset_name=dataset_name,
+        db_path=db_path,
         **valid_params
     )
     
