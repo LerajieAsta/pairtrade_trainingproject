@@ -152,6 +152,9 @@ def download_and_save_data(tickers, conn, start_date="2000-01-01", end_date=None
                                
                 df = pd.DataFrame(data)
                 
+                # 先轉換日期格式（必須在 rename 之前）
+                df['date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
+                
                 # 將 Tiingo 的欄位名稱轉換為符合資料庫的 Schema
                 df = df.rename(columns={
                     'date': 'Date',
@@ -164,10 +167,7 @@ def download_and_save_data(tickers, conn, start_date="2000-01-01", end_date=None
                 })
                 
                 df['Symbol'] = ticker
-                df['Date'] = pd.to_datetime(df['date']).dt.strftime('%Y-%m-%d')
-                
-                df_to_save = df[['Date', 'Symbol', 'open', 'high', 'low', 'close', 'adjClose', 'volume']]
-                df_to_save.columns = ['Date', 'Symbol', 'Open', 'High', 'Low', 'Close', 'Adj_Close', 'Volume']
+                df_to_save = df[['Date', 'Symbol', 'Open', 'High', 'Low', 'Close', 'Adj_Close', 'Volume']]
                 
                 df_to_save.to_sql('Daily_Prices', conn, if_exists='append', index=False)
                 time.sleep(0.1) # 頻率限制緩衝
@@ -243,7 +243,7 @@ if __name__ == "__main__":
         try:
             save_constituents_info(df_info, connection)
             # 開始下載 (改為從 2000 年起抓取)
-            download_and_save_data(all_tickers, connection, start_date="2000-01-01")
+            download_and_save_data(all_tickers, connection, start_date="2000-01-01", end_date="2025-12-31")
             print(f"\n任務完成！所有數據已儲存至 {abs_db_path}")
         finally:
             connection.close()
