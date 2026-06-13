@@ -1,9 +1,0 @@
-﻿Project\Scripts\python.exe : Traceback (most recent call last):
-位於 線路:1 字元:1
-+ Project\Scripts\python.exe -c "import fitz; doc = fitz.open(r'C:\Clar ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-  File "<string>", line 1, in <module>
-ModuleNotFoundError: No module named 'fitz'

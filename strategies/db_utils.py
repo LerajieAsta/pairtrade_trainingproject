@@ -119,15 +119,11 @@ def init_db(db_path="results/result.db"):
     CREATE TABLE IF NOT EXISTS strategy_summaries (
         "_path" TEXT PRIMARY KEY,
         "DATASET" TEXT,
-        "RE-ENTRY" TEXT,
-        "VOL ADJ" TEXT,
         "METHOD" TEXT,
+        "TRADE_METHOD" TEXT,
         "TOP N" TEXT,
         "STOP LOSS %" TEXT,
-        "Z-WINDOW" TEXT,
-        "PORT SL %" TEXT,
         "MAX SEC %" TEXT,
-        "DYN Z" TEXT,
         "Final_Equity" REAL,
         "RCC_Raw" REAL,
         "REC_Raw" REAL,
@@ -143,6 +139,11 @@ def init_db(db_path="results/result.db"):
         "Gross_Loss" REAL
     );
     """)
+
+    try:
+        cursor.execute('ALTER TABLE strategy_summaries ADD COLUMN "TRADE_METHOD" TEXT;')
+    except Exception:
+        pass
 
     # 2. 建立 trade_logs 表：存放每日明細，包含價格、Z-Score、部位及未實現/已實現損益等
     cursor.execute("""
@@ -204,7 +205,7 @@ def init_db(db_path="results/result.db"):
     conn.close()
 
 
-def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_key):
+def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_key, trade_method=""):
     """
     分析每日交易明細 DataFrame，並結合傳入的參數字典計算全方位的量化回測指標。
 
@@ -214,6 +215,7 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         params (dict): 策略參數字典。
         dataset_name (str): 資料集名稱，例如 "Current" 或 "Full"。
         path_key (str): 資料庫中的唯一識別鍵（通常是對應參數組合的偽路徑名稱）。
+        trade_method (str): 交易期的策略方法名稱。
 
     回傳:
         dict: 整理好的關鍵績效指標與策略特徵，若 DataFrame 為空則回傳 None。
@@ -319,7 +321,7 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
 
     return {
         'DATASET': dataset_name, 'RE-ENTRY': reentry, 'VOL ADJ': voladj,
-        'METHOD': strategy_name, 'TOP N': top_n_str, 'STOP LOSS %': sl_pct, 'Z-WINDOW': zwin,
+        'METHOD': strategy_name, 'TRADE_METHOD': trade_method, 'TOP N': top_n_str, 'STOP LOSS %': sl_pct, 'Z-WINDOW': zwin,
         'PORT SL %': psl_pct, 'MAX SEC %': msr_pct, 'DYN Z': dsz_val,
         'Final_Equity': float(final_equity),
         'RCC_Raw': float(rcc), 'REC_Raw': float(rec),
@@ -332,7 +334,7 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
     }
 
 
-def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="results/result.db", overwrite=True):
+def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="results/result.db", overwrite=True, trade_method=""):
     """
     直接將子行程算出的 DataFrame 與績效指標寫入 SQLite，不透過 CSV 檔案轉發。
 
@@ -344,6 +346,7 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
         path_key (str): 偽路徑，作為資料庫中該次網格回測的主鍵 (例如 "SSD_Basic_ReEntry/TradeLogs_...").
         db_path (str): SQLite 儲存路徑。
         overwrite (bool): 是否刪除舊的相同 path_key 數據。
+        trade_method (str): 交易期的策略方法名稱。
         
     回傳:
         bool: 寫入是否成功。
@@ -351,7 +354,7 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
     if df.empty:
         return False
 
-    metrics = calculate_metrics_from_params(df.copy(), strategy_name, params, dataset_name, path_key)
+    metrics = calculate_metrics_from_params(df.copy(), strategy_name, params, dataset_name, path_key, trade_method)
     if not metrics:
         return False
 
@@ -371,15 +374,15 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
 
         cursor.execute("""
         INSERT INTO strategy_summaries (
-            "_path", "DATASET", "RE-ENTRY", "VOL ADJ", "METHOD", "TOP N", "STOP LOSS %",
-            "Z-WINDOW", "PORT SL %", "MAX SEC %", "DYN Z", "Final_Equity", "RCC_Raw",
+            "_path", "DATASET", "METHOD", "TRADE_METHOD", "TOP N", "STOP LOSS %",
+            "MAX SEC %", "Final_Equity", "RCC_Raw",
             "REC_Raw", "Cum_Ret_Raw", "Ann_Ret_Raw", "Sharpe_Raw", "MDD_Raw",
             "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
-            metrics['_path'], metrics['DATASET'], metrics['RE-ENTRY'], metrics['VOL ADJ'],
-            metrics['METHOD'], metrics['TOP N'], metrics['STOP LOSS %'], metrics['Z-WINDOW'],
-            metrics['PORT SL %'], metrics['MAX SEC %'], metrics['DYN Z'],
+            metrics['_path'], metrics['DATASET'],
+            metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
+            metrics['MAX SEC %'],
             metrics['Final_Equity'], metrics['RCC_Raw'], metrics['REC_Raw'],
             metrics['Cum_Ret_Raw'], metrics['Ann_Ret_Raw'], metrics['Sharpe_Raw'], metrics['MDD_Raw'],
             metrics['Entries'], metrics['Exits'], metrics['Stop_Losses'], metrics['Forced_Closes'],
@@ -437,3 +440,30 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
         except:
             pass
         return False
+
+
+def init_formation_db(db_path="data/formation_pairs.db"):
+    """
+    初始化 Formation 期間選出的配對資料庫。
+    """
+    conn = get_db_connection(db_path)
+    if conn is None: return None
+    cursor = conn.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS formation_pairs (
+        "strategy_id" TEXT,
+        "Period_Start" TEXT,
+        "Trade_Start" TEXT,
+        "Trade_End" TEXT,
+        "Ticker_A" TEXT,
+        "Ticker_B" TEXT,
+        "Sector_A" TEXT,
+        "Sector_B" TEXT,
+        "Pair_Rank" INTEGER,
+        "Formation_Params" TEXT,
+        PRIMARY KEY ("strategy_id", "Period_Start", "Ticker_A", "Ticker_B")
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_formation_strat ON formation_pairs (strategy_id);")
+    conn.commit()
+    return conn

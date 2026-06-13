@@ -188,24 +188,38 @@ def extract_features_from_path(path):
     elif "ssd_dtw" in path_lower or "ssd-dtw" in path_lower:
         # SSD_DTW_PCA_NoReEntry 等形式
         is_pca = "pca" in path_lower
-        method = "SSD (DTW-PCA)" if is_pca else "SSD (DTW)"
+        method = "SSD-DTW-PCA (Paper)" if is_pca else "SSD (DTW)"
     elif "ssd" in path_lower:
-        method = "SSD"
+        if "rolling" in path_lower:
+            method = "SSD (Rolling)"
+        else:
+            method = "SSD"
     elif "eg" in path_lower:
         method = "EG"
     elif "pure_dtw" in path_lower or "pure-dtw" in path_lower:
-        method = "Pure DTW"
+        method = "Pure_DTW"
     elif "dtw" in path_lower:
-        # 純 DTW 策略（非 SSD+DTW）
-        method = "DTW"
-    elif "hdbscan" in path_lower:
-        if "multifactor" in path_lower:
-            method = "HDBSCAN (MF)"
-        elif "crosssector" in path_lower or "cross_sector" in path_lower or "cross-sector" in path_lower:
-            method = "HDBSCAN (CS)"
+        if "paper" in path_lower:
+            method = "DTW (Paper)"
         else:
-            is_ae = "_ae_" in path_lower or "hdbscan_ae" in path_lower
-            is_pca = "_pca_" in path_lower or "hdbscan_pca" in path_lower
+            method = "DTW"
+    elif "hdbscan" in path_lower:
+        is_ss = "_ss_" in path_lower
+        is_cs = "_cs_" in path_lower or "crosssector" in path_lower or "cross_sector" in path_lower or "cross-sector" in path_lower
+        is_macro = "_macro_" in path_lower or "macro" in path_lower
+        is_ae = "_ae_" in path_lower or "hdbscan_ae" in path_lower
+        is_pca = "_pca_" in path_lower or "hdbscan_pca" in path_lower
+        is_mf = "_mf_" in path_lower or "multifactor" in path_lower
+        
+        if is_mf:
+            method = "HDBSCAN (CS-MF)" if is_cs else "HDBSCAN (SS-MF)" if is_ss else "HDBSCAN (MF)"
+        elif is_macro:
+            method = "HDBSCAN (Macro-UMAP)"
+        elif is_ss:
+            method = "HDBSCAN (SS-PCA)" if is_pca else "HDBSCAN (SS-UMAP)"
+        elif is_cs:
+            method = "HDBSCAN (CS-PCA)" if is_pca else "HDBSCAN (CS-UMAP)"
+        else:
             if is_ae:
                 method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
             else:
@@ -488,11 +502,12 @@ def compute_all_ttests(paths_tuple: tuple) -> pd.DataFrame:
 
 
 def make_desc(row): 
-    vol_part = f" · {row['VOL ADJ']}" if 'VOL ADJ' in row and row['VOL ADJ'] != 'N/A' else ""
-    psl_part = f" · PSL {row['PORT SL %']}" if 'PORT SL %' in row and row['PORT SL %'] != '0%' else ""
-    msr_part = f" · MSR {row['MAX SEC %']}" if 'MAX SEC %' in row and row['MAX SEC %'] != '0%' else ""
-    dsz_part = f" · DSZ {row['DYN Z']}" if 'DYN Z' in row and row['DYN Z'] != '0' else ""
-    return f"{row['DATASET']} · {row['RE-ENTRY']}{vol_part} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · ZWin {row['Z-WINDOW']}{psl_part}{msr_part}{dsz_part}"
+    vol_part = f" · {row['VOL ADJ']}" if 'VOL ADJ' in row and row['VOL ADJ'] not in ['NoVolAdj', 'N/A', ''] else ""
+    reentry_part = f" · {row['RE-ENTRY']}" if 'RE-ENTRY' in row and row['RE-ENTRY'] not in ['NoReEntry', ''] else ""
+    psl_part = f" · PSL {row['PORT SL %']}" if 'PORT SL %' in row and row['PORT SL %'] not in ['0%', '0.0%', ''] else ""
+    dsz_part = f" · DSZ {row['DYN Z']}" if 'DYN Z' in row and row['DYN Z'] not in ['0', '0.0', ''] else ""
+    zwin_part = f" · ZWin {row['Z-WINDOW']}" if 'Z-WINDOW' in row and row['Z-WINDOW'] not in ['0', ''] else ""
+    return f"{row['DATASET']}{reentry_part}{vol_part} · {row['METHOD']} · {row['TOP N']} · SL {row['STOP LOSS %']} · MSR {row['MAX SEC %']}{zwin_part}{psl_part}{dsz_part}"
 
 @st.fragment
 def render_deep_dive(target_row):
@@ -683,6 +698,45 @@ def get_sector_mapping():
         except Exception:
             pass
     return mapping
+
+def save_ttests_to_db(ttest_df: pd.DataFrame, db_path: str):
+    if ttest_df.empty or not os.path.exists(db_path):
+        return
+    try:
+        import sqlite3
+        conn = sqlite3.connect(db_path, timeout=60.0)
+        cursor = conn.cursor()
+        
+        # 動態為 strategy_summaries 新增缺失的欄位
+        cursor.execute("PRAGMA table_info(strategy_summaries);")
+        existing_cols = {row[1] for row in cursor.fetchall()}
+        
+        for col in ['T_Stat', 'T_Pval', 'NW_T_Stat', 'NW_T_Pval']:
+            if col not in existing_cols:
+                try:
+                    cursor.execute(f'ALTER TABLE strategy_summaries ADD COLUMN "{col}" REAL;')
+                except Exception:
+                    pass
+                    
+        # 批量更新數據
+        update_sql = """
+        UPDATE strategy_summaries 
+        SET T_Stat = ?, T_Pval = ?, NW_T_Stat = ?, NW_T_Pval = ?
+        WHERE _path = ?
+        """
+        update_data = []
+        for _, row in ttest_df.iterrows():
+            t_s = float(row['T_Stat']) if pd.notna(row['T_Stat']) else None
+            t_p = float(row['T_Pval']) if pd.notna(row['T_Pval']) else None
+            nw_t = float(row['NW_T_Stat']) if pd.notna(row['NW_T_Stat']) else None
+            nw_p = float(row['NW_T_Pval']) if pd.notna(row['NW_T_Pval']) else None
+            update_data.append((t_s, t_p, nw_t, nw_p, row['_path']))
+            
+        cursor.executemany(update_sql, update_data)
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
 def render_pair_consistency():
     db_path = os.path.join(RESULTS_DIR, "result.db")
@@ -908,12 +962,12 @@ def main():
                          'PORT SL %', 'MAX SEC %', 'DYN Z'],
                 index=master_df.index
             )
-            # 僅強制覆蓋 METHOD（最易出現舊快取 Unknown 的欄位），其餘欄位只補空值
-            master_df['METHOD'] = parsed_df['METHOD']
-            master_df['RE-ENTRY'] = parsed_df['RE-ENTRY']
-            # DATASET 若 DB 已有有效值（非 Unknown）就保留，否則用解析值補
-            need_dataset = master_df['DATASET'].isin(['Unknown', ''])
-            master_df.loc[need_dataset, 'DATASET'] = parsed_df.loc[need_dataset, 'DATASET']
+            # ── 每次載入後對 DB 缺失/Unknown 的欄位進行回補 ──
+            # 優先保留 DB 中的真實值（如 HDBSCAN (SS-UMAP) 等），僅在資料庫值為 'Unknown'、空值或缺失時才用路徑解析值進行回補。
+            for col in ['DATASET', 'RE-ENTRY', 'VOL ADJ', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 'PORT SL %', 'MAX SEC %', 'DYN Z']:
+                if col in master_df.columns:
+                    need_fill = master_df[col].isna() | master_df[col].isin(['Unknown', ''])
+                    master_df.loc[need_fill, col] = parsed_df.loc[need_fill, col]
             
     if not use_db:
         available_strategies = scan_strategies(RESULTS_DIR)
@@ -924,22 +978,49 @@ def main():
         st.warning("No strategy logs found in the results directory.")
         return
         
+    t_test_needed = False
+    missing_paths = []
+    
     if use_db:
         # 已從 SQLite 資料庫極速載入完成。
-        # 如果資料庫版本缺少 T 檢定欄位，即時從交易明細計算補入
-        if 'T_Stat' not in master_df.columns or master_df['T_Stat'].isna().all():
-            paths_tuple = tuple(master_df['_path'].tolist())
-            ttest_df = compute_all_ttests(paths_tuple)
-            master_df = master_df.merge(ttest_df, on='_path', how='left',
-                                        suffixes=('', '_new'))
+        db_has_ttest_cols = 'T_Stat' in master_df.columns
+        if not db_has_ttest_cols:
+            # 資料庫缺少 T 檢定欄位，動態建立為 NaN 欄位以達到極速啟動
             for col in ['T_Stat', 'T_Pval', 'NW_T_Stat', 'NW_T_Pval']:
-                new_col = col + '_new'
-                if new_col in master_df.columns:
-                    master_df[col] = master_df[new_col]
-                    master_df.drop(columns=[new_col], inplace=True)
+                master_df[col] = np.nan
+            t_test_needed = True
+            missing_paths = master_df['_path'].tolist()
+        else:
+            # 檢查是否有缺失的部分（例如增量更新）
+            isna_mask = master_df['T_Stat'].isna()
+            if isna_mask.any():
+                missing_paths = master_df.loc[isna_mask, '_path'].tolist()
+                # 如果是全部都缺失，就不在啟動時自動計算，避免卡住
+                if len(missing_paths) == len(master_df):
+                    t_test_needed = True
+                else:
+                    # 只有少部分缺失，可以進行背景/即時增量更新
+                    with st.spinner(f"正在增量計算 {len(missing_paths)} 組新策略的 T 檢定..."):
+                        ttest_df = compute_all_ttests(tuple(missing_paths))
+                        save_ttests_to_db(ttest_df, db_path)
+                        # 更新 master_df 中的值
+                        master_df.set_index('_path', inplace=True)
+                        ttest_df.set_index('_path', inplace=True)
+                        for col in ['T_Stat', 'T_Pval', 'NW_T_Stat', 'NW_T_Pval']:
+                            master_df.update(ttest_df[[col]])
+                        master_df.reset_index(inplace=True)
     else:
         with st.spinner("Compiling massive dataset metrics..."):
             master_df = build_master_dataframe(available_strategies)
+    
+    if t_test_needed:
+        st.sidebar.warning("⚠️ 目前資料庫中缺少 T 檢定快取數據。")
+        if st.sidebar.button("🔬 立即計算並快取 T 檢定統計量", use_container_width=True):
+            with st.spinner("正在計算所有策略的 T 檢定統計量，並寫入資料庫快取..."):
+                ttest_df = compute_all_ttests(tuple(missing_paths))
+                save_ttests_to_db(ttest_df, db_path)
+            st.sidebar.success("🎉 T 檢定統計量計算並寫入完畢！")
+            st.rerun()
             
     if master_df.empty:
         st.error("Could not parse any valid strategy data.")
@@ -1049,7 +1130,7 @@ def main():
 
     # 決定顯示欄位
     if expand_config:
-        config_cols = ['DATASET', 'RE-ENTRY', 'VOL ADJ', 'METHOD', 'TOP N', 'STOP LOSS %', 'Z-WINDOW', 'PORT SL %', 'MAX SEC %', 'DYN Z']
+        config_cols = [col for col, _ in FILTER_DEFS if col in master_df.columns and master_df[col].nunique() > 1]
     else:
         config_cols = ['STRATEGY CONFIG']
 

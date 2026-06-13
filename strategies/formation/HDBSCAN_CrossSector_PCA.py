@@ -1,9 +1,6 @@
 # ======================================================================
 """
-HDBSCAN MultiFactor 全市場/跨產業聚類回測系統 (優化版)
-核心功能：以 6 大穩健金融因子作為分群特徵空間，跳過降維步驟，
-          直接以 HDBSCAN 密度分群，從同群內挑選最優配對，
-          結合 Engle-Granger OLS Spread 建構 Z-Score 執行配對交易。
+HDBSCAN PCA 全市場/跨產業聚類回測系統 (優化版)
 """
 
 import sqlite3
@@ -17,7 +14,7 @@ import numpy as np
 import pandas as pd
 from statsmodels.tsa.stattools import adfuller
 
-from strategies.HDBSCAN import Trading, PairState, DataProcessor
+# from strategies.HDBSCAN import Trading, PairState, DataProcessor
 
 # Force stdout to UTF-8
 if hasattr(sys.stdout, "reconfigure"):
@@ -72,6 +69,13 @@ def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
     except Exception:
         return 0.0, 1.0
 
+# Load UMAP (PCA fallback or standard check)
+try:
+    import umap
+    UMAP_AVAILABLE = True
+except ImportError:
+    UMAP_AVAILABLE = False
+
 # Load HDBSCAN
 try:
     import hdbscan
@@ -87,9 +91,69 @@ from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
 
+def _extract_features(log_price: np.ndarray) -> np.ndarray:
+    """從對數價格序列萃取多維特徵向量，用於 HDBSCAN 分群。"""
+    n = len(log_price)
+    ret = np.diff(log_price)
+
+    def safe_ret(days):
+        if n >= days:
+            return float(log_price[-1] - log_price[-days])
+        return 0.0
+
+    def roll_vol(days):
+        if len(ret) >= days:
+            return float(np.std(ret[-days:], ddof=1))
+        return 0.0
+
+    def autocorr(lag):
+        if len(ret) <= lag:
+            return 0.0
+        x1, x2 = ret[:-lag], ret[lag:]
+        try:
+            return float(np.corrcoef(x1, x2)[0, 1])
+        except Exception:
+            return 0.0
+
+    def hurst_approx():
+        if len(log_price) < 20:
+            return 0.5
+        diffs = np.diff(log_price)
+        rs_list = []
+        for seg_len in [len(diffs) // 4, len(diffs) // 2, len(diffs)]:
+            if seg_len < 4:
+                continue
+            seg = diffs[:seg_len]
+            mean_seg = np.mean(seg)
+            deviate  = np.cumsum(seg - mean_seg)
+            rs = (np.max(deviate) - np.min(deviate)) / (np.std(seg, ddof=1) + 1e-8)
+            rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
+        if len(rs_list) < 2:
+            return 0.5
+        xs, ys = zip(*rs_list)
+        try:
+            h = float(np.polyfit(xs, ys, 1)[0])
+        except Exception:
+            h = 0.5
+        return np.clip(h, 0.0, 1.0)
+
+    vol_all  = float(np.std(ret, ddof=1)) if n > 1 else 0.0
+    skew_all = float(pd.Series(ret).skew()) if n > 2 else 0.0
+    kurt_all = float(pd.Series(ret).kurt()) if n > 3 else 0.0
+
+    features = np.array([
+        safe_ret(5),   safe_ret(21),  safe_ret(63),  safe_ret(126),  # 動量
+        roll_vol(21),  roll_vol(63),  vol_all,                        # 波動率
+        autocorr(1),   autocorr(5),   autocorr(21),                  # 自相關
+        skew_all,      kurt_all,      hurst_approx(),                 # 統計矩
+    ], dtype=np.float64)
+
+    features = np.where(np.isfinite(features), features, 0.0)
+    return features
+
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Class 1：Formation（形成期模組）- 時序多因子特徵空間版 (跨產業/全市場分群)
+# Class 1：Formation（形成期模組）- PCA 跨產業聚類版本
 # ══════════════════════════════════════════════════════════════════════════════
 
 class Formation:
@@ -104,18 +168,18 @@ class Formation:
         hdbscan_min_cluster_size: int = 5,     # 預設優化參數值
         hdbscan_min_samples: int = 2,          # 預設優化參數值
         hdbscan_metric: str = "euclidean",
-        reduce_method: str = "none",           # MF 策略不降維
-        umap_n_components: int = 5,            # 保留接口相容性
+        reduce_method: str = "pca",
+        umap_n_components: int = 3,            # 優化：PCA 使用 3 維降維
         umap_n_neighbors: int = 40,
         umap_min_dist: float = 0.01,
         umap_random_state: int = 42,
         adf_max_lags: int = 1,
         adf_pvalue_threshold: float = 0.01,
         max_sector_ratio: float = 0.3,
+        feature_mode: str = "stats13",
         min_corr: float = 0.50,                # 優化：相關係數門檻
         min_zero_crossings: int = 5,           # 優化：殘差均值穿越次數門檻
         use_mom1_filter: bool = True,          # Han et al. 2021：mom1 截面標準差篩選
-        **kwargs
     ):
         self.price_df = price_df.copy()
         self.max_sector_ratio = max_sector_ratio
@@ -129,8 +193,15 @@ class Formation:
         self.hdbscan_min_samples      = hdbscan_min_samples
         self.hdbscan_metric           = hdbscan_metric
 
+        self.reduce_method = reduce_method.lower()
+        self.umap_n_components = umap_n_components
+        self.umap_n_neighbors  = umap_n_neighbors
+        self.umap_min_dist     = umap_min_dist
+        self.umap_random_state = umap_random_state
+
         self.adf_max_lags           = adf_max_lags
         self.adf_pvalue_threshold   = adf_pvalue_threshold
+        self.feature_mode           = feature_mode.lower()
         self.min_corr               = min_corr
         self.min_zero_crossings     = min_zero_crossings
         self.use_mom1_filter        = use_mom1_filter
@@ -142,61 +213,67 @@ class Formation:
         log_prices = np.log(self.price_df)
         tickers    = log_prices.columns.tolist()
 
-        returns_df = log_prices.diff().dropna()
-        if returns_df.empty or len(returns_df.columns) < 2:
-            return np.empty((0, 0)), []
+        if self.feature_mode == "path":
+            price_rows, valid_tickers = [], []
+            for ticker in tickers:
+                series = log_prices[ticker].values
+                if len(series) < 30 or not np.all(np.isfinite(series)):
+                    continue
+                norm_series = (series - np.mean(series)) / (np.std(series) + 1e-12)
+                price_rows.append(norm_series)
+                valid_tickers.append(ticker)
+            if not price_rows:
+                return np.empty((0, 0)), []
+            return np.vstack(price_rows), valid_tickers
 
-        market_returns = returns_df.mean(axis=1).values
         feat_rows, valid_tickers = [], []
-        t_indices = np.arange(len(log_prices))
-
         for ticker in tickers:
-            prices = log_prices[ticker].values
-            if len(prices) < 30 or not np.all(np.isfinite(prices)):
+            series = log_prices[ticker].values
+            if len(series) < 30 or not np.all(np.isfinite(series)):
                 continue
-
-            ticker_ret = returns_df[ticker].values
-
-            # --- 1. Market Beta ---
-            cov_mat = np.cov(ticker_ret, market_returns)
-            beta = cov_mat[0, 1] / (cov_mat[1, 1] + 1e-12) if cov_mat[1, 1] > 1e-12 else 0.0
-
-            # --- 2. Volatility ---
-            vol = np.std(ticker_ret, ddof=1) if len(ticker_ret) > 1 else 0.0
-
-            # --- 3. Skewness ---
-            skew = float(pd.Series(ticker_ret).skew())
-
-            # --- 4. Kurtosis ---
-            kurt = float(pd.Series(ticker_ret).kurt())
-
-            # --- 5. Trend Slope ---
-            try:
-                x_mat = np.column_stack([np.ones(len(prices)), t_indices])
-                coeffs, _, _, _ = np.linalg.lstsq(x_mat, prices, rcond=None)
-                slope = float(coeffs[1])
-            except Exception:
-                slope = 0.0
-
-            # --- 6. Idiosyncratic Volatility ---
-            try:
-                alpha, beta_val, resid = _ols(ticker_ret, market_returns)
-                idio_vol = np.std(resid, ddof=1) if len(resid) > 1 else 0.0
-            except Exception:
-                idio_vol = vol
-
-            feats = np.array([beta, vol, skew, kurt, slope, idio_vol], dtype=np.float64)
-            feats = np.where(np.isfinite(feats), feats, 0.0)
-
-            feat_rows.append(feats)
+            feat_rows.append(_extract_features(series))
             valid_tickers.append(ticker)
 
         if not feat_rows:
             return np.empty((0, 0)), []
 
-        X = np.vstack(feat_rows)
-        X = StandardScaler().fit_transform(X)
+        X = StandardScaler().fit_transform(np.vstack(feat_rows))
         return X, valid_tickers
+
+    def _umap_reduce(self, X: np.ndarray) -> np.ndarray:
+        n_stocks = X.shape[0]
+        n_comp   = min(self.umap_n_components, n_stocks - 1)
+        n_neigh  = min(self.umap_n_neighbors,  n_stocks - 1)
+        if n_comp < 1 or n_neigh < 1:
+            return X
+        try:
+            reducer = umap.UMAP(
+                n_components  = n_comp,
+                n_neighbors   = n_neigh,
+                min_dist      = self.umap_min_dist,
+                random_state  = self.umap_random_state,
+                low_memory    = True,
+            )
+            return reducer.fit_transform(X)
+        except Exception:
+            reducer = umap.UMAP(
+                n_components  = n_comp,
+                n_neighbors   = n_neigh,
+                min_dist      = self.umap_min_dist,
+                random_state  = self.umap_random_state,
+                low_memory    = True,
+                init          = "random"
+            )
+            return reducer.fit_transform(X)
+
+    def _pca_reduce(self, X: np.ndarray) -> np.ndarray:
+        from sklearn.decomposition import PCA
+        n_stocks = X.shape[0]
+        n_comp   = min(self.umap_n_components, n_stocks - 1)
+        if n_comp < 1:
+            return X
+        pca = PCA(n_components=n_comp, random_state=self.umap_random_state)
+        return pca.fit_transform(X)
 
     def _hdbscan_cluster(self, X: np.ndarray) -> np.ndarray:
         current_min_cs = self.hdbscan_min_cluster_size
@@ -224,8 +301,8 @@ class Formation:
             labels = clusterer.fit_predict(X)
             unique_labels = set(labels) - {-1}
             if len(unique_labels) >= 1:
-                if current_min_cs != self.hdbscan_min_cluster_size:
-                    print(f"  [Formation] HDBSCAN parameter fallback succeeded with min_cluster_size={min_cs}, min_samples={min_samp}!")
+                # if current_min_cs != self.hdbscan_min_cluster_size:
+                #     print(f"  [Formation] HDBSCAN parameter fallback succeeded with min_cluster_size={min_cs}, min_samples={min_samp}!")
                 return labels
             
             current_min_cs = current_min_cs // 2
@@ -405,8 +482,12 @@ class Formation:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        # 直接在 6 維時序多因子特徵空間上分群
-        labels = self._hdbscan_cluster(X)
+        if self.reduce_method == "pca":
+            X_embed = self._pca_reduce(X)
+        else:
+            X_embed = self._umap_reduce(X)
+
+        labels = self._hdbscan_cluster(X_embed)
         self.cluster_labels_ = {t: int(lbl) for t, lbl in zip(valid_tickers, labels)}
 
         eg_df = self._cointegration_within_clusters(valid_tickers, labels)
@@ -447,281 +528,3 @@ class Formation:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Class 2：RollingBacktester 引擎 (完全獨立的優化版)
-# ══════════════════════════════════════════════════════════════════════════════
-
-class RollingBacktester:
-    def __init__(
-        self,
-        top_n_list: list,
-        stop_loss_list: list,
-        zscore_window_list: list,
-        entry_z: float,
-        exit_z: float,
-        formation_window: int,
-        trading_window: int,
-        rolling_step: int,
-        fee_rate: float,
-        slippage_rate: float,
-        initial_capital: float,
-        allow_reentry: bool,
-        zscore_clip: float,
-        min_spread_std: float,
-        min_tickers_for_pairing: int,
-        hdbscan_min_cluster_size: int,
-        hdbscan_min_samples: int,
-        hdbscan_metric: str,
-        umap_n_components: int = 5,            # 保留接口相容性
-        umap_n_neighbors: int = 40,
-        umap_min_dist: float = 0.01,
-        umap_random_state: int = 42,
-        adf_max_lags: int = 1,
-        adf_pvalue_threshold: float = 0.01,
-        output_dir: Path = None,
-        reduce_method: str = "none",
-        portfolio_stop_loss_pct_list: list = None,
-        max_sector_ratio_list: list = None,
-        dynamic_stop_z_list: list = None,
-        use_vol_adjust_list: list = None,
-        min_corr: float = 0.50,
-        min_zero_crossings: int = 5,
-        use_mom1_filter: bool = True,
-        db_method: str = "HDBSCAN (MF)",
-        dataset_name: str = "Unknown",
-        db_path: str = "results/result.db",
-        **kwargs
-    ):
-        self.top_n_list = top_n_list
-        self.stop_loss_list = stop_loss_list
-        self.zscore_window_list = zscore_window_list
-        self.entry_z = entry_z
-        self.exit_z = exit_z
-        self.formation_window = formation_window
-        self.trading_window = trading_window
-        self.rolling_step = rolling_step
-        self.fee_rate = fee_rate
-        self.slippage_rate = slippage_rate
-        self.initial_capital = initial_capital
-        self.allow_reentry = allow_reentry
-        self.zscore_clip = zscore_clip
-        self.min_spread_std = min_spread_std
-        self.min_tickers_for_pairing = min_tickers_for_pairing
-
-        self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
-        self.hdbscan_min_samples = hdbscan_min_samples
-        self.hdbscan_metric = hdbscan_metric
-
-        self.adf_max_lags = adf_max_lags
-        self.adf_pvalue_threshold = adf_pvalue_threshold
-        self.output_dir = output_dir
-        self.reduce_method = reduce_method.lower()
-
-        self.portfolio_stop_loss_pct_list = portfolio_stop_loss_pct_list or [0.0]
-        self.max_sector_ratio_list = max_sector_ratio_list or [0.0]
-        self.dynamic_stop_z_list = dynamic_stop_z_list or [0.0]
-        self.use_vol_adjust_list = use_vol_adjust_list or [False]
-
-        self.min_corr = min_corr
-        self.min_zero_crossings = min_zero_crossings
-        self.use_mom1_filter = use_mom1_filter
-        self.db_method = db_method
-        self.dataset_name = dataset_name
-        self.db_path = db_path
-
-    def run(self, price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping):
-        max_concurrent = self.trading_window // self.rolling_step
-        states = {}
-        for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
-            self.top_n_list, self.stop_loss_list, self.zscore_window_list,
-            self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
-        ):
-            states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)] = {
-                "logs":  [],
-                "slots": [{"avail_idx": 0, "capital": self.initial_capital / max_concurrent}
-                          for _ in range(max_concurrent)],
-            }
-
-        roll_start_indices = list(range(local_first_trade_idx, total_days - self.trading_window + 1, self.rolling_step))
-        
-        for roll_idx, trade_start_idx in enumerate(roll_start_indices):
-            form_start_idx = trade_start_idx - self.formation_window
-            form_end_idx   = trade_start_idx
-            trade_end_idx  = min(trade_start_idx + self.trading_window, total_days)
-
-            form_data   = price_pivot.iloc[form_start_idx:form_end_idx]
-            trade_data  = price_pivot.iloc[trade_start_idx:trade_end_idx]
-            extended_start = max(0, trade_start_idx - max(self.zscore_window_list))
-            extended_data_raw = price_pivot.iloc[extended_start:trade_end_idx]
-            valid_cols  = (form_data.isnull().sum() + extended_data_raw.isnull().sum()) == 0
-            form_data   = form_data.loc[:, valid_cols]
-            trade_dates = trade_data.index
-            extended_data  = extended_data_raw.loc[:, valid_cols]
-
-            if form_data.shape[1] < 2 or trade_data.empty:
-                continue
-
-            ts_str = str(all_dates[trade_start_idx])[:10]
-            te_str = str(all_dates[trade_end_idx - 1])[:10]
-            fs_str = str(all_dates[form_start_idx])[:10]
-            fe_str = str(all_dates[form_end_idx - 1])[:10]
-            print(f"  ▶ [HDBSCAN MF] 第 {roll_idx+1:02d} 期 (交易: {ts_str} ~ {te_str})", flush=True)
-
-            formation = Formation(
-                price_df=form_data,
-                form_start=fs_str, form_end=fe_str,
-                top_n=max(self.top_n_list) * 5,
-                sector_mapping=sector_mapping,
-                min_tickers_for_pairing=self.min_tickers_for_pairing,
-                hdbscan_min_cluster_size=self.hdbscan_min_cluster_size,
-                hdbscan_min_samples=self.hdbscan_min_samples,
-                hdbscan_metric=self.hdbscan_metric,
-                adf_max_lags=self.adf_max_lags,
-                adf_pvalue_threshold=self.adf_pvalue_threshold,
-                max_sector_ratio=0,
-                min_corr=self.min_corr,
-                min_zero_crossings=self.min_zero_crossings,
-                use_mom1_filter=self.use_mom1_filter,
-            )
-            max_selected_pairs = formation.run()
-
-            if max_selected_pairs.empty:
-                continue
-
-            for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
-                self.top_n_list, self.stop_loss_list, self.zscore_window_list,
-                self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
-            ):
-                if sec_ratio > 0:
-                    max_pairs_per_sector = max(1, int(n * sec_ratio))
-                    sector_counts = {}
-                    diversified_records = []
-                    for _, row in max_selected_pairs.iterrows():
-                        sec = row["Sector"]
-                        if sec not in sector_counts:
-                            sector_counts[sec] = 0
-                        if sector_counts[sec] < max_pairs_per_sector:
-                            diversified_records.append(row)
-                            sector_counts[sec] += 1
-                        if len(diversified_records) >= n:
-                            break
-                    selected_pairs = pd.DataFrame(diversified_records).copy()
-                else:
-                    selected_pairs = max_selected_pairs.head(n).copy()
-
-                if selected_pairs.empty:
-                    continue
-
-                selected_pairs["Rank"] = range(1, len(selected_pairs) + 1)
-                state  = states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)]
-                slots  = state["slots"]
-
-                free_slots = [i for i, s in enumerate(slots) if s["avail_idx"] <= trade_start_idx]
-                slot_idx   = free_slots[0] if free_slots else min(range(max_concurrent), key=lambda i: slots[i]["avail_idx"])
-
-                cap_period   = slots[slot_idx]["capital"]
-                
-                # 優化：自適應資金分配
-                n_pairs = len(selected_pairs)
-                cap_per_pair = cap_period / n_pairs if n_pairs > 0 else 0.0
-
-                trading = Trading(
-                    price_df=extended_data, trade_dates=trade_dates,
-                    selected_pairs=selected_pairs,
-                    capital_per_pair=cap_per_pair,
-                    fee_rate=self.fee_rate, slippage_rate=self.slippage_rate,
-                    stop_loss_pct=sl, entry_z=self.entry_z, exit_z=self.exit_z,
-                    zscore_window=z_win, allow_reentry=self.allow_reentry,
-                    zscore_clip=self.zscore_clip, min_spread_std=self.min_spread_std,
-                    use_dynamic_stop=(dyn_z > 0),
-                    dynamic_stop_z=dyn_z,
-                    portfolio_stop_loss_pct=p_stop,
-                    use_vol_adjust=vol_adj,
-                )
-
-                trade_log_df, period_pnl = trading.run(ts_str, te_str)
-
-                if not trade_log_df.empty:
-                    state["logs"].append(trade_log_df)
-
-                slots[slot_idx]["capital"]   = max(0.0, cap_period + period_pnl)
-                slots[slot_idx]["avail_idx"] = trade_end_idx
-
-        self._export_results(states)
-
-    def _export_results(self, states: dict):
-        """將每種參數組合的紀錄匯出為資料庫紀錄"""
-        from strategies.db_utils import export_df_to_db
-        print("\n✅ 回測完成！正在將交易紀錄寫入 SQLite 資料庫...", flush=True)
-        for params_tuple, state in states.items():
-            if state["logs"]:
-                full_log_df = pd.concat(state["logs"], ignore_index=True)
-
-                # ── 後標記：將 use_mom1_filter 旗標附加至每筆交易紀錄 ──────
-                full_log_df["use_mom1_filter"] = self.use_mom1_filter
-
-                import uuid
-                n = params_tuple[0] if len(params_tuple) > 0 else 20
-                path_key = f"{self.output_dir.name}/TradeLogs_Top{n}_{uuid.uuid4().hex[:8]}.csv"
-                
-                grid_params = {}
-                for key in dir(self):
-                    if not key.startswith('_') and not callable(getattr(self, key)):
-                        grid_params[key] = getattr(self, key)
-                        
-                grid_params["top_n"] = n
-                if len(params_tuple) >= 2: grid_params["stop_loss_pct"] = params_tuple[1]
-                if len(params_tuple) >= 3: grid_params["zscore_window"] = params_tuple[2]
-
-                success = export_df_to_db(
-                    df=full_log_df,
-                    strategy_name=self.db_method,
-                    params=grid_params,
-                    dataset_name=self.dataset_name,
-                    path_key=path_key,
-                    db_path=self.db_path,
-                    overwrite=True
-                )
-                
-                if success:
-                    mom1_tag = "Mom1=ON" if self.use_mom1_filter else "Mom1=OFF"
-                    print(f"  - 已成功寫入 DB: {path_key} [{mom1_tag}] (共 {len(full_log_df)} 筆紀錄)", flush=True)
-                else:
-                    print(f"  - ⚠️ 寫入 DB 失敗: {path_key}", flush=True)
-                
-        print("\n📁 所有交易紀錄已成功寫入資料庫！", flush=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 標準化策略進入點接口 (Unified Strategy Entry Point)
-# ══════════════════════════════════════════════════════════════════════════════
-def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir, db_method='HDBSCAN (MF)', dataset_name='Unknown', db_path='results/result.db'):
-    import inspect
-    from pathlib import Path
-    
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    
-    init_sig = inspect.signature(RollingBacktester.__init__)
-    valid_params = {}
-    
-    for param_name, param in init_sig.parameters.items():
-        if param_name in ('self', 'output_dir', 'db_method', 'dataset_name', 'db_path'):
-            continue
-        if param_name in params:
-            valid_params[param_name] = params[param_name]
-        elif param.default is not inspect.Parameter.empty:
-            valid_params[param_name] = param.default
-            
-    print(f"[{Path(__file__).stem.upper()}] 正在初始化 RollingBacktester (MultiFactor 全市場聚類優化版)...", flush=True)
-    
-    engine = RollingBacktester(
-        output_dir=out_dir,
-        db_method=db_method,
-        dataset_name=dataset_name,
-        db_path=db_path,
-        **valid_params
-    )
-    
-    print(f"[{Path(__file__).stem.upper()}] 正在啟動滾動回測...", flush=True)
-    engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
-    print(f"[{Path(__file__).stem.upper()}] 回測執行完畢。", flush=True)

@@ -1,19 +1,31 @@
-# ======================================================================
-"""
-HDBSCAN 分群配對交易滾動回測系統 (交易明細版) - 跨產業優化版
-核心功能：以 HDBSCAN 對全市場（不按產業預分）形成期特徵向量進行一次性密度分群，
-          排除噪音點後，在同一個分群內允許跨產業股票進行 Engle-Granger 共整合配對。
-"""
-
 import sqlite3
 import warnings
-import itertools
-from pathlib import Path
-from dataclasses import dataclass
-
+import sys
 import numpy as np
 import pandas as pd
 from statsmodels.tsa.stattools import adfuller
+
+# Try to load UMAP
+try:
+    import umap
+    UMAP_AVAILABLE = True
+except ImportError:
+    UMAP_AVAILABLE = False
+
+# Try to load HDBSCAN
+try:
+    import hdbscan
+    HDBSCAN_LIB = "hdbscan"
+except ImportError:
+    try:
+        from sklearn.cluster import HDBSCAN as sklearn_HDBSCAN
+        HDBSCAN_LIB = "sklearn"
+    except ImportError:
+        raise ImportError("請先安裝 scikit-learn >= 1.3.0 或 hdbscan：pip install scikit-learn hdbscan")
+
+from sklearn.preprocessing import StandardScaler
+
+warnings.filterwarnings("ignore")
 
 def _compute_hurst(series: np.ndarray) -> float:
     """R/S 分析近似 Hurst 指數"""
@@ -62,28 +74,6 @@ def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
         return float(result[0]), float(result[1])
     except Exception:
         return 0.0, 1.0
-
-# 試著載入 UMAP，如果安裝了 umap-learn
-try:
-    import umap
-    UMAP_AVAILABLE = True
-except ImportError:
-    UMAP_AVAILABLE = False
-
-# 試著載入 HDBSCAN
-try:
-    import hdbscan
-    HDBSCAN_LIB = "hdbscan"
-except ImportError:
-    try:
-        from sklearn.cluster import HDBSCAN as sklearn_HDBSCAN
-        HDBSCAN_LIB = "sklearn"
-    except ImportError:
-        raise ImportError("請先安裝 scikit-learn >= 1.3.0 或 hdbscan：pip install scikit-learn hdbscan")
-
-from sklearn.preprocessing import StandardScaler
-
-warnings.filterwarnings("ignore")
 
 def _extract_features(log_price: np.ndarray) -> np.ndarray:
     """從對數價格序列萃取多維特徵向量，用於 HDBSCAN 分群。"""
@@ -145,10 +135,6 @@ def _extract_features(log_price: np.ndarray) -> np.ndarray:
     features = np.where(np.isfinite(features), features, 0.0)
     return features
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Class 1：Formation（形成期模組）- HDBSCAN 跨產業/全市場聚類版本
-# ══════════════════════════════════════════════════════════════════════════════
-
 class Formation:
     def __init__(
         self,
@@ -156,23 +142,21 @@ class Formation:
         form_start: str,
         form_end: str,
         top_n: int = 20,
-        sector_mapping: dict = None,           # 產業分類，僅用於記錄與後置分散化
+        sector_mapping: dict = None,
         min_tickers_for_pairing: int = 2,
-        # HDBSCAN 參數
-        hdbscan_min_cluster_size: int = 30,    # 全市場聚類，調大 min_cluster_size
+        hdbscan_min_cluster_size: int = 30,
         hdbscan_min_samples: int = 10,
         hdbscan_metric: str = "euclidean",
-        # 降維方法：'umap' 或 'pca'
         reduce_method: str = "umap",
         umap_n_components: int = 5,
         umap_n_neighbors: int = 40,
         umap_min_dist: float = 0.01,
         umap_random_state: int = 42,
-        # ADF p 值門檻
         adf_max_lags: int = 1,
-        adf_pvalue_threshold: float = 0.01,   # 預設更嚴格以防止跨產業假共整合
+        adf_pvalue_threshold: float = 0.01,
         max_sector_ratio: float = 0.3,
         feature_mode: str = "stats13",
+        **kwargs
     ):
         self.price_df = price_df.copy()
         self.max_sector_ratio = max_sector_ratio
@@ -293,8 +277,8 @@ class Formation:
             labels = clusterer.fit_predict(X)
             unique_labels = set(labels) - {-1}
             if len(unique_labels) >= 1:
-                if current_min_cs != self.hdbscan_min_cluster_size:
-                    print(f"  [Formation] HDBSCAN parameter fallback succeeded with min_cluster_size={min_cs}, min_samples={min_samp}!")
+                # if current_min_cs != self.hdbscan_min_cluster_size:
+                #     print(f"  [Formation] HDBSCAN parameter fallback succeeded with min_cluster_size={min_cs}, min_samples={min_samp}!")
                 return labels
             
             current_min_cs = current_min_cs // 2
@@ -317,14 +301,12 @@ class Formation:
               f"{noise_count} 個噪音點排除，"
               f"ADF p 值門檻 = {self.adf_pvalue_threshold:.2f}")
 
-        # 僅按 cluster_label 分組，排除噪音 -1，不限產業
-        group_map: dict[int, list[str]] = {}
+        group_map = {}
         for t, lbl in zip(tickers, labels):
             if lbl == -1:
                 continue
             group_map.setdefault(int(lbl), []).append(t)
 
-        # 排除成員數不足的群組
         valid_groups = {k: v for k, v in group_map.items() if len(v) >= self.min_tickers_for_pairing}
         if not valid_groups:
             print("  [Formation] 全市場聚類後無有效配對組合。")
@@ -337,7 +319,6 @@ class Formation:
         rejected_count = 0
 
         for cluster_lbl, group_tickers in sorted(valid_groups.items()):
-            # 限制單個 Cluster 內最大配對測試數以防卡死（通常 S&P500 的單群不會大於 100，保險起見設上限）
             if len(group_tickers) > 100:
                 print(f"  [Formation] 群落 {cluster_lbl} 規模過大 ({len(group_tickers)} 檔)，限制測試前 100 檔。")
                 group_tickers = group_tickers[:100]
@@ -350,7 +331,6 @@ class Formation:
                     log_b = log_prices[tb].values
                     sec_b = self.sector_mapping.get(tb.upper(), "Unknown")
 
-                    # OLS 擬合
                     al_ab, be_ab, re_ab = _ols(log_a, log_b)
                     stat_ab, pval_ab = _adf_stat(re_ab, self.adf_max_lags)
 
@@ -366,12 +346,10 @@ class Formation:
                         best_alpha, best_beta, best_resid = al_ba, be_ba, re_ba
                         best_a, best_b = tb, ta
 
-                    # 篩選條件 1：ADF P-Value
                     if best_pval >= self.adf_pvalue_threshold:
                         rejected_count += 1
                         continue
 
-                    # 篩選條件 2：半衰期
                     dy = np.diff(best_resid)
                     y_lag = best_resid[:-1]
                     n_dy = len(dy)
@@ -391,7 +369,6 @@ class Formation:
                         rejected_count += 1
                         continue
 
-                    # 篩選條件 3：Hurst 指數
                     hurst = _compute_hurst(best_resid)
                     if hurst >= 0.40:
                         rejected_count += 1
@@ -401,13 +378,12 @@ class Formation:
                     spread_mean = float(np.mean(best_resid))
                     spread_std  = float(np.std(best_resid, ddof=1)) if len(best_resid) > 1 else 0.0
 
-                    # 為了符合回測引擎以 "Sector" 進行限制，若兩者同行業則顯示該行業，否則標記為 "Cluster_X"
                     assigned_sector = sec_a if sec_a == sec_b else f"Cluster_{cluster_lbl}"
 
                     eg_records.append({
                         "Form_Start":    self.form_start,
                         "Form_End":      self.form_end,
-                        "Sector":        assigned_sector,  # 設為 Cluster 編號或同行業名稱
+                        "Sector":        assigned_sector,
                         "Cluster_Label": cluster_lbl,
                         "Ticker_A":      best_a,
                         "Ticker_B":      best_b,
@@ -432,7 +408,6 @@ class Formation:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        # ── 優化核心：全市場一次性降維與聚類 ──
         if self.reduce_method == "pca":
             X_embed = self._pca_reduce(X)
         else:
@@ -441,13 +416,11 @@ class Formation:
         labels = self._hdbscan_cluster(X_embed)
         self.cluster_labels_ = {t: int(lbl) for t, lbl in zip(valid_tickers, labels)}
 
-        # 共整合篩選
         eg_df = self._cointegration_within_clusters(valid_tickers, labels)
         if eg_df.empty:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        # 實施分散化限制
         if getattr(self, "max_sector_ratio", 0) > 0:
             max_pairs_per_sec = max(1, int(self.top_n * self.max_sector_ratio))
             sector_counts = {}
@@ -467,7 +440,6 @@ class Formation:
 
         selected["Rank"] = range(1, len(selected) + 1)
 
-        # 附加對數統計量（交易期使用）
         log_prices  = np.log(self.price_df)
         mean_prices = log_prices.mean()
         std_prices  = log_prices.std()
@@ -479,219 +451,3 @@ class Formation:
 
         self.selected_pairs = selected
         return self.selected_pairs
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Class 2, 3, 4：與原本 HDBSCAN.py 大架構一致，無縫相容 Trading、DataProcessor 與 RollingBacktester
-# ══════════════════════════════════════════════════════════════════════════════
-
-# 我們可以直接繼承或重新綁定，但為了獨立執行性，我們將其餘部分複製於此。
-# 這樣能保證 HDBSCAN_CrossSector 可以作為獨立模組被主程序 import。
-
-from strategies.HDBSCAN import Trading, PairState, DataProcessor, RollingBacktester
-
-def run_strategy(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping, params, output_dir, db_method='Unknown', dataset_name='Unknown', db_path='results/result.db'):
-    import inspect
-    from pathlib import Path
-    
-    out_dir = Path(output_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    
-    init_sig = inspect.signature(RollingBacktester.__init__)
-    valid_params = {}
-    
-    for param_name, param in init_sig.parameters.items():
-        if param_name in ('self', 'output_dir'):
-            continue
-        if param_name in params:
-            valid_params[param_name] = params[param_name]
-        elif param.default is not inspect.Parameter.empty:
-            valid_params[param_name] = param.default
-            
-    print(f"[{Path(__file__).stem.upper()}] 正在初始化 RollingBacktester (跨產業聚類優化版)...")
-    
-    # 創建自訂的 RollingBacktester，以調用本檔案內優化的 Formation 類
-    class CustomRollingBacktester(RollingBacktester):
-        def run(self, price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping):
-            max_concurrent = self.trading_window // self.rolling_step
-            states = {}
-            for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
-                self.top_n_list, self.stop_loss_list, self.zscore_window_list,
-                self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
-            ):
-                states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)] = {
-                    "logs":  [],
-                    "slots": [{"avail_idx": 0, "capital": self.initial_capital / max_concurrent}
-                              for _ in range(max_concurrent)],
-                }
-
-            roll_start_indices = list(range(local_first_trade_idx, total_days - self.trading_window + 1, self.rolling_step))
-            
-            for roll_idx, trade_start_idx in enumerate(roll_start_indices):
-                form_start_idx = trade_start_idx - self.formation_window
-                form_end_idx   = trade_start_idx
-                trade_end_idx  = min(trade_start_idx + self.trading_window, total_days)
-
-                form_data   = price_pivot.iloc[form_start_idx:form_end_idx]
-                trade_data  = price_pivot.iloc[trade_start_idx:trade_end_idx]
-                extended_start = max(0, trade_start_idx - max(self.zscore_window_list))
-                extended_data_raw = price_pivot.iloc[extended_start:trade_end_idx]
-                valid_cols  = (form_data.isnull().sum() + extended_data_raw.isnull().sum()) == 0
-                form_data   = form_data.loc[:, valid_cols]
-                trade_dates = trade_data.index
-                extended_data  = extended_data_raw.loc[:, valid_cols]
-
-                if form_data.shape[1] < 2 or trade_data.empty:
-                    continue
-
-                ts_str = str(all_dates[trade_start_idx])[:10]
-                te_str = str(all_dates[trade_end_idx - 1])[:10]
-                fs_str = str(all_dates[form_start_idx])[:10]
-                fe_str = str(all_dates[form_end_idx - 1])[:10]
-                print(f"  ▶ 處理中：第 {roll_idx+1:02d} 期 (交易: {ts_str} ~ {te_str})")
-
-                # 使用本檔案定義的 Formation (全市場聚類 ＆ 跨產業配對)
-                formation = Formation(
-                    price_df=form_data,
-                    form_start=fs_str, form_end=fe_str,
-                    top_n=max(self.top_n_list) * 5,
-                    sector_mapping=sector_mapping,
-                    min_tickers_for_pairing=self.min_tickers_for_pairing,
-                    hdbscan_min_cluster_size=self.hdbscan_min_cluster_size,
-                    hdbscan_min_samples=self.hdbscan_min_samples,
-                    hdbscan_metric=self.hdbscan_metric,
-                    umap_n_components=self.umap_n_components,
-                    umap_n_neighbors=self.umap_n_neighbors,
-                    umap_min_dist=self.umap_min_dist,
-                    umap_random_state=self.umap_random_state,
-                    adf_max_lags=self.adf_max_lags,
-                    adf_pvalue_threshold=self.adf_pvalue_threshold,
-                    reduce_method=getattr(self, "reduce_method", "umap"),
-                    feature_mode=getattr(self, "feature_mode", "stats13"),
-                    max_sector_ratio=0,
-                )
-                max_selected_pairs = formation.run()
-
-                if max_selected_pairs.empty:
-                    continue
-
-                for n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj in itertools.product(
-                    self.top_n_list, self.stop_loss_list, self.zscore_window_list,
-                    self.portfolio_stop_loss_pct_list, self.max_sector_ratio_list, self.dynamic_stop_z_list, self.use_vol_adjust_list
-                ):
-                    if sec_ratio > 0:
-                        max_pairs_per_sector = max(1, int(n * sec_ratio))
-                        sector_counts = {}
-                        diversified_records = []
-                        for _, row in max_selected_pairs.iterrows():
-                            sec = row["Sector"]
-                            if sec not in sector_counts:
-                                sector_counts[sec] = 0
-                            if sector_counts[sec] < max_pairs_per_sector:
-                                diversified_records.append(row)
-                                sector_counts[sec] += 1
-                            if len(diversified_records) >= n:
-                                break
-                        selected_pairs = pd.DataFrame(diversified_records).copy()
-                    else:
-                        selected_pairs = max_selected_pairs.head(n).copy()
-
-                    if selected_pairs.empty:
-                        continue
-
-                    selected_pairs["Rank"] = range(1, len(selected_pairs) + 1)
-                    state  = states[(n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)]
-                    slots  = state["slots"]
-
-                    free_slots = [i for i, s in enumerate(slots) if s["avail_idx"] <= trade_start_idx]
-                    slot_idx   = free_slots[0] if free_slots else min(range(max_concurrent), key=lambda i: slots[i]["avail_idx"])
-
-                    cap_period   = slots[slot_idx]["capital"]
-                    cap_per_pair = cap_period / n
-
-                    trading = Trading(
-                        price_df=extended_data, trade_dates=trade_dates,
-                        selected_pairs=selected_pairs,
-                        capital_per_pair=cap_per_pair,
-                        fee_rate=self.fee_rate, slippage_rate=self.slippage_rate,
-                        stop_loss_pct=sl, entry_z=self.entry_z, exit_z=self.exit_z,
-                        zscore_window=z_win, allow_reentry=self.allow_reentry,
-                        zscore_clip=self.zscore_clip, min_spread_std=self.min_spread_std,
-                        use_dynamic_stop=(dyn_z > 0),
-                        dynamic_stop_z=dyn_z,
-                        portfolio_stop_loss_pct=p_stop,
-                        use_vol_adjust=vol_adj,
-                    )
-
-                    trade_log_df, period_pnl = trading.run(ts_str, te_str)
-
-                    if not trade_log_df.empty:
-                        state["logs"].append(trade_log_df)
-
-                    slots[slot_idx]["capital"]   = max(0, cap_period + period_pnl)
-                    slots[slot_idx]["avail_idx"] = trade_end_idx
-
-            self._export_results(states)
-    def _export_results(self, states: dict):
-        """將每種參數組合的紀錄匯出為資料庫紀錄"""
-        from strategies.db_utils import export_df_to_db
-        print("\n✅ 回測完成！正在將交易紀錄寫入 SQLite 資料庫...")
-        for params_tuple, state in states.items():
-            if state["logs"]:
-                full_log_df = __import__('pandas').concat(state["logs"], ignore_index=True)
-                
-                # 解構參數 (因為不同策略可能有不同參數數量，使用通用的 fallback 機制)
-                # ssd_basic 包含: (n, sl, z_win, p_stop, sec_ratio, dyn_z, vol_adj)
-                # HDBSCAN 包含: (n, sl, min_cluster_size, ...) 等等
-                # 我們統一把原本產生 filename 的邏輯簡化，因為現在 path_key 不用做 Regex
-                
-                # 自動生出一個 Unique Path Key
-                import uuid
-                n = params_tuple[0] if len(params_tuple) > 0 else 20
-                path_key = f"{self.output_dir.name}/TradeLogs_Top{n}_{uuid.uuid4().hex[:8]}.csv"
-                
-                # 建構這次網格的參數字典 (使用 getattr 動態讀取自 engine)
-                # 注意：其實 df_out 在 simulate_pair 時已經寫入了這些參數，我們在這裡可以讀取 df_out 的第一筆記錄做為參數 (這最準確！)
-                # 不過最安全的是傳入 dict，如果沒法完美解析 params_tuple，我們可以傳入 kwargs
-                
-                # 簡單暴力解：從 self 取出全部屬性當作 params 字典傳下去 (RollingBacktester 本來就有存！)
-                grid_params = {}
-                for key in dir(self):
-                    if not key.startswith('_') and not callable(getattr(self, key)):
-                        grid_params[key] = getattr(self, key)
-                        
-                # 為了確保 n 等參數更新為當前網格的參數：
-                grid_params["top_n"] = n
-                if len(params_tuple) >= 2: grid_params["stop_loss_pct"] = params_tuple[1]
-                if len(params_tuple) >= 3: 
-                    # 判斷第三個參數是 z_win 還是 min_cluster_size
-                    if hasattr(self, 'zscore_window_list'):
-                        grid_params["zscore_window"] = params_tuple[2]
-                    else:
-                        grid_params["min_cluster_size"] = params_tuple[2]
-
-                success = export_df_to_db(
-                    df=full_log_df,
-                    strategy_name=getattr(self, "db_method", "Unknown"),
-                    params=grid_params,
-                    dataset_name=getattr(self, "dataset_name", "Unknown"),
-                    path_key=path_key,
-                    db_path=getattr(self, "db_path", "results/result.db"),
-                    overwrite=True
-                )
-                
-                if success:
-                    print(f"  - 已成功寫入 DB: {path_key} (共 {len(full_log_df)} 筆紀錄)")
-                else:
-                    print(f"  - ⚠️ 寫入 DB 失敗: {path_key}")
-                
-        print(f"\\n📁 所有交易紀錄已成功寫入資料庫！")
-
-    engine = CustomRollingBacktester(
-        output_dir=out_dir,
-        **valid_params
-    )
-    
-    print(f"[{Path(__file__).stem.upper()}] 正在啟動滾動回測...")
-    engine.run(price_pivot, all_dates, total_days, local_first_trade_idx, sector_mapping)
-    print(f"[{Path(__file__).stem.upper()}] 回測執行完畢。")
