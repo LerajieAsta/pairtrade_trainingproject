@@ -317,11 +317,15 @@ def calculate_metrics_raw(strategy_path):
         else:
             cum_ret = ann_ret = 0
             
-        daily_returns = portfolio_daily_idx['Daily_Delta'] / INITIAL_CAPITAL
+        # 以真實權益計算每日報酬率 (避免第一天 NaN，使用 shift(1) 並填充 INITIAL_CAPITAL)
+        prev_equity = portfolio_daily_idx['Equity'].shift(1).fillna(INITIAL_CAPITAL)
+        daily_returns = portfolio_daily_idx['Daily_Delta'] / prev_equity
         sharpe = np.sqrt(252) * daily_returns.mean() / daily_returns.std() if daily_returns.std() != 0 else 0
-        roll_max = portfolio_daily['Cumulative_PnL'].cummax()
-        drawdown = portfolio_daily['Cumulative_PnL'] - roll_max
-        mdd_pct = drawdown.min() / INITIAL_CAPITAL
+        
+        # 修正 MDD 算法：以真實動態權益計算最大回撤比例
+        roll_max_equity = portfolio_daily['Equity'].cummax()
+        drawdown_pct = (portfolio_daily['Equity'] - roll_max_equity) / roll_max_equity
+        mdd_pct = drawdown_pct.min()
     else:
         cum_ret = ann_ret = sharpe = mdd_pct = 0
 

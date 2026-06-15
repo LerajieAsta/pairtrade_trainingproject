@@ -12,6 +12,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
 # ── Configuration Settings ──────────────────────────────────────────────
+FORCE_RERUN = True  # 設定為 True 可以強制重新執行，無視斷點續傳紀錄
 DB_PROFILES = {
     "sp500_Current": {
         "db_path":     "./data/sp500_Current.db",
@@ -55,7 +56,7 @@ base_params = {
     "use_vol_adjust":               use_vol_adjust,
     "max_holding_days":             30,
     # 支援多數值比對的網格搜尋參數清單
-    "top_n_list":                   [5, 10, 20],
+    "top_n_list":                   [1, 3, 5, 10, 20],
     "stop_loss_list":               [0.0, 0.05, 0.15],
     "max_sector_ratio_list":        [0.0, 0.30, 0.50],
     # 單一數值作為 fallback 預設值
@@ -68,7 +69,7 @@ base_params = {
 }
 
 hdbscan_common = {
-    "use_dynamic_stop":         True,
+    "use_dynamic_stop":         False,
     "hdbscan_min_cluster_size": 30,
     "hdbscan_min_samples":      10,
     "hdbscan_metric":           "euclidean",
@@ -343,6 +344,9 @@ class ProgressAwareStdout:
 # ════════════════════════════════════════════════════════════════════════════
 
 def check_trading_completed(strategy_config: dict, output_root: str) -> bool:
+    if FORCE_RERUN:
+        return False
+        
     sub_dir = strategy_config["sub_dir"]
     params  = strategy_config["params"]
     
@@ -467,6 +471,11 @@ def worker_task(
             trade_prices = price_pivot.iloc[trade_start_idx : trade_end_idx + 1]
             trade_dates = all_dates[trade_start_idx : trade_end_idx + 1]
 
+            # 延伸價格數據，提供 zscore_window 前期的價格以避免 trading 前期 Z-Score 為 NaN
+            zwin = params.get("zscore_window", 0)
+            extended_start_idx = max(0, trade_start_idx - zwin)
+            trade_prices_extended = price_pivot.iloc[extended_start_idx : trade_end_idx + 1]
+
             for pair, capital in allocations.items():
                 ticker_a, ticker_b = pair
                 pair_data = param_map[pair]
@@ -477,7 +486,7 @@ def worker_task(
                 pb_series = trade_prices[ticker_b]
 
                 kwargs = {
-                    "price_df": trade_prices,
+                    "price_df": trade_prices_extended,  # 傳入延伸價格數據，修復前期 NaN 交易缺失問題
                     "trade_dates": trade_dates,
                     "selected_pairs": pd.DataFrame(),
                     "capital_per_pair": capital,
@@ -496,6 +505,9 @@ def worker_task(
 
                 if hasattr(trading_instance, '_simulate_pair'):
                     try:
+                        # OLS_Alpha 存在時（HDBSCAN）走 log-price 路徑；不存在時（SSD/DTW）走向下相容路徑
+                        raw_alpha = form_params.get("OLS_Alpha", None)
+                        ols_alpha_val = float(raw_alpha) if raw_alpha is not None else None
                         df_log = trading_instance._simulate_pair(
                             period_start=trade_start,
                             period_end=trade_end,
@@ -509,7 +521,8 @@ def worker_task(
                             log_mean_a=form_params.get("Log_Mean_A", 0.0),
                             log_std_a=form_params.get("Log_Std_A", 1.0),
                             log_mean_b=form_params.get("Log_Mean_B", 0.0),
-                            log_std_b=form_params.get("Log_Std_B", 1.0)
+                            log_std_b=form_params.get("Log_Std_B", 1.0),
+                            ols_alpha=ols_alpha_val
                         )
 
                         if not df_log.empty:

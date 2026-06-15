@@ -84,9 +84,15 @@ class Trading:
         state.entry_price_b = 0.0
         state.trade_entry_fee = 0.0
 
-    def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float, 
+    def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float,
                        form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float,
-                       first_price_a: float = 0.0, first_price_b: float = 0.0) -> pd.DataFrame:
+                       first_price_a: float = 0.0, first_price_b: float = 0.0,
+                       ols_alpha: float = None) -> pd.DataFrame:
+        """
+        ols_alpha: OLS 截距，由 HDBSCAN 等 OLS 形成期傳入。
+          - 若非 None：使用原始 log-price 空間計算 spread（與形成期一致），修復 Bug #1/#2。
+          - 若 None：使用標準化 norm_p 空間（SSD / DTW 等舊路徑，保持向下相容）。
+        """
         if ticker_a not in self.price_df.columns or ticker_b not in self.price_df.columns: return pd.DataFrame()
 
         price_a, price_b = self.price_df[ticker_a].dropna(), self.price_df[ticker_b].dropna()
@@ -95,55 +101,95 @@ class Trading:
 
         if len(price_a) < 5: return pd.DataFrame()
 
-        if first_price_a > 0.0 and first_price_b > 0.0 and log_mean_a == 0.0:
-            norm_p_a = price_a / first_price_a
-            norm_p_b = price_b / first_price_b
-        else:
+        # ── 路徑 A：OLS log-price 空間（HDBSCAN 系列） ──────────────────────
+        # 條件：ols_alpha 被明確傳入（非 None），使用原始 log-price 空間，
+        # spread = log_A - ols_alpha - hedge_ratio * log_B，與形成期 OLS 殘差完全一致。
+        if ols_alpha is not None:
             log_p_a = np.log(price_a)
             log_p_b = np.log(price_b)
-            norm_p_a = (log_p_a - log_mean_a) / log_std_a
-            norm_p_b = (log_p_b - log_mean_b) / log_std_b
-        
-        if self.zscore_window == 0:
-            spread = norm_p_a - hedge_ratio * norm_p_b
-            safe_std = max(form_spread_std, self.min_spread_std)
-            if getattr(self, "use_vol_adjust", False):
-                roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
-                vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
-                adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+
+            if self.zscore_window == 0:
+                # 靜態：使用形成期 OLS 參數（alpha, beta）重建殘差
+                spread = log_p_a - ols_alpha - hedge_ratio * log_p_b
+                safe_std = max(form_spread_std, self.min_spread_std)
+                if getattr(self, "use_vol_adjust", False):
+                    roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                    vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                    adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+                else:
+                    adjusted_std = safe_std
+                zscore = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
+                beta_series = pd.Series(hedge_ratio, index=common_idx)
             else:
-                adjusted_std = safe_std
-            zscore = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
-            beta_series = pd.Series(hedge_ratio, index=common_idx)
+                # 滾動：在原始 log-price 空間做 rolling OLS
+                roll_cov = log_p_b.rolling(window=self.zscore_window).cov(log_p_a)
+                roll_var = log_p_b.rolling(window=self.zscore_window).var()
+                roll_beta = np.where(roll_var > 1e-8, roll_cov / roll_var, 0.0)
+                roll_beta = pd.Series(roll_beta, index=common_idx)
+                roll_mean_a = log_p_a.rolling(window=self.zscore_window).mean()
+                roll_mean_b = log_p_b.rolling(window=self.zscore_window).mean()
+                roll_alpha = roll_mean_a - roll_beta * roll_mean_b
+                spread = log_p_a - roll_alpha - roll_beta * log_p_b
+                roll_var_a = log_p_a.rolling(window=self.zscore_window).var()
+                roll_res_var = roll_var_a - roll_beta * roll_cov
+                roll_std = np.sqrt(np.maximum(roll_res_var, 0))
+                if (roll_std < self.min_spread_std * 10).mean() > 0.5:
+                    return pd.DataFrame()
+                safe_std = np.maximum(roll_std, self.min_spread_std)
+                if getattr(self, "use_vol_adjust", False):
+                    roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                    vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                    adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+                else:
+                    adjusted_std = safe_std
+                zscore = np.clip(spread / adjusted_std, -self.zscore_clip, self.zscore_clip)
+                beta_series = roll_beta
+
+        # ── 路徑 B：標準化 norm_p 空間（SSD / DTW，向下相容） ────────────────
         else:
-            roll_cov = norm_p_b.rolling(window=self.zscore_window).cov(norm_p_a)
-            roll_var = norm_p_b.rolling(window=self.zscore_window).var()
-            
-            roll_beta = np.where(roll_var > 1e-8, roll_cov / roll_var, 0.0)
-            roll_beta = pd.Series(roll_beta, index=common_idx)
-            
-            roll_mean_a = norm_p_a.rolling(window=self.zscore_window).mean()
-            roll_mean_b = norm_p_b.rolling(window=self.zscore_window).mean()
-            roll_alpha = roll_mean_a - roll_beta * roll_mean_b
-            
-            spread = norm_p_a - roll_alpha - roll_beta * norm_p_b
-            
-            roll_var_a = norm_p_a.rolling(window=self.zscore_window).var()
-            roll_res_var = roll_var_a - roll_beta * roll_cov
-            roll_std = np.sqrt(np.maximum(roll_res_var, 0))
-            
-            if (roll_std < self.min_spread_std * 10).mean() > 0.5:
-                return pd.DataFrame()
-            
-            safe_std = np.maximum(roll_std, self.min_spread_std)
-            if getattr(self, "use_vol_adjust", False):
-                roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
-                vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
-                adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+            if first_price_a > 0.0 and first_price_b > 0.0 and log_mean_a == 0.0:
+                norm_p_a = price_a / first_price_a
+                norm_p_b = price_b / first_price_b
             else:
-                adjusted_std = safe_std
-            zscore = np.clip(spread / adjusted_std, -self.zscore_clip, self.zscore_clip)
-            beta_series = roll_beta
+                log_p_a = np.log(price_a)
+                log_p_b = np.log(price_b)
+                norm_p_a = (log_p_a - log_mean_a) / log_std_a
+                norm_p_b = (log_p_b - log_mean_b) / log_std_b
+
+            if self.zscore_window == 0:
+                spread = norm_p_a - hedge_ratio * norm_p_b
+                safe_std = max(form_spread_std, self.min_spread_std)
+                if getattr(self, "use_vol_adjust", False):
+                    roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                    vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                    adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+                else:
+                    adjusted_std = safe_std
+                zscore = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
+                beta_series = pd.Series(hedge_ratio, index=common_idx)
+            else:
+                roll_cov = norm_p_b.rolling(window=self.zscore_window).cov(norm_p_a)
+                roll_var = norm_p_b.rolling(window=self.zscore_window).var()
+                roll_beta = np.where(roll_var > 1e-8, roll_cov / roll_var, 0.0)
+                roll_beta = pd.Series(roll_beta, index=common_idx)
+                roll_mean_a = norm_p_a.rolling(window=self.zscore_window).mean()
+                roll_mean_b = norm_p_b.rolling(window=self.zscore_window).mean()
+                roll_alpha = roll_mean_a - roll_beta * roll_mean_b
+                spread = norm_p_a - roll_alpha - roll_beta * norm_p_b
+                roll_var_a = norm_p_a.rolling(window=self.zscore_window).var()
+                roll_res_var = roll_var_a - roll_beta * roll_cov
+                roll_std = np.sqrt(np.maximum(roll_res_var, 0))
+                if (roll_std < self.min_spread_std * 10).mean() > 0.5:
+                    return pd.DataFrame()
+                safe_std = np.maximum(roll_std, self.min_spread_std)
+                if getattr(self, "use_vol_adjust", False):
+                    roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
+                    vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
+                    adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
+                else:
+                    adjusted_std = safe_std
+                zscore = np.clip(spread / adjusted_std, -self.zscore_clip, self.zscore_clip)
+                beta_series = roll_beta
 
         valid_idx = common_idx.intersection(self.trade_dates)
         if len(valid_idx) == 0: return pd.DataFrame()
@@ -340,22 +386,27 @@ class Trading:
         """執行該期所有配對的交易模擬"""
         dfs = []
         for _, row in self.selected_pairs.iterrows():
+            # OLS_Alpha 存在時（HDBSCAN 系列）走 log-price 路徑；
+            # 不存在時（SSD/DTW）走舊有標準化路徑（向下相容）
+            raw_alpha = row.get("OLS_Alpha", None)
+            ols_alpha_val = float(raw_alpha) if raw_alpha is not None and not pd.isna(raw_alpha) else None
             df_pair = self._simulate_pair(
                 period_start=period_start,
                 period_end=period_end,
-                sector=row.get("Sector", "Unknown"), 
-                ticker_a=row["Ticker_A"], 
-                ticker_b=row["Ticker_B"], 
-                pair_rank=row["Rank"], 
-                hedge_ratio=float(row.get("Hedge_Ratio", 1.0)), 
-                form_spread_mean=float(row.get("Spread_Mean", 0.0)), 
-                form_spread_std=float(row.get("Spread_Std", 1.0)), 
-                log_mean_a=float(row.get("Log_Mean_A", 0.0)), 
-                log_std_a=float(row.get("Log_Std_A", 1.0)), 
-                log_mean_b=float(row.get("Log_Mean_B", 0.0)), 
+                sector=row.get("Sector", "Unknown"),
+                ticker_a=row["Ticker_A"],
+                ticker_b=row["Ticker_B"],
+                pair_rank=row["Rank"],
+                hedge_ratio=float(row.get("Hedge_Ratio", 1.0)),
+                form_spread_mean=float(row.get("Spread_Mean", 0.0)),
+                form_spread_std=float(row.get("Spread_Std", 1.0)),
+                log_mean_a=float(row.get("Log_Mean_A", 0.0)),
+                log_std_a=float(row.get("Log_Std_A", 1.0)),
+                log_mean_b=float(row.get("Log_Mean_B", 0.0)),
                 log_std_b=float(row.get("Log_Std_B", 1.0)),
                 first_price_a=float(row.get("First_Price_A", 0.0)),
-                first_price_b=float(row.get("First_Price_B", 0.0))
+                first_price_b=float(row.get("First_Price_B", 0.0)),
+                ols_alpha=ols_alpha_val
             )
             if not df_pair.empty:
                 dfs.append(df_pair)

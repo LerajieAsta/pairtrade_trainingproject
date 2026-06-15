@@ -472,10 +472,11 @@ class Formation:
             mom1_threshold = float(np.std(all_diffs, ddof=1)) if len(all_diffs) > 1 else 0.0
 
             before_mom1 = len(eg_records)
+            # Han et al. 2021：只保留報酬率差值大於等於截面標準差的配對（尋找有報酬空間/已分化之配對）
             eg_records = [r for r in eg_records if r["Mom1_Diff"] >= mom1_threshold]
             after_mom1 = len(eg_records)
             print(f"  [Formation] Mom1 篩選 (Han 2021)：門檻={mom1_threshold:.4f}，"
-                  f"{before_mom1} 對 → {after_mom1} 對（排除 {before_mom1 - after_mom1} 對）")
+                  f"{before_mom1} 對 → {after_mom1} 對（排除 {before_mom1 - after_mom1} 對報酬率差值過小的配對）")
 
             if not eg_records:
                 print("  [Formation] Mom1 篩選後無剩餘配對。")

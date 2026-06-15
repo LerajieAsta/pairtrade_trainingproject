@@ -20,6 +20,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
 # ── Configuration Settings ──────────────────────────────────────────────
+FORCE_RERUN = True  # 設定為 True 可以強制重新執行，無視斷點續傳紀錄
 DB_PROFILES = {
     "sp500_Current": {
         "db_path":     "./data/sp500_Current.db",
@@ -63,7 +64,7 @@ base_params = {
     "use_vol_adjust":               use_vol_adjust,
     "max_holding_days":             30,
     # 支援多數值比對的網格搜尋參數清單
-    "top_n_list":                   [5, 10, 20],
+    "top_n_list":                   [1, 3, 5, 10, 20],
     "stop_loss_list":               [0.0, 0.05, 0.15],
     "max_sector_ratio_list":        [0.0, 0.30, 0.50],
     # 單一數值作為 fallback 預設值 (在形成期，配對數固定為 20 對)
@@ -280,6 +281,9 @@ def check_formation_completed(config: dict, db_path: str, log_dir: str, formatio
     """
     智慧判定策略形成期是否已完整跑完（斷點續傳）。
     """
+    if FORCE_RERUN:
+        return False
+        
     safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in config["name"])
     mark_path = os.path.join(log_dir, f"{safe_name}_completed.json")
 
@@ -470,6 +474,23 @@ def worker_task(
         FormationClass = strat_module.Formation
 
         # 3. 滾動視窗計算
+        # 預先查詢已完成的期數 (實現期數級別的斷點續傳)
+        completed_periods = set()
+        main_db = strategy_config.get("formation_db_path")
+        if main_db and os.path.exists(main_db) and not FORCE_RERUN:
+            try:
+                main_conn = sqlite3.connect(main_db)
+                df_exists = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name='formation_pairs'", main_conn)
+                if not df_exists.empty:
+                    df_completed = pd.read_sql_query(
+                        "SELECT DISTINCT Period_Start FROM formation_pairs WHERE strategy_id = ?",
+                        main_conn, params=(name,)
+                    )
+                    completed_periods = set(df_completed["Period_Start"].tolist())
+                main_conn.close()
+            except Exception:
+                pass
+
         for i, idx in enumerate(roll_start_indices):
             form_start_idx = idx - FORMATION_WINDOW
             form_end_idx   = idx - 1
@@ -481,6 +502,10 @@ def worker_task(
             trade_end_dt   = all_dates[trade_end_idx].strftime('%Y-%m-%d')
 
             # 輸出進度，供攔截器分析
+            if form_start_dt in completed_periods and not FORCE_RERUN:
+                print(f"Window {i+1}/{total_windows}: {form_start_dt} to {form_end_dt} -> \033[90m已完成，跳過\033[0m")
+                continue
+            
             print(f"Window {i+1}/{total_windows}: {form_start_dt} to {form_end_dt}")
 
             # 整理形成期數據與過濾停牌股票
@@ -951,6 +976,7 @@ def run_all_formations():
             "temp_db_path":     f"data/formation_pairs_{db_basename}_{safe_name}.db",
             "db_path":          DB_PATH,
             "log_dir":          log_dir,
+            "formation_db_path": formation_db_path,
         }
         strategies_config.append(config)
 
