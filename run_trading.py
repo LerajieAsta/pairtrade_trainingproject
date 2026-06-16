@@ -5,6 +5,43 @@ import sqlite3
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import multiprocessing
+
+# ── CPU 限制與 Python 3.14 資源追蹤器相容性補丁 ──────────────────────────────
+# 1. 可調控的 CPU 使用率上限 (80%)
+CPU_LIMIT_PCT = 0.8
+
+# 2. 限制底層矩陣運算庫的執行緒數，防止單個子行程佔滿所有 CPU 核心
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NCORES"] = "1"
+
+# 3. 預先註冊資源類型，解決 Python 3.14 resource_tracker 收到 JSON 時的解析錯誤
+try:
+    import multiprocessing.resource_tracker
+    if 'folder' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:
+        multiprocessing.resource_tracker._CLEANUP_FUNCS['folder'] = lambda x: None
+    if 'file' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:
+        multiprocessing.resource_tracker._CLEANUP_FUNCS['file'] = lambda x: None
+except Exception:
+    pass
+
+# 4. 對 joblib.Parallel 進行 Monkey Patch，若在子行程中執行則強制單執行緒 (n_jobs=1)
+try:
+    import joblib
+    original_parallel = joblib.Parallel
+    class PatchedParallel(original_parallel):
+        def __init__(self, n_jobs=None, *args, **kwargs):
+            if multiprocessing.current_process().name != 'MainProcess':
+                n_jobs = 1
+            super().__init__(n_jobs=n_jobs, *args, **kwargs)
+    joblib.Parallel = PatchedParallel
+    joblib.parallel.Parallel = PatchedParallel
+except ImportError:
+    pass
 
 # ── 強制 Windows 終端機使用 UTF-8 輸出並開啟 Line-buffering ──────────────
 if hasattr(sys.stdout, "reconfigure"):
@@ -19,14 +56,19 @@ DB_PROFILES = {
         "output_root": "./results/current",
         "label":       "S&P 500 現行成分股 (Current)",
     },
-    "sp500_Full": {
-        "db_path":     "./data/sp500.db",
+    "sp500_yF": {
+        "db_path":     "./data/sp500_yF.db",
         "output_root": "./results/full",
-        "label":       "S&P 500 完整歷史成分股 (Full)",
+        "label":       "S&P 500 完整歷史成分股 (yFinance)",
+    },
+    "sp500_Tiingo": {
+        "db_path":     "./data/sp500_Tiingo.db",
+        "output_root": "./results/tiingo",
+        "label":       "S&P 500 完整歷史成分股 (Tiingo)",
     },
 }
 
-DB_PATH = "./data/sp500.db"
+DB_PATH = "./data/sp500_yF.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
@@ -988,7 +1030,10 @@ def run_all_trading():
             strategies_to_run.append(config)
             print(f"  ● 排入執行：{config['name']}", flush=True)
 
-    max_workers = min(len(strategies_to_run), max(2, (os.cpu_count() or 4) // 2))
+    # 根據 CPU_LIMIT_PCT 限制 CPU 使用率
+    max_cores = max(1, int((os.cpu_count() or 4) * CPU_LIMIT_PCT))
+    max_workers = min(len(strategies_to_run), max_cores)
+
 
     if not strategies_to_run:
         print("\n✨ 所有策略交易期回測數據皆已存在且最新，無須重新計算！", flush=True)
