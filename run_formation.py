@@ -142,59 +142,59 @@ hdbscan_common = {
 # ════════════════════════════════════════════════════════════════════════════
 strategies_raw = [
     # 1. SSD Basic
-    {
-        "name":    "SSD Basic",
-        "formation_module": "strategies.formation.ssd_basic",
-        "sub_dir": "SSD_Basic",
-        "db_method": "SSD (Basic)",
-        "params":  {
-            **base_params,
-        },
-    },
+    # {
+    #     "name":    "SSD Basic",
+    #     "formation_module": "strategies.formation.ssd_basic",
+    #     "sub_dir": "SSD_Basic",
+    #     "db_method": "SSD (Basic)",
+    #     "params":  {
+    #         **base_params,
+    #     },
+    # },
     # 2. SSD Rolling
-    {
-        "name":    "SSD Rolling",
-        "formation_module": "strategies.formation.ssd",
-        "sub_dir": "SSD_Rolling",
-        "db_method": "SSD (Rolling)",
-        "params":  {
-            **base_params,
-        },
-    },
+    # {
+    #     "name":    "SSD Rolling",
+    #     "formation_module": "strategies.formation.ssd",
+    #     "sub_dir": "SSD_Rolling",
+    #     "db_method": "SSD (Rolling)",
+    #     "params":  {
+    #         **base_params,
+    #     },
+    # },
     # 3. HDBSCAN SameSector UMAP
-    {
-        "name":    "HDBSCAN SameSector UMAP",
-        "formation_module": "strategies.formation.HDBSCAN",
-        "sub_dir": "HDBSCAN_SS_UMAP",
-        "db_method": "HDBSCAN (SS-UMAP)",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  5,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "umap",
-            "feature_mode":       "stats13",
-        },
-    },
+    # {
+    #     "name":    "HDBSCAN SameSector UMAP",
+    #     "formation_module": "strategies.formation.HDBSCAN",
+    #     "sub_dir": "HDBSCAN_SS_UMAP",
+    #     "db_method": "HDBSCAN (SS-UMAP)",
+    #     "params":  {
+    #         **base_params,
+    #         **hdbscan_common,
+    #         "umap_n_components":  5,
+    #         "umap_n_neighbors":   40,
+    #         "umap_min_dist":      0.01,
+    #         "umap_random_state":  42,
+    #         "reduce_method":      "umap",
+    #         "feature_mode":       "stats13",
+    #     },
+    # },
     # 4. HDBSCAN SameSector PCA
-    {
-        "name":    "HDBSCAN SameSector PCA",
-        "formation_module": "strategies.formation.HDBSCAN",
-        "sub_dir": "HDBSCAN_SS_PCA",
-        "db_method": "HDBSCAN (SS-PCA)",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  3,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "pca",
-            "feature_mode":       "stats13",
-        },
-    },
+    # {
+    #     "name":    "HDBSCAN SameSector PCA",
+    #     "formation_module": "strategies.formation.HDBSCAN",
+    #     "sub_dir": "HDBSCAN_SS_PCA",
+    #     "db_method": "HDBSCAN (SS-PCA)",
+    #     "params":  {
+    #         **base_params,
+    #         **hdbscan_common,
+    #         "umap_n_components":  3,
+    #         "umap_n_neighbors":   40,
+    #         "umap_min_dist":      0.01,
+    #         "umap_random_state":  42,
+    #         "reduce_method":      "pca",
+    #         "feature_mode":       "stats13",
+    #     },
+    # },
     # 5. HDBSCAN MacroCluster UMAP
     {
         "name":    "HDBSCAN MacroCluster UMAP",
@@ -213,17 +213,17 @@ strategies_raw = [
         },
     },
     # 6. HDBSCAN CrossSector MF
-    {
-        "name":    "HDBSCAN CrossSector MF",
-        "formation_module": "strategies.formation.HDBSCAN_CrossSector_MultiFactor",
-        "sub_dir": "HDBSCAN_CS_MF",
-        "db_method": "HDBSCAN (CS-MF)",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "use_mom1_filter": True,
-        },
-    },
+    # {
+    #     "name":    "HDBSCAN CrossSector MF",
+    #     "formation_module": "strategies.formation.HDBSCAN_CrossSector_MultiFactor",
+    #     "sub_dir": "HDBSCAN_CS_MF",
+    #     "db_method": "HDBSCAN (CS-MF)",
+    #     "params":  {
+    #         **base_params,
+    #         **hdbscan_common,
+    #         "use_mom1_filter": True,
+    #     },
+    # },
     # 7. HDBSCAN CrossSector PCA
     {
         "name":    "HDBSCAN CrossSector PCA",
@@ -261,41 +261,41 @@ strategies_raw = [
         },
     },
     # 9. Pure DTW (Notebook Ver)
-    {
-        "name":    "Pure DTW (Notebook Ver)",
-        "formation_module": "strategies.formation.DTW_Pure_Notebook",
-        "sub_dir": "Pure_DTW",
-        "db_method": "Pure_DTW",
-        "params":  {
-            **base_params,
-        },
-    },
+    # {
+    #     "name":    "Pure DTW (Notebook Ver)",
+    #     "formation_module": "strategies.formation.DTW_Pure_Notebook",
+    #     "sub_dir": "Pure_DTW",
+    #     "db_method": "Pure_DTW",
+    #     "params":  {
+    #         **base_params,
+    #     },
+    # },
     # 10. DTW Cointegration Paper (DTW)
-    {
-        "name":    "DTW Cointegration Paper DTW",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "sub_dir": "DTW_Paper",
-        "db_method": "DTW (Paper)",
-        "params":  {
-            **base_params,
-            "method": "dtw",
-        },
-    },
+    # {
+    #     "name":    "DTW Cointegration Paper DTW",
+    #     "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+    #     "sub_dir": "DTW_Paper",
+    #     "db_method": "DTW (Paper)",
+    #     "params":  {
+    #         **base_params,
+    #         "method": "dtw",
+    #     },
+    # },
     # 11. DTW Cointegration Paper (SSD+DTW PCA)
-    {
-        "name":    "DTW Cointegration Paper SSD-DTW-PCA",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "sub_dir": "SSD_DTW_PCA_Paper",
-        "db_method": "SSD-DTW-PCA (Paper)",
-        "params":  {
-            **base_params,
-            "method": "ssd_dtw_pca",
-        },
-    },
+    # {
+    #     "name":    "DTW Cointegration Paper SSD-DTW-PCA",
+    #     "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+    #     "sub_dir": "SSD_DTW_PCA_Paper",
+    #     "db_method": "SSD-DTW-PCA (Paper)",
+    #     "params":  {
+    #         **base_params,
+    #         "method": "ssd_dtw_pca",
+    #     },
+    # },
     # 12. DRL LSTM
     {
         "name":    "DRL LSTM",
-        "formation_module": "strategies.formation.ssd",
+        "formation_module": "strategies.formation.HDBSCAN_CrossSector_PCA",
         "sub_dir": "DRL_LSTM",
         "db_method": "DRL LSTM",
         "params":  {

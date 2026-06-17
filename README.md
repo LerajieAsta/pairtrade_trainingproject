@@ -41,8 +41,9 @@ pairtrade_trainingproject/
 ├── tohtml/                # 量化指標編譯器、互動圖表生成與 Quarto 渲染腳本
 ├── docs/                  # 簡報 HTML 與網頁發佈目錄 (GitHub Pages 來源)
 ├── ref/                   # 學術文獻與經典論文庫 (共 23 篇 PDF)
+├── archive/               # 歷史存檔與過期分析檔案目錄 (依日期/月份分類，如 114/, 11505/, 11506/)
 ├── Ref_CODE/              # 歷史參考程式碼與結果比對備份
-├── tmp/                   # 臨時與整理移出的過期檔案暫存區 (如 scratch_analyze.py)
+├── tmp/                   # 臨時腳本與防禦性論證輔助工具目錄
 ├── dashboard.py           # Streamlit 視覺化 Dashboard 應用程式
 ├── main.py                # 多行程滾動回測與網格搜尋控制主程式
 ├── requirements.txt       # 專案相依 Python 套件清單
