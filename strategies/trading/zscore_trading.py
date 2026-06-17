@@ -14,7 +14,6 @@ class PairState:
     trade_entry_fee: float = 0.0
     days_held: int = 0
     is_stopped: bool = False
-    cooldown_dir: int = 0
     prev_total_pnl: float = 0.0
 
 class Trading:
@@ -49,11 +48,11 @@ class Trading:
         v_a = self.capital_per_pair * (1.0 / total_weight)
         v_b = self.capital_per_pair * (abs(hedge_ratio) / total_weight)
         
-        if z > self.entry_z and state.cooldown_dir != -1:
+        if z > self.entry_z:
             state.position = -1
             state.shares_a = -v_a / p_a
             state.shares_b = v_b / p_b
-        elif z < -self.entry_z and state.cooldown_dir != 1:
+        elif z < -self.entry_z:
             state.position = +1
             state.shares_a = v_a / p_a
             state.shares_b = -v_b / p_b
@@ -72,10 +71,6 @@ class Trading:
         
         if stop_loss:
             state.is_stopped = True if not self.allow_reentry else False
-            if self.allow_reentry:
-                state.cooldown_dir = state.position 
-        else:
-            state.cooldown_dir = state.position  
                 
         state.position = 0
         state.shares_a = 0.0
@@ -131,7 +126,7 @@ class Trading:
                 roll_alpha = roll_mean_a - roll_beta * roll_mean_b
                 spread = log_p_a - roll_alpha - roll_beta * log_p_b
                 roll_var_a = log_p_a.rolling(window=self.zscore_window).var()
-                roll_res_var = roll_var_a - roll_beta * roll_cov
+                roll_res_var = roll_var_a * (1 - (roll_cov ** 2 / (roll_var * roll_var_a + 1e-12)))
                 roll_std = np.sqrt(np.maximum(roll_res_var, 0))
                 if (roll_std < self.min_spread_std * 10).mean() > 0.5:
                     return pd.DataFrame()
@@ -177,7 +172,7 @@ class Trading:
                 roll_alpha = roll_mean_a - roll_beta * roll_mean_b
                 spread = norm_p_a - roll_alpha - roll_beta * norm_p_b
                 roll_var_a = norm_p_a.rolling(window=self.zscore_window).var()
-                roll_res_var = roll_var_a - roll_beta * roll_cov
+                roll_res_var = roll_var_a * (1 - (roll_cov ** 2 / (roll_var * roll_var_a + 1e-12)))
                 roll_std = np.sqrt(np.maximum(roll_res_var, 0))
                 if (roll_std < self.min_spread_std * 10).mean() > 0.5:
                     return pd.DataFrame()
@@ -248,10 +243,7 @@ class Trading:
                 out_delta.append(0.0)
                 continue
 
-            if state.cooldown_dir == -1 and z <= self.exit_z:
-                state.cooldown_dir = 0
-            elif state.cooldown_dir == 1 and z >= -self.exit_z:
-                state.cooldown_dir = 0
+            # (cooldown logic removed)
 
             if state.position != 0:
                 state.days_held += 1
@@ -334,7 +326,7 @@ class Trading:
         if state.position != 0 and out_status:
             last_status = out_status[-1]
             if last_status not in ("EXIT", "STOP_LOSS_TRIGGERED", "PERIOD_END_EXIT", "STOPPED"):
-                pnl_before_last_day = out_cum[-2] if len(out_cum) > 1 else 0.0
+                pnl_before_last_day = out_realized[-2] if len(out_realized) > 1 else 0.0
                 
                 p_a_last, p_b_last = pa_arr[-1], pb_arr[-1]
                 raw_unrealized_final = state.shares_a * (p_a_last - state.entry_price_a) + state.shares_b * (p_b_last - state.entry_price_b)
@@ -440,12 +432,14 @@ class Trading:
                     final_realized = 0.0
                     if not df_at.empty:
                         row_at = df_at.iloc[0]
-                        final_realized = row_at["Cumulative_PnL"]
                         if row_at["Position"] != 0:
+                            final_realized = row_at["Realized_PnL"] + row_at["Trade_PnL"]
                             df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOP_TRIGGERED"
                             df_at.loc[df_at.index, "Position"] = 0
                             df_at.loc[df_at.index, "Unrealized_PnL"] = 0.0
                             df_at.loc[df_at.index, "Trade_PnL"] = row_at["Trade_PnL"]
+                            df_at.loc[df_at.index, "Realized_PnL"] = final_realized
+                            df_at.loc[df_at.index, "Cumulative_PnL"] = final_realized
                         else:
                             if row_at["Status"] not in ("STOPPED", "STOP_LOSS_TRIGGERED", "EXIT"):
                                 df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOPPED"

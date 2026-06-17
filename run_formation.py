@@ -10,6 +10,8 @@ import concurrent.futures
 import sqlite3
 import importlib
 import gc
+import copy
+import inspect
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -465,6 +467,7 @@ def worker_task(
     """
     子行程工作單元：執行單一策略形成期的滾動視窗配對篩選，並將結果暫存至獨立 SQLite 中。
     """
+    progress_stream = None
     name          = strategy_config["name"]
     module_name   = strategy_config["formation_module"]
     params        = strategy_config["params"]
@@ -480,8 +483,9 @@ def worker_task(
 
     # 預先計算滾動期數
     roll_start_indices = list(range(local_first_trade_idx, total_days - FORWARD_DAYS + 1, rolling_step))
-    if roll_start_indices[-1] + FORWARD_DAYS < total_days:
-        roll_start_indices.append(total_days - FORWARD_DAYS)
+    last = total_days - FORWARD_DAYS
+    if roll_start_indices[-1] != last:
+        roll_start_indices.append(last)
     total_windows = len(roll_start_indices)
 
     progress_dict[name] = {
@@ -513,6 +517,9 @@ def worker_task(
         # 2. 載入形成期模組
         strat_module = importlib.import_module(module_name)
         FormationClass = strat_module.Formation
+
+        sig = inspect.signature(FormationClass.__init__)
+        valid_param_names = set(sig.parameters.keys())
 
         # 3. 滾動視窗計算
         # 預先查詢已完成的期數 (實現期數級別的斷點續傳)
@@ -566,9 +573,7 @@ def worker_task(
                     kwargs[k] = v
 
             # 依據 Init 簽章篩選合法參數
-            import inspect
-            sig = inspect.signature(FormationClass.__init__)
-            valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+            valid_kwargs = {k: v for k, v in kwargs.items() if k in valid_param_names}
 
             formation_instance = FormationClass(**valid_kwargs)
             pairs_df = formation_instance.run()
@@ -645,10 +650,11 @@ def worker_task(
     finally:
         sys.stdout = orig_stdout
         sys.stderr = orig_stderr
-        try:
-            progress_stream.close()
-        except Exception:
-            pass
+        if progress_stream is not None:
+            try:
+                progress_stream.close()
+            except Exception:
+                pass
         import gc
         gc.collect()
 
@@ -884,11 +890,7 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
             rows = temp_cursor.fetchall()
             temp_conn.close()
 
-            # 在合併前先清理主資料庫中該策略的舊資料
-            if rows:
-                strategy_name = rows[0][0]
-                cursor.execute("DELETE FROM formation_pairs WHERE strategy_id = ?;", (strategy_name,))
-
+            # 直接插入，OR REPLACE 會處理重複
             cursor.executemany("""
                 INSERT OR REPLACE INTO formation_pairs 
                 (strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params)
@@ -981,7 +983,6 @@ def run_all_formations():
         elif not isinstance(msr_list, list):
             msr_list = [msr_list]
             
-        import copy
         for msr in msr_list:
             new_raw = copy.deepcopy(raw)
             new_params = new_raw["params"]
@@ -1055,15 +1056,6 @@ def run_all_formations():
                 "elapsed":  0.0,
             }
             strategies_to_run.append(config)
-            # 在啟動子行程前，先刪除該策略在主庫的舊有數據，防範重疊寫入
-            try:
-                conn = sqlite3.connect(formation_db_path)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM formation_pairs WHERE strategy_id = ?;", (config["name"],))
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
             print(f"  ● 排入執行：{config['name']}", flush=True)
 
     # ── 交錯打散任務順序 (Interleave) ──────────────────────────────────────────

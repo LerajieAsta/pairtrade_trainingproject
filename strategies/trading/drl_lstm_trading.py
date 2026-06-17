@@ -22,7 +22,6 @@ class PairState:
     trade_entry_fee: float = 0.0
     days_held: int = 0
     is_stopped: bool = False
-    cooldown_dir: int = 0
     prev_total_pnl: float = 0.0
 
 # ─── RL Environment ───────────────────────────────────────────────────────────
@@ -139,7 +138,7 @@ class PairTradingEnv(gym.Env):
             done = True
             # 強制平倉
             if self.position != 0:
-                row_last = self.df.iloc[self.current_step]
+                row_last = self.df.iloc[self.current_step - 1]
                 p_a = row_last['Price_A']
                 p_b = row_last['Price_B']
                 raw_unrealized = self.shares_a * (p_a - self.entry_price_a) + self.shares_b * (p_b - self.entry_price_b)
@@ -234,8 +233,6 @@ class DQNAgent:
 class Trading:
     """DRL LSTM Trading Strategy Interface for run_trading.py"""
     
-    _shared_agents = {} # Cache for Shared Agents: { period_start: agent }
-    
     def __init__(self, price_df: pd.DataFrame, trade_dates: pd.DatetimeIndex, selected_pairs: pd.DataFrame, capital_per_pair: float,
                  fee_rate: float, slippage_rate: float, 
                  drl_episodes: int = 100, drl_batch_size: int = 64, drl_gamma: float = 0.99,
@@ -265,7 +262,10 @@ class Trading:
         self.formation_start = formation_start
         self.formation_end = formation_end
         
-    def _prepare_features(self, p_a: pd.Series, p_b: pd.Series, hedge_ratio: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float):
+        # Cache for Shared Agents: { period_start: agent }
+        self._shared_agents = {}
+        
+    def _prepare_features(self, p_a: pd.Series, p_b: pd.Series, hedge_ratio: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float, spread_mean: float = None, spread_std: float = None):
         """Prepare RL features matching the formation/trading period."""
         df = pd.DataFrame({'Price_A': p_a, 'Price_B': p_b})
         
@@ -276,8 +276,12 @@ class Trading:
         # Spread & Z-Score
         spread = norm_a - hedge_ratio * norm_b
         df['Spread'] = spread
-        spread_mean = spread.mean()
-        spread_std = spread.std()
+        
+        if spread_mean is None:
+            spread_mean = spread.mean()
+        if spread_std is None:
+            spread_std = spread.std()
+            
         df['ZScore'] = (spread - spread_mean) / (spread_std if spread_std > 0 else 1.0)
         
         # Relative Return
@@ -295,12 +299,13 @@ class Trading:
         
         return df.fillna(0)
 
-    def _train_shared_agent(self, period_start: str, trade_start: str, sector: str, ticker_a: str, ticker_b: str, hedge_ratio: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float):
+    def _train_shared_agent(self, period_start: str, trade_start: str, sector: str, ticker_a: str, ticker_b: str, hedge_ratio: float, 
+                            form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float):
         """Trains or retrieves the shared agent for this period."""
         agent_key = f"{period_start}_{trade_start}"
         
-        if agent_key in Trading._shared_agents:
-            return Trading._shared_agents[agent_key]
+        if agent_key in self._shared_agents:
+            return self._shared_agents[agent_key]
             
         print(f"    [DRL] Initializing and training new Shared Agent for period {period_start}...")
         
@@ -325,7 +330,7 @@ class Trading:
         
         if len(common_idx) > 50:
             p_a, p_b = p_a.loc[common_idx], p_b.loc[common_idx]
-            feat_df = self._prepare_features(p_a, p_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b)
+            feat_df = self._prepare_features(p_a, p_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b, form_spread_mean, form_spread_std)
             
             env = PairTradingEnv(feat_df, max_steps=len(feat_df), friction_rate=self.friction_rate, hedge_ratio=hedge_ratio, capital=self.capital_per_pair)
             
@@ -351,13 +356,14 @@ class Trading:
                     agent.update_target_model()
                     
         # Store back the agent (it gets incrementally trained on each pair)
-        Trading._shared_agents[agent_key] = agent
+        self._shared_agents[agent_key] = agent
         return agent
 
     def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float, 
                        form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float) -> pd.DataFrame:
         
-        agent = self._train_shared_agent(self.formation_start, period_start, sector, ticker_a, ticker_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b)
+        agent = self._train_shared_agent(self.formation_start, period_start, sector, ticker_a, ticker_b, hedge_ratio, 
+                                         form_spread_mean, form_spread_std, log_mean_a, log_std_a, log_mean_b, log_std_b)
         agent.model.eval() # Switch to evaluation mode for trading period
         
         price_a, price_b = self.trade_prices[ticker_a].dropna(), self.trade_prices[ticker_b].dropna()
@@ -366,7 +372,7 @@ class Trading:
 
         if len(price_a) < 5: return pd.DataFrame()
 
-        feat_df = self._prepare_features(price_a, price_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b)
+        feat_df = self._prepare_features(price_a, price_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b, form_spread_mean, form_spread_std)
         valid_idx = common_idx.intersection(self.trade_dates)
         
         if len(valid_idx) == 0: return pd.DataFrame()
@@ -411,6 +417,7 @@ class Trading:
             current_status = "HOLD_CASH"
             
             if action != state.position:
+                was_flat = (state.position == 0)
                 # Close existing position
                 if state.position != 0:
                     raw_unrealized = state.shares_a * (p_a - state.entry_price_a) + state.shares_b * (p_b - state.entry_price_b)
@@ -432,11 +439,11 @@ class Trading:
                     if action == 1:
                         state.shares_a = v_a / p_a
                         state.shares_b = -v_b / p_b
-                        current_status = "ENTER_LONG_A" if current_status == "HOLD_CASH" else "REVERSE_LONG_A"
+                        current_status = "ENTER_LONG_A" if was_flat else "REVERSE_LONG_A"
                     else:
                         state.shares_a = -v_a / p_a
                         state.shares_b = v_b / p_b
-                        current_status = "ENTER_SHORT_A" if current_status == "HOLD_CASH" else "REVERSE_SHORT_A"
+                        current_status = "ENTER_SHORT_A" if was_flat else "REVERSE_SHORT_A"
                         
                     state.entry_price_a = p_a
                     state.entry_price_b = p_b
@@ -473,7 +480,7 @@ class Trading:
         if state.position != 0 and out_status:
             last_status = out_status[-1]
             if last_status not in ("EXIT", "PERIOD_END_EXIT"):
-                pnl_before_last_day = out_cum[-2] if len(out_cum) > 1 else 0.0
+                pnl_before_last_day = out_realized[-2] if len(out_realized) > 1 else 0.0
                 
                 p_a_last, p_b_last = out_pa[-1], out_pb[-1]
                 raw_unrealized_final = state.shares_a * (p_a_last - state.entry_price_a) + state.shares_b * (p_b_last - state.entry_price_b)

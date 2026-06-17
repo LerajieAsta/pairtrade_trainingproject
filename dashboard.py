@@ -68,6 +68,7 @@ def scan_strategies(base_dir):
                 strategies.append(rel_path.replace("\\", "/"))
     return sorted(strategies)
 
+@st.cache_data(ttl=60, show_spinner=False)
 def load_master_dataframe_from_db(db_path="results/result.db"):
     if not os.path.exists(db_path):
         return pd.DataFrame()
@@ -224,7 +225,7 @@ def extract_features_from_path(path):
                 method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
             else:
                 method = "HDBSCAN (PCA)" if is_pca else "HDBSCAN (UMAP)"
-    elif "lstm" in path_lower or "drl" in path_lower:
+    elif "drl_lstm" in path_lower or ("drl" in path_lower and "lstm" in path_lower):
         method = "DRL_LSTM"
 
     top_n = "Top 20"
@@ -355,11 +356,10 @@ def calculate_metrics_raw(strategy_path):
         if 'Daily_Delta' in df.columns:
             state_change = df['Position'] != df['Prev_Pos']
             df['State_ID'] = state_change.groupby([df['Ticker_A'], df['Ticker_B']]).cumsum()
-            df['Prev_State_ID'] = df.groupby(['Ticker_A', 'Ticker_B'])['State_ID'].shift(1).fillna(0)
-            active_mask = (df['Prev_Pos'] != 0) | (df['Daily_Delta'] != 0)
+            active_mask = df['Position'] != 0
             
             if active_mask.any():
-                trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'Prev_State_ID'])['Daily_Delta'].sum()
+                trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'State_ID'])['Daily_Delta'].sum()
                 gross_profit = float(trade_pnls[trade_pnls > 0].sum())
                 gross_loss = float(trade_pnls[trade_pnls < 0].sum())
             else:
@@ -430,80 +430,82 @@ def compute_all_ttests(paths_tuple: tuple) -> pd.DataFrame:
     # 建立進度展示儲置元件（在函式內初始化，快取命中時不會執行）
     pb  = st.progress(0.0)
     txt = st.empty()
-    txt.markdown("🔬 **首次計算 T 檢定統計量**（僅需執行一次，之後快取生效）")
+    try:
+        txt.markdown("🔬 **首次計算 T 檢定統計量**（僅需執行一次，之後快取生效）")
 
-    records = []
-    total   = len(paths_tuple)
+        records = []
+        total   = len(paths_tuple)
 
-    if use_db:
-        import sqlite3
-        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=60.0)
-        sql = """
-            SELECT Date, SUM(Daily_Delta) AS Daily_Delta
-            FROM trade_logs
-            WHERE strategy_id = ?
-            GROUP BY Date ORDER BY Date
-        """
+        if use_db:
+            import sqlite3
+            conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=60.0)
+            sql = """
+                SELECT Date, SUM(Daily_Delta) AS Daily_Delta
+                FROM trade_logs
+                WHERE strategy_id = ?
+                GROUP BY Date ORDER BY Date
+            """
 
-    for i, path in enumerate(paths_tuple):
-        parts  = path.split('/')
-        folder = parts[-2] if len(parts) >= 2 else path
-        fid    = parts[-1].replace('TradeLogs_', '').replace('.csv', '')[:20]
-        txt.markdown(f"&nbsp;&nbsp;🔬 DB查詢中 `({i+1}/{total})` — **{folder}** · `{fid}`")
-        pb.progress((i + 1) / total)
-
-        t_stat = t_pval = nw_t_stat = nw_t_pval = np.nan
         try:
+            for i, path in enumerate(paths_tuple):
+                parts  = path.split('/')
+                folder = parts[-2] if len(parts) >= 2 else path
+                fid    = parts[-1].replace('TradeLogs_', '').replace('.csv', '')[:20]
+                txt.markdown(f"&nbsp;&nbsp;🔬 DB查詢中 `({i+1}/{total})` — **{folder}** · `{fid}`")
+                pb.progress((i + 1) / total)
+
+                t_stat = t_pval = nw_t_stat = nw_t_pval = np.nan
+                try:
+                    if use_db:
+                        port_daily = pd.read_sql_query(sql, conn, params=(path,))
+                        if port_daily.empty:
+                            port_daily = None
+                        else:
+                            port_daily['Date'] = pd.to_datetime(port_daily['Date'])
+                    else:
+                        port_daily = None
+
+                    if port_daily is None:
+                        file_path = os.path.join(RESULTS_DIR, path)
+                        if os.path.exists(file_path):
+                            df_csv = pd.read_csv(file_path, usecols=['Date', 'Daily_Delta'],
+                                                 dtype={'Daily_Delta': 'float32'})
+                            df_csv['Date'] = pd.to_datetime(df_csv['Date'], errors='coerce')
+                            port_daily = df_csv.groupby('Date')['Daily_Delta'].sum().reset_index()
+
+                    if port_daily is not None and not port_daily.empty:
+                        port_daily = port_daily.sort_values('Date').set_index('Date')
+                        port_daily['Equity'] = INITIAL_CAPITAL + port_daily['Daily_Delta'].cumsum()
+                        monthly_equity = port_daily['Equity'].resample('ME').last().dropna()
+                        if len(monthly_equity) >= 3:
+                            mr = monthly_equity.pct_change().fillna(0).values
+                            n  = len(mr)
+                            if mr.std(ddof=1) > 0:
+                                res       = stats.ttest_1samp(mr, popmean=0, alternative='greater')
+                                t_stat    = float(res.statistic)
+                                t_pval    = float(res.pvalue)
+                                mu_hat    = mr.mean()
+                                e         = mr - mu_hat
+                                lags_nw   = max(1, int(np.floor(4 * (n / 100) ** (2 / 9))))
+                                nw_var    = float(np.dot(e, e) / n)
+                                for lag in range(1, lags_nw + 1):
+                                    w = 1 - lag / (lags_nw + 1)
+                                    nw_var += 2 * w * float(np.dot(e[lag:], e[:-lag]) / n)
+                                nw_se     = np.sqrt(max(nw_var, 1e-20) / n)
+                                nw_t_stat = float(mu_hat / nw_se)
+                                nw_t_pval = float(1 - stats.t.cdf(nw_t_stat, df=n - 1))
+                except Exception:
+                    pass
+
+                records.append({'_path': path,
+                                'T_Stat': t_stat, 'T_Pval': t_pval,
+                                'NW_T_Stat': nw_t_stat, 'NW_T_Pval': nw_t_pval})
+        finally:
             if use_db:
-                port_daily = pd.read_sql_query(sql, conn, params=(path,))
-                if port_daily.empty:
-                    port_daily = None
-                else:
-                    port_daily['Date'] = pd.to_datetime(port_daily['Date'])
-            else:
-                port_daily = None
-
-            if port_daily is None:
-                file_path = os.path.join(RESULTS_DIR, path)
-                if os.path.exists(file_path):
-                    df_csv = pd.read_csv(file_path, usecols=['Date', 'Daily_Delta'],
-                                         dtype={'Daily_Delta': 'float32'})
-                    df_csv['Date'] = pd.to_datetime(df_csv['Date'], errors='coerce')
-                    port_daily = df_csv.groupby('Date')['Daily_Delta'].sum().reset_index()
-
-            if port_daily is not None and not port_daily.empty:
-                port_daily = port_daily.sort_values('Date').set_index('Date')
-                port_daily['Equity'] = INITIAL_CAPITAL + port_daily['Daily_Delta'].cumsum()
-                monthly_equity = port_daily['Equity'].resample('ME').last().dropna()
-                if len(monthly_equity) >= 3:
-                    mr = monthly_equity.pct_change().fillna(0).values
-                    n  = len(mr)
-                    if mr.std(ddof=1) > 0:
-                        res       = stats.ttest_1samp(mr, popmean=0, alternative='greater')
-                        t_stat    = float(res.statistic)
-                        t_pval    = float(res.pvalue)
-                        mu_hat    = mr.mean()
-                        e         = mr - mu_hat
-                        lags_nw   = max(1, int(np.floor(4 * (n / 100) ** (2 / 9))))
-                        nw_var    = float(np.dot(e, e) / n)
-                        for lag in range(1, lags_nw + 1):
-                            w = 1 - lag / (lags_nw + 1)
-                            nw_var += 2 * w * float(np.dot(e[lag:], e[:-lag]) / n)
-                        nw_se     = np.sqrt(max(nw_var, 1e-20) / n)
-                        nw_t_stat = float(mu_hat / nw_se)
-                        nw_t_pval = float(1 - stats.t.cdf(nw_t_stat, df=n - 1))
-        except Exception:
-            pass
-
-        records.append({'_path': path,
-                        'T_Stat': t_stat, 'T_Pval': t_pval,
-                        'NW_T_Stat': nw_t_stat, 'NW_T_Pval': nw_t_pval})
-
-    if use_db:
-        conn.close()
-
-    pb.empty()
-    txt.empty()
+                conn.close()
+    finally:
+        pb.empty()
+        txt.empty()
     return pd.DataFrame(records)
 
 
@@ -625,7 +627,7 @@ def render_deep_dive(target_row):
             status = str(row.get('Status', '')).lower()
             
             if pos != holding_pos:
-                if holding_pos != 0 and (pos == 0 or np.sign(pos) != np.sign(holding_pos)):
+                if holding_pos != 0:
                     end_date = date
                     if 'stop' in status or 'sl' in status or '停損' in status:
                         sl_x.append(date); sl_y.append(y_val)

@@ -21,14 +21,14 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
-def _compute_hurst(series: np.ndarray) -> float:
+def _compute_hurst(series: np.ndarray, already_stationary: bool = False) -> float:
     """R/S 分析近似 Hurst 指數"""
     n = len(series)
     if n < 20:
         return 0.5
-    diffs = np.diff(series)
+    diffs = series if already_stationary else np.diff(series)
     rs_list = []
-    for seg_len in [n // 4, n // 2, n]:
+    for seg_len in [len(diffs) // 4, len(diffs) // 2, len(diffs)]:
         if seg_len < 4:
             continue
         seg = diffs[:seg_len]
@@ -115,28 +115,6 @@ def _extract_features(log_price: np.ndarray) -> np.ndarray:
         except Exception:
             return 0.0
 
-    def hurst_approx():
-        if len(log_price) < 20:
-            return 0.5
-        diffs = np.diff(log_price)
-        rs_list = []
-        for seg_len in [len(diffs) // 4, len(diffs) // 2, len(diffs)]:
-            if seg_len < 4:
-                continue
-            seg = diffs[:seg_len]
-            mean_seg = np.mean(seg)
-            deviate  = np.cumsum(seg - mean_seg)
-            rs = (np.max(deviate) - np.min(deviate)) / (np.std(seg, ddof=1) + 1e-8)
-            rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
-        if len(rs_list) < 2:
-            return 0.5
-        xs, ys = zip(*rs_list)
-        try:
-            h = float(np.polyfit(xs, ys, 1)[0])
-        except Exception:
-            h = 0.5
-        return np.clip(h, 0.0, 1.0)
-
     vol_all  = float(np.std(ret, ddof=1)) if n > 1 else 0.0
     skew_all = float(pd.Series(ret).skew()) if n > 2 else 0.0
     kurt_all = float(pd.Series(ret).kurt()) if n > 3 else 0.0
@@ -145,7 +123,7 @@ def _extract_features(log_price: np.ndarray) -> np.ndarray:
         safe_ret(5),   safe_ret(21),  safe_ret(63),  safe_ret(126),  # 動量
         roll_vol(21),  roll_vol(63),  vol_all,                        # 波動率
         autocorr(1),   autocorr(5),   autocorr(21),                  # 自相關
-        skew_all,      kurt_all,      hurst_approx(),                 # 統計矩
+        skew_all,      kurt_all,      _compute_hurst(log_price),      # 統計矩
     ], dtype=np.float64)
 
     features = np.where(np.isfinite(features), features, 0.0)
@@ -180,6 +158,9 @@ class Formation:
         min_corr: float = 0.50,                # 優化：相關係數門檻
         min_zero_crossings: int = 5,           # 優化：殘差均值穿越次數門檻
         use_mom1_filter: bool = True,          # Han et al. 2021：mom1 截面標準差篩選
+        hurst_threshold: float = 0.5,
+        halflife_min: float = 2.0,
+        halflife_max: float = 63.0,
     ):
         self.price_df = price_df.copy()
         self.max_sector_ratio = max_sector_ratio
@@ -205,6 +186,9 @@ class Formation:
         self.min_corr               = min_corr
         self.min_zero_crossings     = min_zero_crossings
         self.use_mom1_filter        = use_mom1_filter
+        self.hurst_threshold        = hurst_threshold
+        self.halflife_min           = halflife_min
+        self.halflife_max           = halflife_max
 
         self.selected_pairs: pd.DataFrame = pd.DataFrame()
         self.cluster_labels_: dict = {}
@@ -344,8 +328,10 @@ class Formation:
 
         for cluster_lbl, group_tickers in sorted(valid_groups.items()):
             if len(group_tickers) > 100:
-                print(f"  [Formation] 群落 {cluster_lbl} 規模過大 ({len(group_tickers)} 檔)，限制測試前 100 檔。")
-                group_tickers = group_tickers[:100]
+                print(f"  [Formation] 群落 {cluster_lbl} 規模過大 ({len(group_tickers)} 檔)，限制測試隨機 100 檔。")
+                import random
+                random.seed(self.umap_random_state)
+                group_tickers = random.sample(group_tickers, 100)
 
             for i, ta in enumerate(group_tickers):
                 log_a = log_prices[ta].values
@@ -398,13 +384,13 @@ class Formation:
                         continue
                     
                     halflife = -np.log(2) / lambda_val
-                    if halflife < 2.0 or halflife > 60.0:
+                    if halflife < self.halflife_min or halflife > self.halflife_max:
                         rejected_count += 1
                         continue
 
                     # 4. Hurst Index Filter
-                    hurst = _compute_hurst(best_resid)
-                    if hurst >= 0.40:
+                    hurst = _compute_hurst(best_resid, already_stationary=True)
+                    if hurst >= self.hurst_threshold:
                         rejected_count += 1
                         continue
 
@@ -475,7 +461,7 @@ class Formation:
                 print("  [Formation] Mom1 篩選後無剩餘配對。")
                 return pd.DataFrame()
 
-        return pd.DataFrame(eg_records).sort_values("ADF_Stat").reset_index(drop=True)
+        return pd.DataFrame(eg_records).sort_values("ADF_PValue").reset_index(drop=True)
 
     def run(self) -> pd.DataFrame:
         X, valid_tickers = self._build_feature_matrix()

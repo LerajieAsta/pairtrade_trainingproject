@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import multiprocessing
+import itertools
+import copy
 
 # ── CPU 限制與 Python 3.14 資源追蹤器相容性補丁 ──────────────────────────────
 # 1. 可調控的 CPU 使用率上限 (80%)
@@ -385,6 +387,13 @@ class ProgressAwareStdout:
 # 斷點續傳檢查
 # ════════════════════════════════════════════════════════════════════════════
 
+def _build_filename(params: dict) -> str:
+    top_n = params.get("top_n", 10)
+    sl    = int(params.get("stop_loss_pct", 0.0) * 100)
+    zwin  = params.get("zscore_window", 0)
+    msr   = int(params.get("max_sector_ratio", 0.0) * 100)
+    return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}.csv"
+
 def check_trading_completed(strategy_config: dict, output_root: str) -> bool:
     if FORCE_RERUN:
         return False
@@ -392,12 +401,7 @@ def check_trading_completed(strategy_config: dict, output_root: str) -> bool:
     sub_dir = strategy_config["sub_dir"]
     params  = strategy_config["params"]
     
-    top_n = params.get("top_n", 10)
-    sl    = int(params.get("stop_loss_pct", 0.0) * 100)
-    zwin  = params.get("zscore_window", 0)
-    msr   = int(params.get("max_sector_ratio", 0.0) * 100)
-
-    filename = f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}.csv"
+    filename = _build_filename(params)
     csv_path = os.path.join(output_root, sub_dir, filename)
     return os.path.exists(csv_path)
 
@@ -441,8 +445,14 @@ def worker_task(
     start_time  = time.time()
     orig_stdout = sys.stdout
     orig_stderr = sys.stderr
+    progress_stream = None # 函數開頭初始化，防範 finally 內 NameError
 
     try:
+        # 提前建立並攔截 stdout / stderr (total_periods 先傳入預設值 0)
+        progress_stream = ProgressAwareStdout(log_path, progress_dict, name, 0)
+        sys.stdout = progress_stream
+        sys.stderr = progress_stream
+
         # 載入交易策略模組
         strat_module = importlib.import_module(module_name)
         if hasattr(strat_module, 'Trading'):
@@ -465,10 +475,8 @@ def worker_task(
             conn.close()
             raise ValueError(f"No periods found in formation_pairs for strategy: {formation_strategy_id}")
 
-        # 攔截控制台輸出
-        progress_stream = ProgressAwareStdout(log_path, progress_dict, name, total_periods)
-        sys.stdout = progress_stream
-        sys.stderr = progress_stream
+        # 更新實際的 total_periods
+        progress_stream.total_periods = total_periods
 
         pm = PortfolioManager(strategy_id=name, initial_capital=10000.0, max_pairs=params.get("top_n", 10))
         all_trade_logs = []
@@ -549,7 +557,10 @@ def worker_task(
                     try:
                         # OLS_Alpha 存在時（HDBSCAN）走 log-price 路徑；不存在時（SSD/DTW）走向下相容路徑
                         raw_alpha = form_params.get("OLS_Alpha", None)
-                        ols_alpha_val = float(raw_alpha) if raw_alpha is not None else None
+                        try:
+                            ols_alpha_val = float(raw_alpha) if raw_alpha is not None and not pd.isna(float(raw_alpha)) else None
+                        except (TypeError, ValueError):
+                            ols_alpha_val = None
                         df_log = trading_instance._simulate_pair(
                             period_start=trade_start,
                             period_end=trade_end,
@@ -593,12 +604,7 @@ def worker_task(
             df_all = df_all.sort_values("Date").reset_index(drop=True)
 
             # 依據命名規範建立 CSV
-            top_n = params.get("top_n", 10)
-            sl    = int(params.get("stop_loss_pct", 0.0) * 100)
-            zwin  = params.get("zscore_window", 0)
-            msr   = int(params.get("max_sector_ratio", 0.0) * 100)
-
-            filename = f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}.csv"
+            filename = _build_filename(params)
             
             # 建立子目錄並輸出 CSV
             strat_output_dir = os.path.join(output_root, sub_dir)
@@ -649,10 +655,11 @@ def worker_task(
     finally:
         sys.stdout = orig_stdout
         sys.stderr = orig_stderr
-        try:
-            progress_stream.close()
-        except Exception:
-            pass
+        if progress_stream is not None:
+            try:
+                progress_stream.close()
+            except Exception:
+                pass
         import gc
         gc.collect()
 
@@ -951,8 +958,7 @@ def run_all_trading():
         elif not isinstance(msr_list, list):
             msr_list = [msr_list]
             
-        import itertools
-        import copy
+        # (itertools and copy imports moved to top of file)
         for top_n, sl, msr in itertools.product(top_n_list, sl_list, msr_list):
             new_raw = copy.deepcopy(raw)
             new_params = new_raw["params"]
