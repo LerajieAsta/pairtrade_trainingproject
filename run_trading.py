@@ -54,23 +54,23 @@ if hasattr(sys.stdout, "reconfigure"):
 FORCE_RERUN = True  # 設定為 True 可以強制重新執行，無視斷點續傳紀錄
 DB_PROFILES = {
     "sp500_Current": {
-        "db_path":     "./data/sp500_Current.db",
+        "db_path":     "./dataset/sp500_Current.db",
         "output_root": "./results/current",
         "label":       "S&P 500 現行成分股 (Current)",
     },
     "sp500_yF": {
-        "db_path":     "./data/sp500_yF.db",
+        "db_path":     "./dataset/sp500_yF.db",
         "output_root": "./results/full",
         "label":       "S&P 500 完整歷史成分股 (yFinance)",
     },
     "sp500_Tiingo": {
-        "db_path":     "./data/sp500_Tiingo.db",
+        "db_path":     "./dataset/sp500_Tiingo.db",
         "output_root": "./results/tiingo",
         "label":       "S&P 500 完整歷史成分股 (Tiingo)",
     },
 }
 
-DB_PATH = "./data/sp500_Tiingo.db"
+DB_PATH = "./dataset/sp500_Tiingo.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"

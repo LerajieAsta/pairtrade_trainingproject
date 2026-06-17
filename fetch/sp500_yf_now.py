@@ -172,7 +172,7 @@ def save_constituents_info(df_current, conn):
 
 if __name__ == "__main__":
         # ==========================================
-    # 精準路徑定位：與 fetch/ 同層的 data/ 資料夾
+    # 精準路徑定位：與 fetch/ 同層的 dataset/ 資料夾
     # ==========================================
     try:
         # 1. 取得這支 python 檔案所在的資料夾 (例如: .../MyProject/fetch)
@@ -183,8 +183,8 @@ if __name__ == "__main__":
     # 2. 取得專案根目錄 (即 fetch 的上一層，例如: .../MyProject)
     project_dir = os.path.dirname(script_dir)
     
-    # 3. 指定目標資料夾為專案根目錄下的 data 資料夾 (例如: .../MyProject/data)
-    data_dir = os.path.join(project_dir, "data")
+    # 3. 指定目標資料夾為專案根目錄下的 dataset 資料夾 (例如: .../MyProject/dataset)
+    data_dir = os.path.join(project_dir, "dataset")
     
     # 4. 如果資料夾不存在，自動建立它
     os.makedirs(data_dir, exist_ok=True)

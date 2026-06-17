@@ -681,7 +681,7 @@ def render_deep_dive(target_row):
 def get_sector_mapping():
     mapping = {}
     # 優先從 data/sp500.db 讀取（有 843 檔，含下市公司，最完整）
-    for db_file in ["data/sp500.db", "data/SP500_Current.db"]:
+    for db_file in ["data/sp500.db", "dataset/SP500_Current.db"]:
         if os.path.exists(db_file):
             try:
                 import sqlite3
