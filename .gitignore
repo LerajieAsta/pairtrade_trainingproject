@@ -37,6 +37,7 @@ Project/
 
 # Databases
 *.db
+!dataset/*.db
 
 # tmp
 .tmp/
