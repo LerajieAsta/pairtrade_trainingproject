@@ -68,7 +68,7 @@ DB_PROFILES = {
     },
 }
 
-DB_PATH = "./data/sp500_yF.db"
+DB_PATH = "./data/sp500_Tiingo.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
@@ -882,10 +882,20 @@ def run_all_trading():
 
     if matched_profile:
         OUTPUT_ROOT = matched_profile["output_root"]
-        dataset_name = "Current" if "current" in matched_profile["output_root"].lower() else "Full"
+        if "current" in matched_profile["output_root"].lower():
+            dataset_name = "Current"
+        elif "tiingo" in matched_profile["output_root"].lower():
+            dataset_name = "Tiingo"
+        else:
+            dataset_name = "yF"
     else:
         OUTPUT_ROOT = f"./results/{db_basename}"
-        dataset_name = "Current" if "current" in db_basename.lower() else "Full"
+        if "current" in db_basename.lower():
+            dataset_name = "Current"
+        elif "tiingo" in db_basename.lower():
+            dataset_name = "Tiingo"
+        else:
+            dataset_name = "yF"
 
     log_dir = f"{OUTPUT_ROOT}/logs/run_trading"
     os.makedirs(log_dir, exist_ok=True)
@@ -1029,6 +1039,29 @@ def run_all_trading():
             }
             strategies_to_run.append(config)
             print(f"  ● 排入執行：{config['name']}", flush=True)
+
+    # ── 交錯打散任務順序 (Interleave) ──────────────────────────────────────────
+    # 將相同原始策略的子網格任務交錯排列，以確保多核心並行時，不同策略能同時啟動並呈現於儀表板
+    if strategies_to_run:
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for cfg in strategies_to_run:
+            orig_name = None
+            for orig in original_strategies_config:
+                if cfg["name"].startswith(orig["name"]):
+                    orig_name = orig["name"]
+                    break
+            if orig_name is None:
+                orig_name = cfg["name"]
+            groups[orig_name].append(cfg)
+        
+        interleaved_to_run = []
+        max_len = max(len(v) for v in groups.values()) if groups else 0
+        for i in range(max_len):
+            for orig_name in groups:
+                if i < len(groups[orig_name]):
+                    interleaved_to_run.append(groups[orig_name][i])
+        strategies_to_run = interleaved_to_run
 
     # 根據 CPU_LIMIT_PCT 限制 CPU 使用率
     max_cores = max(1, int((os.cpu_count() or 4) * CPU_LIMIT_PCT))

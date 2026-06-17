@@ -170,7 +170,7 @@ def load_data(strategy_path):
 
 def extract_features_from_path(path):
     path_lower = path.lower()
-    dataset = "Full" if "full" in path_lower else "Current" if "current" in path_lower else "Full"  # 無前綴預設 Full（DB路徑無 full/ 開頭）
+    dataset = "Current" if "current" in path_lower else "Tiingo" if "tiingo" in path_lower else "Full"
     reentry = "NoReEntry" if "noreentry" in path_lower else "ReEntry" if "reentry" in path_lower else "Unknown"
     
     # 全域提取 VolAdj 屬性
@@ -224,6 +224,8 @@ def extract_features_from_path(path):
                 method = "HDBSCAN (AE PCA)" if is_pca else "HDBSCAN (AE UMAP)"
             else:
                 method = "HDBSCAN (PCA)" if is_pca else "HDBSCAN (UMAP)"
+    elif "lstm" in path_lower or "drl" in path_lower:
+        method = "DRL_LSTM"
 
     top_n = "Top 20"
     match_n = re.search(r'top(\d+)', path_lower)
@@ -507,7 +509,7 @@ def compute_all_ttests(paths_tuple: tuple) -> pd.DataFrame:
 
 def make_desc(row): 
     vol_part = f" · {row['VOL ADJ']}" if 'VOL ADJ' in row and row['VOL ADJ'] not in ['NoVolAdj', 'N/A', ''] else ""
-    reentry_part = f" · {row['RE-ENTRY']}" if 'RE-ENTRY' in row and row['RE-ENTRY'] not in ['NoReEntry', ''] else ""
+    reentry_part = f" · {row['RE-ENTRY']}" if 'RE-ENTRY' in row and row['RE-ENTRY'] not in ['NoReEntry', 'Unknown', ''] else ""
     psl_part = f" · PSL {row['PORT SL %']}" if 'PORT SL %' in row and row['PORT SL %'] not in ['0%', '0.0%', ''] else ""
     dsz_part = f" · DSZ {row['DYN Z']}" if 'DYN Z' in row and row['DYN Z'] not in ['0', '0.0', ''] else ""
     zwin_part = f" · ZWin {row['Z-WINDOW']}" if 'Z-WINDOW' in row and row['Z-WINDOW'] not in ['0', ''] else ""
@@ -754,11 +756,12 @@ def render_pair_consistency():
     def format_strategy_id(path):
         try:
             dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val = extract_features_from_path(path)
-            vol_part = f" · {voladj}" if voladj != 'N/A' else ""
-            psl_part = f" · PSL {psl_pct}" if psl_pct != '0%' else ""
-            msr_part = f" · MSR {msr_pct}" if msr_pct != '0%' else ""
-            dsz_part = f" · DSZ {dsz_val}" if dsz_val != '0' else ""
-            desc = f"{dataset} · {reentry}{vol_part} · {method} · {top_n} · SL {sl_pct} · ZWin {zwin}{psl_part}{msr_part}{dsz_part}"
+            reentry_part = f" · {reentry}" if reentry not in ['NoReEntry', 'Unknown', ''] else ""
+            vol_part = f" · {voladj}" if voladj not in ['NoVolAdj', 'N/A', ''] else ""
+            psl_part = f" · PSL {psl_pct}" if psl_pct not in ['0%', '0.0%', ''] else ""
+            msr_part = f" · MSR {msr_pct}" if msr_pct not in ['0%', '0.0%', ''] else ""
+            dsz_part = f" · DSZ {dsz_val}" if dsz_val not in ['0', '0.0', ''] else ""
+            desc = f"{dataset}{reentry_part}{vol_part} · {method} · {top_n} · SL {sl_pct} · ZWin {zwin}{psl_part}{msr_part}{dsz_part}"
             short_name = path.split('/')[-1] if '/' in path else path
             return f"{desc} ({short_name})"
         except Exception:

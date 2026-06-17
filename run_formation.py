@@ -1066,6 +1066,29 @@ def run_all_formations():
                 pass
             print(f"  ● 排入執行：{config['name']}", flush=True)
 
+    # ── 交錯打散任務順序 (Interleave) ──────────────────────────────────────────
+    # 將相同原始策略的子任務交錯排列，以確保多核心並行時，不同策略能同時啟動並呈現於儀表板
+    if strategies_to_run:
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for cfg in strategies_to_run:
+            orig_name = None
+            for orig in original_strategies_config:
+                if cfg["name"].startswith(orig["name"]):
+                    orig_name = orig["name"]
+                    break
+            if orig_name is None:
+                orig_name = cfg["name"]
+            groups[orig_name].append(cfg)
+        
+        interleaved_to_run = []
+        max_len = max(len(v) for v in groups.values()) if groups else 0
+        for i in range(max_len):
+            for orig_name in groups:
+                if i < len(groups[orig_name]):
+                    interleaved_to_run.append(groups[orig_name][i])
+        strategies_to_run = interleaved_to_run
+
     # 3. 決定並行行程數 (根據 CPU_LIMIT_PCT 限制 CPU 使用率)
     max_cores = max(1, int((os.cpu_count() or 4) * CPU_LIMIT_PCT))
     max_workers = min(len(strategies_to_run), max_cores)
