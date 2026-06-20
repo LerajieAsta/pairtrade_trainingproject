@@ -58,10 +58,10 @@ DB_PROFILES = {
         "output_root": "./results/current",
         "label":       "S&P 500 現行成分股 (Current)",
     },
-    "sp500_yF": {
-        "db_path":     "./dataset/sp500_yF.db",
+    "sp500_full": {
+        "db_path":     "./data/sp500.db",
         "output_root": "./results/full",
-        "label":       "S&P 500 完整歷史成分股 (yFinance)",
+        "label":       "S&P 500 完整歷史成分股 (Full)",
     },
     "sp500_Tiingo": {
         "db_path":     "./dataset/sp500_Tiingo.db",
@@ -70,7 +70,7 @@ DB_PROFILES = {
     },
 }
 
-DB_PATH = "./dataset/sp500_yF.db"
+DB_PATH = "./data/sp500.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
