@@ -70,7 +70,7 @@ DB_PROFILES = {
     },
 }
 
-DB_PATH = "./dataset/sp500_Tiingo.db"
+DB_PATH = "./dataset/sp500_yF.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
