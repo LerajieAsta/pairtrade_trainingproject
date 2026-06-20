@@ -612,8 +612,8 @@ def worker_task(
             csv_path = os.path.join(strat_output_dir, filename)
             df_all.to_csv(csv_path, index=False)
 
-            # 匯入至結果資料庫 (result.db)
-            dataset_subdir = "current" if dataset_name.lower() == "current" else "full"
+            # 寫入 SQLite 資料庫 (result.db)
+            dataset_subdir = dataset_name.lower()
             path_key = f"{dataset_subdir}/{sub_dir}/{filename}"
             
             from strategies.db_utils import export_df_to_db

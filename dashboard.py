@@ -123,7 +123,20 @@ def load_data(strategy_path):
             return df_db
 
     file_path = os.path.join(RESULTS_DIR, strategy_path)
-    if not os.path.exists(file_path): return pd.DataFrame()
+    if not os.path.exists(file_path):
+        # Fallback: handle legacy DB paths that incorrectly forced "full/" for Tiingo dataset
+        if strategy_path.lower().startswith("full/"):
+            sub_path = strategy_path[5:]
+            alt_tiingo = os.path.join(RESULTS_DIR, "tiingo", sub_path)
+            alt_current = os.path.join(RESULTS_DIR, "current", sub_path)
+            if os.path.exists(alt_tiingo):
+                file_path = alt_tiingo
+            elif os.path.exists(alt_current):
+                file_path = alt_current
+            else:
+                return pd.DataFrame()
+        else:
+            return pd.DataFrame()
     
     try:
         sample = pd.read_csv(file_path, nrows=0)
@@ -681,7 +694,10 @@ def render_deep_dive(target_row):
 def get_sector_mapping():
     mapping = {}
     # 優先從 data/sp500.db 讀取（有 843 檔，含下市公司，最完整）
-    for db_file in ["data/sp500.db", "dataset/SP500_Current.db"]:
+    for db_file in [
+        "data/sp500Full.db", "data/sp500_Current.db", "dataset/sp500_Tiingo.db", 
+        "dataset/sp500_yF.db", "data/sp500.db", "dataset/SP500_Current.db"
+    ]:
         if os.path.exists(db_file):
             try:
                 import sqlite3
@@ -755,9 +771,13 @@ def render_pair_consistency():
         st.warning("找不到 SQLite 資料庫，請先執行歷史回填或回測以建立資料。")
         return
         
+    dataset_map = {}
+    
     def format_strategy_id(path):
         try:
             dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val = extract_features_from_path(path)
+            if path in dataset_map and dataset_map[path] and dataset_map[path] != "Unknown":
+                dataset = dataset_map[path]
             reentry_part = f" · {reentry}" if reentry not in ['NoReEntry', 'Unknown', ''] else ""
             vol_part = f" · {voladj}" if voladj not in ['NoVolAdj', 'N/A', ''] else ""
             psl_part = f" · PSL {psl_pct}" if psl_pct not in ['0%', '0.0%', ''] else ""
@@ -773,6 +793,14 @@ def render_pair_consistency():
         import sqlite3
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
         cursor = conn.cursor()
+        
+        # 先抓取 strategy_summaries 中的 DATASET 資訊，避免單靠路徑解析出錯
+        try:
+            cursor.execute("SELECT _path, DATASET FROM strategy_summaries;")
+            for r in cursor.fetchall():
+                dataset_map[r[0]] = r[1]
+        except Exception:
+            pass
         
         # 檢查 strategy_pairs 表是否存在且有資料
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='strategy_pairs';")
@@ -822,7 +850,7 @@ def render_pair_consistency():
             strat_pairs_df.insert(3, "股票 B 產業", strat_pairs_df["股票 B"].apply(lambda x: sec_map.get(str(x).upper(), "Unknown")))
             
             st.markdown(f"該策略共選出 **{len(strat_pairs_df)}** 個滾動配對關係：")
-            st.dataframe(strat_pairs_df, use_container_width=True, hide_index=True)
+            st.dataframe(strat_pairs_df, width="stretch", hide_index=True)
             
         # 2. 策略配對交集比對 (Strategy Pair Intersection)
         st.markdown("---")
@@ -922,7 +950,7 @@ def render_pair_consistency():
                     })
                     
                 intersection_df = pd.DataFrame(intersection_rows)
-                st.dataframe(intersection_df, use_container_width=True, hide_index=True)
+                st.dataframe(intersection_df, width="stretch", hide_index=True)
             else:
                 st.info("兩個策略之間沒有共同選出的股票對。")
                 
@@ -1024,7 +1052,7 @@ def main():
     
     if t_test_needed:
         st.sidebar.warning("⚠️ 目前資料庫中缺少 T 檢定快取數據。")
-        if st.sidebar.button("🔬 立即計算並快取 T 檢定統計量", use_container_width=True):
+        if st.sidebar.button("🔬 立即計算並快取 T 檢定統計量", width="stretch"):
             with st.spinner("正在計算所有策略的 T 檢定統計量，並寫入資料庫快取..."):
                 ttest_df = compute_all_ttests(tuple(missing_paths))
                 save_ttests_to_db(ttest_df, db_path)
@@ -1072,21 +1100,26 @@ def main():
             filtered_df = filtered_df[filtered_df[col] == chosen]
 
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    empty_series = pd.Series({
+        'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0, 
+        'Sharpe_Raw': 0, 'MDD_Raw': 0, 'Entries': 0, 'Exits': 0, 'Stop_Losses': 0, 'Forced_Closes': 0,
+        'Gross_Profit': 0.0, 'Gross_Loss': 0.0,
+        'DATASET': '-', 'RE-ENTRY': '-', 'VOL ADJ': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-',
+        'PORT SL %': '-', 'MAX SEC %': '-', 'DYN Z': '-',
+        'T_Stat': np.nan, 'T_Pval': np.nan, 'NW_T_Stat': np.nan, 'NW_T_Pval': np.nan
+    })
+    
     if len(filtered_df) > 0:
-        best_cum = filtered_df.loc[filtered_df['Cum_Ret_Raw'].idxmax()]
-        best_ann = filtered_df.loc[filtered_df['Ann_Ret_Raw'].idxmax()]
-        best_rcc = filtered_df.loc[filtered_df['RCC_Raw'].idxmax()]
-        best_shp = filtered_df.loc[filtered_df['Sharpe_Raw'].idxmax()]
-        low_dd = filtered_df.loc[filtered_df['MDD_Raw'].idxmax()] 
+        def safe_get_best(col):
+            return filtered_df.loc[filtered_df[col].idxmax()] if filtered_df[col].notna().any() else empty_series
+
+        best_cum = safe_get_best('Cum_Ret_Raw')
+        best_ann = safe_get_best('Ann_Ret_Raw')
+        best_rcc = safe_get_best('RCC_Raw')
+        best_shp = safe_get_best('Sharpe_Raw')
+        low_dd = safe_get_best('MDD_Raw') 
     else:
-        empty_series = pd.Series({
-            'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0, 
-            'Sharpe_Raw': 0, 'MDD_Raw': 0, 'Entries': 0, 'Exits': 0, 'Stop_Losses': 0, 'Forced_Closes': 0,
-            'Gross_Profit': 0.0, 'Gross_Loss': 0.0,
-            'DATASET': '-', 'RE-ENTRY': '-', 'VOL ADJ': '-', 'METHOD': '-', 'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-',
-            'PORT SL %': '-', 'MAX SEC %': '-', 'DYN Z': '-',
-            'T_Stat': np.nan, 'T_Pval': np.nan, 'NW_T_Stat': np.nan, 'NW_T_Pval': np.nan
-        })
         best_cum = best_ann = best_rcc = best_shp = low_dd = empty_series
 
     c1, c2, c3, c4, c5 = st.columns(5)

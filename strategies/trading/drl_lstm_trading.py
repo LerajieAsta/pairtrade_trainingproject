@@ -360,7 +360,7 @@ class Trading:
         return agent
 
     def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float, 
-                       form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float) -> pd.DataFrame:
+                       form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float, **kwargs) -> pd.DataFrame:
         
         agent = self._train_shared_agent(self.formation_start, period_start, sector, ticker_a, ticker_b, hedge_ratio, 
                                          form_spread_mean, form_spread_std, log_mean_a, log_std_a, log_mean_b, log_std_b)
