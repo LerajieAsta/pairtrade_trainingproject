@@ -10,6 +10,9 @@ from gymnasium import spaces
 import math
 from dataclasses import dataclass
 
+# Avoid CPU thread thrashing when running PyTorch in multiprocessing
+torch.set_num_threads(1)
+
 # ─── Data Classes ─────────────────────────────────────────────────────────────
 @dataclass(slots=True)
 class PairState:
@@ -347,7 +350,10 @@ class Trading:
                     next_state_seq.append(next_obs)
                     
                     agent.store_transition(list(state_seq), action, reward, list(next_state_seq), done)
-                    agent.replay(self.drl_batch_size)
+                    
+                    # Update model every 4 steps to speed up training
+                    if env.current_step % 4 == 0:
+                        agent.replay(self.drl_batch_size)
                     
                     state_seq = next_state_seq
                     
