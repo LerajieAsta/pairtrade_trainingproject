@@ -140,7 +140,7 @@ def get_sp500_tickers():
 # ==========================================
 # 初始化資料庫
 # ==========================================
-def setup_database(db_name="sp500Full.db"):
+def setup_database(db_name="sp500_Tiingo.db"):
     conn = sqlite3.connect(db_name, isolation_level=None)  # autocommit off，手動控制
     conn.execute("PRAGMA journal_mode=WAL;")               # WAL 模式，減少資料損毀風險
     conn.execute("BEGIN")                                  # 開啟交易
@@ -552,7 +552,7 @@ if __name__ == "__main__":
     project_dir = os.path.dirname(script_dir)
     data_dir = os.path.join(project_dir, "dataset")  
     os.makedirs(data_dir, exist_ok=True)
-    db_file = os.path.join(data_dir, "sp500Full.db")  
+    db_file = os.path.join(data_dir, "sp500_Tiingo.db")  
     abs_db_path = os.path.abspath(db_file)
 
     print(f"\n{'='*55}")
