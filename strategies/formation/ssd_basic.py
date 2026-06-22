@@ -15,44 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import scipy.spatial.distance as ssd
-from statsmodels.tsa.stattools import adfuller
-
-def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
-    """ADF 檢定（no constant），同時回傳 (統計量, p 值)"""
-    if len(resid) < max_lags + 5:
-        return 0.0, 1.0
-    try:
-        result = adfuller(resid, maxlag=max_lags, regression="n", autolag=None)
-        return float(result[0]), float(result[1])
-    except Exception:
-        return 0.0, 1.0
-
-def _compute_hurst(series: np.ndarray) -> float:
-    """R/S 分析近似 Hurst 指數"""
-    n = len(series)
-    if n < 20:
-        return 0.5
-    diffs = np.diff(series)
-    rs_list = []
-    for seg_len in [n // 4, n // 2, n]:
-        if seg_len < 4:
-            continue
-        seg = diffs[:seg_len]
-        mean_seg = np.mean(seg)
-        deviate = np.cumsum(seg - mean_seg)
-        std_val = np.std(seg, ddof=1)
-        if std_val < 1e-8:
-            std_val = 1e-8
-        rs = (np.max(deviate) - np.min(deviate)) / std_val
-        rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
-    if len(rs_list) < 2:
-        return 0.5
-    xs, ys = zip(*rs_list)
-    try:
-        h = float(np.polyfit(xs, ys, 1)[0])
-    except Exception:
-        h = 0.5
-    return float(np.clip(h, 0.0, 1.0))
+from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
 
 
 # 忽略不必要的 Pandas/Numpy 警告以保持輸出整潔
@@ -68,13 +31,14 @@ class Formation:
     透過計算累積總回報指數 (Cumulative Total Returns Index) 的 SSD 來尋找走勢相近的股票對。
     累積總回報指數第一天價格歸一化為 1.0 (完全對應 Gatev et al. 2006 論文)。
     """
-    def __init__(self, price_df: pd.DataFrame, form_start: str, form_end: str, top_n: int = 20, sector_mapping: dict = None, min_tickers_for_pairing: int = 2):
+    def __init__(self, price_df: pd.DataFrame, form_start: str, form_end: str, top_n: int = 20, sector_mapping: dict = None, min_tickers_for_pairing: int = 2, adf_pvalue_threshold: float = 0.05, **kwargs):
         self.price_df = price_df.copy()
         self.form_start = form_start
         self.form_end = form_end
         self.top_n = top_n
         self.sector_mapping = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
+        self.adf_pvalue_threshold = adf_pvalue_threshold
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.first_day_prices: pd.Series = pd.Series(dtype=float)
@@ -162,9 +126,9 @@ class Formation:
             
             spread = y_val - beta * x_val
             
-            # A. ADF 共整合檢驗 (p-value < 0.05，過濾隨機漫步)
+            # A. ADF 共整合檢驗 (p-value < adf_pvalue_threshold，過濾隨機漫步)
             stat, pval = _adf_stat(spread, max_lags=1)
-            if pval >= 0.05:
+            if pval >= self.adf_pvalue_threshold:
                 continue
                 
             # B. Ornstein-Uhlenbeck 半衰期過濾 (2.0 <= halflife <= 40.0 天)
@@ -182,12 +146,12 @@ class Formation:
                 continue
                 
             halflife = -np.log(2) / lambda_val
-            if halflife < 2.0 or halflife > 40.0:
+            if halflife < 1.0 or halflife > 60.0:
                 continue
                 
-            # C. Hurst 指數篩選 (Hurst < 0.40，強均值回歸傾向)
-            hurst = _compute_hurst(spread)
-            if hurst >= 0.40:
+            # C. Hurst 指數篩選 (Hurst < 0.50，強均值回歸傾向)
+            hurst = _compute_hurst(spread, already_stationary=True)
+            if hurst >= 0.50:
                 continue
                 
             spread_mean = np.mean(spread)

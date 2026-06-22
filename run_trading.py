@@ -8,379 +8,26 @@ from datetime import datetime
 import multiprocessing
 import itertools
 import copy
-
-# ── CPU 限制與 Python 3.14 資源追蹤器相容性補丁 ──────────────────────────────
-# 1. 可調控的 CPU 使用率上限 (80%)
-CPU_LIMIT_PCT = 0.8
-
-# 2. 限制底層矩陣運算庫的執行緒數，防止單個子行程佔滿所有 CPU 核心
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["NCORES"] = "1"
-
-# 3. 預先註冊資源類型，解決 Python 3.14 resource_tracker 收到 JSON 時的解析錯誤
-try:
-    import multiprocessing.resource_tracker
-    if 'folder' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:
-        multiprocessing.resource_tracker._CLEANUP_FUNCS['folder'] = lambda x: None
-    if 'file' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:
-        multiprocessing.resource_tracker._CLEANUP_FUNCS['file'] = lambda x: None
-except Exception:
-    pass
-
-# 4. 對 joblib.Parallel 進行 Monkey Patch，若在子行程中執行則強制單執行緒 (n_jobs=1)
-try:
-    import joblib
-    original_parallel = joblib.Parallel
-    class PatchedParallel(original_parallel):
-        def __init__(self, n_jobs=None, *args, **kwargs):
-            if multiprocessing.current_process().name != 'MainProcess':
-                n_jobs = 1
-            super().__init__(n_jobs=n_jobs, *args, **kwargs)
-    joblib.Parallel = PatchedParallel
-    joblib.parallel.Parallel = PatchedParallel
-except ImportError:
-    pass
-
-# ── 強制 Windows 終端機使用 UTF-8 輸出並開啟 Line-buffering ──────────────
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
-    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
-
-# ── Configuration Settings ──────────────────────────────────────────────
-FORCE_RERUN = True  # 設定為 True 可以強制重新執行，無視斷點續傳紀錄
-DB_PROFILES = {
-    "sp500_Current": {
-        "db_path":     "./dataset/sp500_Current.db",
-        "output_root": "./results/current",
-        "label":       "S&P 500 現行成分股 (Current)",
-    },
-    "sp500_full": {
-        "db_path":     "./data/sp500.db",
-        "output_root": "./results/full",
-        "label":       "S&P 500 完整歷史成分股 (Full)",
-    },
-    "sp500_Tiingo": {
-        "db_path":     "./dataset/sp500_Tiingo.db",
-        "output_root": "./results/tiingo",
-        "label":       "S&P 500 完整歷史成分股 (Tiingo)",
-    },
-}
-
-DB_PATH = "./data/sp500.db"
-TABLE_NAME = "Daily_Prices"
-INFO_TABLE = "Constituents"
-TICKER_COL = "Symbol"
-SECTOR_COL = "GICS_Sector"
-
-BACKTEST_START   = "2000-01"
-BACKTEST_END     = "2025-12"
-FORMATION_WINDOW = 252
-FORWARD_DAYS     = 126
-rolling_step     = 21
-
-use_vol_adjust = False
-
-base_params = {
-    "entry_z":                      2.0,
-    "exit_z":                       0.0,
-    "formation_window":             FORMATION_WINDOW,
-    "trading_window":               FORWARD_DAYS,
-    "rolling_step":                 rolling_step,
-    "fee_rate":                     0.001,
-    "slippage_rate":                0.001,
-    "initial_capital":              10000,
-    "allow_reentry":                False,
-    "zscore_clip":                  10.0,
-    "min_spread_std":               1e-6,
-    "min_tickers_for_pairing":      2,
-    "use_vol_adjust":               use_vol_adjust,
-    "max_holding_days":             30,
-    # 支援多數值比對的網格搜尋參數清單
-    "top_n_list":                   [1, 3, 5, 10, 20],
-    "stop_loss_list":               [0.0, 0.05, 0.15],
-    "max_sector_ratio_list":        [0.0, 0.30, 0.50],
-    # 單一數值作為 fallback 預設值
-    "top_n":                        10,
-    "stop_loss_pct":                0.0,
-    "zscore_window":                0,
-    "portfolio_stop_loss_pct":      0.0,
-    "max_sector_ratio":             0.0,
-    "dynamic_stop_z":               0.0,
-}
-
-hdbscan_common = {
-    "use_dynamic_stop":         False,
-    "hdbscan_min_cluster_size": 30,
-    "hdbscan_min_samples":      10,
-    "hdbscan_metric":           "euclidean",
-    "adf_max_lags":             1,
-    "adf_pvalue_threshold":     0.01,
-    "min_corr":                 0.50,
-    "min_zero_crossings":       5,
-}
-
-# ════════════════════════════════════════════════════════════════════════════
-# 💡 未來如何更換與切換交易/形成期策略說明指引：
-# ────────────────────────────────────────────────────────────────────────────
-# 1. 新增策略模組：
-#    - 形成期策略：在 `strategies/formation/` 目錄下建立 Python 檔案，實作 `Formation` 類別及 `run()` 方法。
-#    - 交易期策略：在 `strategies/trading/` 目錄下建立 Python 檔案，實作 `Trading` 類別及 `_simulate_pair()` 方法。
-# 2. 註冊與切換策略：
-#    - 調整下方 `strategies_raw` 列表中對應策略的 `formation_module`（在 run_formation.py）或 `trading_module`（在 run_trading.py）。
-#    - 程式在執行時會使用 `importlib.import_module` 動態加載您指定的策略模組，無需更改主控邏輯。
-# ════════════════════════════════════════════════════════════════════════════
-strategies_raw = [
-    # 1. SSD Basic
-    {
-        "name":    "SSD Basic",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "SSD_Basic",
-        "db_method": "SSD (Basic)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-        },
-    },
-    # 2. SSD Rolling
-    {
-        "name":    "SSD Rolling",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "SSD_Rolling",
-        "db_method": "SSD (Rolling)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-        },
-    },
-    # 3. HDBSCAN SameSector UMAP
-    {
-        "name":    "HDBSCAN SameSector UMAP",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "HDBSCAN_SS_UMAP",
-        "db_method": "HDBSCAN (SS-UMAP)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  5,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "umap",
-            "feature_mode":       "stats13",
-        },
-    },
-    # 4. HDBSCAN SameSector PCA
-    {
-        "name":    "HDBSCAN SameSector PCA",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "HDBSCAN_SS_PCA",
-        "db_method": "HDBSCAN (SS-PCA)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  3,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "pca",
-            "feature_mode":       "stats13",
-        },
-    },
-    # 5. HDBSCAN MacroCluster UMAP
-    {
-        "name":    "HDBSCAN MacroCluster UMAP",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "HDBSCAN_Macro_UMAP",
-        "db_method": "HDBSCAN (Macro-UMAP)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  5,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "umap",
-            "feature_mode":       "stats13",
-        },
-    },
-    # 6. HDBSCAN CrossSector MF
-    {
-        "name":    "HDBSCAN CrossSector MF",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "HDBSCAN_CS_MF",
-        "db_method": "HDBSCAN (CS-MF)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "use_mom1_filter": True,
-        },
-    },
-    # 7. HDBSCAN CrossSector PCA
-    {
-        "name":    "HDBSCAN CrossSector PCA",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "HDBSCAN_CS_PCA",
-        "db_method": "HDBSCAN (CS-PCA)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  3,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "pca",
-            "feature_mode":       "stats13",
-            "use_mom1_filter":    True,
-        },
-    },
-    # 8. HDBSCAN CrossSector UMAP
-    {
-        "name":    "HDBSCAN CrossSector UMAP",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "HDBSCAN_CS_UMAP",
-        "db_method": "HDBSCAN (CS-UMAP)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            **hdbscan_common,
-            "umap_n_components":  5,
-            "umap_n_neighbors":   40,
-            "umap_min_dist":      0.01,
-            "umap_random_state":  42,
-            "reduce_method":      "umap",
-            "feature_mode":       "stats13",
-            "use_mom1_filter":    True,
-        },
-    },
-    # 9. Pure DTW (Notebook Ver)
-    {
-        "name":    "Pure DTW (Notebook Ver)",
-        "trading_module": "strategies.trading.pure_dtw_trading",
-        "sub_dir": "Pure_DTW",
-        "db_method": "Pure_DTW",
-        "trade_method": "Pure DTW",
-        "params":  {
-            **base_params,
-        },
-    },
-    # 10. DTW Cointegration Paper (DTW)
-    {
-        "name":    "DTW Cointegration Paper DTW",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "DTW_Paper",
-        "db_method": "DTW (Paper)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            "method": "dtw",
-        },
-    },
-    # 11. DTW Cointegration Paper (SSD+DTW PCA)
-    {
-        "name":    "DTW Cointegration Paper SSD-DTW-PCA",
-        "trading_module": "strategies.trading.zscore_trading",
-        "sub_dir": "SSD_DTW_PCA_Paper",
-        "db_method": "SSD-DTW-PCA (Paper)",
-        "trade_method": "Z-Score",
-        "params":  {
-            **base_params,
-            "method": "ssd_dtw_pca",
-        },
-    },
-    # 12. DRL LSTM
-    {
-        "name":    "DRL LSTM",
-        "trading_module": "strategies.trading.drl_lstm_trading",
-        "sub_dir": "DRL_LSTM",
-        "db_method": "DRL LSTM",
-        "trade_method": "DRL LSTM",
-        "params":  {
-            **base_params,
-            "drl_episodes": 200,          # number of episodes for fast training
-            "drl_batch_size": 64,         # batch size for experience replay
-            "drl_gamma": 0.99,            # discount factor
-            "drl_epsilon_start": 1.0,     # exploration rate
-            "drl_epsilon_end": 0.05,
-            "drl_epsilon_decay": 0.995,
-            "drl_lr": 1e-3,               # learning rate
-            "drl_hidden_size": 64,        # LSTM hidden size
-            "drl_num_layers": 1,          # LSTM layers
-        },
-    },
-]
-from strategies.preprocess_equity import DataProcessor
-from strategies.portfolio_manager import PortfolioManager
 import importlib
 import time
-import multiprocessing
 import concurrent.futures
 import threading
 import re
 import traceback
 
-# ProgressAwareStdout — 子行程 stdout 攔截器
-# ════════════════════════════════════════════════════════════════════════════
-
-class ProgressAwareStdout:
-    """
-    攔截子行程的 stdout，解析「Period X/Y」並即時更新跨行程進度字典。
-    """
-    def __init__(self, log_filepath: str, progress_dict, strategy_name: str, total_periods: int):
-        self.log_file      = None
-        self.progress_dict = progress_dict
-        self.strategy_name = strategy_name
-        self.total_periods = total_periods
-        self.start_time    = time.time()
-        self.pattern       = re.compile(r"Period\s*(\d+)/(\d+)")
-
-        log_dir = os.path.dirname(log_filepath)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        self.log_file = open(log_filepath, "w", encoding="utf-8", buffering=1)
-
-    def write(self, s: str) -> None:
-        self.log_file.write(s)
-        match = self.pattern.search(s)
-        if match:
-            try:
-                curr_period = int(match.group(1))
-                total    = int(match.group(2))
-                pct      = min(100, int(curr_period / total * 100))
-
-                current_info = dict(self.progress_dict.get(self.strategy_name, {}))
-                current_info.update({
-                    "status":   "RUNNING",
-                    "progress": f"{curr_period}/{total}",
-                    "pct":      pct,
-                    "msg":      f"正在處理第 {curr_period:02d}/{total:02d} 期交易期模擬",
-                    "elapsed":  time.time() - self.start_time,
-                })
-                self.progress_dict[self.strategy_name] = current_info
-            except Exception:
-                pass
-
-    def flush(self) -> None:
-        if self.log_file is not None:
-            self.log_file.flush()
-
-    def close(self) -> None:
-        if self.log_file is not None:
-            self.log_file.close()
-
-    def __getattr__(self, name: str):
-        log_file = self.__dict__.get("log_file")
-        if log_file is None:
-            raise AttributeError(name)
-        return getattr(log_file, name)
+from strategies.preprocess_equity import DataProcessor
+from strategies.portfolio_manager import PortfolioManager
+from strategies.db_utils import get_db_connection
+from strategies.config import (
+    INITIAL_CAPITAL,
+    FORCE_RERUN, CPU_LIMIT_PCT, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
+    TICKER_COL, SECTOR_COL, BACKTEST_START, BACKTEST_END,
+    FORMATION_WINDOW, FORWARD_DAYS, rolling_step,
+    base_params, hdbscan_common, strategies_raw,
+    ProgressAwareStdout, draw_dashboard,
+    start_dashboard_thread, interleave_strategies, print_summary_report,
+    _DASHBOARD_FIXED_LINES
+)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -449,9 +96,12 @@ def worker_task(
 
     try:
         # 提前建立並攔截 stdout / stderr (total_periods 先傳入預設值 0)
-        progress_stream = ProgressAwareStdout(log_path, progress_dict, name, 0)
+        progress_stream = ProgressAwareStdout(log_path, progress_dict, name, 0, pattern_keyword="Period")
         sys.stdout = progress_stream
         sys.stderr = progress_stream
+
+        # 預先建立日期到索引的 map，優化 O(n) 線性搜尋為 O(1) 查找
+        date_to_idx = {pd.to_datetime(d): i for i, d in enumerate(all_dates)}
 
         # 載入交易策略模組
         strat_module = importlib.import_module(module_name)
@@ -460,7 +110,7 @@ def worker_task(
         else:
             raise AttributeError(f"Strategy {module_name} missing Trading class.")
 
-        conn = sqlite3.connect(formation_db_path)
+        conn = get_db_connection(formation_db_path)
         
         # 讀取該策略的所有交易週期 (使用 formation_strategy_id)
         formation_strategy_id = strategy_config.get("formation_strategy_id", name)
@@ -476,9 +126,9 @@ def worker_task(
             raise ValueError(f"No periods found in formation_pairs for strategy: {formation_strategy_id}")
 
         # 更新實際的 total_periods
-        progress_stream.total_periods = total_periods
+        progress_stream.total_steps = total_periods
 
-        pm = PortfolioManager(strategy_id=name, initial_capital=10000.0, max_pairs=params.get("top_n", 10))
+        pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL, max_pairs=params.get("top_n", 10))
         all_trade_logs = []
 
         for i, (_, p_row) in enumerate(df_periods.iterrows()):
@@ -516,8 +166,11 @@ def worker_task(
             allocations = pm.allocate_capital(candidates)
 
             # 取得該週期的價格數據切片
-            trade_start_idx = all_dates.index(pd.to_datetime(trade_start))
-            trade_end_idx = all_dates.index(pd.to_datetime(trade_end))
+            trade_start_idx = date_to_idx.get(pd.to_datetime(trade_start))
+            trade_end_idx = date_to_idx.get(pd.to_datetime(trade_end))
+            if trade_start_idx is None or trade_end_idx is None:
+                print(f"  [Warning] Period dates ({trade_start} to {trade_end}) not found in database price index. Skipping period.")
+                continue
             trade_prices = price_pivot.iloc[trade_start_idx : trade_end_idx + 1]
             trade_dates = all_dates[trade_start_idx : trade_end_idx + 1]
 
@@ -525,6 +178,9 @@ def worker_task(
             zwin = params.get("zscore_window", 0)
             extended_start_idx = max(0, trade_start_idx - zwin)
             trade_prices_extended = price_pivot.iloc[extended_start_idx : trade_end_idx + 1]
+
+            import inspect
+            sig = inspect.signature(TradingClass.__init__)
 
             for pair, capital in allocations.items():
                 ticker_a, ticker_b = pair
@@ -547,8 +203,6 @@ def worker_task(
                 for k, v in params.items():
                     kwargs[k] = v
 
-                import inspect
-                sig = inspect.signature(TradingClass.__init__)
                 valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
 
                 trading_instance = TradingClass(**valid_kwargs)
@@ -575,6 +229,8 @@ def worker_task(
                             log_std_a=form_params.get("Log_Std_A", 1.0),
                             log_mean_b=form_params.get("Log_Mean_B", 0.0),
                             log_std_b=form_params.get("Log_Std_B", 1.0),
+                            first_price_a=float(form_params.get("First_Price_A") or 0.0),
+                            first_price_b=float(form_params.get("First_Price_B") or 0.0),
                             ols_alpha=ols_alpha_val
                         )
 
@@ -595,6 +251,9 @@ def worker_task(
 
                     except Exception as e:
                         print(f"Error simulating pair {pair}: {e}")
+
+            # 清理 PortfolioManager 中的 active_pairs 以防累積
+            pm.active_pairs.clear()
 
         conn.close()
 
@@ -664,204 +323,7 @@ def worker_task(
         gc.collect()
 
 
-# ════════════════════════════════════════════════════════════════════════════
-# 終端進度監控儀表板
-# ════════════════════════════════════════════════════════════════════════════
 
-_DASHBOARD_FIXED_LINES = 8
-
-def _visible_len(s: str) -> int:
-    return len(re.sub(r"\033\[[^m]*m", "", s))
-
-def _pad_visible(s: str, width: int, align: str = "left") -> str:
-    v_len = _visible_len(s)
-    if v_len >= width:
-        return s
-    padding = " " * (width - v_len)
-    if align == "right":
-        return padding + s
-    return s + padding
-
-def draw_dashboard(
-    progress_dict,
-    strategies_config: list,  # 傳入原始 strategies_config
-    main_start_time: float,
-    log_dir_desc: str = "",
-) -> None:
-    """
-    原地渲染終端進度儀表板。
-    """
-    n_strategies = len(strategies_config)
-    total_lines  = n_strategies + _DASHBOARD_FIXED_LINES
-
-    sys.stdout.write(f"\033[{total_lines}A")
-
-    try:
-        term_width = min(os.get_terminal_size().columns, 85)
-    except OSError:
-        term_width = 85
-
-    def line(s: str) -> None:
-        visible = re.sub(r"\033\[[^m]*m", "", s)
-        if len(visible) > term_width:
-            s = s[:term_width + (len(s) - len(visible))] + "\033[0m"
-        print(f"{s}\033[K")
-
-    line("\033[95m" + "═" * term_width + "\033[0m")
-    line("        \033[93;1m🚀 配對交易交易期平行化即時監控儀表板 (Trading Stage Core) 🚀\033[0m")
-    line("\033[95m" + "═" * term_width + "\033[0m")
-
-    # 統合計算各原始策略的進度資訊
-    aggregated_info = {}
-    for config in strategies_config:
-        orig_name = config["name"]
-        
-        sub_total = 0
-        sub_success = 0
-        sub_skipped = 0
-        sub_failed = 0
-        sub_running = 0
-        sub_pending = 0
-        sum_pct = 0.0
-        all_elapsed = []
-
-        # 遍歷 progress_dict 尋找所有以 orig_name 開頭的子組合任務
-        for k, info in progress_dict.items():
-            if k == orig_name or k.startswith(orig_name + "_"):
-                sub_total += 1
-                status = info.get("status", "PENDING")
-                pct = info.get("pct", 0)
-                sum_pct += pct
-                all_elapsed.append(info.get("elapsed", 0.0))
-                msg = info.get("msg", "")
-                
-                if status == "PENDING":
-                    sub_pending += 1
-                elif status == "RUNNING":
-                    sub_running += 1
-                elif status == "SUCCESS":
-                    if "跳過" in msg or "已跳過" in msg:
-                        sub_skipped += 1
-                    else:
-                        sub_success += 1
-                elif status == "FAILED":
-                    sub_failed += 1
-
-        if sub_total == 0:
-            # 預設狀態
-            aggregated_info[orig_name] = {
-                "status": "PENDING",
-                "progress": "0/0",
-                "pct": 0,
-                "msg": "等待中...",
-                "elapsed": 0.0,
-            }
-        else:
-            avg_pct = int(sum_pct / sub_total)
-            max_elapsed = max(all_elapsed) if all_elapsed else 0.0
-            completed = sub_success + sub_skipped + sub_failed
-            
-            # 狀態統合
-            if completed == sub_total:
-                if sub_failed > 0:
-                    status = "FAILED"
-                    msg = f"完成 ({sub_success}組成功, {sub_failed}組失敗)"
-                elif sub_skipped == sub_total:
-                    status = "SUCCESS"
-                    msg = "已跳過 (已有完整結果)"
-                else:
-                    status = "SUCCESS"
-                    msg = f"完成 ({sub_success}組成功)"
-            elif sub_pending == sub_total:
-                status = "PENDING"
-                msg = "排隊等待中..."
-            else:
-                status = "RUNNING"
-                msg = f"執行中 ({sub_running}組運行, {completed}/{sub_total}完成)"
-
-            aggregated_info[orig_name] = {
-                "status": status,
-                "progress": f"{completed}/{sub_total}",
-                "pct": avg_pct,
-                "msg": msg,
-                "elapsed": max_elapsed,
-            }
-
-    # 統計總狀態
-    counts = {"PENDING": 0, "RUNNING": 0, "SUCCESS": 0, "SKIPPED": 0, "FAILED": 0}
-    for config in strategies_config:
-        info = aggregated_info[config["name"]]
-        status = info["status"]
-        if status == "SUCCESS" and "跳過" in info["msg"]:
-            counts["SKIPPED"] += 1
-        else:
-            counts[status] = counts.get(status, 0) + 1
-
-    elapsed = time.time() - main_start_time
-    line(
-        f"  📊 \033[1m回測進度\033[0m | 總任務: {n_strategies:<2} | "
-        f"運行: \033[96m{counts['RUNNING']:<2}\033[0m | "
-        f"成功: \033[92m{counts['SUCCESS']:<2}\033[0m | "
-        f"跳過: \033[33m{counts['SKIPPED']:<2}\033[0m | "
-        f"失敗: \033[91m{counts['FAILED']:<2}\033[0m | "
-        f"耗時: {elapsed:.1f}s"
-    )
-    line("\033[90m" + "─" * term_width + "\033[0m")
-
-    for config in strategies_config:
-        name = config["name"]
-        info = aggregated_info[name]
-
-        status       = info["status"]
-        pct          = info["pct"]
-        prog         = info["progress"]
-        msg          = info["msg"]
-        task_elapsed = info["elapsed"]
-
-        if status == "PENDING":
-            status_str = "\033[90m○ PENDING\033[0m"
-        elif status == "RUNNING":
-            status_str = "\033[96m● RUNNING\033[0m"
-        elif status == "SUCCESS":
-            is_skipped = "跳過" in msg
-            status_str = "\033[33m⟳ SKIPPED\033[0m" if is_skipped else "\033[92m✓ SUCCESS\033[0m"
-        elif status == "FAILED":
-            status_str = "\033[91m❌ FAILED \033[0m"
-        else:
-            status_str = f"\033[37m{status}\033[0m"
-
-        bar_width = 5
-        completed = int(bar_width * pct / 100)
-        bar       = "\033[94m" + "█" * completed + "\033[90m" + "░" * (bar_width - completed) + "\033[0m"
-
-        if status == "RUNNING" and pct > 0:
-            eta_str = f"ETA {task_elapsed / pct * (100 - pct):.0f}s"
-        elif status in ("SUCCESS", "SKIPPED"):
-            eta_str = "Done"
-        elif status == "FAILED":
-            eta_str = "Err"
-        else:
-            eta_str = "---"
-
-        # 簡化名稱長度以利儀表板排版
-        display_name = name
-
-        status_pad = _pad_visible(status_str, 10)
-        name_pad   = _pad_visible(display_name[:15], 15)
-        bar_pad    = _pad_visible(bar, 5)
-        msg_pad    = _pad_visible(msg[:20], 20)
-
-        line(
-            f"  {status_pad} | {name_pad} | "
-            f"{bar_pad} {pct:>3}% ({prog:<7}) | "
-            f"{eta_str:<8} | \033[93m{task_elapsed:>5.1f}s\033[0m | "
-            f"\033[37m{msg_pad}\033[0m"
-        )
-
-    line("\033[90m" + "─" * term_width + "\033[0m")
-    line(f"  📁 詳細日誌重導向至: \033[36m{log_dir_desc}/策略名稱.log\033[0m")
-    line("\033[95m" + "═" * term_width + "\033[0m")
-    sys.stdout.flush()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1026,13 +488,29 @@ def run_all_trading():
                 "msg": "✨ 已跳過 (偵測到已有完整回測結果)",
                 "elapsed": 0.0,
             }
+            # 嘗試從結果資料庫中讀取真實的 Final_Equity
+            final_eq = INITIAL_CAPITAL
+            filename = _build_filename(config["params"])
+            dataset_subdir = dataset_name.lower()
+            path_key = f"{dataset_subdir}/{config['sub_dir']}/{filename}"
+            if os.path.exists(results_db_path):
+                try:
+                    import sqlite3
+                    with sqlite3.connect(results_db_path, timeout=10.0) as temp_conn:
+                        cursor = temp_conn.cursor()
+                        cursor.execute("SELECT Final_Equity FROM strategy_summaries WHERE _path = ?", (path_key,))
+                        row = cursor.fetchone()
+                        if row:
+                            final_eq = float(row[0])
+                except Exception:
+                    pass
             results.append({
                 "name": config["name"],
                 "status": "SUCCESS",
                 "skipped": True,
                 "elapsed": 0.0,
                 "error": None,
-                "final_equity": 10000.0,  # 預設
+                "final_equity": final_eq,
             })
             print(f"  ⟳ 跳過（已完成）：{config['name']}", flush=True)
         else:
@@ -1085,13 +563,9 @@ def run_all_trading():
     main_start_time = time.time()
     stop_event = threading.Event()
 
-    def dashboard_updater() -> None:
-        while not stop_event.is_set():
-            draw_dashboard(progress_dict, original_strategies_config, main_start_time, log_dir_desc=log_dir)
-            time.sleep(0.3)
-
-    dashboard_thread = threading.Thread(target=dashboard_updater, daemon=True)
-    dashboard_thread.start()
+    dashboard_thread = start_dashboard_thread(
+        progress_dict, original_strategies_config, main_start_time, log_dir, stop_event, stage_title="交易"
+    )
 
     # 4. 多行程並行運算
     try:
@@ -1133,32 +607,13 @@ def run_all_trading():
         # 停止儀表板並重繪最終狀態
         stop_event.set()
         dashboard_thread.join(timeout=1.0)
-        draw_dashboard(progress_dict, original_strategies_config, main_start_time, log_dir_desc=log_dir)
+        draw_dashboard(
+            progress_dict, original_strategies_config, main_start_time, log_dir_desc=log_dir, stage_title="交易"
+        )
 
     # 6. 終端總結報告
     total_elapsed = time.time() - main_start_time
-    print("\n" + "=" * 80, flush=True)
-    print("                     📊 交易期回測計算執行績效總結報告 (Summary) 📊", flush=True)
-    print("=" * 80, flush=True)
-    print(f" 總耗時: {total_elapsed:.2f} 秒（約 {total_elapsed / 60:.2f} 分鐘）", flush=True)
-    print(
-        f"\n{'策略名稱':<45} | {'狀態':<10} | {'跳過':<4} | {'最終權益':<10} | {'耗時(秒)':<10} | 錯誤訊息",
-        flush=True,
-    )
-    print("-" * 110, flush=True)
-    
-    name_order = {c["name"]: i for i, c in enumerate(strategies_config)}
-    results_sorted = sorted(results, key=lambda r: name_order.get(r["name"], 999))
-    
-    for res in results_sorted:
-        err = res.get("error") or "無"
-        skipped = "是" if res.get("skipped") else "否"
-        final_eq_str = f"${res['final_equity']:.2f}" if 'final_equity' in res else "N/A"
-        print(
-            f"{res['name']:<45} | {res['status']:<10} | {skipped:<4} | {final_eq_str:<10} | {res['elapsed']:<10.2f} | {err}",
-            flush=True,
-        )
-    print("=" * 80, flush=True)
+    print_summary_report(results, original_strategies_config, total_elapsed, show_equity=True)
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()

@@ -48,17 +48,15 @@ class PureDTWTrading(Trading):
         if len(price_a) < 5: 
             return pd.DataFrame()
 
-        # 從 selected_pairs 提取此配對的形成期首日價格
-        pair_row = self.selected_pairs[
-            (self.selected_pairs["Ticker_A"] == ticker_a) & 
-            (self.selected_pairs["Ticker_B"] == ticker_b)
-        ]
-        if not pair_row.empty:
-            first_price_a = float(pair_row["First_Price_A"].iloc[0])
-            first_price_b = float(pair_row["First_Price_B"].iloc[0])
-        else:
-            first_price_a = float(price_a.iloc[0])
-            first_price_b = float(price_b.iloc[0])
+        # 如果傳入的 first_price_a/b 為非正值，則 fallback 交易期首日價格
+        if first_price_a <= 0.0 or first_price_b <= 0.0:
+            valid_idx = common_idx.intersection(self.trade_dates)
+            if len(valid_idx) > 0:
+                first_price_a = float(price_a.loc[valid_idx[0]])
+                first_price_b = float(price_b.loc[valid_idx[0]])
+            else:
+                first_price_a = float(price_a.iloc[0])
+                first_price_b = float(price_b.iloc[0])
 
         # 正規化：以形成期首日價格做為基準除數，確保連續性 (完全對應 notebook)
         norm_p_a = price_a / (first_price_a if first_price_a > 1e-8 else 1.0)
@@ -153,7 +151,9 @@ class PureDTWTrading(Trading):
                 is_z_stop = self.use_dynamic_stop and abs(z) > self.dynamic_stop_z
 
                 if is_cap_stop or is_z_stop:
+                    cooldown_to_set = state.position
                     self._execute_close(state, current_trade_pnl, stop_loss=True)
+                    state.cooldown_dir = cooldown_to_set
                     closed_trade_pnl = current_trade_pnl
                     current_status = "STOP_LOSS_TRIGGERED"
                 else:
@@ -162,7 +162,9 @@ class PureDTWTrading(Trading):
                     is_exit_long  = (state.position == 1)  and (z >= -self.exit_z)  
                     
                     if is_exit_short or is_exit_long:
+                        cooldown_to_set = state.position
                         self._execute_close(state, current_trade_pnl, stop_loss=False)
+                        state.cooldown_dir = cooldown_to_set
                         closed_trade_pnl = current_trade_pnl
                         current_status = "EXIT"
                     else:

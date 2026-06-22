@@ -45,7 +45,8 @@ pairtrade_trainingproject/
 ├── Ref_CODE/              # 過往參考程式碼、試算表與對照結果備份
 ├── tmp/                   # 臨時腳本與防禦性論證輔助工具目錄
 ├── dashboard.py           # Streamlit 績效比對 Dashboard 應用程式 (視覺化核心)
-├── main.py                # 核心回測引擎 (支援多行程平行計算、網格搜尋與智慧斷點續傳)
+├── run_formation.py       # 形成期滾動配對篩選平行化主程式
+├── run_trading.py         # 交易期逐日模擬與回測平行化主程式
 ├── requirements.txt       # 專案相依 Python 套件清單
 ├── pyproject.toml         # 專案套件配置檔 (用於本地模組 Editable 安裝)
 ├── setup.bat              # [一鍵工具] 專案環境初始化與套件安裝
@@ -68,7 +69,7 @@ graph TD
     classDef presentation fill:#faf5ff,stroke:#a855f7,stroke-width:2px,color:#6b21a8;
     classDef launcher fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#92400e;
 
-    Sub1[(1. 原始資料庫<br>data/*.db)]:::source --> Main[2. 核心回測引擎<br>main.py]:::engine
+    Sub1[(1. 原始資料庫<br>data/*.db)]:::source --> Main[2. 核心回測引擎<br>run_formation.py & run_trading.py]:::engine
     Sub2[策略邏輯與網格搜尋<br>strategies/*]:::engine -.-> Main
     
     Main -->|平行化高速回測| ResDir[3. 交易日誌 CSV<br>results/*]:::output
@@ -95,19 +96,20 @@ graph TD
 * **執行方法**：按兩下根目錄的 `setup.bat`。
 * **功能**：自動建立虛擬環境 `Project/`，升級 pip，安裝 `requirements.txt` 中所有的量化、機器學習與自編碼器所需套件，並以開發者模式 (`pip install -e .`) 註冊本地 `src` 模組，確保跨策略調用暢通無阻。
 
-#### 步驟 2：平行化回測與參數網格搜尋 (`main.py`)
+#### 步驟 2：平行化配對篩選與交易期回測 (`run_formation.py` / `run_trading.py`)
 * **執行方法**：
   ```bash
-  # 啟動互動選單（選擇資料集、是否允許停損再進場、是否啟用波動率調節）
-  python main.py
-  # 或使用完全靜態的 CLI 參數直接在後台執行：
-  python main.py --db sp500_Current --allow-reentry --workers 4
+  # 1. 執行形成期平行篩選（滾動篩選最佳對沖配對，並寫入配對資料庫）：
+  python run_formation.py
+
+  # 2. 執行交易期平行回測（進行滾動期逐日模擬，產出詳細 TradeLogs CSV 與 SQLite 績效）：
+  python run_trading.py
   ```
 * **功能**：
   * **單次 I/O 加載**：在主進程中一次性讀取 SQLite 資料庫並進行 Pivot 矩陣轉換，避免子行程重複讀寫硬碟。
   * **多行程並行**：調用進程池並行執行六大策略的滾動回測。
   * **網格優化**：針對 `Top N [5, 10, 20]`、`Stop Loss [0%, 5%, 15%]`、`Z-Window [0]` (固定為 0)、`PSL [0%, 10%, 20%]` (全域動態停損)、`MSR [0%, 3%]` (配對產業上限) 與 `DSZ [0, 3, 5]` (部位動態停損) 等 7 組參數進行科學網格搜尋與高效外部產業切片過濾。
-  * **智慧斷點續傳**：自動檢測策略代碼、資料庫檔案與網格參數是否修改，若無變動則自動跳過，極速節省運算資源。
+  * **智慧斷點續傳與期數級別快取**：自動檢測策略代碼、資料庫檔案與網格參數是否修改，若無變動則自動跳過，極速節省運算資源。
 
 #### 步驟 3：最優參數淨值合併與指標編譯 (`preprocess_equity.py`)
 * **執行方法**：
@@ -183,14 +185,14 @@ Dashboard (`dashboard.py`) 與編譯器 (`preprocess_equity.py`) 是透過掃描
 
 ### ➕ 4.1 新增策略作業
 1. **策略代碼開發**：在 `strategies/` 下新建您的策略 Python 模組（例如 `my_strategy.py`），並實作 `run_strategy` 標準接口。
-2. **註冊回測任務**：開啟 `main.py`，在 `main()` 函數中的 `strategies_raw` 列表中添加您的策略配置與網格搜尋參數。
-3. **執行回測**：運行 `python main.py`，產出對應的 Trade Logs CSV。
-4. **指標編譯**：運行 `python tohtml/preprocess_equity.py`，將新策略的最優曲線編譯進 `equity_curves.csv` 並更新 `analysis.ipynb` 表格。
+2. **註冊回測任務**：開啟 `strategies/config.py`，在 `strategies_raw` 列表中添加您的策略配置與網格搜尋參數。
+3. **執行回測**：依序運行 `python run_formation.py` 與 `python run_trading.py`，產出對應的配對資料庫與交易期 Trade Logs CSV。
+4. **指標編譯**：運行 `python preprocess_equity.py`，將新策略的最優曲線編譯進 `equity_curves.csv` 並更新 `analysis.ipynb` 表格。
 5. **啟動儀表板**：重啟或重新整理 Streamlit，即可在界面中勾選並比對新策略的效能！
 
 ### 📝 4.2 修訂策略作業
 如果您修改了策略邏輯或調整了回測參數：
-1. **執行回測與覆寫**：重新運行 `main.py`。智慧斷點機制會自動識別代碼或參數的變更，強制重新計算並覆寫 `results/` 下的舊 CSV 檔案。
+1. **執行回測與覆寫**：重新運行 `run_formation.py` 與 `run_trading.py`。智慧斷點與期數級別快取機制會自動識別代碼或參數的變更，強制重新計算並覆寫對應的結果。
 2. **⚠️ 關鍵步驟：清除 Dashboard 快取**：
    * 由於 Dashboard 使用了 Streamlit 記憶體快取技術 (`@st.cache_data`) 來加速巨量數據的讀取，**單純重新整理網頁是不會讀入更新後的 CSV 資料的！**
    * **清除快取方法**：在 Streamlit 網頁右上角點選三個點的選單 $\rightarrow$ 點擊 **"Clear cache"**（或直接在網頁畫面上按下鍵盤的 **`C`** 鍵）並點擊確認。

@@ -6,10 +6,10 @@
 
 ## 🚀 平台核心亮點
 
-### 1. 高效能多行程並行回測引擎 (`main.py`)
+### 1. 形成與交易分離的高效能多行程並行回測引擎 (`run_formation.py` / `run_trading.py`)
 * **智慧單次 I/O 設計**：主行程統一載入 SQLite 資料庫並完成 Pivot 矩陣轉換，子行程直接共用記憶體數據，根除硬碟讀寫瓶頸。
 * **網格搜尋優化**：針對配對組數 (Top N)、停損門檻 (Stop Loss)、Z-Score 滾動天數 (Z-Window 固定為 0)、全域動態停損 (PSL)、配對產業上限 (MSR) 與部位動態停損 (DSZ) 等 7 組參數自動進行網格搜尋與科學績效比對，並引進高效的外部產業上限過濾技術。
-* **智慧斷點續傳**：自動對比資料庫修改時間、策略代碼雜湊與網格參數，未變動之策略自動跳過，極速節省計算開銷。
+* **智慧斷點續傳與期數級別快取**：自動對比資料庫修改時間、策略代碼雜湊與網格參數，未變動之策略/期數自動跳過，極速節省計算開銷。
 
 ### 2. 五大前沿配對交易策略 (`strategies/`)
 * **經典 SSD (Basic)**：基於最小平方距離法進行傳統股票配對。
@@ -45,7 +45,8 @@ pairtrade_trainingproject/
 ├── Ref_CODE/              # 歷史參考程式碼與結果比對備份
 ├── tmp/                   # 臨時腳本與防禦性論證輔助工具目錄
 ├── dashboard.py           # Streamlit 視覺化 Dashboard 應用程式
-├── main.py                # 多行程滾動回測與網格搜尋控制主程式
+├── run_formation.py       # 形成期滾動配對篩選平行化主程式
+├── run_trading.py         # 交易期逐日模擬與回測平行化主程式
 ├── requirements.txt       # 專案相依 Python 套件清單
 ├── setup.bat              # [一鍵工具] 專案環境初始化與套件安裝
 └── run.bat                # [一鍵工具] 績效比對 Dashboard 一鍵啟動器
@@ -66,11 +67,11 @@ pairtrade_trainingproject/
 ### 2. 啟動多行程回測與網格搜尋
 在專案根目錄下執行：
 ```bash
-# 啟動互動選單（手動點選資料集、重入機制與波動度調節）：
-python main.py
+# 1. 執行形成期平行運算（滾動篩選最佳對沖配對，並寫入配對資料庫）：
+python run_formation.py
 
-# 或使用非互動式 CLI 參數在後台直接跑完：
-python main.py --db sp500_Current --allow-reentry --workers 4
+# 2. 執行交易期平行運算（執行逐日模擬，輸出 TradeLogs CSV 並記錄最終績效到 SQLite）：
+python run_trading.py
 ```
 
 ### 3. 指標編譯與 Notebook 表格注入

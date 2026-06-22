@@ -53,7 +53,7 @@ st.markdown("""
 # CONSTANTS & CONFIG
 # ==========================================
 RESULTS_DIR = "results"
-INITIAL_CAPITAL = 10000.0
+from strategies.config import INITIAL_CAPITAL
 
 def natural_sort_key(s):
     return [int(text) if text.isdigit() else str(text).lower() for text in re.split(r'(\d+)', str(s))]
@@ -369,10 +369,11 @@ def calculate_metrics_raw(strategy_path):
         if 'Daily_Delta' in df.columns:
             state_change = df['Position'] != df['Prev_Pos']
             df['State_ID'] = state_change.groupby([df['Ticker_A'], df['Ticker_B']]).cumsum()
-            active_mask = df['Position'] != 0
+            df['Prev_State_ID'] = df.groupby(['Ticker_A', 'Ticker_B'])['State_ID'].shift(1).fillna(0)
+            active_mask = (df['Prev_Pos'] != 0) | (df['Daily_Delta'] != 0)
             
             if active_mask.any():
-                trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'State_ID'])['Daily_Delta'].sum()
+                trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'Prev_State_ID'])['Daily_Delta'].sum()
                 gross_profit = float(trade_pnls[trade_pnls > 0].sum())
                 gross_loss = float(trade_pnls[trade_pnls < 0].sum())
             else:
@@ -1244,9 +1245,9 @@ def main():
     def color_equity(val):
         try:
             numeric_val = float(val)
-            if numeric_val > 10000.0:
+            if numeric_val > INITIAL_CAPITAL:
                 return 'color: #4ade80; font-weight: bold;'
-            elif numeric_val < 10000.0:
+            elif numeric_val < INITIAL_CAPITAL:
                 return 'color: #f87171; font-weight: bold;'
         except (ValueError, TypeError):
             pass

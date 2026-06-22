@@ -27,7 +27,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 # 定義策略初始資金常數，用於計算報酬率與部位佔比
-INITIAL_CAPITAL = 10000.0
+from strategies.config import INITIAL_CAPITAL
 
 
 def get_db_connection(db_path="results/result.db", max_retries=5, retry_delay=0.5):

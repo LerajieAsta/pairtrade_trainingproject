@@ -5,11 +5,11 @@ import time
 
 def convert_tiingo_database_pandas():
     project_dir = r"d:\Unknown\Papper\Code"
-    data_dir = os.path.join(project_dir, "data")
+    data_dir = os.path.join(project_dir, "dataset")
     
-    db_yf = os.path.join(data_dir, "sp500.db")
+    db_yf = os.path.join(data_dir, "sp500_yF.db")
     db_tg = os.path.join(data_dir, "sp500Full.db")
-    db_out = os.path.join(data_dir, "sp500_Tiingo_Converted.db")
+    db_out = os.path.join(data_dir, "sp500_Tiingo.db")
     
     print("=== Lock-Free Tiingo to yFinance Schema Database Converter ===")
     print(f"yFinance (Source Structure): {db_yf}")

@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+from strategies.db_utils import get_db_connection
 
 class DataProcessor:
     """
@@ -28,7 +29,7 @@ class DataProcessor:
             dict: {股票代碼: 產業分類名稱} 的映射字典。
         """
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = get_db_connection(self.db_path)
             df = pd.read_sql_query(f"SELECT {ticker_col}, {sector_col} FROM {info_table}", conn)
             conn.close()
             mapping = {}
@@ -54,7 +55,7 @@ class DataProcessor:
         回傳:
             tuple: (價格 Pivot 矩陣, 時間索引序列, 總天數, 交易啟動本地日期索引位置)
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = get_db_connection(self.db_path)
         # 合理載入 Adj_Close 或 Close 價格
         raw_df = pd.read_sql_query(f"SELECT Date AS date, Symbol AS ticker, COALESCE(Adj_Close, Close) AS price FROM {self.table_name} WHERE COALESCE(Adj_Close, Close) IS NOT NULL ORDER BY Date ASC", conn)
         conn.close()

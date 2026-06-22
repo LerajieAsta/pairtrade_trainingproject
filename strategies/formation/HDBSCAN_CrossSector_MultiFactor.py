@@ -24,53 +24,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
-def _compute_hurst(series: np.ndarray) -> float:
-    """R/S 分析近似 Hurst 指數"""
-    n = len(series)
-    if n < 20:
-        return 0.5
-    diffs = np.diff(series)
-    rs_list = []
-    for seg_len in [n // 4, n // 2, n]:
-        if seg_len < 4:
-            continue
-        seg = diffs[:seg_len]
-        mean_seg = np.mean(seg)
-        deviate  = np.cumsum(seg - mean_seg)
-        std_val  = np.std(seg, ddof=1)
-        if std_val < 1e-8:
-            std_val = 1e-8
-        rs = (np.max(deviate) - np.min(deviate)) / std_val
-        rs_list.append((np.log(seg_len), np.log(rs + 1e-8)))
-    if len(rs_list) < 2:
-        return 0.5
-    xs, ys = zip(*rs_list)
-    try:
-        h = float(np.polyfit(xs, ys, 1)[0])
-    except Exception:
-        h = 0.5
-    return np.clip(h, 0.0, 1.0)
-
-def _ols(y: np.ndarray, x: np.ndarray) -> tuple[float, float, np.ndarray]:
-    """簡易 OLS：y = alpha + beta * x + resid，回傳 (alpha, beta, residuals)"""
-    n = len(y)
-    x_mat = np.column_stack([np.ones(n), x])
-    try:
-        coeffs, _, _, _ = np.linalg.lstsq(x_mat, y, rcond=None)
-    except np.linalg.LinAlgError:
-        return 0.0, 0.0, y - np.mean(y)
-    alpha, beta = float(coeffs[0]), float(coeffs[1])
-    return alpha, beta, y - alpha - beta * x
-
-def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
-    """ADF 檢定（no constant），同時回傳 (統計量, p 值)"""
-    if len(resid) < max_lags + 5:
-        return 0.0, 1.0
-    try:
-        result = adfuller(resid, maxlag=max_lags, regression="n", autolag=None)
-        return float(result[0]), float(result[1])
-    except Exception:
-        return 0.0, 1.0
+from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
 
 # Load HDBSCAN
 try:
@@ -321,13 +275,13 @@ class Formation:
                         continue
                     
                     halflife = -np.log(2) / lambda_val
-                    if halflife < 2.0 or halflife > 60.0:
+                    if halflife < 1.0 or halflife > 60.0:
                         rejected_count += 1
                         continue
 
                     # 4. Hurst Index Filter
-                    hurst = _compute_hurst(best_resid)
-                    if hurst >= 0.40:
+                    hurst = _compute_hurst(best_resid, already_stationary=True)
+                    if hurst >= 0.50:
                         rejected_count += 1
                         continue
 

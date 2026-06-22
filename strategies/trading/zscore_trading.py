@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
+from strategies.config import INITIAL_CAPITAL
 
 @dataclass(slots=True)
 class PairState:
@@ -15,6 +16,7 @@ class PairState:
     days_held: int = 0
     is_stopped: bool = False
     prev_total_pnl: float = 0.0
+    cooldown_dir: int = 0
 
 class Trading:
     """負責在交易期 (Trading Period) 模擬配對交易並產生詳細交易紀錄"""
