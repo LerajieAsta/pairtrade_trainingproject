@@ -68,10 +68,8 @@ class DataProcessor:
         # 重塑為以日期為 Index，Symbol 為 Columns 的寬表
         price_pivot = raw_df.pivot_table(index="date", columns="ticker", values="price", aggfunc="last").sort_index()
 
-        # 剔除回測區間中缺失值比例大於 20% 的劣質標的，其餘以 forward fill 填補 (限制最多連續填 5 天)
-        price_pivot = price_pivot.loc[:, price_pivot.isnull().mean() < 0.20].ffill(limit=5)
-        # 進一步確保剩餘股票含有至少 90% 的非空值，防止後續計算報錯
-        price_pivot.dropna(axis=1, thresh=int(len(price_pivot) * 0.9), inplace=True)
+        # 對價格進行補值 (限制最多連續填 5 天)，允許缺失值留給滾動視窗邏輯去判斷
+        price_pivot = price_pivot.ffill(limit=5)
 
         def _safe_parse(d_str, is_end=False):
             if not d_str: return None

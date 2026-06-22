@@ -97,6 +97,23 @@ def robust_get(url, headers, max_retries=3, retry_delay=5):
 # 取得 S&P 500 成份股清單
 # ==========================================
 def get_sp500_tickers():
+    """獲取標普 500 成分股清單"""
+    print("正在嘗試從 yF 資料庫載入完整歷史成分股清單...")
+    yf_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dataset", "sp500_yF.db")
+    if os.path.exists(yf_db_path):
+        try:
+            import sqlite3
+            conn_yf = sqlite3.connect(yf_db_path)
+            df_const = pd.read_sql_query("SELECT * FROM Constituents", conn_yf)
+            df_im = pd.read_sql_query("SELECT * FROM index_memberships", conn_yf)
+            conn_yf.close()
+            
+            all_tickers = df_const['Symbol'].tolist()
+            print(f"成功！從 yF 資料庫取得 {len(all_tickers)} 支歷年成分股與上下市紀錄。")
+            return all_tickers, df_const, df_im
+        except Exception as e:
+            print(f"從 yF 資料庫載入失敗: {e}，回退到 Wikipedia...")
+            
     print("正在從 Wikipedia 獲取 S&P 500 成份股清單...")
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
     headers = {
@@ -130,11 +147,11 @@ def get_sp500_tickers():
         all_tickers = [str(t).replace('.', '-') for t in all_tickers if pd.notna(t)]
 
         print(f"成功！共找到 {len(all_tickers)} 支歷年成分股。")
-        return all_tickers, df_current
+        return all_tickers, df_current, None
 
     except Exception as e:
         print(f"獲取清單失敗: {e}")
-        return [], pd.DataFrame()
+        return [], pd.DataFrame(), None
 
 
 # ==========================================
@@ -258,6 +275,10 @@ def download_and_save_data(tickers, conn, start_date="2000-01-01", end_date="202
                 # else: 差距太小（週末），跳過
         else:
             tasks.append((start_date, end_date, "首次下載"))
+
+        if not tasks:
+            print(f"[{i+1}/{total}] {ticker}: 資料已為最新，略過。")
+            continue
 
         for f_start, f_end, task_type in tasks:
             if _interrupted:
@@ -514,8 +535,15 @@ def audit_missing_data(conn, tickers, start_date="2000-01-01", end_date="2025-12
 # ==========================================
 # 儲存成份股基本資訊
 # ==========================================
-def save_constituents_info(df_current, conn):
+def save_constituents_info(df_current, df_im, conn):
     if df_current.empty:
+        return
+
+    # 若從 yF 繼承過來，直接寫入完整表格
+    if df_im is not None:
+        df_current.to_sql('Constituents', conn, if_exists='replace', index=False)
+        df_im.to_sql('index_memberships', conn, if_exists='replace', index=False)
+        print("完整歷史成分股與上下市時間已從 yF 同步至資料庫。")
         return
 
     df_current = df_current.copy()
@@ -559,7 +587,7 @@ if __name__ == "__main__":
     print(f"📁 資料庫路徑: {abs_db_path}")
     print(f"{'='*55}\n")
 
-    all_tickers, df_info = get_sp500_tickers()
+    all_tickers, df_info, df_im = get_sp500_tickers()
 
     if not all_tickers:
         print("無法取得股票清單，程式終止。")
@@ -569,7 +597,7 @@ if __name__ == "__main__":
     _conn_global = connection  # 讓 signal handler 能存取
 
     try:
-        save_constituents_info(df_info, connection)
+        save_constituents_info(df_info, df_im, connection)
 
         # 執行模式選擇
         import argparse
