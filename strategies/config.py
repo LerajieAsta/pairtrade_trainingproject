@@ -107,6 +107,7 @@ base_params = {
 
 hdbscan_common = {
     "use_dynamic_stop":         True,
+    "dynamic_stop_z":           3.0,   # must override base_params' 0.0 to avoid stopping every bar
     "hdbscan_min_cluster_size": 30,
     "hdbscan_min_samples":      10,
     "hdbscan_metric":           "euclidean",

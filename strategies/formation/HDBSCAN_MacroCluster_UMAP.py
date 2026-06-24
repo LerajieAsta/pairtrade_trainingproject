@@ -90,6 +90,11 @@ class Formation:
         adf_pvalue_threshold: float = 0.01,
         max_sector_ratio: float = 0.3,
         feature_mode: str = "stats13",
+        min_corr: float = 0.50,
+        min_zero_crossings: int = 5,
+        hurst_threshold: float = 0.50,
+        halflife_min: float = 1.0,
+        halflife_max: float = 60.0,
         **kwargs
     ):
         self.price_df = price_df.copy()
@@ -115,6 +120,11 @@ class Formation:
         self.adf_max_lags           = adf_max_lags
         self.adf_pvalue_threshold   = adf_pvalue_threshold
         self.feature_mode           = feature_mode.lower()
+        self.min_corr               = min_corr
+        self.min_zero_crossings     = min_zero_crossings
+        self.hurst_threshold        = hurst_threshold
+        self.halflife_min           = halflife_min
+        self.halflife_max           = halflife_max
 
         self.selected_pairs: pd.DataFrame = pd.DataFrame()
         self.cluster_labels_: dict = {}
@@ -265,6 +275,12 @@ class Formation:
                     log_b = log_prices[tb].values
                     sec_b = self.sector_mapping.get(tb.upper(), "Unknown")
 
+                    # 1. Pearson Correlation Filter
+                    corr = np.corrcoef(log_a, log_b)[0, 1]
+                    if corr < self.min_corr:
+                        rejected_count += 1
+                        continue
+
                     al_ab, be_ab, re_ab = _ols(log_a, log_b)
                     stat_ab, pval_ab = _adf_stat(re_ab, self.adf_max_lags)
 
@@ -280,10 +296,12 @@ class Formation:
                         best_alpha, best_beta, best_resid = al_ba, be_ba, re_ba
                         best_a, best_b = tb, ta
 
+                    # 2. ADF P-Value Filter
                     if best_pval >= self.adf_pvalue_threshold:
                         rejected_count += 1
                         continue
 
+                    # 3. Half-life Filter
                     dy = np.diff(best_resid)
                     y_lag = best_resid[:-1]
                     n_dy = len(dy)
@@ -297,17 +315,26 @@ class Formation:
                     if lambda_val >= 0.0:
                         rejected_count += 1
                         continue
-                    
+
                     halflife = -np.log(2) / lambda_val
-                    if halflife < 1.0 or halflife > 60.0:
+                    if halflife < self.halflife_min or halflife > self.halflife_max:
                         rejected_count += 1
                         continue
 
+                    # 4. Hurst Index Filter
                     hurst = _compute_hurst(best_resid, already_stationary=True)
-                    if hurst >= 0.50:
+                    if hurst >= self.hurst_threshold:
                         rejected_count += 1
                         continue
-                    
+
+                    # 5. Zero Crossings Filter
+                    mean_val = np.mean(best_resid)
+                    demeaned = best_resid - mean_val
+                    zero_crossings = int(np.sum(np.diff(np.sign(demeaned)) != 0))
+                    if zero_crossings < self.min_zero_crossings:
+                        rejected_count += 1
+                        continue
+
                     passed_count += 1
                     spread_mean = float(np.mean(best_resid))
                     spread_std  = float(np.std(best_resid, ddof=1)) if len(best_resid) > 1 else 0.0
