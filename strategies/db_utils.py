@@ -130,7 +130,12 @@ def init_db(db_path="results/result.db"):
         "Cum_Ret_Raw" REAL,
         "Ann_Ret_Raw" REAL,
         "Sharpe_Raw" REAL,
+        "Sortino_Raw" REAL,
+        "Calmar_Raw" REAL,
         "MDD_Raw" REAL,
+        "Win_Rate" REAL,
+        "Profit_Factor" REAL,
+        "Avg_Trade_Days" REAL,
         "Entries" INTEGER,
         "Exits" INTEGER,
         "Stop_Losses" INTEGER,
@@ -268,13 +273,21 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         prev_equity = portfolio_daily_idx['Equity'].shift(1).fillna(INITIAL_CAPITAL)
         daily_returns = portfolio_daily_idx['Daily_Delta'] / prev_equity
         sharpe = np.sqrt(252) * daily_returns.mean() / daily_returns.std() if daily_returns.std() != 0 else 0
-        
+
+        # Sortino Ratio
+        neg_ret = daily_returns[daily_returns < 0]
+        sortino = (np.sqrt(252) * daily_returns.mean() / neg_ret.std()) if (len(neg_ret) > 0 and neg_ret.std() != 0) else 0.0
+
         # 修正 MDD 算法：以真實動態權益計算最大回撤比例
         roll_max_equity = portfolio_daily['Equity'].cummax()
         drawdown_pct = (portfolio_daily['Equity'] - roll_max_equity) / roll_max_equity
         mdd_pct = drawdown_pct.min()
+
+        # Calmar Ratio
+        calmar = ann_ret / abs(mdd_pct) if mdd_pct != 0 else 0.0
     else:
         cum_ret = ann_ret = sharpe = mdd_pct = 0
+        sortino = calmar = 0.0
 
     rcc = final_pnl / c_period if c_period > 0 else 0
 
@@ -308,15 +321,27 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
                 trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'Prev_State_ID'])['Daily_Delta'].sum()
                 gross_profit = float(trade_pnls[trade_pnls > 0].sum())
                 gross_loss = float(trade_pnls[trade_pnls < 0].sum())
+                win_rate = float((trade_pnls > 0).mean()) if len(trade_pnls) > 0 else 0.0
+                profit_factor = gross_profit / abs(gross_loss) if gross_loss != 0 else 0.0
             else:
                 gross_profit = gross_loss = 0.0
+                win_rate = profit_factor = 0.0
         else:
             gross_profit = gross_loss = 0.0
+            win_rate = profit_factor = 0.0
+
+        # Average trade duration (days)
+        if 'Days_Held' in df.columns and 'Trade_PnL' in df.columns:
+            closed_trades = df[df['Trade_PnL'] != 0]
+            avg_trade_days = float(closed_trades['Days_Held'].mean()) if len(closed_trades) > 0 else 0.0
+        else:
+            avg_trade_days = 0.0
     else:
         n_traded = n_entries = n_normal_exits = 0
         n_stop_loss = -1
         n_forced_close = 0
         gross_profit = gross_loss = 0.0
+        win_rate = profit_factor = avg_trade_days = 0.0
 
     c_pair = c_period / top_n_int if top_n_int > 0 else c_period
     engaged_capital = n_traded * c_pair
@@ -329,7 +354,10 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         'Final_Equity': float(final_equity),
         'RCC_Raw': float(rcc), 'REC_Raw': float(rec),
         'Cum_Ret_Raw': float(cum_ret), 'Ann_Ret_Raw': float(ann_ret),
-        'Sharpe_Raw': float(sharpe), 'MDD_Raw': float(mdd_pct),
+        'Sharpe_Raw': float(sharpe), 'Sortino_Raw': float(sortino),
+        'Calmar_Raw': float(calmar), 'MDD_Raw': float(mdd_pct),
+        'Win_Rate': float(win_rate), 'Profit_Factor': float(profit_factor),
+        'Avg_Trade_Days': float(avg_trade_days),
         'Entries': int(n_entries), 'Exits': int(n_normal_exits),
         'Stop_Losses': int(n_stop_loss), 'Forced_Closes': int(n_forced_close),
         'Gross_Profit': float(gross_profit), 'Gross_Loss': float(gross_loss),
@@ -379,15 +407,18 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
         INSERT INTO strategy_summaries (
             "_path", "DATASET", "METHOD", "TRADE_METHOD", "TOP N", "STOP LOSS %",
             "MAX SEC %", "Final_Equity", "RCC_Raw",
-            "REC_Raw", "Cum_Ret_Raw", "Ann_Ret_Raw", "Sharpe_Raw", "MDD_Raw",
+            "REC_Raw", "Cum_Ret_Raw", "Ann_Ret_Raw", "Sharpe_Raw", "Sortino_Raw", "Calmar_Raw", "MDD_Raw",
+            "Win_Rate", "Profit_Factor", "Avg_Trade_Days",
             "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             metrics['_path'], metrics['DATASET'],
             metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
             metrics['MAX SEC %'],
             metrics['Final_Equity'], metrics['RCC_Raw'], metrics['REC_Raw'],
-            metrics['Cum_Ret_Raw'], metrics['Ann_Ret_Raw'], metrics['Sharpe_Raw'], metrics['MDD_Raw'],
+            metrics['Cum_Ret_Raw'], metrics['Ann_Ret_Raw'], metrics['Sharpe_Raw'],
+            metrics['Sortino_Raw'], metrics['Calmar_Raw'], metrics['MDD_Raw'],
+            metrics['Win_Rate'], metrics['Profit_Factor'], metrics['Avg_Trade_Days'],
             metrics['Entries'], metrics['Exits'], metrics['Stop_Losses'], metrics['Forced_Closes'],
             metrics['Gross_Profit'], metrics['Gross_Loss']
         ))

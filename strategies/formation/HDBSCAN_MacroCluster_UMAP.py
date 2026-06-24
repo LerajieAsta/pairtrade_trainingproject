@@ -27,7 +27,7 @@ from sklearn.preprocessing import StandardScaler
 
 warnings.filterwarnings("ignore")
 
-from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._utils import _compute_hurst, _ols, _adf_stat, _johansen_test
 
 def _extract_features(log_price: np.ndarray) -> np.ndarray:
     """從對數價格序列萃取多維特徵向量，用於 HDBSCAN 分群。"""
@@ -332,6 +332,19 @@ class Formation:
                     demeaned = best_resid - mean_val
                     zero_crossings = int(np.sum(np.diff(np.sign(demeaned)) != 0))
                     if zero_crossings < self.min_zero_crossings:
+                        rejected_count += 1
+                        continue
+
+                    # 6. Johansen Cointegration Test
+                    is_johansen, _ = _johansen_test(log_a, log_b)
+                    if not is_johansen:
+                        rejected_count += 1
+                        continue
+
+                    # 7. Spread Stability Check (前後半段均值差 < 1 個 std)
+                    half = len(best_resid) // 2
+                    resid_std = best_resid.std()
+                    if resid_std > 0 and abs(best_resid[:half].mean() - best_resid[half:].mean()) > resid_std:
                         rejected_count += 1
                         continue
 

@@ -1,6 +1,19 @@
 import numpy as np
 from statsmodels.tsa.stattools import adfuller
 
+
+def _johansen_test(y: np.ndarray, x: np.ndarray) -> tuple[bool, float]:
+    """Johansen trace test for cointegration. Returns (is_cointegrated, trace_stat)."""
+    from statsmodels.tsa.vector_ar.vecm import coint_johansen
+    mat = np.column_stack([y, x])
+    try:
+        result = coint_johansen(mat, det_order=0, k_ar_diff=1)
+        trace_stat = float(result.lr1[0])
+        crit_95 = float(result.cvt[0, 1])
+        return trace_stat > crit_95, trace_stat
+    except Exception:
+        return False, 0.0
+
 def _compute_hurst(series: np.ndarray, already_stationary: bool = False) -> float:
     """
     R/S 分析近似 Hurst 指數。

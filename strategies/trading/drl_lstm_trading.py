@@ -43,9 +43,9 @@ class PairTradingEnv(gym.Env):
         
         # Action: 0 (Flat), 1 (Long Spread: Buy A, Sell B), 2 (Short Spread: Sell A, Buy B)
         self.action_space = spaces.Discrete(3)
-        # 5 features
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float32)
-        
+        # 8 features: ZScore, Rel_Return, MA_Dist, time_to_maturity, Spread_Std, position, days_held_norm, Spread_Trend
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
+
         # Initialize attributes
         self.current_step = 0
         self.position = 0
@@ -55,7 +55,8 @@ class PairTradingEnv(gym.Env):
         self.entry_price_a = 0.0
         self.entry_price_b = 0.0
         self.entry_fee = 0.0
-        
+        self.days_held = 0
+
         self.reset()
         
     def reset(self, seed=None, options=None):
@@ -68,21 +69,24 @@ class PairTradingEnv(gym.Env):
         self.entry_price_a = 0.0
         self.entry_price_b = 0.0
         self.entry_fee = 0.0
+        self.days_held = 0
         return self._get_obs(), {}
         
     def _get_obs(self):
         row = self.df.iloc[self.current_step]
         time_to_maturity = (self.max_steps - self.current_step) / self.max_steps
-        
-        # 動態波動度：價差滾動標準差的變動率 (或單純標準差)
-        volatility = row['Spread_Std'] if 'Spread_Std' in row else 1.0
-        
+        volatility = float(row['Spread_Std']) if 'Spread_Std' in row else 1.0
+        spread_trend = float(row['Spread_Trend']) if 'Spread_Trend' in row else 0.0
+
         obs = np.array([
-            row['ZScore'],          # Spread Z-Score
-            row['Rel_Return'],      # 相對報酬率
-            row['MA_Dist'],         # 均線距離
-            time_to_maturity,       # 剩餘交易天數
-            volatility              # 動態波動度
+            row['ZScore'],                                    # Spread Z-Score
+            row['Rel_Return'],                                # 相對報酬率
+            row['MA_Dist'],                                   # 均線距離
+            time_to_maturity,                                 # 剩餘交易天數
+            volatility,                                       # 正規化滾動波動度
+            float(self.position),                             # 倉位方向 {-1, 0, 1}
+            self.days_held / max(self.max_steps, 1),          # 持倉天數（正規化）
+            spread_trend,                                     # Z-Score 5 日動量
         ], dtype=np.float32)
         return obs
         
@@ -98,7 +102,8 @@ class PairTradingEnv(gym.Env):
         
         reward = 0.0
         done = False
-        
+        prev_position = self.position
+
         # 動作激勵/懲罰與事件型獎勵
         if action != self.position:
             # 平倉事件 (Close position)
@@ -107,35 +112,50 @@ class PairTradingEnv(gym.Env):
                 exit_fee = (abs(self.shares_a)*p_a + abs(self.shares_b)*p_b) * self.friction_rate
                 trade_pnl = raw_unrealized - self.entry_fee - exit_fee
                 # 依獲利給予對應獎勵 (標準化)
-                reward += (trade_pnl / self.capital) * 100.0 
-                
+                reward += (trade_pnl / self.capital) * 100.0
+
                 self.realized_pnl += trade_pnl
                 self.shares_a = 0.0
                 self.shares_b = 0.0
                 self.position = 0
                 self.entry_fee = 0.0
-            
+
             # 開倉事件 (Open position)
             if action != 0:
                 total_weight = 1.0 + abs(self.hedge_ratio)
                 v_a = self.capital * (1.0 / total_weight)
                 v_b = self.capital * (abs(self.hedge_ratio) / total_weight)
-                
+
                 if action == 1: # Long Spread -> Buy A, Sell B
                     self.shares_a = v_a / p_a
                     self.shares_b = -v_b / p_b
                 else: # Short Spread -> Sell A, Buy B
                     self.shares_a = -v_a / p_a
                     self.shares_b = v_b / p_b
-                    
+
                 self.entry_price_a = p_a
                 self.entry_price_b = p_b
                 self.entry_fee = (abs(self.shares_a)*p_a + abs(self.shares_b)*p_b) * self.friction_rate
                 self.position = action
-                
+
                 # Action Penalty (減少過度交易)
-                reward -= (self.entry_fee / self.capital) * 100.0 * 0.5 
-                
+                reward -= (self.entry_fee / self.capital) * 100.0 * 0.5
+
+        # 更新持倉天數
+        if self.position == prev_position and self.position != 0:
+            self.days_held += 1
+        else:
+            self.days_held = 0
+
+        # Daily holding reward: 引導 agent 感知每日損益方向
+        if self.position != 0 and self.current_step + 1 < len(self.df):
+            next_row = self.df.iloc[self.current_step + 1]
+            daily_delta = (
+                self.shares_a * (next_row['Price_A'] - p_a) +
+                self.shares_b * (next_row['Price_B'] - p_b)
+            )
+            reward += (daily_delta / self.capital) * 100.0 * 0.3
+
         self.current_step += 1
         if self.current_step >= self.max_steps:
             done = True
@@ -301,9 +321,13 @@ class Trading:
         ma_long = spread.rolling(window=21, min_periods=1).mean()
         df['MA_Dist'] = ma_short - ma_long
         
-        # Volatility
-        df['Spread_Std'] = spread.rolling(window=20, min_periods=1).std().pct_change().fillna(0)
-        
+        # Volatility (normalized rolling std)
+        roll_std = spread.rolling(window=20, min_periods=5).std()
+        df['Spread_Std'] = (roll_std / (roll_std.mean() + 1e-8)).fillna(1.0)
+
+        # Spread Trend (5-day Z-score momentum, clipped for stability)
+        df['Spread_Trend'] = (df['ZScore'] - df['ZScore'].shift(5).fillna(df['ZScore'])).clip(-5.0, 5.0)
+
         return df.fillna(0)
 
     def _train_shared_agent(self, period_start: str, trade_start: str, sector: str, ticker_a: str, ticker_b: str, hedge_ratio: float, 
@@ -316,7 +340,7 @@ class Trading:
             
         print(f"    [DRL] Initializing and training new Shared Agent for period {period_start}...")
         
-        agent = DQNAgent(state_dim=5, action_dim=3, hidden_dim=self.drl_hidden_size, num_layers=self.drl_num_layers,
+        agent = DQNAgent(state_dim=8, action_dim=3, hidden_dim=self.drl_hidden_size, num_layers=self.drl_num_layers,
                          lr=self.drl_lr, gamma=self.drl_gamma, epsilon_start=self.drl_epsilon_start, 
                          epsilon_end=self.drl_epsilon_end, epsilon_decay=self.drl_epsilon_decay)
                          
@@ -399,22 +423,51 @@ class Trading:
         state = PairState()
         out_dates, out_pa, out_pb, out_hr, out_z, out_pos = [], [], [], [], [], []
         out_unrealized, out_realized, out_cum, out_status, out_trade_pnl, out_days, out_delta = [], [], [], [], [], [], []
-        
-        # Initial State Sequence for inference
-        obs_zeros = np.zeros(5, dtype=np.float32)
-        state_seq = deque([obs_zeros]*agent.seq_len, maxlen=agent.seq_len)
-        
+
+        STATE_DIM = 8
+
+        # Warm-start: 用 formation 期最後 seq_len 天初始化 state_seq，消除冷啟動偏誤
+        try:
+            form_prices = self.full_price_df.loc[self.formation_start:self.formation_end]
+            fp_a = form_prices[ticker_a].dropna()
+            fp_b = form_prices[ticker_b].dropna()
+            common_form = fp_a.index.intersection(fp_b.index)
+            if len(common_form) >= agent.seq_len + 5 and self.full_price_df is not None:
+                fp_a = fp_a.loc[common_form].where(fp_a.loc[common_form].pct_change().abs() <= 0.5).ffill().bfill()
+                fp_b = fp_b.loc[common_form].where(fp_b.loc[common_form].pct_change().abs() <= 0.5).ffill().bfill()
+                form_feat = self._prepare_features(fp_a, fp_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b, form_spread_mean, form_spread_std)
+                tail = form_feat.iloc[-agent.seq_len:]
+                n_tail = len(tail)
+                init_states = []
+                for k in range(n_tail):
+                    f_row = tail.iloc[k]
+                    f_obs = np.array([
+                        f_row['ZScore'], f_row['Rel_Return'], f_row['MA_Dist'],
+                        (n_tail - k) / max(n_tail, 1),
+                        f_row['Spread_Std'], 0.0, 0.0, f_row['Spread_Trend'],
+                    ], dtype=np.float32)
+                    init_states.append(f_obs)
+                state_seq = deque(init_states, maxlen=agent.seq_len)
+            else:
+                state_seq = deque([np.zeros(STATE_DIM, dtype=np.float32)] * agent.seq_len, maxlen=agent.seq_len)
+        except Exception:
+            state_seq = deque([np.zeros(STATE_DIM, dtype=np.float32)] * agent.seq_len, maxlen=agent.seq_len)
+
         total_steps = len(dates_arr)
-        
+
         for i in range(total_steps):
             date = dates_arr[i]
             row = feat_df.iloc[i]
             p_a, p_b = row['Price_A'], row['Price_B']
             z = row['ZScore']
-            
-            # Prepare observation
+
+            # Prepare observation (8-dim state)
             time_to_mat = (total_steps - i) / total_steps
-            obs = np.array([z, row['Rel_Return'], row['MA_Dist'], time_to_mat, row['Spread_Std']], dtype=np.float32)
+            obs = np.array([
+                z, row['Rel_Return'], row['MA_Dist'], time_to_mat,
+                row['Spread_Std'], float(state.position),
+                state.days_held / max(total_steps, 1), row['Spread_Trend'],
+            ], dtype=np.float32)
             state_seq.append(obs)
             
             # Predict action

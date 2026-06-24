@@ -534,14 +534,27 @@ def run_all_formations():
             strategies_to_run.append(config)
             print(f"  ● 排入執行：{config['name']}", flush=True)
 
-    # ── 交錯打散任務順序 (Interleave) ──────────────────────────────────────────
-    # 將相同原始策略的子任務交錯排列，以確保多核心並行時，不同策略能同時啟動並呈現於儀表板
-    if strategies_to_run:
-        strategies_to_run = interleave_strategies(strategies_to_run, original_strategies_config)
+    # ── 依原始策略分組：同組的 MSR 變體並行，組與組之間串行（全力處理一個策略後再執行下一個）──
+    from collections import defaultdict
+    group_dict = defaultdict(list)
+    for cfg in strategies_to_run:
+        orig_name = None
+        for orig in original_strategies_config:
+            if cfg["name"].startswith(orig["name"]):
+                orig_name = orig["name"]
+                break
+        if orig_name:
+            group_dict[orig_name].append(cfg)
 
-    # 3. 決定並行行程數 (根據 CPU_LIMIT_PCT 限制 CPU 使用率)
+    groups = []
+    for orig in original_strategies_config:
+        if orig["name"] in group_dict:
+            groups.append(group_dict[orig["name"]])
+
+    # 3. 決定並行行程數（同組最多 MSR 變體數 vs CPU 限制，取小值）
     max_cores = max(1, int((os.cpu_count() or 4) * CPU_LIMIT_PCT))
-    max_workers = min(len(strategies_to_run), max_cores)
+    max_group_size = max((len(g) for g in groups), default=1)
+    max_workers = min(max_group_size, max_cores)
 
 
     if not strategies_to_run:
@@ -560,38 +573,39 @@ def run_all_formations():
 
     dashboard_thread = start_dashboard_thread(progress_dict, original_strategies_config, main_start_time, log_dir, stop_event, stage_title="形成")
 
-    # 4. 多行程並行運算
+    # 4. 多行程並行運算（一個原始策略的所有 MSR 變體並行，策略與策略之間串行）
     try:
         try:
             with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-                futures = {}
-                for config in strategies_to_run:
-                    f = executor.submit(
-                        worker_task,
-                        config,
-                        price_pivot,
-                        all_dates,
-                        total_days,
-                        local_first_trade_idx,
-                        sector_mapping,
-                        progress_dict,
-                        df_memberships,
-                    )
-                    futures[f] = config
+                for group_cfgs in groups:
+                    futures = {}
+                    for config in group_cfgs:
+                        f = executor.submit(
+                            worker_task,
+                            config,
+                            price_pivot,
+                            all_dates,
+                            total_days,
+                            local_first_trade_idx,
+                            sector_mapping,
+                            progress_dict,
+                            df_memberships,
+                        )
+                        futures[f] = config
 
-                for f in concurrent.futures.as_completed(futures):
-                    config = futures[f]
-                    try:
-                        res = f.result()
-                        results.append(res)
-                    except Exception as exc:
-                        results.append({
-                            "name":    config["name"],
-                            "status":  "FAILED",
-                            "skipped": False,
-                            "elapsed": 0.0,
-                            "error":   str(exc),
-                        })
+                    for f in concurrent.futures.as_completed(futures):
+                        config = futures[f]
+                        try:
+                            res = f.result()
+                            results.append(res)
+                        except Exception as exc:
+                            results.append({
+                                "name":    config["name"],
+                                "status":  "FAILED",
+                                "skipped": False,
+                                "elapsed": 0.0,
+                                "error":   str(exc),
+                            })
         finally:
             # 停止儀表板並重繪最終狀態
             stop_event.set()

@@ -21,7 +21,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
-from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._utils import _compute_hurst, _ols, _adf_stat, _johansen_test
 
 # Load UMAP (PCA fallback or standard check)
 try:
@@ -355,7 +355,20 @@ class Formation:
                     if zero_crossings < self.min_zero_crossings:
                         rejected_count += 1
                         continue
-                    
+
+                    # 6. Johansen Cointegration Test
+                    is_johansen, _ = _johansen_test(log_a, log_b)
+                    if not is_johansen:
+                        rejected_count += 1
+                        continue
+
+                    # 7. Spread Stability Check (前後半段均值差 < 1 個 std)
+                    half = len(best_resid) // 2
+                    resid_std = best_resid.std()
+                    if resid_std > 0 and abs(best_resid[:half].mean() - best_resid[half:].mean()) > resid_std:
+                        rejected_count += 1
+                        continue
+
                     passed_count += 1
                     spread_mean = float(np.mean(best_resid))
                     spread_std  = float(np.std(best_resid, ddof=1)) if len(best_resid) > 1 else 0.0
