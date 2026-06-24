@@ -235,7 +235,9 @@ class DQNAgent:
 # ─── Integration Strategy Class ───────────────────────────────────────────────
 class Trading:
     """DRL LSTM Trading Strategy Interface for run_trading.py"""
-    
+
+    _shared_agents: dict = {}  # class-level cache: {formation+trade+pair key -> DQNAgent}
+
     def __init__(self, price_df: pd.DataFrame, trade_dates: pd.DatetimeIndex, selected_pairs: pd.DataFrame, capital_per_pair: float,
                  fee_rate: float, slippage_rate: float, 
                  drl_episodes: int = 100, drl_batch_size: int = 64, drl_gamma: float = 0.99,
@@ -265,8 +267,10 @@ class Trading:
         self.formation_start = formation_start
         self.formation_end = formation_end
         
-        # Cache for Shared Agents: { period_start: agent }
-        self._shared_agents = {}
+        # Class-level cache shared across all Trading instances within the same process.
+        # Key: "{formation_start}_{trade_start}_{ticker_a}_{ticker_b}" so each unique
+        # (period, pair) trains once and is reused by subsequent calls (e.g. multiple
+        # top_n / stop_loss variants that share the same formation period).
         
     def _prepare_features(self, p_a: pd.Series, p_b: pd.Series, hedge_ratio: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float, spread_mean: float = None, spread_std: float = None):
         """Prepare RL features matching the formation/trading period."""
@@ -305,10 +309,10 @@ class Trading:
     def _train_shared_agent(self, period_start: str, trade_start: str, sector: str, ticker_a: str, ticker_b: str, hedge_ratio: float, 
                             form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float):
         """Trains or retrieves the shared agent for this period."""
-        agent_key = f"{period_start}_{trade_start}"
-        
-        if agent_key in self._shared_agents:
-            return self._shared_agents[agent_key]
+        agent_key = f"{period_start}_{trade_start}_{ticker_a}_{ticker_b}"
+
+        if agent_key in Trading._shared_agents:
+            return Trading._shared_agents[agent_key]
             
         print(f"    [DRL] Initializing and training new Shared Agent for period {period_start}...")
         
@@ -361,8 +365,7 @@ class Trading:
                 if ep % 5 == 0:
                     agent.update_target_model()
                     
-        # Store back the agent (it gets incrementally trained on each pair)
-        self._shared_agents[agent_key] = agent
+        Trading._shared_agents[agent_key] = agent
         return agent
 
     def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float, 

@@ -265,14 +265,14 @@ class Trading:
                 current_trade_pnl = raw_unrealized - state.trade_entry_fee - exit_fee_est
                 
                 is_cap_stop = self.stop_loss_pct > 0 and (-current_trade_pnl / self.capital_per_pair) >= self.stop_loss_pct
-                is_z_stop = self.use_dynamic_stop and abs(z) > self.dynamic_stop_z
+                is_z_stop = self.use_dynamic_stop and self.dynamic_stop_z > 0 and abs(z) > self.dynamic_stop_z
 
                 if is_cap_stop or is_z_stop:
                     self._execute_close(state, current_trade_pnl, stop_loss=True)
                     closed_trade_pnl = current_trade_pnl
                     current_status = "STOP_LOSS_TRIGGERED"
                 else:
-                    is_exit_short = (state.position == -1) and (z <= self.exit_z)  
+                    is_exit_short = (state.position == -1) and (z <= self.exit_z)
                     is_exit_long  = (state.position == 1)  and (z >= -self.exit_z)  
                     
                     if is_exit_short or is_exit_long:

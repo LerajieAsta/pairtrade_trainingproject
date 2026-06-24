@@ -156,7 +156,7 @@ class PureDTWTrading(Trading):
                 
                 # 個別配對停損判定
                 is_cap_stop = self.stop_loss_pct > 0 and (-current_trade_pnl / self.capital_per_pair) >= self.stop_loss_pct
-                is_z_stop = self.use_dynamic_stop and abs(z) > self.dynamic_stop_z
+                is_z_stop = self.use_dynamic_stop and self.dynamic_stop_z > 0 and abs(z) > self.dynamic_stop_z
 
                 if is_cap_stop or is_z_stop:
                     cooldown_to_set = state.position
