@@ -337,7 +337,7 @@ def run_all_trading():
     print("=" * 80, flush=True)
 
     db_basename = os.path.splitext(os.path.basename(DB_PATH))[0]
-    formation_db_path = f"data/formation_pairs_{db_basename}.db"
+    formation_db_path = f"formation_data/formation_pairs_{db_basename}.db"
 
     if not os.path.exists(formation_db_path):
         print(f"❌ 找不到配對資料庫 {formation_db_path}，請先執行 run_formation.py！", flush=True)

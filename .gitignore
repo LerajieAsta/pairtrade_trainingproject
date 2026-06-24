@@ -38,6 +38,10 @@ Project/
 # Databases
 *.db
 !dataset/*.db
+!formation_data/*.db
+# SQLite WAL/SHM temp files should never be committed
+*.db-shm
+*.db-wal
 
 # tmp
 .tmp/

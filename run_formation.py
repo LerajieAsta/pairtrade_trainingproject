@@ -386,7 +386,7 @@ def run_all_formations():
     print("=" * 80, flush=True)
 
     db_basename = os.path.splitext(os.path.basename(DB_PATH))[0]
-    formation_db_path = f"data/formation_pairs_{db_basename}.db"
+    formation_db_path = f"formation_data/formation_pairs_{db_basename}.db"
 
     # 搜尋是否有吻合的 profile 來決定日誌目錄
     matched_profile = None
@@ -407,7 +407,7 @@ def run_all_formations():
 
     # 自動清理舊有殘留的暫存資料庫檔案 (防範先前因中斷、強退而殘留)
     import glob
-    old_temps = glob.glob(f"data/formation_pairs_{db_basename}_*.db*")
+    old_temps = glob.glob(f"formation_data/formation_pairs_{db_basename}_*.db*")
     for old_temp in old_temps:
         try:
             os.remove(old_temp)
@@ -500,7 +500,7 @@ def run_all_formations():
             "formation_module": raw["formation_module"],
             "params":           raw["params"],
             "log_path":         f"{log_dir}/{safe_name}.log",
-            "temp_db_path":     f"data/formation_pairs_{db_basename}_{safe_name}.db",
+            "temp_db_path":     f"formation_data/formation_pairs_{db_basename}_{safe_name}.db",
             "db_path":          DB_PATH,
             "log_dir":          log_dir,
             "formation_db_path": formation_db_path,
