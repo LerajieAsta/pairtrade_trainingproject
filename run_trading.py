@@ -235,19 +235,20 @@ def worker_task(
                         )
 
                         if not df_log.empty:
-                            # 停牌下市處理
-                            nan_dates = pa_series[pa_series.isna()].index.union(pb_series[pb_series.isna()].index)
-                            if not nan_dates.empty:
-                                first_nan_date = nan_dates[0]
-                                valid_log = df_log[pd.to_datetime(df_log['Date']) < first_nan_date].copy()
-                                if not valid_log.empty:
-                                    last_idx = valid_log.index[-1]
-                                    valid_log.loc[last_idx, 'Status'] = 'FORCED_CLOSE_DELISTED'
-                                    df_log = valid_log
+                            # 下市/停牌處理：若模擬實際跑到的最後日期 < trade_end，
+                            # 代表模擬中途因為 NaN（下市或停牌）而提早結束；
+                            # 直接標記最後一筆為 FORCED_CLOSE_DELISTED，P&L 已由
+                            # 模擬器的 PERIOD_END_EXIT 邏輯正確結算，無需再截斷。
+                            last_sim_date = pd.to_datetime(df_log['Date'].iloc[-1])
+                            expected_end   = pd.to_datetime(trade_end)
+                            if last_sim_date < expected_end:
+                                last_idx = df_log.index[-1]
+                                df_log.loc[last_idx, 'Status'] = 'FORCED_CLOSE_DELISTED'
 
                             all_trade_logs.append(df_log)
                             final_realized_pnl = df_log['Realized_PnL'].iloc[-1]
                             pm.process_closed_trade(pair, final_realized_pnl)
+
 
                     except Exception as e:
                         print(f"Error simulating pair {pair}: {e}")

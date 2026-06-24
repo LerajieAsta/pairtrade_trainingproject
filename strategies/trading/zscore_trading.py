@@ -96,7 +96,17 @@ class Trading:
         common_idx = price_a.index.intersection(price_b.index)
         price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
 
+        # ── 資料清洗：過濾單日漲跌幅超過 50% 的異常點 ──────────────────────
+        # 目的：除去因下市、拆股、資料錯誤導致的一日暴漲/暴跌，
+        # 這類異常點會讓 shares 計算嚴重偏離，進而造成天文數字 PnL。
+        _max_daily_move = 0.50
+        price_a = price_a.where(price_a.pct_change().abs() <= _max_daily_move).ffill().bfill()
+        price_b = price_b.where(price_b.pct_change().abs() <= _max_daily_move).ffill().bfill()
+        common_idx = price_a.dropna().index.intersection(price_b.dropna().index)
+        price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
+
         if len(price_a) < 5: return pd.DataFrame()
+
 
         # ── 路徑 A：OLS log-price 空間（HDBSCAN 系列） ──────────────────────
         # 條件：ols_alpha 被明確傳入（非 None），使用原始 log-price 空間，
@@ -328,7 +338,7 @@ class Trading:
         if state.position != 0 and out_status:
             last_status = out_status[-1]
             if last_status not in ("EXIT", "STOP_LOSS_TRIGGERED", "PERIOD_END_EXIT", "STOPPED"):
-                pnl_before_last_day = out_realized[-2] if len(out_realized) > 1 else 0.0
+                pnl_before_last_day = out_cum[-2] if len(out_cum) > 1 else 0.0
                 
                 p_a_last, p_b_last = pa_arr[-1], pb_arr[-1]
                 raw_unrealized_final = state.shares_a * (p_a_last - state.entry_price_a) + state.shares_b * (p_b_last - state.entry_price_b)

@@ -45,8 +45,16 @@ class PureDTWTrading(Trading):
         common_idx = price_a.index.intersection(price_b.index)
         price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
 
+        # ── 資料清洗：過濾單日漲跌幅超過 50% 的異常點 ──────────────────────
+        _max_daily_move = 0.50
+        price_a = price_a.where(price_a.pct_change().abs() <= _max_daily_move).ffill().bfill()
+        price_b = price_b.where(price_b.pct_change().abs() <= _max_daily_move).ffill().bfill()
+        common_idx = price_a.dropna().index.intersection(price_b.dropna().index)
+        price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
+
         if len(price_a) < 5: 
             return pd.DataFrame()
+
 
         # 如果傳入的 first_price_a/b 為非正值，則 fallback 交易期首日價格
         if first_price_a <= 0.0 or first_price_b <= 0.0:

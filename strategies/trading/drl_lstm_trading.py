@@ -376,6 +376,13 @@ class Trading:
         common_idx = price_a.index.intersection(price_b.index)
         price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
 
+        # ── 資料清洗：過濾單日漲跌幅超過 50% 的異常點 ──────────────────────
+        _max_daily_move = 0.50
+        price_a = price_a.where(price_a.pct_change().abs() <= _max_daily_move).ffill().bfill()
+        price_b = price_b.where(price_b.pct_change().abs() <= _max_daily_move).ffill().bfill()
+        common_idx = price_a.dropna().index.intersection(price_b.dropna().index)
+        price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
+
         if len(price_a) < 5: return pd.DataFrame()
 
         feat_df = self._prepare_features(price_a, price_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b, form_spread_mean, form_spread_std)
@@ -486,7 +493,7 @@ class Trading:
         if state.position != 0 and out_status:
             last_status = out_status[-1]
             if last_status not in ("EXIT", "PERIOD_END_EXIT"):
-                pnl_before_last_day = out_realized[-2] if len(out_realized) > 1 else 0.0
+                pnl_before_last_day = out_cum[-2] if len(out_cum) > 1 else 0.0
                 
                 p_a_last, p_b_last = out_pa[-1], out_pb[-1]
                 raw_unrealized_final = state.shares_a * (p_a_last - state.entry_price_a) + state.shares_b * (p_b_last - state.entry_price_b)

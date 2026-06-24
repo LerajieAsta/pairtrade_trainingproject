@@ -120,6 +120,7 @@ def worker_task(
     local_first_trade_idx,
     sector_mapping,
     progress_dict,
+    df_memberships=None,
 ) -> dict:
     """
     子行程工作單元：執行單一策略形成期的滾動視窗配對篩選，並將結果暫存至獨立 SQLite 中。
@@ -215,6 +216,19 @@ def worker_task(
 
             # 整理形成期數據與過濾停牌股票
             form_prices = price_pivot.iloc[form_start_idx:idx]
+
+            # ── 動態成分股過濾 (Dynamic S&P 500 Constituents Filtering) ─────────────────
+            # 目的：僅保留在當前滾動形成期結束日 (form_end_dt) 真實處於標普 500 的成分股。
+            # 防止使用已退市股票（例如 TIE 在 2012 年退市後的脏數據）或尚未上市/入選成分股的標的。
+            if df_memberships is not None and not df_memberships.empty:
+                active_df = df_memberships[
+                    (df_memberships['start_date'] <= form_end_dt) & 
+                    ((df_memberships['end_date'].isna()) | (df_memberships['end_date'] >= form_end_dt))
+                ]
+                active_symbols = set(active_df['Symbol'].unique())
+                valid_cols = [c for c in form_prices.columns if c in active_symbols]
+                form_prices = form_prices[valid_cols]
+
             form_prices = form_prices.dropna(axis=1)
 
             # 動態匹配建構子參數
@@ -422,6 +436,16 @@ def run_all_formations():
         print(f"❌ [嚴重錯誤] 無法加載配對形成所需數據：{e}", flush=True)
         sys.exit(1)
 
+    # 1.5 載入標普 500 歷史成員變動紀錄 (index_memberships)
+    print("⏳ 正在從資料庫載入標普 500 歷史成員變動紀錄 (index_memberships)...", flush=True)
+    try:
+        with get_db_connection(DB_PATH) as conn:
+            df_memberships = pd.read_sql_query("SELECT Symbol, start_date, end_date FROM index_memberships", conn)
+        print(f"✅ 成功載入成員紀錄，共 {len(df_memberships)} 筆數據。\n", flush=True)
+    except Exception as e:
+        print(f"⚠️ 無法載入 index_memberships 表，回退至全歷史標的池。錯誤: {e}\n", flush=True)
+        df_memberships = None
+
     # 2. 斷點續傳篩選
     print(f"🔍 正在進行參數網格展開與任務篩選（斷點續傳檢查）...", flush=True)
     
@@ -551,6 +575,7 @@ def run_all_formations():
                         local_first_trade_idx,
                         sector_mapping,
                         progress_dict,
+                        df_memberships,
                     )
                     futures[f] = config
 
