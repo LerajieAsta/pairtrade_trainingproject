@@ -10,8 +10,6 @@
 
 ```text
 pairtrade_trainingproject/
-├── .vscode/               # VS Code 開發環境配置（設定檔、除錯、自訂任務）
-├── Project/               # Python venv 虛擬環境（已在 .gitignore 中排除）
 ├── src/                   # 共享核心模組目錄（預留給未來共用邏輯，已支援 Editable Install）
 │   └── __init__.py
 ├── strategies/            # 核心配對交易策略邏輯實作目錄
@@ -22,13 +20,11 @@ pairtrade_trainingproject/
 │   ├── HDBSCAN_Autoencoder.py # 4. HDBSCAN + 深度學習自編碼器 (AE) 特徵提取策略
 │   └── HDBSCAN_MultiFactor.py # 5. HDBSCAN 多因子分群策略
 ├── fetch/                 # 數據下載與維護模組 (SP500_Tiingo.py, SP500_yf.py 等)
-├── data/                  # 歷史價格與成分股資料庫目錄
-│   ├── SP500_Current.db   # 現行 S&P 500 成分股價格資料庫 (SQLite)
-│   ├── sp500.db           # 完整歷史 S&P 500 生存者偏誤修正資料庫
-│   └── imputed_sectors.csv # 補缺後的行業分類對照表
-├── results/               # 存放所有策略回測結果與日誌
-│   ├── current/           # 現行成分股回測輸出目錄（包含各子策略資料夾）
-│   └── full/              # 完整歷史成分股回測輸出目錄
+├── dataset/               # 歷史價格與成分股資料庫目錄
+│   ├── sp500_Current.db   # 現行 S&P 500 成分股價格資料庫 (SQLite)
+│   ├── sp500_Tiingo.db    # 完整歷史 S&P 500 成分股價格資料庫 (Tiingo)
+│   ├── sp500_yF.db        # 完整歷史 S&P 500 成分股價格資料庫 (yFinance)
+│   └── sp500Full.db       # 完整歷史 S&P 500 生存者偏誤修正資料庫
 ├── notebooks/             # Jupyter Notebooks 實驗與研究簡報目錄
 │   ├── analysis.ipynb     # 核心分析與六大策略最優參數對比 Notebook
 │   ├── equity_curves.csv  # 由編譯程式產出的六大最優策略淨值合併 CSV
@@ -40,10 +36,7 @@ pairtrade_trainingproject/
 ├── docs/                  # 靜態 HTML 簡報與文檔輸出目錄 (Quarto 輸出與 GitHub Pages 部署來源)
 │   ├── index.html         # 簡報索引首頁
 │   └── *.html / *_files/  # 由 render.bat 產生、自定義名稱的簡報與依賴檔案
-├── ref/                   # 學術文獻與經典論文庫 (共 23 篇 PDF 檔)
 ├── archive/               # 歷史存檔與過期分析檔案目錄 (依日期/月份分類，如 114/, 11505/, 11506/)
-├── Ref_CODE/              # 過往參考程式碼、試算表與對照結果備份
-├── tmp/                   # 臨時腳本與防禦性論證輔助工具目錄
 ├── dashboard.py           # Streamlit 績效比對 Dashboard 應用程式 (視覺化核心)
 ├── run_formation.py       # 形成期滾動配對篩選平行化主程式
 ├── run_trading.py         # 交易期逐日模擬與回測平行化主程式
@@ -69,7 +62,7 @@ graph TD
     classDef presentation fill:#faf5ff,stroke:#a855f7,stroke-width:2px,color:#6b21a8;
     classDef launcher fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#92400e;
 
-    Sub1[(1. 原始資料庫<br>data/*.db)]:::source --> Main[2. 核心回測引擎<br>run_formation.py & run_trading.py]:::engine
+    Sub1[(1. 原始資料庫<br>dataset/*.db)]:::source --> Main[2. 核心回測引擎<br>run_formation.py & run_trading.py]:::engine
     Sub2[策略邏輯與網格搜尋<br>strategies/*]:::engine -.-> Main
     
     Main -->|平行化高速回測| ResDir[3. 交易日誌 CSV<br>results/*]:::output

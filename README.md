@@ -35,15 +35,11 @@
 pairtrade_trainingproject/
 ├── strategies/            # 核心策略目錄 (SSD, HDBSCAN, Autoencoder 等)
 ├── fetch/                 # 數據下載與維護模組 (Yahoo Finance, Tiingo)
-├── data/                  # 歷史價格與成分股 SQLite 資料庫
-├── results/               # 回測日誌與 TradeLogs CSV 資料夾
+├── dataset/               # 歷史價格與成分股 SQLite 資料庫
 ├── notebooks/             # 核心分析 Notebook (analysis.ipynb) 與淨值曲線
 ├── tohtml/                # 量化指標編譯器、互動圖表生成與 Quarto 渲染腳本
 ├── docs/                  # 簡報 HTML 與網頁發佈目錄 (GitHub Pages 來源)
-├── ref/                   # 學術文獻與經典論文庫 (共 23 篇 PDF)
 ├── archive/               # 歷史存檔與過期分析檔案目錄 (依日期/月份分類，如 114/, 11505/, 11506/)
-├── Ref_CODE/              # 歷史參考程式碼與結果比對備份
-├── tmp/                   # 臨時腳本與防禦性論證輔助工具目錄
 ├── dashboard.py           # Streamlit 視覺化 Dashboard 應用程式
 ├── run_formation.py       # 形成期滾動配對篩選平行化主程式
 ├── run_trading.py         # 交易期逐日模擬與回測平行化主程式
@@ -90,4 +86,3 @@ python preprocess_equity.py
 ## 📖 核心參考文件
 
 * **策略開發與檔案管理 SOP**：請務必詳閱 [PROJECT_GUIDE.md](file:///c:/Clark/YZU/Papper/Code/PROJECT_GUIDE.md)。其中包含了資料契約 (Data Contract)、命名規範以及「新增、修訂、刪除策略」的標準作業程序。
-* **學術與文獻背景**：請參閱 [ref/](file:///c:/Clark/YZU/Papper/Code/ref) 目錄，其中收錄了 23 篇本專案架構（包含聚類、降維與自編碼器應用於配對交易）的奠基學術文獻。
