@@ -30,7 +30,6 @@ class PureDTWTrading(Trading):
 
         state.entry_price_a = p_a
         state.entry_price_b = p_b
-        # 計算交易手續費 + 滑價 (friction_rate)
         state.trade_entry_fee = (abs(state.shares_a) * p_a + abs(state.shares_b) * p_b) * self.friction_rate
         state.days_held = 0
         return True, -state.trade_entry_fee
@@ -66,15 +65,13 @@ class PureDTWTrading(Trading):
                 first_price_a = float(price_a.iloc[0])
                 first_price_b = float(price_b.iloc[0])
 
-        # 正規化：以形成期首日價格做為基準除數，確保連續性 (完全對應 notebook)
+        # 以形成期首日價格正規化，確保連續性
         norm_p_a = price_a / (first_price_a if first_price_a > 1e-8 else 1.0)
         norm_p_b = price_b / (first_price_b if first_price_b > 1e-8 else 1.0)
-        
-        # 價差與 Z-score
+
         spread = norm_p_a - norm_p_b
         safe_std = max(form_spread_std, self.min_spread_std)
-        
-        # 波動度調節 (若啟用)
+
         if getattr(self, "use_vol_adjust", False):
             roll20_std = spread.rolling(window=20, min_periods=1).std().fillna(form_spread_std)
             vol_factor = np.maximum(1.0, roll20_std / form_spread_std)
@@ -84,7 +81,6 @@ class PureDTWTrading(Trading):
             
         zscore = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
 
-        # 篩選出屬於交易期的日期
         valid_idx = common_idx.intersection(self.trade_dates)
         if len(valid_idx) == 0: 
             return pd.DataFrame()
@@ -154,7 +150,6 @@ class PureDTWTrading(Trading):
                 
                 current_trade_pnl = raw_unrealized - state.trade_entry_fee - exit_fee_est
                 
-                # 個別配對停損判定
                 is_cap_stop = self.stop_loss_pct > 0 and (-current_trade_pnl / self.capital_per_pair) >= self.stop_loss_pct
                 is_z_stop = self.use_dynamic_stop and self.dynamic_stop_z > 0 and abs(z) > self.dynamic_stop_z
 
@@ -219,7 +214,7 @@ class PureDTWTrading(Trading):
             if current_status in ["STOP_LOSS_TRIGGERED", "EXIT"]:
                 state.days_held = 0 
 
-            # 如果已經停損且不允許再進場，則直接填補後續所有交易日並退出
+            # 停損後填補剩餘交易日並退出
             if state.is_stopped and i < len(dates_arr) - 1:
                 for j in range(i + 1, len(dates_arr)):
                     rd = dates_arr[j]

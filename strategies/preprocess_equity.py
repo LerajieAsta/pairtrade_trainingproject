@@ -2,6 +2,38 @@ import sqlite3
 import pandas as pd
 from strategies.db_utils import get_db_connection
 
+
+def _clean_price_errors(df: pd.DataFrame, memberships: pd.DataFrame) -> pd.DataFrame:
+    """
+    移除 Volume=0 且單日跳空 >200% 的資料點（yFinance 拆股還原錯誤）。
+    只在該股票的 S&P 500 成分股期間內執行清理，期間外資料直接保留（後續 pivot 不會用到）。
+    直接刪除壞資料點，不補值，避免人為數字影響共整合檢定。
+    """
+    if df.empty or memberships.empty:
+        return df
+
+    sym = df['ticker'].iloc[0]
+    mem = memberships[memberships['Symbol'] == sym]
+    if mem.empty:
+        return df
+
+    df = df.sort_values('date').copy()
+    pct = df['price'].pct_change(fill_method=None).abs()
+
+    in_period = pd.Series(False, index=df.index)
+    for _, row in mem.iterrows():
+        start = row['start_date']
+        end = row['end_date'] if pd.notna(row['end_date']) else pd.Timestamp('2099-01-01')
+        in_period |= (df['date'] >= start) & (df['date'] <= end)
+
+    bad = (pct > 2.0) & (df['volume'] == 0) & in_period
+    if bad.any():
+        print(f"  [資料清理] {sym}: 移除 {bad.sum()} 筆成分股期間內的異常資料點")
+        df = df[~bad].reset_index(drop=True)
+
+    return df
+
+
 class DataProcessor:
     """
     資料庫載入與資料特徵前處理器。
@@ -56,14 +88,24 @@ class DataProcessor:
             tuple: (價格 Pivot 矩陣, 時間索引序列, 總天數, 交易啟動本地日期索引位置)
         """
         conn = get_db_connection(self.db_path)
-        # 合理載入 Adj_Close 或 Close 價格
-        raw_df = pd.read_sql_query(f"SELECT Date AS date, Symbol AS ticker, COALESCE(Adj_Close, Close) AS price FROM {self.table_name} WHERE COALESCE(Adj_Close, Close) IS NOT NULL ORDER BY Date ASC", conn)
+        raw_df = pd.read_sql_query(
+            f"SELECT Date AS date, Symbol AS ticker, COALESCE(Adj_Close, Close) AS price, Volume AS volume "
+            f"FROM {self.table_name} WHERE COALESCE(Adj_Close, Close) IS NOT NULL ORDER BY Date ASC", conn)
+        memberships = pd.read_sql_query("SELECT Symbol, start_date, end_date FROM index_memberships", conn)
         conn.close()
 
         raw_df["date"] = pd.to_datetime(raw_df["date"])
         raw_df["price"] = pd.to_numeric(raw_df["price"], errors="coerce")
+        raw_df["volume"] = pd.to_numeric(raw_df["volume"], errors="coerce").fillna(0)
         raw_df.dropna(subset=["price"], inplace=True)
         raw_df = raw_df[raw_df["price"] > 0]
+
+        memberships["start_date"] = pd.to_datetime(memberships["start_date"])
+        memberships["end_date"] = pd.to_datetime(memberships["end_date"])
+
+        # 清理成分股期間內 Volume=0 且單日跳空 >200% 的資料錯誤
+        cleaned = [_clean_price_errors(grp, memberships) for _, grp in raw_df.groupby("ticker", sort=False)]
+        raw_df = pd.concat(cleaned, ignore_index=True)
 
         # 重塑為以日期為 Index，Symbol 為 Columns 的寬表
         price_pivot = raw_df.pivot_table(index="date", columns="ticker", values="price", aggfunc="last").sort_index()

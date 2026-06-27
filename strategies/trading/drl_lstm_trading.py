@@ -13,7 +13,9 @@ from dataclasses import dataclass
 # Avoid CPU thread thrashing when running PyTorch in multiprocessing
 torch.set_num_threads(1)
 
-# ─── Data Classes ─────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════
+# Data Classes
+# ══════════════════════════════════════════════════════════════════════
 @dataclass(slots=True)
 class PairState:
     position: int = 0
@@ -27,7 +29,9 @@ class PairState:
     is_stopped: bool = False
     prev_total_pnl: float = 0.0
 
-# ─── RL Environment ───────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════
+# RL Environment
+# ══════════════════════════════════════════════════════════════════════
 class PairTradingEnv(gym.Env):
     """
     自定義 Gymnasium 環境：模擬單一配對在時間序列上的交易。
@@ -46,7 +50,6 @@ class PairTradingEnv(gym.Env):
         # 8 features: ZScore, Rel_Return, MA_Dist, time_to_maturity, Spread_Std, position, days_held_norm, Spread_Trend
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(8,), dtype=np.float32)
 
-        # Initialize attributes
         self.current_step = 0
         self.position = 0
         self.realized_pnl = 0.0
@@ -111,8 +114,7 @@ class PairTradingEnv(gym.Env):
                 raw_unrealized = self.shares_a * (p_a - self.entry_price_a) + self.shares_b * (p_b - self.entry_price_b)
                 exit_fee = (abs(self.shares_a)*p_a + abs(self.shares_b)*p_b) * self.friction_rate
                 trade_pnl = raw_unrealized - self.entry_fee - exit_fee
-                # 依獲利給予對應獎勵 (標準化)
-                reward += (trade_pnl / self.capital) * 100.0
+                        reward += (trade_pnl / self.capital) * 100.0
 
                 self.realized_pnl += trade_pnl
                 self.shares_a = 0.0
@@ -141,7 +143,6 @@ class PairTradingEnv(gym.Env):
                 # Action Penalty (減少過度交易)
                 reward -= (self.entry_fee / self.capital) * 100.0 * 0.5
 
-        # 更新持倉天數
         if self.position == prev_position and self.position != 0:
             self.days_held += 1
         else:
@@ -176,7 +177,9 @@ class PairTradingEnv(gym.Env):
     def render(self):
         pass
 
-# ─── RL Agent & Model ─────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════
+# RL Agent & Model
+# ══════════════════════════════════════════════════════════════════════
 class LSTM_DQN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, num_layers=1):
         super(LSTM_DQN, self).__init__()
@@ -252,7 +255,9 @@ class DQNAgent:
     def update_target_model(self):
         self.target_model.load_state_dict(self.model.state_dict())
 
-# ─── Integration Strategy Class ───────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════
+# Integration Strategy Class
+# ══════════════════════════════════════════════════════════════════════
 class Trading:
     """DRL LSTM Trading Strategy Interface for run_trading.py"""
 
@@ -271,7 +276,6 @@ class Trading:
         self.capital_per_pair = capital_per_pair
         self.friction_rate = fee_rate + slippage_rate
         
-        # RL Hyperparameters
         self.drl_episodes = drl_episodes
         self.drl_batch_size = drl_batch_size
         self.drl_gamma = drl_gamma
@@ -282,21 +286,14 @@ class Trading:
         self.drl_hidden_size = drl_hidden_size
         self.drl_num_layers = drl_num_layers
         
-        # Formation Data for Training
         self.full_price_df = full_price_df
         self.formation_start = formation_start
         self.formation_end = formation_end
-        
-        # Class-level cache shared across all Trading instances within the same process.
-        # Key: "{formation_start}_{trade_start}_{ticker_a}_{ticker_b}" so each unique
-        # (period, pair) trains once and is reused by subsequent calls (e.g. multiple
-        # top_n / stop_loss variants that share the same formation period).
         
     def _prepare_features(self, p_a: pd.Series, p_b: pd.Series, hedge_ratio: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float, spread_mean: float = None, spread_std: float = None):
         """Prepare RL features matching the formation/trading period."""
         df = pd.DataFrame({'Price_A': p_a, 'Price_B': p_b})
         
-        # Normalize prices
         norm_a = (np.log(df['Price_A']) - log_mean_a) / log_std_a
         norm_b = (np.log(df['Price_B']) - log_mean_b) / log_std_b
         
@@ -344,13 +341,7 @@ class Trading:
                          lr=self.drl_lr, gamma=self.drl_gamma, epsilon_start=self.drl_epsilon_start, 
                          epsilon_end=self.drl_epsilon_end, epsilon_decay=self.drl_epsilon_decay)
                          
-        # We need formation data to train. Since we are called per pair in run_trading, we only have the current pair's info.
-        # But wait, run_trading loops over pairs. To train on ALL pairs in the batch, we need access to selected_pairs!
-        # In run_trading, `selected_pairs` is empty because of how it was called. 
-        # But we DO have `full_price_df`. If we want true batch training across all pairs, we should do it at the portfolio level.
-        # Given run_trading's current architecture, we'll collect the current pair's formation data and train the shared agent on it.
-        # As it loops through pairs, the agent continues training, acting as a shared agent!
-        
+        # 使用當前配對的形成期資料訓練；隨配對迭代持續累積，作為共享 agent
         form_start_idx = self.full_price_df.index.get_loc(pd.to_datetime(self.formation_start))
         form_end_idx = self.full_price_df.index.get_loc(pd.to_datetime(self.formation_end))
         form_prices = self.full_price_df.iloc[form_start_idx:form_end_idx]
@@ -397,7 +388,7 @@ class Trading:
         
         agent = self._train_shared_agent(self.formation_start, period_start, sector, ticker_a, ticker_b, hedge_ratio, 
                                          form_spread_mean, form_spread_std, log_mean_a, log_std_a, log_mean_b, log_std_b)
-        agent.model.eval() # Switch to evaluation mode for trading period
+        agent.model.eval()
         
         price_a, price_b = self.trade_prices[ticker_a].dropna(), self.trade_prices[ticker_b].dropna()
         common_idx = price_a.index.intersection(price_b.index)
@@ -461,7 +452,6 @@ class Trading:
             p_a, p_b = row['Price_A'], row['Price_B']
             z = row['ZScore']
 
-            # Prepare observation (8-dim state)
             time_to_mat = (total_steps - i) / total_steps
             obs = np.array([
                 z, row['Rel_Return'], row['MA_Dist'], time_to_mat,
@@ -470,13 +460,11 @@ class Trading:
             ], dtype=np.float32)
             state_seq.append(obs)
             
-            # Predict action
             with torch.no_grad():
                 state_tensor = torch.FloatTensor(list(state_seq)).unsqueeze(0).to(agent.device)
                 q_values = agent.model(state_tensor)
                 action_idx = q_values.argmax().item()
             
-            # Map action to position
             action = 0
             if action_idx == 1: action = 1
             elif action_idx == 2: action = -1

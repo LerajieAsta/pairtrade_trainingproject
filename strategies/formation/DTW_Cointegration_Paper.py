@@ -1,4 +1,3 @@
-# ======================================================================
 """
 DTW 配對交易滾動回測系統 (交易明細版) - 許鈞翔 (2025) 論文對齊版
 核心功能：
@@ -44,9 +43,7 @@ def _sakoe_chiba_dtw(x: np.ndarray, y: np.ndarray, window: int = 15) -> float:
 
 warnings.filterwarnings("ignore")
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Class 1：Formation（形成期模組）- 許鈞翔論文重構版
-# ══════════════════════════════════════════════════════════════════════════════
+
 class Formation:
     """
     負責在形成期 (Formation Period) 篩選最佳配對。
@@ -86,7 +83,6 @@ class Formation:
         tickers = self.normalized_df.columns.tolist()
         records = []
 
-        # 根據產業分類分組
         sector_groups = {}
         if self.sector_mapping:
             for ticker in tickers:
@@ -114,7 +110,7 @@ class Formation:
                     ticker_a = sector_tickers[j]
                     y_val = self.normalized_df[ticker_a].values
                     
-                    # 1. 雙向 OLS 擬合與共整合檢定
+                    # 步驟 1：雙向 OLS + ADF 共整合
                     al_ab, be_ab, re_ab = _ols(y_val, x_val)
                     stat_ab, pval_ab = _adf_stat(re_ab, 1)
 
@@ -130,11 +126,11 @@ class Formation:
                         best_alpha, best_beta, best_resid = al_ba, be_ba, re_ba
                         best_a, best_b = ticker_b, ticker_a
 
-                    # A. ADF 共整合篩選 (依論文預設 adf_pvalue_threshold 為 0.01)
+                    # 步驟 2：ADF 篩選
                     if best_pval >= self.adf_pvalue_threshold:
                         continue
-                        
-                    # B. Ornstein-Uhlenbeck 半衰期過濾 (2.0 <= halflife <= 40.0 天)
+
+                    # 步驟 3：OU 半衰期
                     dy = np.diff(best_resid)
                     y_lag = best_resid[:-1]
                     n_dy = len(dy)
@@ -151,20 +147,16 @@ class Formation:
                     halflife = -np.log(2) / lambda_val
                     if halflife < 1.0 or halflife > 60.0:
                         continue
-                        
-                    # C. Hurst 指數篩選 (Hurst < 0.50)
+
+                    # 步驟 4：Hurst 指數
                     hurst = _compute_hurst(best_resid, already_stationary=True)
                     if hurst >= 0.50:
                         continue
                     
-                    # 通過篩選後，計算 SSD 與 DTW 距離
+                    # 步驟 5：計算 SSD 與 DTW 距離
                     norm_a = self.normalized_df[best_a].values
                     norm_b = self.normalized_df[best_b].values
-                    
-                    # SSD 距離
                     ssd_dist = float(np.sum((norm_a - norm_b) ** 2))
-                    
-                    # DTW 距離 (Sakoe-Chiba window)
                     dtw_dist = _sakoe_chiba_dtw(norm_a, norm_b, window=self.dtw_window)
                     
                     spread_mean = np.mean(best_resid)
@@ -194,14 +186,12 @@ class Formation:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        # 根據指定模式進行排序
         if self.method == "dtw":
-            # 論文對照組：依 DTW 距離升序排序
+            # 對照組：依 DTW 距離升序
             selected = pairs_df.sort_values("DTW_Dist").head(self.top_n).copy()
         elif self.method == "ssd_dtw_pca":
-            # 論文實驗組：標準化後使用 PCA 提取第一主成分排序
+            # 實驗組：PCA 融合 SSD+DTW 取第一主成分排序
             if len(pairs_df) < 2:
-                # 樣本太少無法做 PCA，退回 DTW
                 selected = pairs_df.sort_values("DTW_Dist").head(self.top_n).copy()
             else:
                 from sklearn.preprocessing import StandardScaler
@@ -213,7 +203,7 @@ class Formation:
                 pca = PCA(n_components=1, random_state=42)
                 scores = pca.fit_transform(feats_scaled).flatten()
                 
-                # 調整得分方向，確保 loadings 為正，即綜合距離越小，得分越小
+                # 確保 loadings 方向為正（距離越小得分越小）
                 loadings = pca.components_[0]
                 if loadings[0] < 0:
                     scores = -scores
@@ -244,6 +234,3 @@ class Formation:
         self.normalize_prices()
         self.select_pairs()
         return self.selected_pairs
-
-
-# ══════════════════════════════════════════════════════════════════════════════

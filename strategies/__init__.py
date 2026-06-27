@@ -2,10 +2,13 @@
 Strategies 模組
 ================
 
-本模組包含用於配對交易 (Pairs Trading) 的回測策略與相關工具：
-1. db_utils.py: 資料庫連線、指標計算與交易紀錄 (CSV) 匯入工具。
-2. ssd_basic.py: 基於 SSD 與 Z-Score 的基本滾動配對交易回測系統 (單因子)。
-3. ssd.py: 完整版 SSD 配對交易滾動回測系統。
-4. HDBSCAN.py: 基於機器學習/降維 (PCA/UMAP) 與密度聚類 (HDBSCAN) 的配對交易回測系統。
-5. HDBSCAN_MultiFactor.py: 結合多因子特徵進行 HDBSCAN 聚類的進階配對交易回測系統。
+Formation 策略（strategies/formation/）：
+  ssd_basic.py           — SSD Basic：靜態單期 SSD 配對篩選
+  ssd_rolling.py         — SSD Rolling：滾動多期 SSD 配對篩選
+  HDBSCAN_MultiScale.py  — HDBSCAN MultiScale：多時間尺度跨期穩定性聚類配對
+  HDBSCAN_UMAP.py        — HDBSCAN UMAP：雙層特徵（單股10維 + 配對層10維）聚類配對
+  DTW_Cointegration_Paper.py — DTW Paper：DTW / SSD-DTW-PCA 論文對齊版
+
+舊版 HDBSCAN 策略（SS-UMAP/SS-PCA/MacroCluster/CrossSector 及對應 DRL LSTM）
+已於 2026-06-27 移至 archive/11506/formation/。
 """

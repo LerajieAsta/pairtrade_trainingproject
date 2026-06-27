@@ -255,8 +255,6 @@ class Trading:
                 out_delta.append(0.0)
                 continue
 
-            # (cooldown logic removed)
-
             if state.position != 0:
                 state.days_held += 1
                 raw_unrealized = state.shares_a * (p_a - state.entry_price_a) + state.shares_b * (p_b - state.entry_price_b)
@@ -418,7 +416,7 @@ class Trading:
         if not dfs: 
             return pd.DataFrame(), 0.0
             
-        # ---- 實作後置投資組合總體止損斷路器 ----
+        # ── 投資組合總體止損斷路器 ──
         if getattr(self, "portfolio_stop_loss_pct", 0) > 0:
             temp_df = pd.concat(dfs, ignore_index=True)
             total_cap = self.capital_per_pair * len(dfs)
@@ -469,7 +467,6 @@ class Trading:
                         
                     new_dfs.append(pd.concat([df_before, df_at, df_after], ignore_index=True))
                 dfs = new_dfs
-        # ----------------------------------------------
 
         log_df = pd.concat(dfs, ignore_index=True)
         period_daily_delta = log_df.groupby("Date")["Daily_Delta"].sum()
