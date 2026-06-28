@@ -82,19 +82,30 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 
 ---
 
-## 3. 目前啟用策略（`config.py` L451）
+## 3. 策略清單（`config.py`）
+
+`strategies_raw_all` 為策略池（共 13 個），`strategies_raw` 決定實際執行範圍：
 
 ```python
-strategies_raw = strategies_raw_all[-3:]
+strategies_raw = strategies_raw_all[-3:]   # 只跑 #11–#13
+# strategies_raw = strategies_raw_all      # 跑全部 13 個
 ```
 
-| # | 策略名稱 | 形成期 | 交易期 |
+| # | 策略名稱 | 形成期模組 | 交易期模組 |
 | :---: | :--- | :--- | :--- |
-| 13 | SSD Rolling DRL | `ssd_rolling.py` | `drl_lstm_trading.py` |
-| 14 | HDBSCAN UMAP DRL | `HDBSCAN_UMAP.py` | `drl_lstm_trading.py` |
-| 15 | HDBSCAN MultiScale DRL | `HDBSCAN_MultiScale.py` | `drl_lstm_trading.py` |
-
-`strategies_raw_all` 共 15 個策略（#1–#12 停用，#13–#15 啟用）。
+| 1 | SSD Basic | `ssd_basic.py` | `zscore_trading.py` |
+| 2 | SSD Rolling | `ssd_rolling.py` | `zscore_trading.py` |
+| 3 | DTW Paper (DTW) | `DTW_Cointegration_Paper.py` | `zscore_trading.py` |
+| 4 | DTW Paper (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | `zscore_trading.py` |
+| 5 | HDBSCAN MultiScale | `HDBSCAN_MultiScale.py` | `zscore_trading.py` |
+| 6 | HDBSCAN MultiScale PCA-UMAP | `HDBSCAN_MultiScale.py` | `zscore_trading.py` |
+| 7 | HDBSCAN UMAP | `HDBSCAN_UMAP.py` | `zscore_trading.py` |
+| 8 | HDBSCAN UMAP PCA-UMAP | `HDBSCAN_UMAP.py` | `zscore_trading.py` |
+| 9 | Ensemble HDBSCAN | `ensemble.py` | `zscore_trading.py` |
+| 10 | Ensemble SSD-DTW | `ensemble.py` | `zscore_trading.py` |
+| 11 | SSD Rolling DRL | `ssd_rolling.py` | `drl_lstm_trading.py` |
+| 12 | HDBSCAN UMAP DRL | `HDBSCAN_UMAP.py` | `drl_lstm_trading.py` |
+| 13 | HDBSCAN MultiScale DRL | `HDBSCAN_MultiScale.py` | `drl_lstm_trading.py` |
 
 ---
 

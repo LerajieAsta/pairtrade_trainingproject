@@ -4,15 +4,25 @@
 
 ---
 
-## 目前啟用策略
+## 策略清單（`strategies_raw_all`，共 13 個）
 
-| 策略 | 形成期模組 | 交易期模組 |
-| :--- | :--- | :--- |
-| SSD Rolling DRL | `strategies/formation/ssd_rolling.py` | `strategies/trading/drl_lstm_trading.py` |
-| HDBSCAN UMAP DRL | `strategies/formation/HDBSCAN_UMAP.py` | `strategies/trading/drl_lstm_trading.py` |
-| HDBSCAN MultiScale DRL | `strategies/formation/HDBSCAN_MultiScale.py` | `strategies/trading/drl_lstm_trading.py` |
+| # | 策略 | 形成期模組 | 交易期 |
+| :---: | :--- | :--- | :--- |
+| 1 | SSD Basic | `ssd_basic.py` | Z-Score |
+| 2 | SSD Rolling | `ssd_rolling.py` | Z-Score |
+| 3 | DTW Paper (DTW) | `DTW_Cointegration_Paper.py` | Z-Score |
+| 4 | DTW Paper (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | Z-Score |
+| 5 | HDBSCAN MultiScale | `HDBSCAN_MultiScale.py` | Z-Score |
+| 6 | HDBSCAN MultiScale PCA-UMAP | `HDBSCAN_MultiScale.py` | Z-Score |
+| 7 | HDBSCAN UMAP | `HDBSCAN_UMAP.py` | Z-Score |
+| 8 | HDBSCAN UMAP PCA-UMAP | `HDBSCAN_UMAP.py` | Z-Score |
+| 9 | Ensemble HDBSCAN | `ensemble.py` | Z-Score |
+| 10 | Ensemble SSD-DTW | `ensemble.py` | Z-Score |
+| 11 | SSD Rolling DRL | `ssd_rolling.py` | DRL |
+| 12 | HDBSCAN UMAP DRL | `HDBSCAN_UMAP.py` | DRL |
+| 13 | HDBSCAN MultiScale DRL | `HDBSCAN_MultiScale.py` | DRL |
 
-切換策略組合：修改 `strategies/config.py` 中的 `strategies_raw = strategies_raw_all[-3:]`。
+切換執行範圍：修改 `strategies/config.py` 中的 `strategies_raw`，例如 `strategies_raw_all[-3:]` 只跑後 3 個，`strategies_raw_all` 跑全部 13 個。
 
 ---
 

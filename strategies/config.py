@@ -110,6 +110,7 @@ base_params = {
 hdbscan_common = {}
 
 strategies_raw_all = [
+    # ── SSD ──────────────────────────────────────────────────────────────────
     # 1. SSD Basic
     {
         "name":             "SSD Basic",
@@ -134,7 +135,35 @@ strategies_raw_all = [
             **base_params,
         },
     },
-    # 3. HDBSCAN MultiScale (多時間尺度跨期穩定性)
+    # ── DTW ──────────────────────────────────────────────────────────────────
+    # 3. DTW Paper (DTW)
+    {
+        "name":             "DTW Paper (DTW)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "DTW_Paper",
+        "db_method":        "DTW (Paper)",
+        "trade_method":     "Z-Score",
+        "params":  {
+            **base_params,
+            "method": "dtw",
+        },
+    },
+    # 4. DTW Paper (SSD-DTW-PCA)
+    {
+        "name":             "DTW Paper (SSD-DTW-PCA)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "SSD_DTW_PCA_Paper",
+        "db_method":        "SSD-DTW-PCA (Paper)",
+        "trade_method":     "Z-Score",
+        "params":  {
+            **base_params,
+            "method": "ssd_dtw_pca",
+        },
+    },
+    # ── HDBSCAN ──────────────────────────────────────────────────────────────
+    # 5. HDBSCAN MultiScale
     {
         "name":             "HDBSCAN MultiScale",
         "formation_module": "strategies.formation.HDBSCAN_MultiScale",
@@ -163,7 +192,36 @@ strategies_raw_all = [
             "use_mom1_filter":          True,
         },
     },
-    # 4. HDBSCAN UMAP (雙層特徵：單股10維 + 配對層10維)
+    # 6. HDBSCAN MultiScale PCA-UMAP
+    {
+        "name":             "HDBSCAN MultiScale PCA-UMAP",
+        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_MultiScale_PCA_UMAP",
+        "db_method":        "HDBSCAN (MultiScale-PCA-UMAP)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":      2,
+            "hdbscan_metric":           "euclidean",
+            "umap_n_components":        5,
+            "umap_n_neighbors":         40,
+            "umap_min_dist":            0.01,
+            "umap_random_state":        42,
+            "reduce_method":            "pca_umap",
+            "adf_pvalue_threshold":     0.05,
+            "adf_sub_pvalue":           0.10,
+            "min_corr_mean":            0.50,
+            "min_corr_min":             0.10,
+            "max_corr_std":             0.30,
+            "min_coint_pass_rate":      0.40,
+            "max_regime_diff":          0.50,
+            "max_vol_ratio_std":        0.80,
+            "use_mom1_filter":          True,
+        },
+    },
+    # 7. HDBSCAN UMAP
     {
         "name":             "HDBSCAN UMAP",
         "formation_module": "strategies.formation.HDBSCAN_UMAP",
@@ -195,62 +253,7 @@ strategies_raw_all = [
             "feature_mode":             "stats10",
         },
     },
-    # 5. DTW Paper (DTW)
-    {
-        "name":             "DTW Paper (DTW)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "DTW_Paper",
-        "db_method":        "DTW (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-            "method": "dtw",
-        },
-    },
-    # 6. DTW Paper (SSD-DTW-PCA)
-    {
-        "name":             "DTW Paper (SSD-DTW-PCA)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_DTW_PCA_Paper",
-        "db_method":        "SSD-DTW-PCA (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-            "method": "ssd_dtw_pca",
-        },
-    },
-    # 5c. HDBSCAN MultiScale — PCA+UMAP（混合穩定化）
-    {
-        "name":             "HDBSCAN MultiScale PCA-UMAP",
-        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_MultiScale_PCA_UMAP",
-        "db_method":        "HDBSCAN (MultiScale-PCA-UMAP)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "pca_umap",
-            "adf_pvalue_threshold":     0.05,
-            "adf_sub_pvalue":           0.10,
-            "min_corr_mean":            0.50,
-            "min_corr_min":             0.10,
-            "max_corr_std":             0.30,
-            "min_coint_pass_rate":      0.40,
-            "max_regime_diff":          0.50,
-            "max_vol_ratio_std":        0.80,
-            "use_mom1_filter":          True,
-        },
-    },
-    # 6c. HDBSCAN UMAP — PCA+UMAP（混合穩定化）
+    # 8. HDBSCAN UMAP PCA-UMAP
     {
         "name":             "HDBSCAN UMAP PCA-UMAP",
         "formation_module": "strategies.formation.HDBSCAN_UMAP",
@@ -282,7 +285,8 @@ strategies_raw_all = [
             "feature_mode":             "stats10",
         },
     },
-    # 7. Ensemble: HDBSCAN UMAP × HDBSCAN MultiScale（跨產業交集）
+    # ── Ensemble ─────────────────────────────────────────────────────────────
+    # 9. Ensemble: HDBSCAN UMAP × HDBSCAN MultiScale
     {
         "name":             "Ensemble HDBSCAN",
         "formation_module": "strategies.formation.ensemble",
@@ -346,7 +350,7 @@ strategies_raw_all = [
             ],
         },
     },
-    # 8. Ensemble: SSD Rolling × DTW Paper（產業內交集）
+    # 10. Ensemble: SSD Rolling × DTW Paper
     {
         "name":             "Ensemble SSD-DTW",
         "formation_module": "strategies.formation.ensemble",
@@ -371,7 +375,8 @@ strategies_raw_all = [
             ],
         },
     },
-    # 13. SSD Rolling DRL
+    # ── DRL ──────────────────────────────────────────────────────────────────
+    # 11. SSD Rolling DRL
     {
         "name":             "SSD Rolling DRL",
         "formation_module": "strategies.formation.ssd_rolling",
@@ -384,7 +389,7 @@ strategies_raw_all = [
             "drl_episodes": 40,
         },
     },
-    # 14. HDBSCAN UMAP DRL
+    # 12. HDBSCAN UMAP DRL
     {
         "name":             "HDBSCAN UMAP DRL",
         "formation_module": "strategies.formation.HDBSCAN_UMAP",
@@ -417,7 +422,7 @@ strategies_raw_all = [
             "drl_episodes":             40,
         },
     },
-    # 15. HDBSCAN MultiScale DRL
+    # 13. HDBSCAN MultiScale DRL
     {
         "name":             "HDBSCAN MultiScale DRL",
         "formation_module": "strategies.formation.HDBSCAN_MultiScale",
