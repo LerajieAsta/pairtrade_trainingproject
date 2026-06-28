@@ -92,9 +92,6 @@ class Formation:
                         "SSD": float(ssd_value), "Hedge_Ratio": float(beta),
                     })
 
-        # if skipped_unknown_count > 0:
-        #     print(f"  [Formation] 跳過 {skipped_unknown_count} 支未分類 (Unknown) 股票。")
-
         if not ssd_records: 
             return pd.DataFrame()
 

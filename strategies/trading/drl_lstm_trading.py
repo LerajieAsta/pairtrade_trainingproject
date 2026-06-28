@@ -114,7 +114,7 @@ class PairTradingEnv(gym.Env):
                 raw_unrealized = self.shares_a * (p_a - self.entry_price_a) + self.shares_b * (p_b - self.entry_price_b)
                 exit_fee = (abs(self.shares_a)*p_a + abs(self.shares_b)*p_b) * self.friction_rate
                 trade_pnl = raw_unrealized - self.entry_fee - exit_fee
-                        reward += (trade_pnl / self.capital) * 100.0
+                reward += (trade_pnl / self.capital) * 100.0
 
                 self.realized_pnl += trade_pnl
                 self.shares_a = 0.0

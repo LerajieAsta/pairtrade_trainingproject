@@ -82,7 +82,7 @@ class Trading:
         state.trade_entry_fee = 0.0
 
     def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float,
-                       form_spread_mean: float, form_spread_std: float, log_mean_a: float, log_std_a: float, log_mean_b: float, log_std_b: float,
+                       form_spread_mean: float, form_spread_std: float, log_mean_a=None, log_std_a: float = 1.0, log_mean_b=None, log_std_b: float = 1.0,
                        first_price_a: float = 0.0, first_price_b: float = 0.0,
                        ols_alpha: float = None) -> pd.DataFrame:
         """
@@ -154,7 +154,7 @@ class Trading:
 
         # ── 路徑 B：標準化 norm_p 空間（SSD / DTW，向下相容） ────────────────
         else:
-            if first_price_a > 0.0 and first_price_b > 0.0 and log_mean_a == 0.0:
+            if first_price_a > 0.0 and first_price_b > 0.0 and log_mean_a is None:
                 norm_p_a = price_a / first_price_a
                 norm_p_b = price_b / first_price_b
             else:
@@ -212,16 +212,8 @@ class Trading:
         pb_arr = price_b.values
         beta_arr = beta_series.values
 
-        base_log = {
-            "Period_Start": period_start, "Period_End": period_end,
-            "Sector": sector, "Pair_Rank": pair_rank,
-            "Ticker_A": ticker_a, "Ticker_B": ticker_b,
-            "Log_Mean_A": log_mean_a, "Log_Std_A": log_std_a,
-            "Log_Mean_B": log_mean_b, "Log_Std_B": log_std_b
-        }
-
         state = PairState()
-        
+
         out_dates, out_pa, out_pb = [], [], []
         out_hr, out_z, out_pos = [], [], []
         out_unrealized, out_realized, out_cum = [], [], []
@@ -439,17 +431,20 @@ class Trading:
                     df_before = df[before_mask]
                     
                     df_at = df[at_mask].copy()
-                    final_realized = 0.0
+                    # 若停損日剛好為非交易日，以 df_before 最後一筆作為已實現盈虧基準
+                    final_realized = float(df_before["Realized_PnL"].iloc[-1]) if not df_before.empty else 0.0
                     if not df_at.empty:
                         row_at = df_at.iloc[0]
                         if row_at["Position"] != 0:
-                            final_realized = row_at["Realized_PnL"] + row_at["Trade_PnL"]
+                            # 強制平倉：已實現 = 歷史累積 + 當前持倉未實現損益
+                            final_realized = row_at["Realized_PnL"] + row_at["Unrealized_PnL"]
                             df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOP_TRIGGERED"
                             df_at.loc[df_at.index, "Position"] = 0
                             df_at.loc[df_at.index, "Unrealized_PnL"] = 0.0
-                            df_at.loc[df_at.index, "Trade_PnL"] = row_at["Trade_PnL"]
+                            df_at.loc[df_at.index, "Trade_PnL"] = row_at["Unrealized_PnL"]
                             df_at.loc[df_at.index, "Realized_PnL"] = final_realized
                             df_at.loc[df_at.index, "Cumulative_PnL"] = final_realized
+                            df_at.loc[df_at.index, "Daily_Delta"] = 0.0
                         else:
                             if row_at["Status"] not in ("STOPPED", "STOP_LOSS_TRIGGERED", "EXIT"):
                                 df_at.loc[df_at.index, "Status"] = "PORTFOLIO_STOPPED"

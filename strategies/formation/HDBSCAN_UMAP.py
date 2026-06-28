@@ -185,7 +185,11 @@ def _compute_pair_features(
 
     log_vol_a   = np.log1p(vol_a.astype(float))
     log_vol_b   = np.log1p(vol_b.astype(float))
-    volume_corr = float(np.corrcoef(log_vol_a, log_vol_b)[0, 1]) if len(log_vol_a) > 10 else 0.0
+    if len(log_vol_a) > 10 and np.std(log_vol_a) > 1e-10 and np.std(log_vol_b) > 1e-10:
+        volume_corr = float(np.corrcoef(log_vol_a, log_vol_b)[0, 1])
+        volume_corr = volume_corr if np.isfinite(volume_corr) else 0.0
+    else:
+        volume_corr = 0.0
     adv_ratio   = _compute_adv_ratio(vol_a, vol_b)
 
     return {
@@ -262,6 +266,7 @@ class Formation:
         umap_n_neighbors:        int   = 40,
         umap_min_dist:           float = 0.01,
         umap_random_state:       int   = 42,
+        pca_n_components:        int   = 15,
         adf_max_lags:            int   = 1,
         adf_pvalue_threshold:    float = 0.01,
         max_sector_ratio:        float = 0.3,
@@ -295,6 +300,7 @@ class Formation:
         self.umap_n_neighbors  = umap_n_neighbors
         self.umap_min_dist     = umap_min_dist
         self.umap_random_state = umap_random_state
+        self.pca_n_components  = pca_n_components
 
         if self.reduce_method == "umap" and not UMAP_AVAILABLE:
             raise RuntimeError("umap-learn 未安裝：pip install umap-learn")
@@ -374,16 +380,15 @@ class Formation:
 
     def _pca_reduce(self, X: np.ndarray) -> np.ndarray:
         from sklearn.decomposition import PCA
-        n_comp = min(self.umap_n_components, X.shape[0] - 1)
+        n_comp = min(self.pca_n_components, X.shape[0] - 1, X.shape[1])
         if n_comp < 1:
             return X
         return PCA(n_components=n_comp, random_state=self.umap_random_state).fit_transform(X)
 
-    def _pca_umap_reduce(self, X: np.ndarray, pca_components: int = 15) -> np.ndarray:
+    def _pca_umap_reduce(self, X: np.ndarray) -> np.ndarray:
         """先 PCA 降維去除噪音，再 UMAP 非線性嵌入，降低退化解機率。"""
         from sklearn.decomposition import PCA
-        n = X.shape[0]
-        pca_comp = min(pca_components, n - 1, X.shape[1])
+        pca_comp = min(self.pca_n_components, X.shape[0] - 1, X.shape[1])
         if pca_comp >= 1:
             X = PCA(n_components=pca_comp, random_state=self.umap_random_state).fit_transform(X)
         return self._umap_reduce(X)

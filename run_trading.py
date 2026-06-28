@@ -187,10 +187,6 @@ def worker_task(
                 pair_data = param_map[pair]
                 form_params = pair_data["Params"]
 
-                # 排除 NaN
-                pa_series = trade_prices[ticker_a]
-                pb_series = trade_prices[ticker_b]
-
                 kwargs = {
                     "price_df": trade_prices_extended,  # 傳入延伸價格數據，修復前期 NaN 交易缺失問題
                     "trade_dates": trade_dates,
@@ -225,9 +221,9 @@ def worker_task(
                             hedge_ratio=form_params.get("Hedge_Ratio", 1.0),
                             form_spread_mean=form_params.get("Spread_Mean", 0.0),
                             form_spread_std=form_params.get("Spread_Std", 1.0),
-                            log_mean_a=form_params.get("Log_Mean_A", 0.0),
+                            log_mean_a=form_params.get("Log_Mean_A"),
                             log_std_a=form_params.get("Log_Std_A", 1.0),
-                            log_mean_b=form_params.get("Log_Mean_B", 0.0),
+                            log_mean_b=form_params.get("Log_Mean_B"),
                             log_std_b=form_params.get("Log_Std_B", 1.0),
                             first_price_a=float(form_params.get("First_Price_A") or 0.0),
                             first_price_b=float(form_params.get("First_Price_B") or 0.0),

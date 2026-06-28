@@ -130,10 +130,12 @@ class Formation:
                 if key not in key_to_row:
                     key_to_row[key] = row.to_dict()
                 else:
-                    # 若兩個策略都有，取 Quality_Score 較高者的欄位
+                    # 若兩個策略都有，取 Quality_Score 較高者；相同時以 Pair_Rank 較小者優先
                     existing_score = key_to_row[key].get("Quality_Score", 0)
                     new_score = row.get("Quality_Score", 0)
-                    if new_score > existing_score:
+                    existing_rank = key_to_row[key].get("Pair_Rank", key_to_row[key].get("Rank", 9999))
+                    new_rank = row.get("Pair_Rank", row.get("Rank", 9999))
+                    if new_score > existing_score or (new_score == existing_score and new_rank < existing_rank):
                         key_to_row[key] = row.to_dict()
 
         def avg_rank(key):
@@ -153,6 +155,27 @@ class Formation:
         records = []
         for rank, key in enumerate(selected_keys, start=1):
             row = key_to_row[key].copy()
+
+            # 若原始方向與正則 key 不同，翻轉 OLS 相關欄位以確保 Y=key[0]、X=key[1]
+            orig_a = str(row.get("Ticker_A", ""))
+            if orig_a != key[0]:
+                hr = float(row.get("Hedge_Ratio", 1.0))
+                safe_hr = hr if abs(hr) > 1e-8 else 1.0
+                row["Hedge_Ratio"] = round(1.0 / safe_hr, 4)
+                if row.get("OLS_Alpha") is not None:
+                    row["OLS_Alpha"] = round(-float(row["OLS_Alpha"]) / safe_hr, 6)
+                if "Spread_Mean" in row:
+                    # 翻轉後 E[spread_new] = -OLS_Alpha / Hedge_Ratio（OLS 殘差均值=0 時 ≈ 0）
+                    ols_alpha_val = float(row.get("OLS_Alpha") or 0.0)
+                    row["Spread_Mean"] = round(-ols_alpha_val / safe_hr, 6)
+                if "Spread_Std" in row:
+                    row["Spread_Std"] = round(float(row["Spread_Std"]) / abs(safe_hr), 6)
+                # 同步交換 Sector / Log_Mean / Log_Std / First_Price
+                for col_a, col_b in [("Sector_A", "Sector_B"), ("Log_Mean_A", "Log_Mean_B"),
+                                      ("Log_Std_A", "Log_Std_B"), ("First_Price_A", "First_Price_B")]:
+                    if col_a in row and col_b in row:
+                        row[col_a], row[col_b] = row[col_b], row[col_a]
+
             row["Rank"]          = rank
             row["Ticker_A"]      = key[0]
             row["Ticker_B"]      = key[1]

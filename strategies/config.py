@@ -43,7 +43,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
 # ── 共用常數 ─────────────────────────────────────────────────────────────
-FORCE_RERUN = True
+FORCE_RERUN = False
 CPU_LIMIT_PCT = 0.8
 DB_PROFILES = {
     "sp500_Current": {
@@ -109,7 +109,7 @@ base_params = {
 # old HDBSCAN strategies (3-14) archived 2026-06-27 to archive/11506/formation/
 hdbscan_common = {}
 
-strategies_raw = [
+strategies_raw_all = [
     # 1. SSD Basic
     {
         "name":             "SSD Basic",
@@ -195,27 +195,6 @@ strategies_raw = [
             "feature_mode":             "stats10",
         },
     },
-    # 3-8. HDBSCAN SameSector / MacroCluster / CrossSector — archived 2026-06-27
-    # Formation modules moved to archive/11506/formation/
-    # {
-    #     "name":             "HDBSCAN SameSector UMAP",
-    #     "formation_module": "strategies.formation.HDBSCAN",
-    #     ...
-    # },
-    # (4 HDBSCAN SameSector PCA, 5 MacroCluster UMAP, 6 CS-MF, 7 CS-PCA, 8 CS-UMAP omitted)
-
-    # 9. Pure DTW (Notebook Ver)
-    # {
-    #     "name":             "Pure DTW (Notebook Ver)",
-    #     "formation_module": "strategies.formation.DTW_Pure_Notebook",
-    #     "trading_module":   "strategies.trading.pure_dtw_trading",
-    #     "sub_dir":          "Pure_DTW",
-    #     "db_method":        "Pure_DTW",
-    #     "trade_method":     "Pure DTW",
-    #     "params":  {
-    #         **base_params,
-    #     },
-    # },
     # 5. DTW Paper (DTW)
     {
         "name":             "DTW Paper (DTW)",
@@ -240,32 +219,6 @@ strategies_raw = [
         "params":  {
             **base_params,
             "method": "ssd_dtw_pca",
-        },
-    },
-    # 5b. HDBSCAN MultiScale — PCA（確定性基準）
-    {
-        "name":             "HDBSCAN MultiScale PCA",
-        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_MultiScale_PCA",
-        "db_method":        "HDBSCAN (MultiScale-PCA)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "reduce_method":            "pca",
-            "adf_pvalue_threshold":     0.05,
-            "adf_sub_pvalue":           0.10,
-            "min_corr_mean":            0.50,
-            "min_corr_min":             0.10,
-            "max_corr_std":             0.30,
-            "min_coint_pass_rate":      0.40,
-            "max_regime_diff":          0.50,
-            "max_vol_ratio_std":        0.80,
-            "use_mom1_filter":          True,
         },
     },
     # 5c. HDBSCAN MultiScale — PCA+UMAP（混合穩定化）
@@ -295,35 +248,6 @@ strategies_raw = [
             "max_regime_diff":          0.50,
             "max_vol_ratio_std":        0.80,
             "use_mom1_filter":          True,
-        },
-    },
-    # 6b. HDBSCAN UMAP — PCA（確定性基準）
-    {
-        "name":             "HDBSCAN UMAP PCA",
-        "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_UMAP_PCA",
-        "db_method":        "HDBSCAN (UMAP-PCA)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "reduce_method":            "pca",
-            "adf_pvalue_threshold":     0.01,
-            "min_corr":                 0.50,
-            "min_zero_crossings":       5,
-            "hurst_threshold":          0.5,
-            "halflife_min":             1.0,
-            "halflife_max":             60.0,
-            "roll_corr_window":         60,
-            "max_beta_diff":            0.8,
-            "max_vol_ratio":            3.0,
-            "min_adv_ratio":            0.1,
-            "use_mom1_filter":          True,
-            "feature_mode":             "stats10",
         },
     },
     # 6c. HDBSCAN UMAP — PCA+UMAP（混合穩定化）
@@ -447,15 +371,85 @@ strategies_raw = [
             ],
         },
     },
-    # 12-14. DRL LSTM PCA / UMAP / MF — archived 2026-06-27
-    # Depended on HDBSCAN CrossSector formation modules; suspended with those modules.
-    # {
-    #     "name":             "DRL LSTM PCA",
-    #     "formation_module": "strategies.formation.HDBSCAN_CrossSector_PCA",
-    #     ...
-    # },
-    # (13 DRL LSTM UMAP, 14 DRL LSTM MF omitted)
+    # 13. SSD Rolling DRL
+    {
+        "name":             "SSD Rolling DRL",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "trading_module":   "strategies.trading.drl_lstm_trading",
+        "sub_dir":          "SSD_Rolling_DRL",
+        "db_method":        "SSD (Rolling-DRL)",
+        "trade_method":     "DRL",
+        "params":  {
+            **base_params,
+            "drl_episodes": 40,
+        },
+    },
+    # 14. HDBSCAN UMAP DRL
+    {
+        "name":             "HDBSCAN UMAP DRL",
+        "formation_module": "strategies.formation.HDBSCAN_UMAP",
+        "trading_module":   "strategies.trading.drl_lstm_trading",
+        "sub_dir":          "HDBSCAN_UMAP_DRL",
+        "db_method":        "HDBSCAN (UMAP-DRL)",
+        "trade_method":     "DRL",
+        "params":  {
+            **base_params,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":      2,
+            "hdbscan_metric":           "euclidean",
+            "umap_n_components":        5,
+            "umap_n_neighbors":         40,
+            "umap_min_dist":            0.01,
+            "umap_random_state":        42,
+            "reduce_method":            "umap",
+            "adf_pvalue_threshold":     0.01,
+            "min_corr":                 0.50,
+            "min_zero_crossings":       5,
+            "hurst_threshold":          0.5,
+            "halflife_min":             1.0,
+            "halflife_max":             60.0,
+            "roll_corr_window":         60,
+            "max_beta_diff":            0.8,
+            "max_vol_ratio":            3.0,
+            "min_adv_ratio":            0.1,
+            "use_mom1_filter":          True,
+            "feature_mode":             "stats10",
+            "drl_episodes":             40,
+        },
+    },
+    # 15. HDBSCAN MultiScale DRL
+    {
+        "name":             "HDBSCAN MultiScale DRL",
+        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
+        "trading_module":   "strategies.trading.drl_lstm_trading",
+        "sub_dir":          "HDBSCAN_MultiScale_DRL",
+        "db_method":        "HDBSCAN (MultiScale-DRL)",
+        "trade_method":     "DRL",
+        "params":  {
+            **base_params,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":      2,
+            "hdbscan_metric":           "euclidean",
+            "umap_n_components":        5,
+            "umap_n_neighbors":         40,
+            "umap_min_dist":            0.01,
+            "umap_random_state":        42,
+            "reduce_method":            "umap",
+            "adf_pvalue_threshold":     0.05,
+            "adf_sub_pvalue":           0.10,
+            "min_corr_mean":            0.50,
+            "min_corr_min":             0.10,
+            "max_corr_std":             0.30,
+            "min_coint_pass_rate":      0.40,
+            "max_regime_diff":          0.50,
+            "max_vol_ratio_std":        0.80,
+            "use_mom1_filter":          True,
+            "drl_episodes":             40,
+        },
+    },
 ]
+strategies_raw = strategies_raw_all[-3:]
+
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
 _DASHBOARD_FIXED_LINES = 8
@@ -488,9 +482,9 @@ def draw_dashboard(
     sys.stdout.write(f"\033[{total_lines}A")
 
     try:
-        term_width = min(os.get_terminal_size().columns, 85)
+        term_width = min(os.get_terminal_size().columns, 130)
     except OSError:
-        term_width = 85
+        term_width = 130
 
     def line(s: str) -> None:
         visible = re.sub(r"\033\[[^m]*m", "", s)
@@ -634,9 +628,9 @@ def draw_dashboard(
         display_name = name
 
         status_pad = _pad_visible(status_str, 10)
-        name_pad   = _pad_visible(display_name[:15], 15)
+        name_pad   = _pad_visible(display_name[:30], 30)
         bar_pad    = _pad_visible(bar, 5)
-        msg_pad    = _pad_visible(msg[:20], 20)
+        msg_pad    = _pad_visible(msg[:35], 35)
 
         line(
             f"  {status_pad} | {name_pad} | "

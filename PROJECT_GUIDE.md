@@ -1,205 +1,204 @@
-# Pairs Trading 專案開發、策略管理與自動化執行指南 (PROJECT_GUIDE)
-
-歡迎使用 Pairs Trading 量化專案！本指南將說明專案的**整理後目錄結構**、**完整端到端執行工作流 (Workflow)**、**一鍵啟動方式**，以及如何進行策略的**新增、修訂與刪除**作業，協助您建立高效且科學的量化回測與績效比對流程。
+# Pairs Trading 專案開發指南 (PROJECT_GUIDE)
 
 ---
 
-## 1. 專案完整目錄結構導覽
-
-為了保持根目錄的整潔與專案架構的清晰，本專案已完成檔案整理。所有的過期測試腳本、舊分析檔案，均已移入 archive/ 資料夾中並依日期進行分類。臨時開發腳本則存放在 tmp/ 中。以下是整理後的最新專案結構：
+## 1. 專案目錄結構
 
 ```text
-pairtrade_trainingproject/
-├── src/                   # 共享核心模組目錄（預留給未來共用邏輯，已支援 Editable Install）
-│   └── __init__.py
-├── strategies/            # 核心配對交易策略邏輯實作目錄
-│   ├── __init__.py
-│   ├── ssd_basic.py       # 1. 經典 SSD (Basic) 距離策略
-│   ├── ssd.py             # 2. 進階 SSD (OLS) 殘差滾動策略
-│   ├── HDBSCAN.py         # 3. HDBSCAN 分群策略 (支援 UMAP / PCA 降維)
-│   ├── HDBSCAN_Autoencoder.py # 4. HDBSCAN + 深度學習自編碼器 (AE) 特徵提取策略
-│   └── HDBSCAN_MultiFactor.py # 5. HDBSCAN 多因子分群策略
-├── fetch/                 # 數據下載與維護模組 (SP500_Tiingo.py, SP500_yf.py 等)
-├── dataset/               # 歷史價格與成分股資料庫目錄
-│   ├── sp500_Current.db   # 現行 S&P 500 成分股價格資料庫 (SQLite)
-│   ├── sp500_Tiingo.db    # 完整歷史 S&P 500 成分股價格資料庫 (Tiingo)
-│   ├── sp500_yF.db        # 完整歷史 S&P 500 成分股價格資料庫 (yFinance)
-│   └── sp500Full.db       # 完整歷史 S&P 500 生存者偏誤修正資料庫
-├── notebooks/             # Jupyter Notebooks 實驗與研究簡報目錄
-│   ├── analysis.ipynb     # 核心分析與六大策略最優參數對比 Notebook
-│   ├── equity_curves.csv  # 由編譯程式產出的六大最優策略淨值合併 CSV
-│   ├── styles.scss        # RevealJS 簡報自訂樣式設定
-│   └── iframe_figures/    # 存放嵌入式互動 Plotly HTML 圖表 (figure_4.html)
-├── tohtml/                # Jupyter Notebook 轉 HTML / Slides 報告工具包 (僅保留核心 Python 腳本)
-│   ├── preprocess_equity.py # [核心編譯器] 自適應編譯最優淨值並自動注入注入 analysis.ipynb 表格
-│   └── generate_plotly_iframe.py # 優化 Plotly 排版並生成 figure_4.html
-├── docs/                  # 靜態 HTML 簡報與文檔輸出目錄 (Quarto 輸出與 GitHub Pages 部署來源)
-│   ├── index.html         # 簡報索引首頁
-│   └── *.html / *_files/  # 由 render.bat 產生、自定義名稱的簡報與依賴檔案
-├── archive/               # 歷史存檔與過期分析檔案目錄 (依日期/月份分類，如 114/, 11505/, 11506/)
-├── dashboard.py           # Streamlit 績效比對 Dashboard 應用程式 (視覺化核心)
-├── run_formation.py       # 形成期滾動配對篩選平行化主程式
-├── run_trading.py         # 交易期逐日模擬與回測平行化主程式
-├── requirements.txt       # 專案相依 Python 套件清單
-├── pyproject.toml         # 專案套件配置檔 (用於本地模組 Editable 安裝)
-├── setup.bat              # [一鍵工具] 專案環境初始化與套件安裝
-├── run.bat                # [一鍵工具] 一鍵啟動 Streamlit Dashboard
-└── render.bat             # [一鍵工具] [新/移入根目錄] 一鍵編譯與自定義簡報發佈至 docs/
+Papper/
+├── strategies/
+│   ├── config.py                  # 策略清單、網格參數、全域回測設定
+│   ├── db_utils.py                # SQLite 合併、讀寫工具
+│   ├── portfolio_manager.py       # 組合層級資金管理（MSR 產業上限）
+│   ├── preprocess_equity.py       # 權益曲線前處理
+│   ├── formation/
+│   │   ├── _utils.py              # 共用統計工具（_ols、_adf_stat、_compute_hurst）
+│   │   ├── ssd_basic.py           # SSD Basic：累積回報比值距離
+│   │   ├── ssd_rolling.py         # SSD Rolling：Z-Score 標準化 log-price 空間
+│   │   ├── DTW_Cointegration_Paper.py  # DTW + ADF 雙重篩選
+│   │   ├── HDBSCAN_UMAP.py        # HDBSCAN UMAP：10 維特徵 Quality Score
+│   │   ├── HDBSCAN_MultiScale.py  # HDBSCAN MultiScale：形成期內部 n_splits 等分子期間
+│   │   └── ensemble.py            # Ensemble：Tier-1 交集 + Tier-2 聯集補足
+│   └── trading/
+│       ├── zscore_trading.py      # Z-Score 狀態機（基礎類，三條 Spread 路徑）
+│       ├── drl_lstm_trading.py    # DRL LSTM-DQN（目前三個策略使用）
+│       └── pure_dtw_trading.py    # 純 DTW 交叉進場（程式碼保留，目前停用）
+├── fetch/
+│   ├── SP500_Tiingo.py            # Tiingo API 歷史數據下載
+│   └── sp500_yf_now.py            # yFinance 當日數據更新
+├── dataset/                       # 資料庫（大檔案透過 Git LFS 追蹤）
+│   ├── sp500_yF.db                # 主要資料庫（目前 DB_PATH 指向此）
+│   ├── sp500_Tiingo.db            # Tiingo 備用資料庫
+│   ├── sp500_Current.db           # 現行成分股資料庫
+│   └── audit_report.csv           # 交易期資料品質審計報告
+├── formation_data/
+│   └── formation_pairs_sp500_yF.db  # 形成期主合併資料庫（LFS 追蹤）
+├── notebooks/
+│   ├── formation.ipynb            # 五大形成期策略完整邏輯說明
+│   └── trading.ipynb              # 三大交易期模組完整邏輯說明
+├── archive/
+│   ├── 114/                       # 114 學年早期 notebook
+│   ├── 11505/                     # 115 年 5 月 notebook
+│   ├── 11506/                     # 115 年 6 月 notebook（含早期 formation 模組）
+│   ├── docs/                      # 歷次學術 HTML 簡報（1150325–1150527）
+│   └── Ref_CODE/                  # 原始研究 notebook 與 dashboard 截圖
+├── dashboard.py                   # Streamlit 績效比對儀表板
+├── run_formation.py               # 形成期主程式
+├── run_trading.py                 # 交易期主程式
+├── run.bat                        # 一鍵啟動 Dashboard
+├── setup.bat / setup.sh           # 環境初始化腳本
+├── requirements.txt               # Python 套件清單
+└── pyproject.toml                 # 套件配置（Editable Install）
 ```
 
 ---
 
-## 2. 完整端到端執行工作流 (Workflow)
+## 2. 執行工作流
 
-專案提供了一套科學且高度自動化的完整執行流程。下圖展示了從**原始數據載入**到**最終簡報與視覺化儀表板**的端到端數據流向：
-
-```mermaid
-graph TD
-    %% 節點定義與樣式
-    classDef source fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,color:#0f172a;
-    classDef engine fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e40af;
-    classDef output fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#166534;
-    classDef presentation fill:#faf5ff,stroke:#a855f7,stroke-width:2px,color:#6b21a8;
-    classDef launcher fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#92400e;
-
-    Sub1[(1. 原始資料庫<br>dataset/*.db)]:::source --> Main[2. 核心回測引擎<br>run_formation.py & run_trading.py]:::engine
-    Sub2[策略邏輯與網格搜尋<br>strategies/*]:::engine -.-> Main
-    
-    Main -->|平行化高速回測| ResDir[3. 交易日誌 CSV<br>results/*]:::output
-    
-    ResDir --> Prep[4. 性能指標編譯器<br>tohtml/preprocess_equity.py]:::engine
-    
-    Prep -->|A. 合併最優參數淨值| EqCSV[5. 淨值資料<br>notebooks/equity_curves.csv]:::output
-    Prep -->|B. 真實數據注入| NbAnal[6. 核心分析<br>notebooks/analysis.ipynb]:::output
-    
-    EqCSV --> PlotlyGen[7. 圖表排版優化器<br>tohtml/generate_plotly_iframe.py]:::engine
-    PlotlyGen -->|生成互動圖表| FigHtml[8. 圖表 HTML<br>notebooks/iframe_figures/figure_4.html]:::output
-    
-    NbAnal --> Quarto[9. 簡報渲染器<br>tohtml/render.ps1]:::engine
-    FigHtml -.-> Quarto
-    Quarto -->|Quarto RevealJS| Docs[10. 簡報網頁<br>docs/*.html]:::presentation
-    
-    ResDir --> Streamlit[11. 績效儀表板<br>dashboard.py]:::presentation
-    RunBat[run.bat]:::launcher -->|一鍵載入| Streamlit
+```
+setup.bat
+    ↓
+python run_formation.py     ← 形成期：篩選配對 → formation_data/formation_pairs_*.db
+    ↓
+python run_trading.py       ← 交易期：逐日模擬 → results/ + dataset/audit_report.csv
+    ↓
+run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 ```
 
-### 🏃 執行生命週期步驟說明：
+### run_formation.py 細節
 
-#### 步驟 1：環境初始化 (`setup.bat`)
-* **執行方法**：按兩下根目錄的 `setup.bat`。
-* **功能**：自動建立虛擬環境 `Project/`，升級 pip，安裝 `requirements.txt` 中所有的量化、機器學習與自編碼器所需套件，並以開發者模式 (`pip install -e .`) 註冊本地 `src` 模組，確保跨策略調用暢通無阻。
+- 讀取 `dataset/sp500_yF.db`（或 config 指定資料庫）
+- 多行程平行執行每個策略的每個滾動期形成期計算
+- 結果寫入 `formation_data/formation_pairs_{db_basename}.db`
+- 智慧續傳：JSON 完成標記 + SQLite 期數計數雙重驗證，已完成的期數自動跳過
+- `FORCE_RERUN = False`（config.py）：正常模式，不強制重跑
 
-#### 步驟 2：平行化配對篩選與交易期回測 (`run_formation.py` / `run_trading.py`)
-* **執行方法**：
-  ```bash
-  # 1. 執行形成期平行篩選（滾動篩選最佳對沖配對，並寫入配對資料庫）：
-  python run_formation.py
+### run_trading.py 細節
 
-  # 2. 執行交易期平行回測（進行滾動期逐日模擬，產出詳細 TradeLogs CSV 與 SQLite 績效）：
-  python run_trading.py
-  ```
-* **功能**：
-  * **單次 I/O 加載**：在主進程中一次性讀取 SQLite 資料庫並進行 Pivot 矩陣轉換，避免子行程重複讀寫硬碟。
-  * **多行程並行**：調用進程池並行執行六大策略的滾動回測。
-  * **網格優化**：針對 `Top N [5, 10, 20]`、`Stop Loss [0%, 5%, 15%]`、`Z-Window [0]` (固定為 0)、`PSL [0%, 10%, 20%]` (全域動態停損)、`MSR [0%, 3%]` (配對產業上限) 與 `DSZ [0, 3, 5]` (部位動態停損) 等 7 組參數進行科學網格搜尋與高效外部產業切片過濾。
-  * **智慧斷點續傳與期數級別快取**：自動檢測策略代碼、資料庫檔案與網格參數是否修改，若無變動則自動跳過，極速節省運算資源。
-
-#### 步驟 3：最優參數淨值合併與指標編譯 (`preprocess_equity.py`)
-* **執行方法**：
-  ```bash
-  python preprocess_equity.py
-  ```
-* **功能**：
-  * 自動掃描 `results/` 資料夾，篩選出六大策略的最佳參數組合。
-  * 計算出與 `dashboard.py` 100% 精準對齊的量化指標（包含最終淨值、年化報酬率、夏普值、最大回撤、RCC 與實際動用保證金收益率 REC）。
-  * 合併最優淨值曲線並導出至 `notebooks/equity_curves.csv`。
-  * **動態 Notebook 改寫**：直接將最新、真實的 HTML 績效對比表格動態注入到 `notebooks/analysis.ipynb` 中，無需手動複製。
-
-#### 步驟 4：互動 Plotly 圖表生成與簡報渲染 (`tohtml/generate_plotly_iframe.py` 與 `tohtml/render.ps1`)
-* **執行方法**：
-  在 PowerShell 中執行：
-  ```powershell
-  cd tohtml
-  .\render.ps1
-  ```
-* **功能**：
-  * 執行 `generate_plotly_iframe.py`：讀取 `equity_curves.csv`，移除重疊的內部標題，設定優雅的 Inter 字體與配色，產出雙通道（可隨選 Current/Full 數據）的互動式 Plotly 圖表 `notebooks/iframe_figures/figure_4.html`。
-  * 執行 `quarto render`：一鍵將 `notebooks/analysis.ipynb` 渲染成高質感的 RevealJS HTML 簡報，輸出至 `docs/` 資料夾，作為學術報告與進度展示使用。
-
-#### 步驟 5：啟動 Streamlit 績效比對儀表板 (`run.bat`)
-* **執行方法**：按兩下根目錄的 `run.bat`。
-* **功能**：啟動 Streamlit 本地伺服器，自動在瀏覽器中開啟 `http://localhost:8501`。
-* **亮點**：
-  * 提供多維度 Filter（資料集、重入機制、波動調節、策略方法、配對數、停損率、Z-Window）。
-  * 實時繪製多達 5 個策略的淨值曲線對比。
-  * **Deep Dive 功能**：可逐期（Period）查看交易標的，點擊特定配對即可叫出 **Trade Visualizer**，動態還原該配對的買入（Buy Long）、賣空（Sell Short）、平倉（Close）以及停損（Stop Loss）的所有時點與價格折線！
+- 讀取 formation_data/ 的配對清單 + dataset/ 的價格資料
+- 多行程平行執行交易期逐日模擬
+- 輸出：`results/yFinance/` 下的 Trade Log CSV + `dataset/audit_report.csv`
+- 網格搜尋：Top N / Stop Loss / MSR 等參數組合
 
 ---
 
-## 3. 策略 CSV 資料對接規範 (Data Contract)
+## 3. 目前啟用策略（`config.py` L451）
 
-Dashboard (`dashboard.py`) 與編譯器 (`preprocess_equity.py`) 是透過掃描 `results/` 目錄下的 CSV 檔案來進行績效分析與對比的。回測產出的 CSV 檔案必須嚴格符合以下規範：
+```python
+strategies_raw = strategies_raw_all[-3:]
+```
 
-### 3.1 檔名特徵解析規則
-系統會遞迴掃描檔名包含 **`TradeLogs`** 或 **`detailed_trade_logs`** 的 CSV 檔案，並透過檔名關鍵字自動解析特徵：
+| # | 策略名稱 | 形成期 | 交易期 |
+| :---: | :--- | :--- | :--- |
+| 13 | SSD Rolling DRL | `ssd_rolling.py` | `drl_lstm_trading.py` |
+| 14 | HDBSCAN UMAP DRL | `HDBSCAN_UMAP.py` | `drl_lstm_trading.py` |
+| 15 | HDBSCAN MultiScale DRL | `HDBSCAN_MultiScale.py` | `drl_lstm_trading.py` |
 
-| 特徵欄位 | 規則 (不分大小寫) | 範例與解析結果 |
+`strategies_raw_all` 共 15 個策略（#1–#12 停用，#13–#15 啟用）。
+
+---
+
+## 4. 形成期策略說明
+
+### Spread 空間與 Formation_Params
+
+| 策略 | Spread 空間 | 關鍵 Formation_Params |
 | :--- | :--- | :--- |
-| **DATASET** | 包含 `full` $\rightarrow$ `Full`<br>包含 `current` $\rightarrow$ `Current`<br>包含 `quick_test` $\rightarrow$ `Quick_Test`<br>其他 $\rightarrow$ `Unknown` | `strategy_full_TradeLogs.csv` $\rightarrow$ **Full** |
-| **RE-ENTRY** | 包含 `noreentry` $\rightarrow$ `NoReEntry`<br>包含 `reentry` $\rightarrow$ `ReEntry`<br>其他 $\rightarrow$ `Unknown` | `SSD_noreentry_TradeLogs.csv` $\rightarrow$ **NoReEntry** |
-| **METHOD** | 包含 `ssd_basic` $\rightarrow$ `SSD (Basic)`<br>包含 `ssd` $\rightarrow$ `SSD`<br>包含 `eg` $\rightarrow$ `EG`<br>包含 `hdbscan` 且 `multifactor` $\rightarrow$ `HDBSCAN (MF)` (MultiFactor)<br>包含 `hdbscan_ae_pca` 或包含 `_ae_` 且 `_pca_` $\rightarrow$ `HDBSCAN (AE PCA)`<br>包含 `hdbscan_ae` 或單純有 `_ae_` $\rightarrow$ `HDBSCAN (AE UMAP)`<br>包含 `hdbscan_pca` 或單純有 `_pca_` $\rightarrow$ `HDBSCAN (PCA)`<br>其他 `hdbscan` 相關 $\rightarrow$ `HDBSCAN (UMAP)` | `eg_reentry_TradeLogs.csv` $\rightarrow$ **EG**<br>`hdbscan_ae_pca_TradeLogs.csv` $\rightarrow$ **HDBSCAN (AE PCA)** |
-| **TOP N** | 正則匹配 `top(\d+)` | `top5` $\rightarrow$ **Top 5**（預設為 Top 20） |
-| **STOP LOSS %** | 正則匹配 `sl(\d+)` | `sl5` $\rightarrow$ **5%**（預設為 0%） |
-| **Z-WINDOW** | 正則匹配 `zwin(\d+)` | `zwin0` $\rightarrow$ **0**（固定為 0） |
-| **PSL % (全域停損)** | 正則匹配 `psl(\d+)` | `psl10` $\rightarrow$ **10%**（0% 為無全域停損） |
-| **MSR % (產業上限)** | 正則匹配 `msr(\d+)` | `msr3` $\rightarrow$ **3%**（0% 為無產業上限） |
-| **DSZ (動態停損)** | 正則匹配 `dsz(\d+)` | `dsz3` $\rightarrow$ **3.0**（0 為不停損） |
-| **VOL (波動度調節)** | 包含 `voladj` $\rightarrow$ `有`<br>包含 `novol` $\rightarrow$ `無` | `novol` $\rightarrow$ **無** |
+| SSD Basic | 累積回報比值 $P_A/P_{A0} - P_B/P_{B0}$ | `First_Price_A/B`, `Hedge_Ratio=1.0` |
+| SSD Rolling | Z-Score 標準化 log-price | `Log_Mean_A/B`, `Log_Std_A/B`, `Spread_Mean/Std` |
+| DTW | OLS 殘差 log-price | `OLS_Alpha`, `Hedge_Ratio`, `Spread_Mean/Std` |
+| HDBSCAN UMAP | OLS 殘差 log-price | `OLS_Alpha`, `Hedge_Ratio`, `Quality_Score` |
+| HDBSCAN MultiScale | OLS 殘差 log-price | `OLS_Alpha`, `Hedge_Ratio`, `Corr_Mean`, `Coint_Pass_Rate` |
 
-> 💡 **最佳命名格式建議**：
-> `results/[DATASET]/[METHOD]_[REENTRY]/TradeLogs_top[N]_sl[SL]_zwin[Z]_psl[PSL]_msr[MSR]_dsz[DSZ]_[VOL].csv`
-> * 實例：`results/current/HDBSCAN_UMAP_NoReEntry/HDBSCAN_UMAP_TradeLogs_Top5_SL5_ZWin0_PSL10_MSR3_DSZ3_NoVol.csv`
+### 過濾門檻（全策略共用）
 
-### 3.2 CSV 必備欄位結構
-回測 CSV 檔案中，請務必包含並精確命名以下欄位：
-* `Date` (格式: `YYYY-MM-DD`) - 交易日期
-* `Position` (數值, 例如 `1`, `0`, `-1`) - 持倉狀態
-* `Ticker_A`, `Ticker_B` - 交易配對標的代號
-* `Daily_Delta` (數值) - 每日 PnL 損益變化量（用以計算累計權益曲線、年化報酬率與 Sharpe Ratio）
-* `Status` (字串, 如 `Stop Loss`、`Normal Exit` 或 `停損`) - 交易結束狀態（若包含 `stop`、`sl` 或 `停損`，會被統計入 Stop Losses 次數）
-* `Hedge_Ratio` - 配對避險比例 (OLS 或 EG 計算之 Beta)
-* `Price_A`, `Price_B` - 標的價格（用以進行單對 Trade Visualizer 繪圖）
-* `Days_Held` - 持倉天數
-* `Period_Start`, `Period_End` - 該配對所屬的交易週期起訖時間
+| 指標 | 門檻 |
+| :--- | :--- |
+| OU 半衰期 | 1 ≤ halflife ≤ 60 天 |
+| Hurst 指數 | < 0.50（均值回歸） |
+| ADF p-value | ≤ 0.05（DTW/HDBSCAN）或 ≤ 0.01（SSD） |
+| 零穿越次數 | ≥ 5 次 |
+
+### HDBSCAN MultiScale 設計說明
+
+- **子期間**：`_make_relative_sub_periods(form_start, form_end, n_splits=4)` 將形成期等分為 4 段（Q1–Q4），確保每個 252 天滾動窗口都有 4 段可計算，不依賴固定日曆邊界
+- **熊市判斷**：`_build_dynamic_bear_mask()` 以等權 log-price 指數低於 60 日 MA 動態標記熊市日，無需硬編碼歷史日期
+- **Coverage 評分**：`s_coverage = n_valid_periods / n_splits`，分母與實際子期間數一致，滿分可達
 
 ---
 
-## 4. 策略管理標準作業程序 (SOP)
+## 5. 交易期策略說明
 
-### ➕ 4.1 新增策略作業
-1. **策略代碼開發**：在 `strategies/` 下新建您的策略 Python 模組（例如 `my_strategy.py`），並實作 `run_strategy` 標準接口。
-2. **註冊回測任務**：開啟 `strategies/config.py`，在 `strategies_raw` 列表中添加您的策略配置與網格搜尋參數。
-3. **執行回測**：依序運行 `python run_formation.py` 與 `python run_trading.py`，產出對應的配對資料庫與交易期 Trade Logs CSV。
-4. **指標編譯**：運行 `python preprocess_equity.py`，將新策略的最優曲線編譯進 `equity_curves.csv` 並更新 `analysis.ipynb` 表格。
-5. **啟動儀表板**：重啟或重新整理 Streamlit，即可在界面中勾選並比對新策略的效能！
+### Spread 重建三條路徑（`zscore_trading.py`）
 
-### 📝 4.2 修訂策略作業
-如果您修改了策略邏輯或調整了回測參數：
-1. **執行回測與覆寫**：重新運行 `run_formation.py` 與 `run_trading.py`。智慧斷點與期數級別快取機制會自動識別代碼或參數的變更，強制重新計算並覆寫對應的結果。
-2. **⚠️ 關鍵步驟：清除 Dashboard 快取**：
-   * 由於 Dashboard 使用了 Streamlit 記憶體快取技術 (`@st.cache_data`) 來加速巨量數據的讀取，**單純重新整理網頁是不會讀入更新後的 CSV 資料的！**
-   * **清除快取方法**：在 Streamlit 網頁右上角點選三個點的選單 $\rightarrow$ 點擊 **"Clear cache"**（或直接在網頁畫面上按下鍵盤的 **`C`** 鍵）並點擊確認。
+| 路徑 | 觸發條件 | 公式 |
+| :--- | :--- | :--- |
+| A | `OLS_Alpha` 不為 None | $\ln P_A - \alpha - \beta \ln P_B$ |
+| B1 | `OLS_Alpha` 為 None + `First_Price_A/B > 0` | $P_A/P_{A0} - P_B/P_{B0}$ |
+| B2 | `OLS_Alpha` 為 None，無 `First_Price` | $P'_A - \beta P'_B$（Z-Score 標準化 log） |
 
-### ❌ 4.3 刪除策略作業
-當某些舊策略不再需要進行績效比對時：
-1. **移除檔案**：
-   * 開啟 `results/` 目錄，直接刪除不需要的 CSV 檔案或整個子策略資料夾。
-   * *(推薦備份做法)* 將不需要的 CSV 移至根目錄的 `archive/` 中（建議依日期/月份分類放置，例如 `11506/`）。由於 Dashboard 與編譯器只會掃描 `results/`，移出此目錄的檔案將不會被載入。
-2. **清除 Dashboard 快取**：在 Streamlit 介面上按下鍵盤的 **`C`** 鍵清除快取，已刪除的策略就會完全從 Dashboard 與選單中消失。
+### DRL LSTM-DQN（`drl_lstm_trading.py`）
+
+- **訓練**：每配對每期獨立訓練，40 episodes，agent 快取於 `Trading._shared_agents`
+- **8 維觀測**：`[ZScore, Rel_Return, MA_Dist, TTM, Spread_Std, position, days_held_norm, Spread_Trend]`
+- **動作**：`0=Flat, 1=Long_Spread, 2=Short_Spread`
+- **網路**：LSTM(seq_len=10, hidden=64) → FC → 3 Q 值
+
+### 六大風控機制
+
+1. **SL**：個配對停損（`stop_loss_pct`，預設停用）
+2. **DSZ**：Z-Score 發散停損（`dynamic_stop_z`）
+3. **PSL**：全域組合停損（`portfolio_stop_loss_pct`，使用 `Unrealized_PnL` 計帳）
+4. **MSR**：產業分散上限（`max_sector_ratio`）
+5. **Cooldown**：方向性冷卻（等 Z 穿越 0 才解凍）
+6. **VOL ADJ**：波動率自適應（`use_vol_adjust`，動態放大 σ）
 
 ---
 
-## 5. 學術與參考資源
+## 6. 資料庫規範
 
-* **學術論文庫 (`ref/`)**：專案收集了從 2006 年至 2025 年共 23 篇經典的配對交易與機器學習論文（如共整合 Copula 方法、無監督學習配對、以及強化學習配對交易模型），為本專案的策略設計（如 HDBSCAN 與自編碼器）奠定了深厚的理論基礎。
-* **參考程式碼 (`Ref_CODE/`)**：包含了專案開發初期的原型程式碼（DTW 配對、經典 SSD 策略等）與二十年歷史股價 Excel 對照表，供策略開發與正確性驗證時查閱。
+### dataset/ — 價格資料庫（Git LFS）
+
+| 檔案 | 用途 |
+| :--- | :--- |
+| `sp500_yF.db` | 主要資料庫，`DB_PATH` 預設指向此 |
+| `sp500_Tiingo.db` | Tiingo 備用（config 可切換） |
+| `sp500_Current.db` | 現行成分股查詢 |
+
+資料表：`Prices`（Date, Symbol, Open, High, Low, Close, Volume）、`Constituents`（Symbol, GICS_Sector）
+
+### formation_data/ — 形成期結果資料庫（Git LFS）
+
+| 檔案 | 說明 |
+| :--- | :--- |
+| `formation_pairs_sp500_yF.db` | 所有策略的形成期配對主資料庫 |
+| `formation_pairs_sp500_yF_*.db` | 各策略獨立暫存庫（測試用，不上傳 Git） |
+
+---
+
+## 7. 策略新增 SOP
+
+1. 在 `strategies/formation/` 建立新模組，實作 `class Formation` 與 `run()` 方法，回傳含 `Ticker_A/B, Rank, Hedge_Ratio` 等欄位的 DataFrame
+2. 在 `strategies/trading/` 確認交易期模組（通常直接使用 `drl_lstm_trading.py`）
+3. 在 `strategies/config.py` 的 `strategies_raw_all` 新增策略字典，指定 `formation_module`、`trading_module` 及所有 params
+4. 調整 `strategies_raw = strategies_raw_all[...]` 以啟用新策略
+5. 依序執行 `run_formation.py` → `run_trading.py`
+
+---
+
+## 8. Git 規範
+
+### 追蹤原則
+
+| 類型 | 處理 |
+| :--- | :--- |
+| 核心 `.py` 程式碼 | 一律追蹤 |
+| `dataset/*.db`、`formation_data/formation_pairs_sp500_yF.db` | Git LFS 追蹤（`.gitattributes` 設定） |
+| `formation_data/formation_pairs_sp500_yF_*.db` | `.gitignore` 忽略（測試暫存） |
+| `results/`、`tmp/`、`scratch/`、`data/`、`Ref_CODE/` | `.gitignore` 忽略 |
+| `*.db-shm`、`*.db-wal` | `.gitignore` 忽略（SQLite WAL 暫存） |
+
+### 注意事項
+
+- 執行 `git add formation_data/*.db` 前確認已安裝 Git LFS（`git lfs install`）
+- 大型 DB 首次推送需要 LFS 儲存空間配額

@@ -142,7 +142,7 @@ def worker_task(
     # 預先計算滾動期數
     roll_start_indices = list(range(local_first_trade_idx, total_days - FORWARD_DAYS + 1, rolling_step))
     last = total_days - FORWARD_DAYS
-    if roll_start_indices[-1] != last:
+    if roll_start_indices and roll_start_indices[-1] != last:
         roll_start_indices.append(last)
     total_windows = len(roll_start_indices)
 

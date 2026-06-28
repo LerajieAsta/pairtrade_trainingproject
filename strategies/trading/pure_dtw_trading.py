@@ -55,21 +55,25 @@ class PureDTWTrading(Trading):
             return pd.DataFrame()
 
 
-        # 如果傳入的 first_price_a/b 為非正值，則 fallback 交易期首日價格
-        if first_price_a <= 0.0 or first_price_b <= 0.0:
-            valid_idx = common_idx.intersection(self.trade_dates)
-            if len(valid_idx) > 0:
-                first_price_a = float(price_a.loc[valid_idx[0]])
-                first_price_b = float(price_b.loc[valid_idx[0]])
-            else:
-                first_price_a = float(price_a.iloc[0])
-                first_price_b = float(price_b.iloc[0])
+        # Spread 使用 OLS 殘差空間（與 DTW_Cointegration_Paper 形成期一致）
+        ols_alpha_val = kwargs.get("ols_alpha", None)
+        log_mean_a    = kwargs.get("log_mean_a", None)
+        log_mean_b    = kwargs.get("log_mean_b", None)
+        log_std_a     = kwargs.get("log_std_a", 1.0) or 1.0
+        log_std_b     = kwargs.get("log_std_b", 1.0) or 1.0
 
-        # 以形成期首日價格正規化，確保連續性
-        norm_p_a = price_a / (first_price_a if first_price_a > 1e-8 else 1.0)
-        norm_p_b = price_b / (first_price_b if first_price_b > 1e-8 else 1.0)
+        log_p_a = np.log(np.maximum(price_a, 1e-8))
+        log_p_b = np.log(np.maximum(price_b, 1e-8))
 
-        spread = norm_p_a - norm_p_b
+        if ols_alpha_val is not None:
+            # DTW：OLS 殘差 = log_A - alpha - beta * log_B（與形成期相同空間）
+            spread = log_p_a - ols_alpha_val - hedge_ratio * log_p_b
+        else:
+            # Fallback：Z-score 標準化對數價格空間
+            norm_p_a = (log_p_a - (log_mean_a or 0.0)) / (log_std_a if log_std_a > 1e-12 else 1.0)
+            norm_p_b = (log_p_b - (log_mean_b or 0.0)) / (log_std_b if log_std_b > 1e-12 else 1.0)
+            spread = norm_p_a - hedge_ratio * norm_p_b
+
         safe_std = max(form_spread_std, self.min_spread_std)
 
         if getattr(self, "use_vol_adjust", False):
@@ -78,7 +82,7 @@ class PureDTWTrading(Trading):
             adjusted_std = np.maximum(safe_std * vol_factor, self.min_spread_std)
         else:
             adjusted_std = safe_std
-            
+
         zscore = np.clip((spread - form_spread_mean) / adjusted_std, -self.zscore_clip, self.zscore_clip)
 
         valid_idx = common_idx.intersection(self.trade_dates)
@@ -137,10 +141,10 @@ class PureDTWTrading(Trading):
                 out_delta.append(0.0)
                 continue
 
-            # 冷卻期重設
-            if state.cooldown_dir == -1 and z <= self.exit_z:
+            # 冷卻期重設：等 Z-score 回穿 0 才允許再進場
+            if state.cooldown_dir == -1 and z >= 0.0:
                 state.cooldown_dir = 0
-            elif state.cooldown_dir == 1 and z >= -self.exit_z:
+            elif state.cooldown_dir == 1 and z <= 0.0:
                 state.cooldown_dir = 0
 
             if state.position != 0:

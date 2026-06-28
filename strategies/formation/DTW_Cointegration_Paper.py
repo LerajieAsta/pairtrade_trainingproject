@@ -172,9 +172,6 @@ class Formation:
                         "Spread_Std": round(spread_std, 6)
                     })
 
-        # if skipped_unknown_count > 0:
-        #     print(f"  [Formation] 跳過 {skipped_unknown_count} 支未分類股票。")
-
         if not records:
             return pd.DataFrame()
             
