@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S&P 500 Pairs Trading — 策略邏輯文件</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f8f9fa;
+      color: #212529;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 680px;
+      width: 100%;
+      padding: 3rem 2rem;
+    }
+    .header {
+      margin-bottom: 2.5rem;
+    }
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: #0d1117;
+      margin-bottom: 0.5rem;
+    }
+    .header p {
+      font-size: 0.95rem;
+      color: #6c757d;
+      line-height: 1.6;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      margin-top: 0.75rem;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      display: block;
+    }
+    .card:hover {
+      border-color: #0d6efd;
+      box-shadow: 0 2px 8px rgba(13,110,253,0.12);
+    }
+    .card-icon {
+      font-size: 1.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+      color: #0d1117;
+    }
+    .card p {
+      font-size: 0.82rem;
+      color: #6c757d;
+      line-height: 1.5;
+    }
+    .strategies {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .strategies h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6c757d;
+      margin-bottom: 0.75rem;
+    }
+    .strategy-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.4rem 0;
+      font-size: 0.88rem;
+      border-bottom: 1px solid #f1f3f5;
+    }
+    .strategy-item:last-child { border-bottom: none; }
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #28a745;
+      flex-shrink: 0;
+    }
+    .footer {
+      margin-top: 2rem;
+      font-size: 0.78rem;
+      color: #adb5bd;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>S&amp;P 500 Pairs Trading</h1>
+      <p>配對交易量化回測平台 — 策略邏輯技術文件</p>
+      <span class="badge">目前啟用 3 個策略</span>
+    </div>
+
+    <div class="cards">
+      <a class="card" href="formation.html">
+        <div class="card-icon">🔍</div>
+        <h2>形成期策略邏輯</h2>
+        <p>五大形成期模組的篩選流程、統計指標、Quality Score 公式與 Spread 空間定義</p>
+      </a>
+      <a class="card" href="trading.html">
+        <div class="card-icon">📈</div>
+        <h2>交易期策略邏輯</h2>
+        <p>Z-Score 狀態機、DRL LSTM-DQN 強化學習、六大風控機制與 PnL 計算公式</p>
+      </a>
+    </div>
+
+    <div class="strategies">
+      <h3>目前啟用策略</h3>
+      <div class="strategy-item">
+        <span class="dot"></span>
+        <span>SSD Rolling DRL — Z-Score 標準化 log-price 空間 + LSTM-DQN</span>
+      </div>
+      <div class="strategy-item">
+        <span class="dot"></span>
+        <span>HDBSCAN UMAP DRL — 10 維 Quality Score 分群 + LSTM-DQN</span>
+      </div>
+      <div class="strategy-item">
+        <span class="dot"></span>
+        <span>HDBSCAN MultiScale DRL — 形成期內部 4 等分子期間 + 動態熊市 + LSTM-DQN</span>
+      </div>
+    </div>
+
+    <div class="footer">
+      LerajieAsta / pairtrade_trainingproject
+    </div>
+  </div>
+</body>
+</html>
