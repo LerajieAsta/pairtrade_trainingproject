@@ -1,0 +1,32 @@
+project:
+  type: default
+  output-dir: ../docs
+
+format:
+  html:
+    theme:
+      dark: [darkly, custom.scss]
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    toc-title: "目錄"
+    smooth-scroll: true
+    code-fold: show
+    code-summary: "查看程式碼"
+    code-copy: true
+    code-line-numbers: false
+    highlight-style: dracula
+    html-math-method: katex
+    grid:
+      body-width: 900px
+      sidebar-width: 220px
+    self-contained: true
+    anchor-sections: true
+    citations-hover: false
+    footnotes-hover: false
+    link-external-newwindow: true
+
+execute:
+  enabled: false
+  echo: true
+  warning: false

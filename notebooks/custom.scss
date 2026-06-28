@@ -1,0 +1,158 @@
+/*-- scss:defaults --*/
+$body-bg:        #1a1a1a;
+$body-color:     #e0e0e0;
+$link-color:     #4da6ff;
+$font-size-base: 0.95rem;
+$line-height-base: 1.75;
+
+$code-bg:        #0d1117;
+$code-color:     #c9d1d9;
+
+$table-color:           #e0e0e0;
+$table-bg:              #1e1e1e;
+$table-border-color:    #333333;
+$table-striped-bg:      #222222;
+$table-hover-bg:        #2a2a2a;
+$table-striped-order:   odd;
+
+/*-- scss:rules --*/
+
+/* ── Typography ─────────────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5 {
+  color: #ffffff;
+  font-weight: 600;
+  margin-top: 1.8em;
+  line-height: 1.3;
+}
+h1 {
+  font-size: 1.75rem;
+  border-bottom: 2px solid #4da6ff;
+  padding-bottom: 0.4rem;
+  margin-bottom: 1rem;
+}
+h2 {
+  font-size: 1.3rem;
+  border-left: 4px solid #4da6ff;
+  padding-left: 10px;
+  margin-left: -14px;
+}
+h3 {
+  font-size: 1.08rem;
+  color: #c0d8f0;
+}
+
+/* ── Body layout ──────────────────────────────────────────────────────────── */
+body {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+/* Sidebar TOC */
+#quarto-sidebar {
+  background: #141414;
+  border-right: 1px solid #2a2a2a;
+}
+.sidebar-navigation a {
+  color: #a0b8cc;
+}
+.sidebar-navigation a:hover,
+.sidebar-navigation a.active {
+  color: #4da6ff;
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+.table {
+  color: #e0e0e0 !important;
+  border-color: #333333 !important;
+
+  thead th {
+    background-color: #2d2d2d !important;
+    color: #ffffff !important;
+    border-bottom: 2px solid #4da6ff !important;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    border-color: #2e2e2e !important;
+    vertical-align: middle;
+  }
+
+  &.table-striped tbody tr:nth-of-type(odd) td {
+    background-color: #222222 !important;
+  }
+
+  &.table-hover tbody tr:hover td {
+    background-color: #2a3a4a !important;
+    color: #ffffff !important;
+  }
+}
+
+/* ── Code blocks ─────────────────────────────────────────────────────────── */
+pre.sourceCode {
+  background-color: #0d1117 !important;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  border-left: 3px solid #4da6ff;
+}
+code {
+  font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+  font-size: 0.85rem;
+}
+p code, li code {
+  background: #252525;
+  color: #79c0ff;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+/* ── Callout blocks ──────────────────────────────────────────────────────── */
+.callout {
+  background-color: #252525 !important;
+  border-radius: 6px;
+  margin: 1.2rem 0;
+
+  .callout-header {
+    background-color: #2d2d2d !important;
+    font-weight: 600;
+  }
+
+  &.callout-important {
+    border-left-color: #ff5555 !important;
+    .callout-header { color: #ff8080 !important; }
+  }
+  &.callout-note {
+    border-left-color: #4da6ff !important;
+    .callout-header { color: #7ec8ff !important; }
+  }
+  &.callout-tip {
+    border-left-color: #50fa7b !important;
+    .callout-header { color: #80ffaa !important; }
+  }
+  &.callout-warning {
+    border-left-color: #ffb86c !important;
+    .callout-header { color: #ffd0a0 !important; }
+  }
+}
+
+/* Blockquote → callout-note style */
+blockquote {
+  background: #1e2a38;
+  border-left: 4px solid #4da6ff;
+  border-radius: 0 6px 6px 0;
+  padding: 0.7rem 1rem;
+  color: #aaccee;
+  margin: 1rem 0;
+}
+
+/* ── Math ────────────────────────────────────────────────────────────────── */
+.math { color: #e0e0e0; }
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+hr {
+  border-color: #333333;
+  margin: 2rem 0;
+}
+.quarto-title-banner {
+  background: #141414 !important;
+}
