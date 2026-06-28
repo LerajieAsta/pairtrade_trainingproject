@@ -47,6 +47,13 @@ Project/
 .tmp/
 tmp/
 
+# Generated notebook outputs
+notebooks/iframe_figures/
+notebooks/equity_curves.csv
+
+# Diagnostic / scratch scripts
+scratch/
+
 # user specified Custom ignored data
 ref/
 reference/
@@ -54,3 +61,7 @@ Ref_CODE/
 result/
 results/
 data/
+
+# formation_data: exclude unmerged per-strategy test DBs, keep main merged DB
+formation_data/formation_pairs_sp500_yF_*.db
+formation_data/formation_pairs_sp500_Tiingo.db
