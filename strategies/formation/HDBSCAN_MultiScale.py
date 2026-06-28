@@ -63,21 +63,26 @@ warnings.filterwarnings("ignore")
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 市場週期定義（SP500 × 2000–2025）
-# ══════════════════════════════════════════════════════════════════════
-
-DEFAULT_SUB_PERIODS = [
-    ("2000-01-01", "2004-12-31", "Tech_Bubble"),
-    ("2005-01-01", "2009-12-31", "GFC"),
-    ("2010-01-01", "2014-12-31", "Post_GFC"),
-    ("2015-01-01", "2019-12-31", "Low_Vol_Bull"),
-    ("2020-01-01", "2025-12-31", "COVID_Rate_Hike"),
-]
-
-
-# ══════════════════════════════════════════════════════════════════════
 # 工具函數
 # ══════════════════════════════════════════════════════════════════════
+
+def _make_relative_sub_periods(form_start: str, form_end: str, n_splits: int = 4) -> list[tuple]:
+    """
+    將形成期 [form_start, form_end] 等分為 n_splits 段，回傳 (start, end, label) 清單。
+    取代固定日曆邊界，確保每個滾動窗口都有 n_splits 個子期間可計算。
+    """
+    s = pd.Timestamp(form_start)
+    e = pd.Timestamp(form_end)
+    total_days = (e - s).days
+    if total_days <= 0 or n_splits <= 0:
+        return [(form_start, form_end, "Full")]
+    step = total_days / n_splits
+    periods = []
+    for i in range(n_splits):
+        ps = s + pd.Timedelta(days=int(i * step))
+        pe = (s + pd.Timedelta(days=int((i + 1) * step)) - pd.Timedelta(days=1)) if i < n_splits - 1 else e
+        periods.append((ps.strftime("%Y-%m-%d"), pe.strftime("%Y-%m-%d"), f"Q{i+1}"))
+    return periods
 
 def _sub_period_corr(
     log_a: np.ndarray,
@@ -189,25 +194,16 @@ def _sub_period_hurst(
 
 
 def _bull_bear_corr_diff(
-    ret_a:        np.ndarray,
-    ret_b:        np.ndarray,
-    idx:          pd.DatetimeIndex,
-    bear_periods: list[tuple] = None,
+    ret_a:     np.ndarray,
+    ret_b:     np.ndarray,
+    bear_mask: np.ndarray,   # boolean array, same length as ret_a/ret_b
 ) -> dict:
-    if bear_periods is None:
-        bear_periods = [
-            ("2000-03-01", "2002-10-31"),
-            ("2007-10-01", "2009-03-31"),
-            ("2020-02-01", "2020-04-30"),
-            ("2022-01-01", "2022-12-31"),
-        ]
-
-    bear_mask = np.zeros(len(idx), dtype=bool)
-    for (bs, be) in bear_periods:
-        bear_mask |= (idx >= bs) & (idx <= be)
+    """
+    計算牛熊市條件相關差異。
+    bear_mask 由動態 MA 方法在呼叫前計算，不依賴硬編碼的歷史日期。
+    """
     bull_mask = ~bear_mask
-
-    result = {"corr_bull": 0.5, "corr_bear": 0.5, "regime_diff": 0.5}
+    result    = {"corr_bull": 0.5, "corr_bear": 0.5, "regime_diff": 0.5}
 
     if bull_mask.sum() >= 30:
         c = np.corrcoef(ret_a[bull_mask], ret_b[bull_mask])[0, 1]
@@ -255,13 +251,13 @@ def _sub_period_vol_ratio_stability(
 
 
 def _compute_multiscale_pair_features(
-    log_a:              np.ndarray,
-    log_b:              np.ndarray,
-    idx:                pd.DatetimeIndex,
-    sub_periods:        list[tuple],
-    adf_max_lags:       int   = 1,
-    adf_pvalue_thresh:  float = 0.05,
-    bear_periods:       list  = None,
+    log_a:             np.ndarray,
+    log_b:             np.ndarray,
+    idx:               pd.DatetimeIndex,
+    sub_periods:       list[tuple],
+    bear_mask_ret:     np.ndarray,   # boolean array len = len(idx)-1
+    adf_max_lags:      int   = 1,
+    adf_pvalue_thresh: float = 0.05,
 ) -> dict:
     ret_a   = np.diff(log_a)
     ret_b   = np.diff(log_b)
@@ -269,7 +265,7 @@ def _compute_multiscale_pair_features(
 
     corr_info   = _sub_period_corr(log_a, log_b, idx, sub_periods)
     coint_info  = _sub_period_coint(log_a, log_b, idx, sub_periods, adf_max_lags, adf_pvalue_thresh)
-    regime_info = _bull_bear_corr_diff(ret_a, ret_b, idx_ret, bear_periods)
+    regime_info = _bull_bear_corr_diff(ret_a, ret_b, bear_mask_ret)
     vol_info    = _sub_period_vol_ratio_stability(ret_a, ret_b, idx_ret, sub_periods)
     hurst_info  = _sub_period_hurst(log_a, log_b, log_a, log_b, idx, sub_periods, adf_max_lags)
 
@@ -289,7 +285,7 @@ def _compute_multiscale_pair_features(
     }
 
 
-def _multiscale_quality_score(mf: dict) -> float:
+def _multiscale_quality_score(mf: dict, n_splits: int = 4) -> float:
     s_corr_mean   = max(0.0, (mf["corr_mean"] - 0.5) / 0.5)
     s_corr_std    = max(0.0, 1.0 - mf["corr_std"] / 0.3)
     s_corr_min    = max(0.0, mf["corr_min"])
@@ -301,7 +297,8 @@ def _multiscale_quality_score(mf: dict) -> float:
     s_vol_mean    = max(0.0, 1.0 - abs(mf["vol_ratio_mean"] - 1.0) / 2.0)
     s_hurst_mean  = max(0.0, (0.5 - mf["hurst_mean"])  / 0.5)
     s_hurst_worst = max(0.0, (0.5 - mf["hurst_worst"]) / 0.5)
-    s_coverage    = min(1.0, mf["n_valid_periods"] / 5.0)
+    # 分母改為實際子期間數，確保任何滾動窗口下滿分都可達到
+    s_coverage    = min(1.0, mf["n_valid_periods"] / max(1, n_splits))
 
     return float(
         0.10 * s_corr_mean   +
@@ -385,8 +382,8 @@ class Formation:
         top_n:                   int   = 20,
         sector_mapping:          dict  = None,
         min_tickers_for_pairing: int   = 2,
-        sub_periods:             list  = None,
-        bear_periods:            list  = None,
+        n_splits:                int   = 4,    # 形成期內部等分數（取代固定日曆子期間）
+        bear_ma_window:          int   = 60,   # 動態熊市判斷：等權指數低於 N 日 MA 即為熊市
         min_corr_mean:           float = 0.50,
         min_corr_min:            float = 0.10,
         max_corr_std:            float = 0.30,
@@ -409,6 +406,7 @@ class Formation:
         umap_n_neighbors:        int   = 40,
         umap_min_dist:           float = 0.01,
         umap_random_state:       int   = 42,
+        pca_n_components:        int   = 15,
         max_sector_ratio:        float = 0.3,
         use_mom1_filter:         bool  = True,
         market_returns: Optional[pd.Series] = None,
@@ -420,18 +418,13 @@ class Formation:
         self.sector_mapping          = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
         self.max_sector_ratio        = max_sector_ratio
+        self.n_splits                = n_splits
+        self.bear_ma_window          = bear_ma_window
 
-        raw_periods      = sub_periods if sub_periods is not None else DEFAULT_SUB_PERIODS
-        self.sub_periods = [
-            (s, e, label) for (s, e, label) in raw_periods
-            if s <= form_end and e >= form_start
-        ]
-        if not self.sub_periods:
-            self.sub_periods = [(form_start, form_end, "Full")]
+        # 從形成期內部等分產生子期間，確保每個滾動窗口都有 n_splits 段可計算
+        self.sub_periods = _make_relative_sub_periods(form_start, form_end, n_splits)
 
-        self.bear_periods = bear_periods
-
-        self.min_corr_mean        = min_corr_mean
+        self.min_corr_mean         = min_corr_mean
         self.min_corr_min         = min_corr_min
         self.max_corr_std         = max_corr_std
         self.min_coint_pass_rate  = min_coint_pass_rate
@@ -454,6 +447,7 @@ class Formation:
         self.umap_n_neighbors  = umap_n_neighbors
         self.umap_min_dist     = umap_min_dist
         self.umap_random_state = umap_random_state
+        self.pca_n_components  = pca_n_components
 
         if self.reduce_method == "umap" and not UMAP_AVAILABLE:
             raise RuntimeError("umap-learn 未安裝：pip install umap-learn")
@@ -463,6 +457,25 @@ class Formation:
 
         self.selected_pairs:  pd.DataFrame = pd.DataFrame()
         self.cluster_labels_: dict         = {}
+
+    def _build_dynamic_bear_mask(self) -> np.ndarray:
+        """
+        動態計算熊市 mask（長度 = len(price_df) - 1，對應日報酬序列）。
+        以等權平均 log-price 指數對比其 bear_ma_window 日 MA：
+          - 指數低於 MA → 熊市（True）
+          - 指數高於 MA → 牛市（False）
+        完全基於形成期內部資料，不使用任何硬編碼歷史日期。
+        """
+        log_prices   = np.log(self.price_df)
+        eq_idx       = log_prices.mean(axis=1)          # 等權 log-price 指數
+        prices_exp   = np.exp(eq_idx.values)
+        ma_window    = max(5, self.bear_ma_window)
+        min_periods  = max(1, ma_window // 2)
+        ma           = (pd.Series(prices_exp)
+                        .rolling(ma_window, min_periods=min_periods)
+                        .mean().values)
+        bear_price   = prices_exp < ma                  # 長度 = len(price_df)
+        return bear_price[1:]                           # 截去第一天（對齊日報酬長度）
 
     def _build_feature_matrix(self) -> tuple[np.ndarray, list[str]]:
         log_prices = np.log(self.price_df)
@@ -511,16 +524,15 @@ class Formation:
 
     def _pca_reduce(self, X: np.ndarray) -> np.ndarray:
         from sklearn.decomposition import PCA
-        n_comp = min(self.umap_n_components, X.shape[0] - 1)
+        n_comp = min(self.pca_n_components, X.shape[0] - 1, X.shape[1])
         if n_comp < 1:
             return X
         return PCA(n_components=n_comp, random_state=self.umap_random_state).fit_transform(X)
 
-    def _pca_umap_reduce(self, X: np.ndarray, pca_components: int = 15) -> np.ndarray:
+    def _pca_umap_reduce(self, X: np.ndarray) -> np.ndarray:
         """先 PCA 降維去除噪音，再 UMAP 非線性嵌入，降低退化解機率。"""
         from sklearn.decomposition import PCA
-        n = X.shape[0]
-        pca_comp = min(pca_components, n - 1, X.shape[1])
+        pca_comp = min(self.pca_n_components, X.shape[0] - 1, X.shape[1])
         if pca_comp >= 1:
             X = PCA(n_components=pca_comp, random_state=self.umap_random_state).fit_transform(X)
         return self._umap_reduce(X)
@@ -560,8 +572,9 @@ class Formation:
 
     def _cointegration_within_clusters(
         self,
-        tickers: list[str],
-        labels:  np.ndarray,
+        tickers:      list[str],
+        labels:       np.ndarray,
+        bear_mask_ret: np.ndarray,
     ) -> pd.DataFrame:
         log_prices    = np.log(self.price_df[tickers])
         idx           = pd.DatetimeIndex(self.price_df.index)
@@ -670,9 +683,9 @@ class Formation:
                         log_b             = log_b,
                         idx               = idx,
                         sub_periods       = self.sub_periods,
+                        bear_mask_ret     = bear_mask_ret,
                         adf_max_lags      = self.adf_max_lags,
                         adf_pvalue_thresh = self.adf_sub_pvalue,
-                        bear_periods      = self.bear_periods,
                     )
 
                     if mf["corr_mean"]       < self.min_corr_mean:       rejected_count += 1; continue
@@ -682,7 +695,7 @@ class Formation:
                     if mf["regime_diff"]     > self.max_regime_diff:     rejected_count += 1; continue
                     if mf["vol_ratio_std"]   > self.max_vol_ratio_std:   rejected_count += 1; continue
 
-                    quality_score   = _multiscale_quality_score(mf)
+                    quality_score   = _multiscale_quality_score(mf, n_splits=self.n_splits)
                     passed_count   += 1
                     assigned_sector = sec_a if sec_a == sec_b else f"Cluster_{cluster_lbl}"
 
@@ -776,7 +789,8 @@ class Formation:
         labels  = self._hdbscan_cluster(X_embed)
         self.cluster_labels_ = {t: int(lbl) for t, lbl in zip(valid_tickers, labels)}
 
-        eg_df = self._cointegration_within_clusters(valid_tickers, labels)
+        bear_mask_ret = self._build_dynamic_bear_mask()
+        eg_df = self._cointegration_within_clusters(valid_tickers, labels, bear_mask_ret)
         if eg_df.empty:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
