@@ -78,7 +78,7 @@ def _rolling_corr_stability(
 ) -> tuple[float, float]:
     if len(ret_a) < window * 2:
         c = np.corrcoef(ret_a, ret_b)[0, 1]
-        return float(c), 0.5
+        return (float(c) if np.isfinite(c) else 0.0), 0.5
 
     roll_corrs = []
     for start in range(0, len(ret_a) - window + 1, window // 2):
@@ -174,7 +174,10 @@ def _compute_pair_features(
     if bull_mask.sum() >= 20 and bear_mask.sum() >= 20:
         corr_bull = np.corrcoef(ret_a[bull_mask], ret_b[bull_mask])[0, 1]
         corr_bear = np.corrcoef(ret_a[bear_mask], ret_b[bear_mask])[0, 1]
-        corr_regime_diff = float(abs(corr_bull - corr_bear))
+        if np.isfinite(corr_bull) and np.isfinite(corr_bear):
+            corr_regime_diff = float(abs(corr_bull - corr_bear))
+        else:
+            corr_regime_diff = 0.5
     else:
         corr_regime_diff = 0.5
 
@@ -491,7 +494,7 @@ class Formation:
 
                     # 步驟 1：相關係數初篩
                     corr = float(np.corrcoef(log_a, log_b)[0, 1])
-                    if corr < self.min_corr:
+                    if not np.isfinite(corr) or corr < self.min_corr:
                         rejected_count += 1
                         continue
 
@@ -523,6 +526,15 @@ class Formation:
                     # 步驟 4：Hurst
                     hurst = _compute_hurst(best_resid, already_stationary=True)
                     if hurst >= self.hurst_threshold:
+                        rejected_count += 1
+                        continue
+
+                    # 步驟 4b：分段 Hurst（3 段均需 < hurst_threshold，確保全期均值回歸一致）
+                    seg_len = len(best_resid) // 3
+                    if seg_len >= 20 and any(
+                        _compute_hurst(best_resid[k * seg_len:(k + 1) * seg_len], already_stationary=True)
+                        >= self.hurst_threshold for k in range(3)
+                    ):
                         rejected_count += 1
                         continue
 

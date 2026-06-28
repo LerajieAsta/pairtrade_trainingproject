@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import sqlite3
+import inspect
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -41,16 +42,31 @@ def _build_filename(params: dict) -> str:
     msr   = int(params.get("max_sector_ratio", 0.0) * 100)
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}.csv"
 
-def check_trading_completed(strategy_config: dict, output_root: str) -> bool:
+def check_trading_completed(strategy_config: dict, output_root: str, results_db_path: str = "", dataset_name: str = "") -> bool:
     if FORCE_RERUN:
         return False
-        
-    sub_dir = strategy_config["sub_dir"]
-    params  = strategy_config["params"]
-    
+
+    sub_dir  = strategy_config["sub_dir"]
+    params   = strategy_config["params"]
     filename = _build_filename(params)
     csv_path = os.path.join(output_root, sub_dir, filename)
-    return os.path.exists(csv_path)
+
+    if not os.path.exists(csv_path):
+        return False
+
+    # Also verify the result is registered in result.db to catch stale CSV
+    if results_db_path and os.path.exists(results_db_path) and dataset_name:
+        try:
+            path_key = f"{dataset_name.lower()}/{sub_dir}/{filename}"
+            with sqlite3.connect(results_db_path, timeout=5.0) as _conn:
+                row = _conn.execute(
+                    "SELECT 1 FROM strategy_summaries WHERE _path = ?", (path_key,)
+                ).fetchone()
+                return row is not None
+        except Exception:
+            pass
+
+    return True
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -131,19 +147,23 @@ def worker_task(
         pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL, max_pairs=params.get("top_n", 10))
         all_trade_logs = []
 
+        # Cache signature once — valid for all periods and pairs of the same Trading class
+        _sig = inspect.signature(TradingClass.__init__)
+        _valid_kwargs_keys = set(_sig.parameters.keys())
+
         for i, (_, p_row) in enumerate(df_periods.iterrows()):
             period_start = p_row["Period_Start"]
             trade_start = p_row["Trade_Start"]
             trade_end = p_row["Trade_End"]
-            
+
             # 列印期數，觸發 ProgressAwareStdout 解析
             print(f"Period {i+1}/{total_periods}: {period_start} to {trade_end}")
 
             # 讀取該週期在形成期篩選出的配對 (使用 formation_strategy_id)
             df_pairs = pd.read_sql_query("""
-                SELECT Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params 
-                FROM formation_pairs 
-                WHERE strategy_id = ? AND Period_Start = ? 
+                SELECT Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params
+                FROM formation_pairs
+                WHERE strategy_id = ? AND Period_Start = ?
                 ORDER BY Pair_Rank ASC
             """, conn, params=(formation_strategy_id, period_start))
 
@@ -163,7 +183,21 @@ def worker_task(
                     "Params": json.loads(pair_row["Formation_Params"])
                 }
 
-            allocations = pm.allocate_capital(candidates)
+            if params.get("vol_target_allocation", False) and param_map and pm.current_equity > 0:
+                slots = pm.get_available_slots()
+                selected = candidates[:slots]
+                vol_inv = {
+                    p: 1.0 / max(float(param_map[p]["Params"].get("Spread_Std", 1.0) or 1.0), 1e-6)
+                    for p in selected
+                }
+                total_w = sum(vol_inv.values()) or 1.0
+                base = pm.current_equity / max(pm.max_pairs, 1)
+                n = len(selected)
+                allocations = {p: min(base * n * vol_inv[p] / total_w, base * 2.0) for p in selected}
+                for p, cap in allocations.items():
+                    pm.active_pairs[p] = cap
+            else:
+                allocations = pm.allocate_capital(candidates)
 
             # 取得該週期的價格數據切片
             trade_start_idx = date_to_idx.get(pd.to_datetime(trade_start))
@@ -171,16 +205,12 @@ def worker_task(
             if trade_start_idx is None or trade_end_idx is None:
                 print(f"  [Warning] Period dates ({trade_start} to {trade_end}) not found in database price index. Skipping period.")
                 continue
-            trade_prices = price_pivot.iloc[trade_start_idx : trade_end_idx + 1]
             trade_dates = all_dates[trade_start_idx : trade_end_idx + 1]
 
             # 延伸價格數據，提供 zscore_window 前期的價格以避免 trading 前期 Z-Score 為 NaN
             zwin = params.get("zscore_window", 0)
             extended_start_idx = max(0, trade_start_idx - zwin)
             trade_prices_extended = price_pivot.iloc[extended_start_idx : trade_end_idx + 1]
-
-            import inspect
-            sig = inspect.signature(TradingClass.__init__)
 
             for pair, capital in allocations.items():
                 ticker_a, ticker_b = pair
@@ -199,7 +229,7 @@ def worker_task(
                 for k, v in params.items():
                     kwargs[k] = v
 
-                valid_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+                valid_kwargs = {k: v for k, v in kwargs.items() if k in _valid_kwargs_keys}
 
                 trading_instance = TradingClass(**valid_kwargs)
 
@@ -477,7 +507,7 @@ def run_all_trading():
         }
         strategies_config.append(config)
 
-        if check_trading_completed(config, OUTPUT_ROOT):
+        if check_trading_completed(config, OUTPUT_ROOT, results_db_path, dataset_name):
             progress_dict[config["name"]] = {
                 "status": "SUCCESS",
                 "progress": "完成",
@@ -492,7 +522,6 @@ def run_all_trading():
             path_key = f"{dataset_subdir}/{config['sub_dir']}/{filename}"
             if os.path.exists(results_db_path):
                 try:
-                    import sqlite3
                     with sqlite3.connect(results_db_path, timeout=10.0) as temp_conn:
                         cursor = temp_conn.cursor()
                         cursor.execute("SELECT Final_Equity FROM strategy_summaries WHERE _path = ?", (path_key,))

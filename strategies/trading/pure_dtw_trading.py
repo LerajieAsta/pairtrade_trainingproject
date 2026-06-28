@@ -44,14 +44,7 @@ class PureDTWTrading(Trading):
         common_idx = price_a.index.intersection(price_b.index)
         price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
 
-        # ── 資料清洗：過濾單日漲跌幅超過 50% 的異常點 ──────────────────────
-        _max_daily_move = 0.50
-        price_a = price_a.where(price_a.pct_change().abs() <= _max_daily_move).ffill().bfill()
-        price_b = price_b.where(price_b.pct_change().abs() <= _max_daily_move).ffill().bfill()
-        common_idx = price_a.dropna().index.intersection(price_b.dropna().index)
-        price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
-
-        if len(price_a) < 5: 
+        if len(price_a) < 5:
             return pd.DataFrame()
 
 
@@ -218,27 +211,25 @@ class PureDTWTrading(Trading):
             if current_status in ["STOP_LOSS_TRIGGERED", "EXIT"]:
                 state.days_held = 0 
 
-            # 停損後填補剩餘交易日並退出
+            # 停損後填補剩餘交易日並退出（vectorized bulk-extend）
             if state.is_stopped and i < len(dates_arr) - 1:
-                for j in range(i + 1, len(dates_arr)):
-                    rd = dates_arr[j]
-                    r_z = 0.0 if np.isnan(zscore_arr[j]) else zscore_arr[j]
-                    r_pa, r_pb = pa_arr[j], pb_arr[j]
-                    
-                    out_dates.append(rd)
-                    out_pa.append(round(r_pa, 4))
-                    out_pb.append(round(r_pb, 4))
-                    out_hr.append(1.0)
-                    out_z.append(round(float(r_z), 4))
-                    out_pos.append(0)
-                    out_unrealized.append(0.0)
-                    out_realized.append(round(float(state.realized_pnl), 4))
-                    out_cum.append(round(float(state.realized_pnl), 4))
-                    out_status.append("STOPPED")
-                    out_trade_pnl.append(0.0)
-                    out_days.append(0)
-                    out_delta.append(0.0)
-                break 
+                remain = slice(i + 1, len(dates_arr))
+                n_remain = len(dates_arr) - (i + 1)
+                final_realized = round(float(state.realized_pnl), 4)
+                out_dates.extend(dates_arr[remain])
+                out_pa.extend([round(v, 4) for v in pa_arr[remain].tolist()])
+                out_pb.extend([round(v, 4) for v in pb_arr[remain].tolist()])
+                out_hr.extend([1.0] * n_remain)
+                out_z.extend([round(float(v), 4) for v in np.where(np.isnan(zscore_arr[remain]), 0.0, zscore_arr[remain]).tolist()])
+                out_pos.extend([0] * n_remain)
+                out_unrealized.extend([0.0] * n_remain)
+                out_realized.extend([final_realized] * n_remain)
+                out_cum.extend([final_realized] * n_remain)
+                out_status.extend(["STOPPED"] * n_remain)
+                out_trade_pnl.extend([0.0] * n_remain)
+                out_days.extend([0] * n_remain)
+                out_delta.extend([0.0] * n_remain)
+                break
 
         # 每期結束時強制平倉
         if state.position != 0 and out_status:

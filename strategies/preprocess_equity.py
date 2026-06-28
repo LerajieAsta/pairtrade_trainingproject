@@ -20,11 +20,11 @@ def _clean_price_errors(df: pd.DataFrame, memberships: pd.DataFrame) -> pd.DataF
     df = df.sort_values('date').copy()
     pct = df['price'].pct_change(fill_method=None).abs()
 
-    in_period = pd.Series(False, index=df.index)
-    for _, row in mem.iterrows():
-        start = row['start_date']
-        end = row['end_date'] if pd.notna(row['end_date']) else pd.Timestamp('2099-01-01')
-        in_period |= (df['date'] >= start) & (df['date'] <= end)
+    ends = mem['end_date'].fillna(pd.Timestamp('2099-01-01'))
+    in_period = pd.concat(
+        [(df['date'].ge(s) & df['date'].le(e)) for s, e in zip(mem['start_date'], ends)],
+        axis=1,
+    ).any(axis=1)
 
     bad = (pct > 2.0) & (df['volume'] == 0) & in_period
     if bad.any():

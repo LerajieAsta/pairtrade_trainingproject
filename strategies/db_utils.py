@@ -228,6 +228,7 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
     if df.empty:
         return None
 
+    df = df.copy()
     c_period = INITIAL_CAPITAL
     top_n_int = params.get("top_n", 20)
 

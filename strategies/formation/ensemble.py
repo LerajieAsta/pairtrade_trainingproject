@@ -94,16 +94,27 @@ class Formation:
             print(f"  [Ensemble] {name} 選出 {len(df)} 對")
             sub_results.append((name, df))
 
-        # 每個子策略建立 pair_key → Rank 映射
+        # 單次遍歷同時建立 rank_maps 和 key_to_row（合併原本的兩遍 iterrows）
         rank_maps = []
+        key_to_row: dict = {}
         for name, df in sub_results:
             if df.empty:
                 rank_maps.append({})
                 continue
-            rmap = {}
+            rmap: dict = {}
             for _, row in df.iterrows():
                 key = self._canonical_pair(str(row["Ticker_A"]), str(row["Ticker_B"]))
                 rmap[key] = int(row.get("Rank", row.name + 1))
+                if key not in key_to_row:
+                    key_to_row[key] = row.to_dict()
+                else:
+                    # 若兩個策略都有，取 Quality_Score 較高者；相同時以 Pair_Rank 較小者優先
+                    existing_score = key_to_row[key].get("Quality_Score", 0)
+                    new_score = row.get("Quality_Score", 0)
+                    existing_rank = key_to_row[key].get("Pair_Rank", key_to_row[key].get("Rank", 9999))
+                    new_rank = row.get("Pair_Rank", row.get("Rank", 9999))
+                    if new_score > existing_score or (new_score == existing_score and new_rank < existing_rank):
+                        key_to_row[key] = row.to_dict()
             rank_maps.append(rmap)
 
         all_keys = set()
@@ -118,25 +129,6 @@ class Formation:
         union_only_keys = all_keys - intersection_keys
 
         print(f"  [Ensemble] 交集配對: {len(intersection_keys)} 對 | 僅單策略: {len(union_only_keys)} 對")
-
-        # 建立候選列表（含原始 DataFrame 的欄位，取第一個子策略的資料為主）
-        # 建立 key → row 的映射（優先取 Quality_Score 較高的子策略的資料）
-        key_to_row = {}
-        for name, df in sub_results:
-            if df.empty:
-                continue
-            for _, row in df.iterrows():
-                key = self._canonical_pair(str(row["Ticker_A"]), str(row["Ticker_B"]))
-                if key not in key_to_row:
-                    key_to_row[key] = row.to_dict()
-                else:
-                    # 若兩個策略都有，取 Quality_Score 較高者；相同時以 Pair_Rank 較小者優先
-                    existing_score = key_to_row[key].get("Quality_Score", 0)
-                    new_score = row.get("Quality_Score", 0)
-                    existing_rank = key_to_row[key].get("Pair_Rank", key_to_row[key].get("Rank", 9999))
-                    new_rank = row.get("Pair_Rank", row.get("Rank", 9999))
-                    if new_score > existing_score or (new_score == existing_score and new_rank < existing_rank):
-                        key_to_row[key] = row.to_dict()
 
         def avg_rank(key):
             ranks = [rmap[key] for rmap in rank_maps if key in rmap]

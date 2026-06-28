@@ -63,7 +63,7 @@ DB_PROFILES = {
     },
 }
 
-DB_PATH = "./dataset/sp500_yF.db"
+DB_PATH = "./dataset/sp500_Tiingo.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
@@ -103,11 +103,55 @@ base_params = {
     "portfolio_stop_loss_pct":      0.0,
     "max_sector_ratio":             0.0,
     "dynamic_stop_z":               0.0,
+    "vol_regime_threshold":         0.0,
+    "vol_target_allocation":        False,
 }
 
 # hdbscan_common — kept as empty dict for import compatibility;
 # old HDBSCAN strategies (3-14) archived 2026-06-27 to archive/11506/formation/
 hdbscan_common = {}
+
+# ── 共用 HDBSCAN / UMAP 超參數區塊 ─────────────────────────────────────────
+_HDBSCAN_UMAP_COMMON = {
+    "hdbscan_min_cluster_size": 5,
+    "hdbscan_min_samples":      2,
+    "hdbscan_metric":           "euclidean",
+    "umap_n_components":        5,
+    "umap_n_neighbors":         40,
+    "umap_min_dist":            0.01,
+    "umap_random_state":        42,
+}
+
+# HDBSCAN_UMAP 的篩選門檻（用於策略 7、8、12 及 Ensemble 子策略）
+_HDBSCAN_UMAP_FILTERS = {
+    "adf_pvalue_threshold": 0.01,
+    "min_corr":             0.50,
+    "min_zero_crossings":   5,
+    "hurst_threshold":      0.5,
+    "halflife_min":         1.0,
+    "halflife_max":         FORWARD_DAYS / 3,
+    "roll_corr_window":     60,
+    "max_beta_diff":        0.8,
+    "max_vol_ratio":        3.0,
+    "min_adv_ratio":        0.1,
+    "use_mom1_filter":      True,
+    "feature_mode":         "stats10",
+}
+
+# HDBSCAN_MultiScale 的篩選門檻（用於策略 5、6、13 及 Ensemble 子策略）
+_HDBSCAN_MS_FILTERS = {
+    "adf_pvalue_threshold": 0.05,
+    "adf_sub_pvalue":       0.10,
+    "min_corr_mean":        0.50,
+    "min_corr_min":         0.10,
+    "max_corr_std":         0.30,
+    "min_coint_pass_rate":  0.40,
+    "max_regime_diff":      0.50,
+    "max_vol_ratio_std":    0.80,
+    "use_mom1_filter":      True,
+    "halflife_min":         1.0,
+    "halflife_max":         FORWARD_DAYS / 3,
+}
 
 strategies_raw_all = [
     # ── SSD ──────────────────────────────────────────────────────────────────
@@ -171,26 +215,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_MultiScale",
         "db_method":        "HDBSCAN (MultiScale)",
         "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "umap",
-            "adf_pvalue_threshold":     0.05,
-            "adf_sub_pvalue":           0.10,
-            "min_corr_mean":            0.50,
-            "min_corr_min":             0.10,
-            "max_corr_std":             0.30,
-            "min_coint_pass_rate":      0.40,
-            "max_regime_diff":          0.50,
-            "max_vol_ratio_std":        0.80,
-            "use_mom1_filter":          True,
-        },
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap"},
     },
     # 6. HDBSCAN MultiScale PCA-UMAP
     {
@@ -200,26 +225,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_MultiScale_PCA_UMAP",
         "db_method":        "HDBSCAN (MultiScale-PCA-UMAP)",
         "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "pca_umap",
-            "adf_pvalue_threshold":     0.05,
-            "adf_sub_pvalue":           0.10,
-            "min_corr_mean":            0.50,
-            "min_corr_min":             0.10,
-            "max_corr_std":             0.30,
-            "min_coint_pass_rate":      0.40,
-            "max_regime_diff":          0.50,
-            "max_vol_ratio_std":        0.80,
-            "use_mom1_filter":          True,
-        },
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "pca_umap"},
     },
     # 7. HDBSCAN UMAP
     {
@@ -229,29 +235,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_UMAP",
         "db_method":        "HDBSCAN (UMAP)",
         "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "umap",
-            "adf_pvalue_threshold":     0.01,
-            "min_corr":                 0.50,
-            "min_zero_crossings":       5,
-            "hurst_threshold":          0.5,
-            "halflife_min":             1.0,
-            "halflife_max":             60.0,
-            "roll_corr_window":         60,
-            "max_beta_diff":            0.8,
-            "max_vol_ratio":            3.0,
-            "min_adv_ratio":            0.1,
-            "use_mom1_filter":          True,
-            "feature_mode":             "stats10",
-        },
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap"},
     },
     # 8. HDBSCAN UMAP PCA-UMAP
     {
@@ -261,29 +245,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_UMAP_PCA_UMAP",
         "db_method":        "HDBSCAN (UMAP-PCA-UMAP)",
         "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "pca_umap",
-            "adf_pvalue_threshold":     0.01,
-            "min_corr":                 0.50,
-            "min_zero_crossings":       5,
-            "hurst_threshold":          0.5,
-            "halflife_min":             1.0,
-            "halflife_max":             60.0,
-            "roll_corr_window":         60,
-            "max_beta_diff":            0.8,
-            "max_vol_ratio":            3.0,
-            "min_adv_ratio":            0.1,
-            "use_mom1_filter":          True,
-            "feature_mode":             "stats10",
-        },
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "pca_umap"},
     },
     # ── Ensemble ─────────────────────────────────────────────────────────────
     # 9. Ensemble: HDBSCAN UMAP × HDBSCAN MultiScale
@@ -301,51 +263,12 @@ strategies_raw_all = [
                 {
                     "name":   "HDBSCAN UMAP",
                     "module": "strategies.formation.HDBSCAN_UMAP",
-                    "params": {
-                        "hdbscan_min_cluster_size": 5,
-                        "hdbscan_min_samples":      2,
-                        "hdbscan_metric":           "euclidean",
-                        "umap_n_components":        5,
-                        "umap_n_neighbors":         40,
-                        "umap_min_dist":            0.01,
-                        "umap_random_state":        42,
-                        "reduce_method":            "umap",
-                        "adf_pvalue_threshold":     0.01,
-                        "min_corr":                 0.50,
-                        "min_zero_crossings":       5,
-                        "hurst_threshold":          0.5,
-                        "halflife_min":             1.0,
-                        "halflife_max":             60.0,
-                        "roll_corr_window":         60,
-                        "max_beta_diff":            0.8,
-                        "max_vol_ratio":            3.0,
-                        "min_adv_ratio":            0.1,
-                        "use_mom1_filter":          True,
-                        "feature_mode":             "stats10",
-                    },
+                    "params": {**_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap"},
                 },
                 {
                     "name":   "HDBSCAN MultiScale",
                     "module": "strategies.formation.HDBSCAN_MultiScale",
-                    "params": {
-                        "hdbscan_min_cluster_size": 5,
-                        "hdbscan_min_samples":      2,
-                        "hdbscan_metric":           "euclidean",
-                        "umap_n_components":        5,
-                        "umap_n_neighbors":         40,
-                        "umap_min_dist":            0.01,
-                        "umap_random_state":        42,
-                        "reduce_method":            "umap",
-                        "adf_pvalue_threshold":     0.05,
-                        "adf_sub_pvalue":           0.10,
-                        "min_corr_mean":            0.50,
-                        "min_corr_min":             0.10,
-                        "max_corr_std":             0.30,
-                        "min_coint_pass_rate":      0.40,
-                        "max_regime_diff":          0.50,
-                        "max_vol_ratio_std":        0.80,
-                        "use_mom1_filter":          True,
-                    },
+                    "params": {**_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap"},
                 },
             ],
         },
@@ -397,30 +320,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_UMAP_DRL",
         "db_method":        "HDBSCAN (UMAP-DRL)",
         "trade_method":     "DRL",
-        "params":  {
-            **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "umap",
-            "adf_pvalue_threshold":     0.01,
-            "min_corr":                 0.50,
-            "min_zero_crossings":       5,
-            "hurst_threshold":          0.5,
-            "halflife_min":             1.0,
-            "halflife_max":             60.0,
-            "roll_corr_window":         60,
-            "max_beta_diff":            0.8,
-            "max_vol_ratio":            3.0,
-            "min_adv_ratio":            0.1,
-            "use_mom1_filter":          True,
-            "feature_mode":             "stats10",
-            "drl_episodes":             40,
-        },
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap", "drl_episodes": 40},
     },
     # 13. HDBSCAN MultiScale DRL
     {
@@ -430,30 +330,40 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_MultiScale_DRL",
         "db_method":        "HDBSCAN (MultiScale-DRL)",
         "trade_method":     "DRL",
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap", "drl_episodes": 40},
+    },
+    # ── Kalman Filter ─────────────────────────────────────────────────────────
+    # 14. SSD Rolling Kalman
+    {
+        "name":             "SSD Rolling Kalman",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "trading_module":   "strategies.trading.kalman_trading",
+        "sub_dir":          "SSD_Rolling_Kalman",
+        "db_method":        "SSD (Rolling-Kalman)",
+        "trade_method":     "Kalman",
         "params":  {
             **base_params,
-            "hdbscan_min_cluster_size": 5,
-            "hdbscan_min_samples":      2,
-            "hdbscan_metric":           "euclidean",
-            "umap_n_components":        5,
-            "umap_n_neighbors":         40,
-            "umap_min_dist":            0.01,
-            "umap_random_state":        42,
-            "reduce_method":            "umap",
-            "adf_pvalue_threshold":     0.05,
-            "adf_sub_pvalue":           0.10,
-            "min_corr_mean":            0.50,
-            "min_corr_min":             0.10,
-            "max_corr_std":             0.30,
-            "min_coint_pass_rate":      0.40,
-            "max_regime_diff":          0.50,
-            "max_vol_ratio_std":        0.80,
-            "use_mom1_filter":          True,
-            "drl_episodes":             40,
+            "kalman_delta": 1e-4,
+            "kalman_R":     1e-2,
+        },
+    },
+    # 15. HDBSCAN UMAP Kalman
+    {
+        "name":             "HDBSCAN UMAP Kalman",
+        "formation_module": "strategies.formation.HDBSCAN_UMAP",
+        "trading_module":   "strategies.trading.kalman_trading",
+        "sub_dir":          "HDBSCAN_UMAP_Kalman",
+        "db_method":        "HDBSCAN (UMAP-Kalman)",
+        "trade_method":     "Kalman",
+        "params": {
+            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
+            "reduce_method": "umap",
+            "kalman_delta":  1e-4,
+            "kalman_R":      1e-2,
         },
     },
 ]
-strategies_raw = strategies_raw_all[-3:]
+strategies_raw = strategies_raw_all[:]
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────

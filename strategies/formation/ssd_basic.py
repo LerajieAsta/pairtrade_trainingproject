@@ -34,6 +34,7 @@ class Formation:
         self.sector_mapping = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
         self.adf_pvalue_threshold = adf_pvalue_threshold
+        self.halflife_max = kwargs.get("trading_window", 126) / 3.0
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.first_day_prices: pd.Series = pd.Series(dtype=float)
@@ -128,7 +129,7 @@ class Formation:
                 continue
                 
             halflife = -np.log(2) / lambda_val
-            if halflife < 1.0 or halflife > 60.0:
+            if halflife < 1.0 or halflife > self.halflife_max:
                 continue
 
             # 步驟 3：Hurst 指數（均值回歸傾向）
@@ -166,13 +167,8 @@ class Formation:
         selected = ssd_df.head(self.top_n).copy()
         selected["Rank"] = range(1, len(selected) + 1)
 
-        first_price_a_list, first_price_b_list = [], []
-        for _, row in selected.iterrows():
-            first_price_a_list.append(self.price_df[row["Ticker_A"]].iloc[0])
-            first_price_b_list.append(self.price_df[row["Ticker_B"]].iloc[0])
-            
-        selected["First_Price_A"] = first_price_a_list
-        selected["First_Price_B"] = first_price_b_list
+        selected["First_Price_A"] = [self.price_df[t].iloc[0] for t in selected["Ticker_A"]]
+        selected["First_Price_B"] = [self.price_df[t].iloc[0] for t in selected["Ticker_B"]]
 
         self.selected_pairs = selected
         return self.selected_pairs

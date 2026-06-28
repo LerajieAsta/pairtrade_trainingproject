@@ -33,6 +33,7 @@ class Formation:
         self.sector_mapping = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
         self.adf_pvalue_threshold = adf_pvalue_threshold
+        self.halflife_max = kwargs.get("trading_window", 126) / 3.0
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -132,7 +133,7 @@ class Formation:
                 continue
                 
             halflife = -np.log(2) / lambda_val
-            if halflife < 1.0 or halflife > 60.0:
+            if halflife < 1.0 or halflife > self.halflife_max:
                 continue
 
             # 步驟 3：Hurst 指數（均值回歸傾向）
@@ -170,17 +171,10 @@ class Formation:
         selected = ssd_df.head(self.top_n).copy()
         selected["Rank"] = range(1, len(selected) + 1)
 
-        mean_a_list, std_a_list, mean_b_list, std_b_list = [], [], [], []
-        for _, row in selected.iterrows():
-            mean_a_list.append(self.mean_prices[row["Ticker_A"]])
-            std_a_list.append(self.std_prices[row["Ticker_A"]])
-            mean_b_list.append(self.mean_prices[row["Ticker_B"]])
-            std_b_list.append(self.std_prices[row["Ticker_B"]])
-            
-        selected["Log_Mean_A"] = mean_a_list
-        selected["Log_Std_A"] = std_a_list
-        selected["Log_Mean_B"] = mean_b_list
-        selected["Log_Std_B"] = std_b_list
+        selected["Log_Mean_A"] = [self.mean_prices[t] for t in selected["Ticker_A"]]
+        selected["Log_Std_A"]  = [self.std_prices[t]  for t in selected["Ticker_A"]]
+        selected["Log_Mean_B"] = [self.mean_prices[t] for t in selected["Ticker_B"]]
+        selected["Log_Std_B"]  = [self.std_prices[t]  for t in selected["Ticker_B"]]
 
         self.selected_pairs = selected
         return self.selected_pairs

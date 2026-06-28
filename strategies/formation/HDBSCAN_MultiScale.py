@@ -621,7 +621,7 @@ class Formation:
 
                     # 步驟 1：全期相關係數初篩
                     corr_full = float(np.corrcoef(log_a, log_b)[0, 1])
-                    if corr_full < self.min_corr_mean:
+                    if not np.isfinite(corr_full) or corr_full < self.min_corr_mean:
                         rejected_count += 1
                         continue
 
@@ -667,6 +667,15 @@ class Formation:
                     # 步驟 4：全期 Hurst
                     hurst = _compute_hurst(best_resid, already_stationary=True)
                     if hurst >= self.hurst_threshold:
+                        rejected_count += 1
+                        continue
+
+                    # 步驟 4b：分段 Hurst（3 段均需 < hurst_threshold，確保全期均值回歸一致）
+                    seg_len = len(best_resid) // 3
+                    if seg_len >= 20 and any(
+                        _compute_hurst(best_resid[k * seg_len:(k + 1) * seg_len], already_stationary=True)
+                        >= self.hurst_threshold for k in range(3)
+                    ):
                         rejected_count += 1
                         continue
 

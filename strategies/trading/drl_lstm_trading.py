@@ -262,20 +262,25 @@ class Trading:
     """DRL LSTM Trading Strategy Interface for run_trading.py"""
 
     _shared_agents: dict = {}  # class-level cache: {formation+trade+pair key -> DQNAgent}
+    _MAX_CACHED_AGENTS: int = 120  # cap to prevent OOM on long backtests
 
     def __init__(self, price_df: pd.DataFrame, trade_dates: pd.DatetimeIndex, selected_pairs: pd.DataFrame, capital_per_pair: float,
-                 fee_rate: float, slippage_rate: float, 
+                 fee_rate: float, slippage_rate: float,
                  drl_episodes: int = 100, drl_batch_size: int = 64, drl_gamma: float = 0.99,
                  drl_epsilon_start: float = 1.0, drl_epsilon_end: float = 0.05, drl_epsilon_decay: float = 0.995,
                  drl_lr: float = 1e-3, drl_hidden_size: int = 64, drl_num_layers: int = 1,
                  full_price_df: pd.DataFrame = None, formation_start: str = None, formation_end: str = None, **kwargs):
-        
-        self.trade_prices = price_df.copy()
+
+        # Pre-clean 50%+ daily moves once for both price matrices
+        _pct_clean = lambda df: df.where(df.pct_change().abs() <= 0.50).ffill().bfill() if df is not None else None
+        self.trade_prices = _pct_clean(price_df.copy())
+        self.full_price_df = _pct_clean(full_price_df.copy() if full_price_df is not None else None)
+
         self.trade_dates = trade_dates
         self.selected_pairs = selected_pairs
         self.capital_per_pair = capital_per_pair
         self.friction_rate = fee_rate + slippage_rate
-        
+
         self.drl_episodes = drl_episodes
         self.drl_batch_size = drl_batch_size
         self.drl_gamma = drl_gamma
@@ -285,8 +290,7 @@ class Trading:
         self.drl_lr = drl_lr
         self.drl_hidden_size = drl_hidden_size
         self.drl_num_layers = drl_num_layers
-        
-        self.full_price_df = full_price_df
+
         self.formation_start = formation_start
         self.formation_end = formation_end
         
@@ -334,6 +338,12 @@ class Trading:
 
         if agent_key in Trading._shared_agents:
             return Trading._shared_agents[agent_key]
+
+        # Evict oldest entries when cache exceeds limit to prevent OOM
+        if len(Trading._shared_agents) >= Trading._MAX_CACHED_AGENTS:
+            n_evict = len(Trading._shared_agents) - Trading._MAX_CACHED_AGENTS + 1
+            for old_key in list(Trading._shared_agents.keys())[:n_evict]:
+                del Trading._shared_agents[old_key]
             
         print(f"    [DRL] Initializing and training new Shared Agent for period {period_start}...")
         
@@ -394,13 +404,6 @@ class Trading:
         common_idx = price_a.index.intersection(price_b.index)
         price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
 
-        # ── 資料清洗：過濾單日漲跌幅超過 50% 的異常點 ──────────────────────
-        _max_daily_move = 0.50
-        price_a = price_a.where(price_a.pct_change().abs() <= _max_daily_move).ffill().bfill()
-        price_b = price_b.where(price_b.pct_change().abs() <= _max_daily_move).ffill().bfill()
-        common_idx = price_a.dropna().index.intersection(price_b.dropna().index)
-        price_a, price_b = price_a.loc[common_idx], price_b.loc[common_idx]
-
         if len(price_a) < 5: return pd.DataFrame()
 
         feat_df = self._prepare_features(price_a, price_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b, form_spread_mean, form_spread_std)
@@ -424,8 +427,8 @@ class Trading:
             fp_b = form_prices[ticker_b].dropna()
             common_form = fp_a.index.intersection(fp_b.index)
             if len(common_form) >= agent.seq_len + 5 and self.full_price_df is not None:
-                fp_a = fp_a.loc[common_form].where(fp_a.loc[common_form].pct_change().abs() <= 0.5).ffill().bfill()
-                fp_b = fp_b.loc[common_form].where(fp_b.loc[common_form].pct_change().abs() <= 0.5).ffill().bfill()
+                fp_a = fp_a.loc[common_form]
+                fp_b = fp_b.loc[common_form]
                 form_feat = self._prepare_features(fp_a, fp_b, hedge_ratio, log_mean_a, log_std_a, log_mean_b, log_std_b, form_spread_mean, form_spread_std)
                 tail = form_feat.iloc[-agent.seq_len:]
                 n_tail = len(tail)
@@ -445,23 +448,30 @@ class Trading:
             state_seq = deque([np.zeros(STATE_DIM, dtype=np.float32)] * agent.seq_len, maxlen=agent.seq_len)
 
         total_steps = len(dates_arr)
+        # Pre-extract columns to avoid per-step .iloc overhead
+        feat_np = feat_df[['Price_A', 'Price_B', 'ZScore', 'Rel_Return', 'MA_Dist', 'Spread_Std', 'Spread_Trend']].values.astype(np.float32)
+        total_steps_inv = 1.0 / max(total_steps, 1)
+        # Reusable numpy circular buffer — avoids deque→list→FloatTensor per step
+        seq_buf = np.array(list(state_seq), dtype=np.float32)  # (seq_len, STATE_DIM)
 
         for i in range(total_steps):
             date = dates_arr[i]
-            row = feat_df.iloc[i]
-            p_a, p_b = row['Price_A'], row['Price_B']
-            z = row['ZScore']
+            row_np = feat_np[i]
+            p_a, p_b = float(row_np[0]), float(row_np[1])
+            z = float(row_np[2])
 
-            time_to_mat = (total_steps - i) / total_steps
+            time_to_mat = (total_steps - i) * total_steps_inv
             obs = np.array([
-                z, row['Rel_Return'], row['MA_Dist'], time_to_mat,
-                row['Spread_Std'], float(state.position),
-                state.days_held / max(total_steps, 1), row['Spread_Trend'],
+                z, row_np[3], row_np[4], time_to_mat,
+                row_np[5], float(state.position),
+                state.days_held * total_steps_inv, row_np[6],
             ], dtype=np.float32)
-            state_seq.append(obs)
-            
+            # Shift buffer and insert new obs (avoids deque overhead)
+            seq_buf[:-1] = seq_buf[1:]
+            seq_buf[-1] = obs
+
             with torch.no_grad():
-                state_tensor = torch.FloatTensor(list(state_seq)).unsqueeze(0).to(agent.device)
+                state_tensor = torch.from_numpy(seq_buf).unsqueeze(0).to(agent.device)
                 q_values = agent.model(state_tensor)
                 action_idx = q_values.argmax().item()
             
