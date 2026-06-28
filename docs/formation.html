@@ -7793,7 +7793,75 @@ a.anchor-link {
     white-space: normal;
   }
 </style>
-<!-- End of mermaid configuration --></head>
+<!-- End of mermaid configuration -->
+<style>
+  /* ── Layout ── */
+  body { background: #f8f9fa; }
+  #notebook-container,
+  .jp-Notebook { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* ── Markdown cells ── */
+  .jp-MarkdownCell .jp-MarkdownOutput,
+  div.text_cell_render {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: #1a1a2e;
+  }
+
+  /* ── Tables ── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: #2c3e50;
+    color: #fff;
+    padding: 0.55rem 0.8rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  td { padding: 0.45rem 0.8rem; border-bottom: 1px solid #dee2e6; }
+  tr:nth-child(even) td { background: #f1f3f5; }
+  tr:hover td { background: #e8f4fd; }
+
+  /* ── Code blocks ── */
+  pre, code {
+    font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+    font-size: 0.85rem;
+  }
+  .jp-CodeCell .jp-InputArea-editor {
+    border-left: 3px solid #0d6efd;
+    border-radius: 4px;
+    background: #1e1e2e;
+  }
+
+  /* ── Headings ── */
+  h1 { font-size: 1.7rem; color: #0d1117; border-bottom: 2px solid #0d6efd; padding-bottom: 0.4rem; margin-bottom: 1rem; }
+  h2 { font-size: 1.25rem; color: #1a1a2e; margin-top: 2rem; }
+  h3 { font-size: 1.05rem; color: #2c3e50; margin-top: 1.5rem; }
+
+  /* ── Blockquote (callouts) ── */
+  blockquote {
+    border-left: 4px solid #0d6efd;
+    background: #e8f4fd;
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.9rem;
+    color: #1a3a5c;
+  }
+
+  /* ── Math ── */
+  .MathJax { font-size: 1.05em !important; }
+
+  /* ── Cell spacing ── */
+  .jp-Cell { margin-bottom: 0.25rem; }
+
+  /* ── Hide input prompt numbers ── */
+  .jp-InputPrompt, .jp-OutputPrompt { display: none; }
+</style></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
@@ -8221,9 +8289,46 @@ $$\text{方向 BA}: \quad x = \alpha_{BA} + \beta_{BA} y + \epsilon_{BA}$$</p>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="%F0%9F%95%90-%E5%9B%9B%E3%80%81-HDBSCAN-MultiScale-%E5%BD%A2%E6%88%90%E6%9C%9F%E9%82%8F%E8%BC%AF-(HDBSCAN_MultiScale.py)">🕐 四、 HDBSCAN MultiScale 形成期邏輯 (<code>HDBSCAN_MultiScale.py</code>)<a class="anchor-link" href="#%F0%9F%95%90-%E5%9B%9B%E3%80%81-HDBSCAN-MultiScale-%E5%BD%A2%E6%88%90%E6%9C%9F%E9%82%8F%E8%BC%AF-(HDBSCAN_MultiScale.py)">¶</a></h2><p>HDBSCAN MultiScale 採用「<strong>廣度</strong>」策略：不求在單一時期最優，而是篩選在<strong>多個市場週期內持續穩定</strong>的配對，衡量跨週期的共整合一致性。</p>
-<h3 id="4.1-%E5%AD%90%E6%99%82%E6%9C%9F%E5%88%87%E5%88%86">4.1 子時期切分<a class="anchor-link" href="#4.1-%E5%AD%90%E6%99%82%E6%9C%9F%E5%88%87%E5%88%86">¶</a></h3><p>將形成期按預設時間段（如 2000–2004、2005–2009、2010–2014、2015–2019、2020–2025）切分為多個子期間，過短的子期間會被合併。若無子期間符合，退化為全期單一窗口。</p>
-<h3 id="4.2-%E5%96%AE%E8%82%A1%E7%89%B9%E5%BE%B5%E8%90%83%E5%8F%96%EF%BC%88%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%EF%BC%89">4.2 單股特徵萃取（多時間尺度）<a class="anchor-link" href="#4.2-%E5%96%AE%E8%82%A1%E7%89%B9%E5%BE%B5%E8%90%83%E5%8F%96%EF%BC%88%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%EF%BC%89">¶</a></h3><p>對每支股票，在各子期間計算滾動特徵統計（均值、標準差、最差值、牛熊差等），拼接成跨時期的多維特徵向量。之後同樣透過 RobustScaler + UMAP/PCA 降維 + HDBSCAN 聚類。</p>
-<h3 id="4.3-%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%E5%93%81%E8%B3%AA%E8%A9%95%E5%88%86">4.3 多時間尺度品質評分<a class="anchor-link" href="#4.3-%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%E5%93%81%E8%B3%AA%E8%A9%95%E5%88%86">¶</a></h3><table>
+<h3 id="4.1-%E5%AD%90%E6%99%82%E6%9C%9F%E8%87%AA%E9%81%A9%E6%87%89%E5%88%87%E5%88%86">4.1 子時期自適應切分<a class="anchor-link" href="#4.1-%E5%AD%90%E6%99%82%E6%9C%9F%E8%87%AA%E9%81%A9%E6%87%89%E5%88%87%E5%88%86">¶</a></h3><p>不使用固定日曆邊界，而是<strong>以當次形成期的起訖日為基準</strong>，等比例切割為 <code>n_splits=4</code> 段（確保每個 252 天滾動窗口都有 4 段可計算）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">子期間</th>
+<th style="text-align:center">長度</th>
+<th style="text-align:left">說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">Q1</td>
+<td style="text-align:center">¼ 形成期</td>
+<td style="text-align:left">最早 ~63 天</td>
+</tr>
+<tr>
+<td style="text-align:center">Q2</td>
+<td style="text-align:center">¼ 形成期</td>
+<td style="text-align:left">次早 ~63 天</td>
+</tr>
+<tr>
+<td style="text-align:center">Q3</td>
+<td style="text-align:center">¼ 形成期</td>
+<td style="text-align:left">次晚 ~63 天</td>
+</tr>
+<tr>
+<td style="text-align:center">Q4</td>
+<td style="text-align:center">¼ 形成期</td>
+<td style="text-align:left">最晚 ~63 天</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>無預知未來問題：所有子期間均在形成期窗口內，不跨入交易期。</p>
+</blockquote>
+<h3 id="4.2-%E5%8B%95%E6%85%8B%E7%86%8A%E5%B8%82%E5%88%A4%E6%96%B7">4.2 動態熊市判斷<a class="anchor-link" href="#4.2-%E5%8B%95%E6%85%8B%E7%86%8A%E5%B8%82%E5%88%A4%E6%96%B7">¶</a></h3><p>不使用硬編碼歷史日期，而是即時計算形成期內每日的市場狀態：</p>
+<p>$$\text{Bear}_t = \left(\exp\!\left(\frac{1}{N}\sum_i \ln P_{i,t}\right) &lt; \text{MA}_{60}\right)$$</p>
+<p>等權 log-price 指數低於 60 日移動平均即判定為熊市日，動態標記 <code>bear_mask</code>。</p>
+<h3 id="4.3-%E5%96%AE%E8%82%A1%E7%89%B9%E5%BE%B5%E8%90%83%E5%8F%96%EF%BC%88%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%EF%BC%89">4.3 單股特徵萃取（多時間尺度）<a class="anchor-link" href="#4.3-%E5%96%AE%E8%82%A1%E7%89%B9%E5%BE%B5%E8%90%83%E5%8F%96%EF%BC%88%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%EF%BC%89">¶</a></h3><p>對每支股票，在各子期間計算滾動特徵統計（均值、標準差、最差值、牛熊差等），拼接成跨時期的多維特徵向量。之後同樣透過 RobustScaler + UMAP/PCA 降維 + HDBSCAN 聚類。</p>
+<h3 id="4.4-%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%E5%93%81%E8%B3%AA%E8%A9%95%E5%88%86">4.4 多時間尺度品質評分<a class="anchor-link" href="#4.4-%E5%A4%9A%E6%99%82%E9%96%93%E5%B0%BA%E5%BA%A6%E5%93%81%E8%B3%AA%E8%A9%95%E5%88%86">¶</a></h3><table>
 <thead>
 <tr>
 <th style="text-align:left">評分分項</th>
@@ -8269,7 +8374,7 @@ $$\text{方向 BA}: \quad x = \alpha_{BA} + \beta_{BA} y + \epsilon_{BA}$$</p>
 </tr>
 <tr>
 <td style="text-align:left"><code>regime_diff</code></td>
-<td style="text-align:left">牛熊相關差值</td>
+<td style="text-align:left">牛熊相關差值（動態計算）</td>
 <td style="text-align:center">0.06</td>
 </tr>
 <tr>
@@ -8294,6 +8399,7 @@ $$\text{方向 BA}: \quad x = \alpha_{BA} + \beta_{BA} y + \epsilon_{BA}$$</p>
 </tr>
 </tbody>
 </table>
+<p>Coverage 評分：$s_{\text{coverage}} = \min\!\left(1.0,\, n_{\text{valid\_periods}} / n_{\text{splits}}\right)$，分母與實際子期間數一致，滿分可達。</p>
 <blockquote>
 <p><strong>與 HDBSCAN UMAP 核心差異</strong>：UMAP 版用「完整形成期」的深度特徵（10 維配對品質）；MultiScale 版用「切片跨期」的廣度特徵（多週期穩定性）。兩者互補，故 ensemble.py 支援將二者取交集。</p>
 </blockquote>
@@ -8306,11 +8412,10 @@ $$\text{方向 BA}: \quad x = \alpha_{BA} + \beta_{BA} y + \epsilon_{BA}$$</p>
 <li><strong>Tier 1（交集）</strong>：兩個子策略均選出的配對，依<strong>平均排名</strong>升序排列（確定性最高）</li>
 <li><strong>Tier 2（補足）</strong>：僅一個子策略選出的配對，依<strong>最小排名</strong>升序補至 <code>top_n</code></li>
 </ol>
-<h3 id="5.2-%E6%96%B9%E5%90%91%E6%AD%A3%E5%89%87%E5%8C%96%EF%BC%88%E7%A2%BA%E4%BF%9D-Ticker_A-=-min-%E5%AD%97%E6%AF%8D%E5%BA%8F%EF%BC%89">5.2 方向正則化（確保 Ticker_A = min 字母序）<a class="anchor-link" href="#5.2-%E6%96%B9%E5%90%91%E6%AD%A3%E5%89%87%E5%8C%96%EF%BC%88%E7%A2%BA%E4%BF%9D-Ticker_A-=-min-%E5%AD%97%E6%AF%8D%E5%BA%8F%EF%BC%89">¶</a></h3><p>當某配對的原始子策略方向與正則 key 不同（即原始 Ticker_A &gt; Ticker_B 字母序），需翻轉 OLS 相關欄位：</p>
-<p>$$\beta_\text{new} = \frac{1}{\beta}, \quad \alpha_\text{new} = \frac{-\alpha}{\beta}$$
-$$\mu_{\epsilon,\text{new}} = \frac{-\alpha}{\beta} \approx 0, \quad \sigma_{\epsilon,\text{new}} = \frac{\sigma_\epsilon}{|\beta|}$$</p>
+<h3 id="5.2-%E6%96%B9%E5%90%91%E6%AD%A3%E5%89%87%E5%8C%96%EF%BC%88%E7%A2%BA%E4%BF%9D-Ticker_A-=-min-%E5%AD%97%E6%AF%8D%E5%BA%8F%EF%BC%89">5.2 方向正則化（確保 Ticker_A = min 字母序）<a class="anchor-link" href="#5.2-%E6%96%B9%E5%90%91%E6%AD%A3%E5%89%87%E5%8C%96%EF%BC%88%E7%A2%BA%E4%BF%9D-Ticker_A-=-min-%E5%AD%97%E6%AF%8D%E5%BA%8F%EF%BC%89">¶</a></h3><p>當某配對的原始子策略方向與正則 key 不同，需翻轉 OLS 相關欄位：</p>
+<p>$$\beta_{\text{new}} = \frac{1}{\beta}, \quad \alpha_{\text{new}} = \frac{-\alpha}{\beta}$$</p>
 <p>並同步交換 <code>Sector_A/B</code>、<code>Log_Mean_A/B</code>、<code>Log_Std_A/B</code>、<code>First_Price_A/B</code>。</p>
-<h3 id="5.3-%E9%85%8D%E5%B0%8D%E8%B3%87%E6%96%99%E9%81%B8%E6%93%87%EF%BC%88%E5%90%8C%E9%85%8D%E5%B0%8D%E8%A2%AB%E5%85%A9%E5%80%8B%E5%AD%90%E7%AD%96%E7%95%A5%E9%83%BD%E9%81%B8%E5%87%BA%E6%99%82%EF%BC%89">5.3 配對資料選擇（同配對被兩個子策略都選出時）<a class="anchor-link" href="#5.3-%E9%85%8D%E5%B0%8D%E8%B3%87%E6%96%99%E9%81%B8%E6%93%87%EF%BC%88%E5%90%8C%E9%85%8D%E5%B0%8D%E8%A2%AB%E5%85%A9%E5%80%8B%E5%AD%90%E7%AD%96%E7%95%A5%E9%83%BD%E9%81%B8%E5%87%BA%E6%99%82%EF%BC%89">¶</a></h3><p>若兩個子策略均選出同一配對（Tier 1 情況），優先保留 <code>Quality_Score</code> 較高者的欄位；若 <code>Quality_Score</code> 相同（如 SSD/DTW 無此欄位時均為 0），則以 <code>Pair_Rank</code> 較小者優先。</p>
+<h3 id="5.3-%E9%85%8D%E5%B0%8D%E8%B3%87%E6%96%99%E9%81%B8%E6%93%87%EF%BC%88%E5%90%8C%E9%85%8D%E5%B0%8D%E8%A2%AB%E5%85%A9%E5%80%8B%E5%AD%90%E7%AD%96%E7%95%A5%E9%83%BD%E9%81%B8%E5%87%BA%E6%99%82%EF%BC%89">5.3 配對資料選擇（同配對被兩個子策略都選出時）<a class="anchor-link" href="#5.3-%E9%85%8D%E5%B0%8D%E8%B3%87%E6%96%99%E9%81%B8%E6%93%87%EF%BC%88%E5%90%8C%E9%85%8D%E5%B0%8D%E8%A2%AB%E5%85%A9%E5%80%8B%E5%AD%90%E7%AD%96%E7%95%A5%E9%83%BD%E9%81%B8%E5%87%BA%E6%99%82%EF%BC%89">¶</a></h3><p>若兩個子策略均選出同一配對（Tier 1 情況），優先保留 <code>Quality_Score</code> 較高者的欄位；若 <code>Quality_Score</code> 相同，則以 <code>Pair_Rank</code> 較小者優先。</p>
 </div>
 </div>
 </div>

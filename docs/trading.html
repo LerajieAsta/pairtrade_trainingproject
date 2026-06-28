@@ -7793,7 +7793,75 @@ a.anchor-link {
     white-space: normal;
   }
 </style>
-<!-- End of mermaid configuration --></head>
+<!-- End of mermaid configuration -->
+<style>
+  /* ── Layout ── */
+  body { background: #f8f9fa; }
+  #notebook-container,
+  .jp-Notebook { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* ── Markdown cells ── */
+  .jp-MarkdownCell .jp-MarkdownOutput,
+  div.text_cell_render {
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: #1a1a2e;
+  }
+
+  /* ── Tables ── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.88rem;
+  }
+  th {
+    background: #2c3e50;
+    color: #fff;
+    padding: 0.55rem 0.8rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  td { padding: 0.45rem 0.8rem; border-bottom: 1px solid #dee2e6; }
+  tr:nth-child(even) td { background: #f1f3f5; }
+  tr:hover td { background: #e8f4fd; }
+
+  /* ── Code blocks ── */
+  pre, code {
+    font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+    font-size: 0.85rem;
+  }
+  .jp-CodeCell .jp-InputArea-editor {
+    border-left: 3px solid #0d6efd;
+    border-radius: 4px;
+    background: #1e1e2e;
+  }
+
+  /* ── Headings ── */
+  h1 { font-size: 1.7rem; color: #0d1117; border-bottom: 2px solid #0d6efd; padding-bottom: 0.4rem; margin-bottom: 1rem; }
+  h2 { font-size: 1.25rem; color: #1a1a2e; margin-top: 2rem; }
+  h3 { font-size: 1.05rem; color: #2c3e50; margin-top: 1.5rem; }
+
+  /* ── Blockquote (callouts) ── */
+  blockquote {
+    border-left: 4px solid #0d6efd;
+    background: #e8f4fd;
+    padding: 0.7rem 1rem;
+    margin: 1rem 0;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.9rem;
+    color: #1a3a5c;
+  }
+
+  /* ── Math ── */
+  .MathJax { font-size: 1.05em !important; }
+
+  /* ── Cell spacing ── */
+  .jp-Cell { margin-bottom: 0.25rem; }
+
+  /* ── Hide input prompt numbers ── */
+  .jp-InputPrompt, .jp-OutputPrompt { display: none; }
+</style></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
@@ -7807,41 +7875,102 @@ a.anchor-link {
 <p>[!IMPORTANT]
 本文件以 <code>strategies/trading/</code> 下實際運行的 <code>.py</code> 原始碼為唯一依據。</p>
 </blockquote>
-<h3 id="%E7%9B%AE%E5%89%8D%E5%95%9F%E7%94%A8%E7%AD%96%E7%95%A5%EF%BC%88config.py-strategies_raw-=-strategies_raw_all%5B-3:%5D%EF%BC%89%EF%BC%9A">目前啟用策略（<code>config.py</code> <code>strategies_raw = strategies_raw_all[-3:]</code>）：<a class="anchor-link" href="#%E7%9B%AE%E5%89%8D%E5%95%9F%E7%94%A8%E7%AD%96%E7%95%A5%EF%BC%88config.py-strategies_raw-=-strategies_raw_all%5B-3:%5D%EF%BC%89%EF%BC%9A">¶</a></h3><table>
+<h3 id="%E7%AD%96%E7%95%A5%E6%B1%A0%EF%BC%88config.py-strategies_raw_all%EF%BC%8C%E5%85%B1-13-%E5%80%8B%EF%BC%89%EF%BC%9A">策略池（<code>config.py</code> <code>strategies_raw_all</code>，共 13 個）：<a class="anchor-link" href="#%E7%AD%96%E7%95%A5%E6%B1%A0%EF%BC%88config.py-strategies_raw_all%EF%BC%8C%E5%85%B1-13-%E5%80%8B%EF%BC%89%EF%BC%9A">¶</a></h3><table>
 <thead>
 <tr>
+<th style="text-align:center">#</th>
 <th style="text-align:left">策略</th>
-<th style="text-align:left">形成期</th>
+<th style="text-align:left">形成期模組</th>
 <th style="text-align:left">交易期模組</th>
-<th style="text-align:center">狀態</th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td style="text-align:center">1</td>
+<td style="text-align:left">SSD Basic</td>
+<td style="text-align:left"><code>ssd_basic.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">2</td>
+<td style="text-align:left">SSD Rolling</td>
+<td style="text-align:left"><code>ssd_rolling.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">3</td>
+<td style="text-align:left">DTW Paper (DTW)</td>
+<td style="text-align:left"><code>DTW_Cointegration_Paper.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">4</td>
+<td style="text-align:left">DTW Paper (SSD-DTW-PCA)</td>
+<td style="text-align:left"><code>DTW_Cointegration_Paper.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">5</td>
+<td style="text-align:left">HDBSCAN MultiScale</td>
+<td style="text-align:left"><code>HDBSCAN_MultiScale.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">6</td>
+<td style="text-align:left">HDBSCAN MultiScale PCA-UMAP</td>
+<td style="text-align:left"><code>HDBSCAN_MultiScale.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">7</td>
+<td style="text-align:left">HDBSCAN UMAP</td>
+<td style="text-align:left"><code>HDBSCAN_UMAP.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">8</td>
+<td style="text-align:left">HDBSCAN UMAP PCA-UMAP</td>
+<td style="text-align:left"><code>HDBSCAN_UMAP.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">9</td>
+<td style="text-align:left">Ensemble HDBSCAN</td>
+<td style="text-align:left"><code>ensemble.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">10</td>
+<td style="text-align:left">Ensemble SSD-DTW</td>
+<td style="text-align:left"><code>ensemble.py</code></td>
+<td style="text-align:left"><code>zscore_trading.py</code></td>
+</tr>
+<tr>
+<td style="text-align:center">11</td>
 <td style="text-align:left">SSD Rolling DRL</td>
 <td style="text-align:left"><code>ssd_rolling.py</code></td>
 <td style="text-align:left"><code>drl_lstm_trading.py</code></td>
-<td style="text-align:center"><strong>啟用</strong></td>
 </tr>
 <tr>
+<td style="text-align:center">12</td>
 <td style="text-align:left">HDBSCAN UMAP DRL</td>
 <td style="text-align:left"><code>HDBSCAN_UMAP.py</code></td>
 <td style="text-align:left"><code>drl_lstm_trading.py</code></td>
-<td style="text-align:center"><strong>啟用</strong></td>
 </tr>
 <tr>
+<td style="text-align:center">13</td>
 <td style="text-align:left">HDBSCAN MultiScale DRL</td>
 <td style="text-align:left"><code>HDBSCAN_MultiScale.py</code></td>
 <td style="text-align:left"><code>drl_lstm_trading.py</code></td>
-<td style="text-align:center"><strong>啟用</strong></td>
 </tr>
 </tbody>
 </table>
-<h3 id="%F0%9F%93%82-%E4%BA%A4%E6%98%93%E6%9C%9F%E6%A8%A1%E7%B5%84%E6%9E%B6%E6%A7%8B%EF%BC%9A">📂 交易期模組架構：<a class="anchor-link" href="#%F0%9F%93%82-%E4%BA%A4%E6%98%93%E6%9C%9F%E6%A8%A1%E7%B5%84%E6%9E%B6%E6%A7%8B%EF%BC%9A">¶</a></h3><pre><code>drl_lstm_trading.py          ← 目前所有啟用策略使用（DRL 強化學習）
+<p><code>strategies_raw</code> 決定實際執行範圍（如 <code>strategies_raw_all[-3:]</code> 只跑 #11–#13，<code>strategies_raw_all</code> 跑全部 13 個）。</p>
+<h3 id="%F0%9F%93%82-%E4%BA%A4%E6%98%93%E6%9C%9F%E6%A8%A1%E7%B5%84%E6%9E%B6%E6%A7%8B%EF%BC%9A">📂 交易期模組架構：<a class="anchor-link" href="#%F0%9F%93%82-%E4%BA%A4%E6%98%93%E6%9C%9F%E6%A8%A1%E7%B5%84%E6%9E%B6%E6%A7%8B%EF%BC%9A">¶</a></h3><pre><code>drl_lstm_trading.py          ← #11–#13 使用（DRL 強化學習）
     繼承/匯入 zscore_trading.py  ← 基礎 Z-Score 狀態機，提供 Spread 計算邏輯
 
+zscore_trading.py            ← #1–#10 使用（通用 Z-Score 狀態機）
 pure_dtw_trading.py          ← 純 DTW 交叉帶內進場（程式碼保留，目前無策略使用）
-zscore_trading.py            ← 通用 Z-Score 狀態機（基礎類）
 </code></pre>
 <h3 id="%E5%9B%9E%E6%B8%AC%E5%8F%83%E6%95%B8%EF%BC%88config.py-base_params%EF%BC%89%EF%BC%9A">回測參數（<code>config.py</code> <code>base_params</code>）：<a class="anchor-link" href="#%E5%9B%9E%E6%B8%AC%E5%8F%83%E6%95%B8%EF%BC%88config.py-base_params%EF%BC%89%EF%BC%9A">¶</a></h3><table>
 <thead>
@@ -8317,16 +8446,10 @@ $$\text{Trade\_PnL} = \text{Unrealized\_PnL}_\text{at\_stop} \quad \text{（平�
 </thead>
 <tbody>
 <tr>
-<td style="text-align:left"><strong>目前使用策略</strong></td>
-<td style="text-align:center">—</td>
-<td style="text-align:center">—</td>
-<td style="text-align:center">SSD Rolling DRL、HDBSCAN UMAP DRL、HDBSCAN MultiScale DRL</td>
-</tr>
-<tr>
-<td style="text-align:left"><strong>啟用狀態</strong></td>
-<td style="text-align:center">基礎類（被繼承）</td>
-<td style="text-align:center">停用（程式碼保留）</td>
-<td style="text-align:center"><strong>啟用</strong></td>
+<td style="text-align:left"><strong>使用策略</strong></td>
+<td style="text-align:center">#1–#10（SSD/DTW/HDBSCAN/Ensemble 共 10 個）</td>
+<td style="text-align:center">— （程式碼保留，無策略使用）</td>
+<td style="text-align:center">#11–#13（SSD Rolling DRL、HDBSCAN UMAP DRL、HDBSCAN MultiScale DRL）</td>
 </tr>
 <tr>
 <td style="text-align:left"><strong>開倉條件</strong></td>
