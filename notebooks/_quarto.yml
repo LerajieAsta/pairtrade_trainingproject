@@ -7,7 +7,7 @@ format:
     theme:
       dark: [darkly, custom.scss]
     toc: true
-    toc-depth: 3
+    toc-depth: 2
     toc-location: right
     toc-title: "目錄"
     smooth-scroll: true
@@ -18,8 +18,8 @@ format:
     highlight-style: dracula
     html-math-method: katex
     grid:
-      body-width: 900px
-      sidebar-width: 220px
+      body-width: 860px
+      sidebar-width: 270px
     self-contained: true
     anchor-sections: true
     citations-hover: false
