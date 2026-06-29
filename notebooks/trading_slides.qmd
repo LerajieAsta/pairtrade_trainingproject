@@ -1,0 +1,445 @@
+---
+title: "S&P 500 配對交易｜交易期策略"
+subtitle: "Trading Period Strategies — Z-Score 狀態機、DRL LSTM-DQN 與六大風控"
+date: "2026-06-29"
+author: "LerajieAsta"
+lang: zh-TW
+
+format:
+  revealjs:
+    theme: [dark, slides.scss]
+    slide-number: c/t
+    transition: slide
+    transition-speed: fast
+    controls: true
+    controls-layout: bottom-right
+    progress: true
+    history: true
+    chalkboard:
+      theme: whiteboard
+      boardmarker-width: 3
+    zoom: true
+    touch: true
+    overview: true
+    pdf-separate-fragments: false
+    scrollable: true
+    html-math-method: katex
+    code-fold: false
+    highlight-style: dracula
+    self-contained: true
+    footer: "YZU｜S&P 500 Pairs Trading｜交易期策略"
+
+execute:
+  enabled: false
+  echo: false
+  warning: false
+---
+
+# 📈 交易期 (Trading Period) 策略概覽 {background-color="#111827"}
+
+## 核心任務
+
+在 **交易期**（$T = 126$ 天）根據 Spread Z-Score 訊號執行多空操作，並結合多層風控管理資金
+
+**三類交易模組：**
+
+| 模組 | 適用策略 | 核心機制 |
+|:---|:---|:---|
+| `zscore_trading.py` | #1–#10（10 個策略） | Z-Score 狀態機（規則型） |
+| `pure_dtw_trading.py` | — （保留備用） | 折返穿越進場（規則型） |
+| `drl_lstm_trading.py` | #11–#13（3 個策略） | LSTM-DQN 強化學習（學習型） |
+
+---
+
+# 📚 核心參考論著 {background-color="#111827"}
+
+## Gatev et al. (2006) — Z-Score 交易框架
+
+::: {.ref-card}
+[**Pairs Trading: Performance of a Relative Value Arbitrage Rule**]{.ref-title}
+
+[*Review of Financial Studies*, 19(3), 797–827]{.ref-meta}
+
+**論著重點（交易期部分）：**
+
+- Z-Score 突破 $\pm 2\sigma$ 進場，回歸均值出場是配對交易的基準實作
+- 靜態形成期統計（$\mu_\epsilon$、$\sigma_\epsilon$）在整個交易期保持不變
+- 等市值對沖（美元中性）消除市場 Beta 暴露
+- 超過 30 天未出場強制平倉，防止持倉過長的尾部風險
+
+**本研究對應：** `zscore_trading.py` 靜態模式（`zscore_window=0`）
+:::
+
+## Mnih et al. (2015) — DQN 基礎
+
+::: {.ref-card}
+[**Human-level control through deep reinforcement learning**]{.ref-title}
+
+[*Nature*, 518, 529–533]{.ref-meta}
+
+**論著重點：**
+
+- **深度 Q 網路（DQN）**：以神經網路逼近動作值函數 $Q(s,a;\theta)$
+- **Experience Replay**：打破時序相關性，提升訓練穩定性（`maxlen=10000`）
+- **Target Network**：定期同步目標網路防止 Q 值震盪（每 5 輪同步一次）
+- $\epsilon$-greedy 探索策略：從 $\epsilon=1.0$ 衰減至 $0.05$（`decay=0.995`）
+
+**本研究對應：** `drl_lstm_trading.py` 的訓練框架
+:::
+
+## Hochreiter & Schmidhuber (1997) — LSTM 記憶
+
+::: {.ref-card}
+[**Long Short-Term Memory**]{.ref-title}
+
+[*Neural Computation*, 9(8), 1735–1780]{.ref-meta}
+
+**論著重點：**
+
+- LSTM 透過輸入門、遺忘門、輸出門解決 RNN 的梯度消失問題
+- 適合處理**長距離時序依賴**，捕捉 Spread 的多日動態模式
+- 隱藏狀態 $h_t$ 編碼過去 `seq_len=10` 天的市場狀態
+- 與 DQN 結合（LSTM-DQN）：特徵提取 → Q 值輸出
+
+**本研究對應：** DRL 的神經網路骨幹架構
+:::
+
+## Krauss et al. (2016) — 交易期風控基礎
+
+::: {.ref-card}
+[**The Profitability of Pairs Trading Strategies**]{.ref-title}
+
+[*European Journal of Operational Research*, 2016]{.ref-meta}
+
+**論著重點（風控部分）：**
+
+- 交易成本（手續費 + 滑點）對配對交易獲利能力影響顯著
+- 單程各 0.1% 的來回摩擦（總 0.4%）為現實市場的保守估計
+- 停損機制（Stop-Loss）可顯著降低最大回撤，但需權衡觸發頻率
+- 產業分散（Sector Ratio）限制避免特定產業過度集中的系統性風險
+
+**本研究對應：** 六大風控機制設計
+:::
+
+---
+
+# 🧠 Z-Score 狀態機 {background-color="#111827"}
+
+## Spread 重建三條路徑
+
+交易期根據形成期存入的欄位**自動路由**：
+
+**路徑 A** — 原始 log-price OLS 殘差空間 [DTW｜HDBSCAN]{.chip}
+
+$$\text{Spread}_t = \ln P_{A,t} - \alpha - \beta \cdot \ln P_{B,t}$$
+
+**路徑 B1** — 累積回報比值空間 [SSD Basic]{.chip}
+
+$$\text{Spread}_t = \frac{P_{A,t}}{P_{A,0}} - \frac{P_{B,t}}{P_{B,0}}$$
+
+**路徑 B2** — Z-Score 標準化 log 空間 [SSD Rolling]{.chip}
+
+$$P'_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}, \quad \text{Spread}_t = P'_{A,t} - \beta \cdot P'_{B,t}$$
+
+> 三條路徑保證 Z-Score 基準空間與形成期計算 `Spread_Mean/Std` 的空間完全一致
+
+## Z-Score 計算與訊號
+
+**靜態模式**（`zscore_window=0`，所有 13 個策略預設）：
+
+$$Z_t = \text{clip}\!\left(\frac{\text{Spread}_t - \mu_\epsilon}{\max(\sigma_\epsilon, \sigma_\text{min})},\; -10,\; 10\right)$$
+
+**進出場訊號狀態機：**
+
+| 條件 | 動作 |
+|:---|:---|
+| $Z_t > 2.0$ | 空頭建倉：空 A，多 B |
+| $Z_t < -2.0$ | 多頭建倉：多 A，空 B |
+| $Z_t \le 0.0$（原空頭） | 回歸均值，平倉 |
+| $Z_t \ge 0.0$（原多頭） | 回歸均值，平倉 |
+| 持倉 $> 30$ 天 | 超時強制平倉 |
+
+## 資金配置與 PnL
+
+**風險中性加權部位（基於 Gatev et al. 2006）：**
+
+$$W_{total} = 1.0 + |\beta|, \quad v_A = \frac{C_{pair}}{W_{total}}, \quad v_B = \frac{|\beta| \cdot C_{pair}}{W_{total}}$$
+
+當 $\beta = 1.0$（SSD Basic）退化為等市值 50%/50%
+
+**PnL 計算（含交易摩擦）：**
+
+$$\text{Entry Fee} = (|n_A| P_{A,\text{entry}} + |n_B| P_{B,\text{entry}}) \times (f_{fee} + f_{slip})$$
+$$\text{Trade PnL} = \underbrace{n_A(P_{A,\text{exit}} - P_{A,\text{entry}}) + n_B(P_{B,\text{exit}} - P_{B,\text{entry}})}_{\text{Raw PnL}} - \text{Entry Fee} - \text{Exit Fee}$$
+
+費率：$f_{fee} = f_{slip} = 0.001$（單程各 0.1%，來回共 0.4%）
+
+## 波動率自適應（VOL ADJ）
+
+**動機：** 震盪市場中形成期 $\sigma_\epsilon$ 可能低估當期波動，導致過度交易
+
+$$\sigma_\text{adj} = \max\!\left(\sigma_\epsilon \times \max\!\left(1.0,\; \frac{\sigma_\text{roll20}}{\sigma_\epsilon}\right),\; \sigma_\text{min}\right)$$
+
+$$Z_t = \text{clip}\!\left(\frac{\text{Spread}_t - \mu_\epsilon}{\sigma_\text{adj}},\; -10,\; 10\right)$$
+
+近期 20 日滾動波動率顯著高於形成期時，有效放大進場門檻，過濾無效震盪訊號
+
+---
+
+# ⏳ 純 DTW 折返進場 {background-color="#111827"}
+
+## DTW 交叉帶內進場（保留備用）
+
+**動機：** 傳統 Z-Score 在突破時立即進場，可能遭遇 Spread 持續發散
+
+**改進：** 要求 Z-Score 先突破後折返才建倉（Cross Back Inside the Bands）
+
+| 訊號 | 條件 |
+|:---|:---|
+| 空頭建倉 | $Z_{t-1} > 2.0$ 且 $Z_t \le 2.0$（從上方折返穿越） |
+| 多頭建倉 | $Z_{t-1} < -2.0$ 且 $Z_t \ge -2.0$（從下方折返穿越） |
+
+**冷卻期重設：** 停損後需等 Z-Score 穿越 0 才能再次進場
+
+```
+多頭停損後（cooldown_dir = 1）：等待 Z_t ≤ 0.0
+空頭停損後（cooldown_dir = -1）：等待 Z_t ≥ 0.0
+```
+
+> **目前無策略使用**（啟用策略均使用 `drl_lstm_trading.py`），程式碼保留備用
+
+---
+
+# 🤖 DRL LSTM-DQN 交易期 {background-color="#111827"}
+
+## 馬可夫決策過程建模
+
+**來源：Mnih et al. (2015) + Hochreiter & Schmidhuber (1997)**
+
+每個配對的交易問題建模為 MDP：
+
+| MDP 元素 | 定義 |
+|:---|:---|
+| **狀態** $s_t$ | 8 維觀測向量（見下頁） |
+| **動作** $a_t$ | $\{0: \text{平倉}, 1: \text{多 Spread}, 2: \text{空 Spread}\}$ |
+| **獎勵** $r_t$ | PnL 比例 + 交易懲罰 + 日持倉獎勵 |
+| **環境** | Gymnasium 包裝，形成期價格序列 |
+
+**訓練策略：**
+
+- 每個配對、每個滾動期**獨立訓練** 40 episodes
+- 快取 key：`{period_start}_{trade_start}_{A}_{B}`，避免重複訓練
+
+## 8 維觀測向量
+
+**捕捉 Spread 的即時狀態、動量與持倉情境：**
+
+| 維度 | 特徵 | 計算方式 |
+|:---:|:---|:---|
+| 1 | `ZScore` | 即時 Spread Z-Score $Z_t$ |
+| 2 | `Rel_Return` | 日收益率差 $R_{A,t} - R_{B,t}$ |
+| 3 | `MA_Dist` | MA5 $-$ MA21（短期 Z-Score 動量） |
+| 4 | `time_to_maturity` | $(T - t) / T$（剩餘交易日比例） |
+| 5 | `Spread_Std` | 20 日滾動 Spread 標準差（相對歸一化） |
+| 6 | `position` | 當前倉位 $\in \{-1, 0, 1\}$ |
+| 7 | `days_held_norm` | 持倉天數 / 交易期總天數 |
+| 8 | `Spread_Trend` | $Z_t - Z_{t-5}$（5 日動量，clip $\pm 5$） |
+
+## LSTM-DQN 網路架構
+
+**來源：Mnih et al. (2015) 的 DQN + Hochreiter & Schmidhuber (1997) 的 LSTM**
+
+```
+輸入序列（seq_len=10 × 8 維）
+    ↓
+LSTM（hidden_dim=64, num_layers=1）
+    ↓  取最後一步 hidden state
+全連接層（64 → 3）
+    ↓
+Q 值輸出：[Q(Flat), Q(Long), Q(Short)]
+```
+
+**訓練超參數：**
+
+| 參數 | 值 |
+|:---|:---:|
+| Episodes | 40 per pair-period |
+| Experience Replay | maxlen=10,000 |
+| 更新頻率 | 每 4 步 |
+| Target Network 同步 | 每 5 輪 |
+| $\epsilon$ 初始/終值/衰減 | 1.0 / 0.05 / 0.995 |
+
+## 獎勵函數設計
+
+$$R_t = R_\text{close} + R_\text{entry\_penalty} + R_\text{daily\_hold} + R_\text{forced\_close}$$
+
+| 獎勵項 | 公式 | 觸發時機 |
+|:---|:---|:---|
+| 平倉收益 | $\frac{\text{Trade PnL}}{C_{pair}} \times 100$ | 動作改變且有部位 |
+| 開倉摩擦懲罰 | $-\frac{\text{Entry Fee}}{C_{pair}} \times 100 \times 0.5$ | 開倉時 |
+| 日持倉獎勵 | $\frac{\Delta \text{PnL}_{t+1}}{C_{pair}} \times 100 \times 0.3$ | 每日持倉 |
+| 強制平倉 | $\frac{\text{Trade PnL}}{C_{pair}} \times 100$ | 到達 max\_steps |
+
+> **設計動機：** 日持倉獎勵（0.3 折）讓 agent 學會持倉等待回歸，而非過度交易；摩擦懲罰 (0.5 折) 抑制頻繁開倉
+
+## Z-Score vs DRL 的關鍵差異
+
+| 比較維度 | Z-Score 狀態機 | LSTM-DQN |
+|:---|:---:|:---:|
+| 決策依據 | 1 維 Z-Score | **8 維**觀測向量 |
+| 時序記憶 | 無 | **10 天** LSTM 序列 |
+| 規則來源 | 人工設計 | 從形成期資料學習 |
+| 交易策略 | 突破進場 / 回歸出場 | 最大化累積獎勵 |
+| 訓練成本 | 無 | 每配對每期 40 episodes |
+| 可解釋性 | 完全透明 | 黑箱（Q 值可部分解釋） |
+
+---
+
+# 🛡️ 六大風控機制 {background-color="#111827"}
+
+## 風控機制一覽
+
+**所有交易模組共享（均繼承 `zscore_trading.Trading`）：**
+
+| # | 機制 | 觸發條件 | 行為 |
+|:---:|:---|:---|:---|
+| 1 | **個股停損 SL** | 未實現虧損 / $C_{pair}$ ≥ `stop_loss_pct` | 強平該配對，進入冷卻 |
+| 2 | **動態 Z 停損 DSZ** | $\|Z_t\| >$ `dynamic_stop_z`（如 5.0） | 結構性破裂判定，強平凍結 |
+| 3 | **全域組合停損 PSL** | 總未實現虧損 / 初始資金 ≥ `portfolio_stop_loss_pct` | 斬倉**所有**持倉，重置計數 |
+| 4 | **產業分散 MSR** | 單產業配對數超過 $\lfloor N \times \text{max\_sector\_ratio} \rfloor$ | 超額配對排隊不進場 |
+| 5 | **方向冷卻** | 停損或強平後 | 等 Z-Score 穿越 0 才解凍 |
+| 6 | **波動率自適應** | `use_vol_adjust=True` | 20 日滾動 $\sigma$ 放大進場門檻 |
+
+## PSL 計帳正確性
+
+**Portfolio Stop-Loss（PSL）觸發時的 PnL 計帳：**
+
+PSL 觸發時部位尚未正式平倉，若直接使用 `Trade_PnL`（平倉前為 0）會**漏記損失**：
+
+$$\text{正確：} \quad \text{final\_realized} = \text{Realized\_PnL}_\text{before} + \underbrace{\text{Unrealized\_PnL}_\text{at\_stop}}_{\text{強平時 book 進 Trade\_PnL}}$$
+
+$$\text{錯誤：} \quad \text{只計算} \;\text{Realized\_PnL} \;\Rightarrow\; \text{開放部位損失永遠不被記帳}$$
+
+> 此計帳設計確保全域停損後資金計算與實際損益完全一致
+
+---
+
+# 📊 交易模組完整對比 {background-color="#111827"}
+
+## 特徵總表
+
+| 交易特徵 | Z-Score | 純 DTW | DRL LSTM |
+|:---|:---:|:---:|:---:|
+| 使用策略 | #1–#10 | — | #11–#13 |
+| 開倉條件 | 突破 $\|Z\|>2$ | 折返穿越 $\|Z\|=2$ | DRL action 1/2 |
+| 平倉條件 | $\|Z\|\le0$ 回歸 | 回歸中心 | DRL action 0 |
+| 觀測維度 | 1 D | 1 D（含前值） | **8 D** |
+| 時序記憶 | 無 | 兩日比較 | **LSTM 10 天** |
+| 訓練方式 | 無（規則型） | 無（規則型） | **40 episodes/pair** |
+| 對沖比例 | OLS $\beta$ | 固定 $\beta=1$ | OLS $\beta$ |
+| 六大風控 | 完整 | 完整 | 完整（外層） |
+
+---
+
+# 📖 參考文獻 {background-color="#111827"}
+
+## References
+
+::: {style="font-size: 0.78em; line-height: 1.8;"}
+
+**[1]** Gatev, E., Goetzmann, W. N., & Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. *Review of Financial Studies*, 19(3), 797–827.
+
+**[2]** Krauss, C., Do, X. A., & Huck, N. (2016). The profitability of pairs trading strategies: Distance, cointegration and copula methods. *European Journal of Operational Research*.
+
+**[3]** Mnih, V., Kavukcuoglu, K., Silver, D., et al. (2015). Human-level control through deep reinforcement learning. *Nature*, 518, 529–533.
+
+**[4]** Hochreiter, S., & Schmidhuber, J. (1997). Long short-term memory. *Neural Computation*, 9(8), 1735–1780.
+
+**[5]** Zhu, M. (2024). Pairs trading with dynamic time warping. Working Paper.
+
+**[6]** Han, Y., He, A., Rapach, D., & Zhou, G. (2021). In search of pairs using firm fundamentals. Working Paper.
+
+**[7]** Bellman, R. (1957). *Dynamic Programming*. Princeton University Press.
+
+**[8]** Sutton, R. S., & Barto, A. G. (2018). *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press.
+
+:::
+
+---
+
+# {background-color="#111827"}
+
+::: {style="text-align: center; padding-top: 3em;"}
+
+**S&P 500 Pairs Trading — 交易期策略**
+
+::: {style="font-size: 0.9em; color: #8888aa; margin-top: 1em;"}
+操作說明：`Alt + Click` 局部放大 ｜ `O` 鍵縮圖總覽 ｜ `B` 鍵黑幕 ｜ `F` 鍵全螢幕
+:::
+
+::: {style="font-size: 0.85em; color: #4da6ff; margin-top: 0.5em;"}
+使用畫面右下角 🔍 按鈕可啟用跟隨式放大鏡
+:::
+
+:::
+
+```{=html}
+<script>
+(function () {
+  const SIZE = 260, ZOOM = 2.8, OFFSET = 20;
+  let active = false, overlay, btn;
+
+  function init() {
+    overlay = document.createElement('div');
+    overlay.id = 'magnifier-overlay';
+    overlay.style.cssText = `width:${SIZE}px;height:${SIZE}px;`;
+    document.body.appendChild(overlay);
+
+    btn = document.createElement('button');
+    btn.id = 'magnifier-btn';
+    btn.textContent = '🔍 放大鏡';
+    btn.title = '啟用跟隨式放大鏡（Ctrl+M）';
+    btn.addEventListener('click', toggle);
+    document.body.appendChild(btn);
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') { e.preventDefault(); toggle(); }
+    });
+  }
+
+  function toggle() {
+    active = !active;
+    btn.classList.toggle('on', active);
+    btn.textContent = active ? '🔍 關閉放大鏡' : '🔍 放大鏡';
+    overlay.classList.toggle('active', active);
+  }
+
+  function onMove(e) {
+    if (!active) return;
+    const mx = e.clientX, my = e.clientY, hw = SIZE / 2;
+    let lx = mx + OFFSET, ly = my + OFFSET;
+    if (lx + SIZE > window.innerWidth)  lx = mx - SIZE - OFFSET;
+    if (ly + SIZE > window.innerHeight) ly = my - SIZE - OFFSET;
+
+    overlay.style.left = lx + 'px';
+    overlay.style.top  = ly + 'px';
+    overlay.innerHTML  = '';
+
+    const inner = document.createElement('div');
+    inner.style.cssText =
+      `position:absolute;width:${window.innerWidth}px;height:${window.innerHeight}px;` +
+      `transform:scale(${ZOOM});transform-origin:${mx}px ${my}px;` +
+      `top:${-(my*(ZOOM-1))+(my-ly)}px;left:${-(mx*(ZOOM-1))+(mx-lx)}px;pointer-events:none;`;
+    const clone = document.querySelector('.reveal').cloneNode(true);
+    clone.style.cssText = `position:static;width:${window.innerWidth}px;height:${window.innerHeight}px;overflow:hidden;`;
+    inner.appendChild(clone);
+    overlay.appendChild(inner);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else { init(); }
+})();
+</script>
+```

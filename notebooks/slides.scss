@@ -1,0 +1,201 @@
+/*-- scss:defaults --*/
+$body-bg:         #1a1a1a;
+$body-color:      #e8e8e8;
+$link-color:      #4da6ff;
+$font-size-base:  1.15rem;          /* 投影用大字體 */
+
+/*-- scss:rules --*/
+
+/* ── 全域基底 ─────────────────────────────────────────────────────────────── */
+.reveal {
+  font-size: 1.6rem;                /* 投影基準字體 */
+  font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  background: #1a1a1a;
+  color: #e8e8e8;
+}
+
+/* ── 標題層級 ─────────────────────────────────────────────────────────────── */
+.reveal h1 {
+  font-size: 2.1em;
+  color: #ffffff;
+  border-bottom: 3px solid #4da6ff;
+  padding-bottom: 0.35em;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.reveal h2 {
+  font-size: 1.55em;
+  color: #ffffff;
+  border-left: 5px solid #4da6ff;
+  padding-left: 0.5em;
+  font-weight: 600;
+}
+.reveal h3 {
+  font-size: 1.2em;
+  color: #a8cfee;
+  font-weight: 600;
+}
+
+/* ── 表格 ─────────────────────────────────────────────────────────────────── */
+.reveal table {
+  font-size: 0.82em;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.6em auto;
+}
+.reveal table th {
+  background: #2a3a4a !important;
+  color: #ffffff !important;
+  border-bottom: 2px solid #4da6ff !important;
+  padding: 0.45em 0.7em;
+  font-weight: 600;
+}
+.reveal table td {
+  padding: 0.35em 0.7em;
+  border-bottom: 1px solid #2e2e2e;
+  vertical-align: middle;
+  color: #e0e0e0;
+}
+.reveal table tr:nth-child(even) td {
+  background: #222222;
+}
+.reveal table tr:hover td {
+  background: #1e3050 !important;
+}
+
+/* ── 程式碼 ───────────────────────────────────────────────────────────────── */
+.reveal pre {
+  background: #0d1117 !important;
+  border: 1px solid #30363d;
+  border-left: 4px solid #4da6ff;
+  border-radius: 6px;
+  font-size: 0.72em;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.reveal code {
+  font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+  color: #79c0ff;
+}
+.reveal p code, .reveal li code {
+  background: #252525;
+  padding: 0.08em 0.3em;
+  border-radius: 3px;
+  color: #79c0ff;
+  font-size: 0.88em;
+}
+
+/* ── Callout 風格引用塊 ───────────────────────────────────────────────────── */
+.reveal blockquote {
+  background: #1e2a38;
+  border-left: 5px solid #4da6ff;
+  border-radius: 0 6px 6px 0;
+  padding: 0.6em 1em;
+  color: #b0ccee;
+  font-style: normal;
+  margin: 0.8em 0;
+  font-size: 0.88em;
+}
+
+/* ── 論文引用卡片 ─────────────────────────────────────────────────────────── */
+.ref-card {
+  background: #1e2535;
+  border: 1px solid #2a4060;
+  border-left: 5px solid #50fa7b;
+  border-radius: 6px;
+  padding: 0.7em 1.1em;
+  margin: 0.7em 0;
+  font-size: 0.82em;
+}
+.ref-card .ref-title {
+  font-weight: 700;
+  color: #80ffaa;
+  font-size: 1em;
+}
+.ref-card .ref-meta {
+  color: #8888aa;
+  font-size: 0.88em;
+  margin-top: 0.2em;
+}
+.ref-card .ref-key {
+  margin-top: 0.5em;
+  color: #c8e0cc;
+}
+.ref-card .ref-key li {
+  margin: 0.2em 0;
+}
+
+/* ── 數學公式 ─────────────────────────────────────────────────────────────── */
+.reveal .math { color: #e8e8e8; }
+.katex { font-size: 1em !important; }
+
+/* ── 幻燈片編號 ───────────────────────────────────────────────────────────── */
+.reveal .slide-number {
+  background: #2a2a2a;
+  color: #888;
+  font-size: 0.7em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+/* ── 放大鏡遮罩 ───────────────────────────────────────────────────────────── */
+#magnifier-overlay {
+  display: none;
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  border-radius: 50%;
+  border: 3px solid #4da6ff;
+  box-shadow: 0 0 0 2px #1a1a1a, 0 0 20px rgba(77,166,255,0.5);
+  overflow: hidden;
+  background: #1a1a1a;
+}
+#magnifier-overlay.active {
+  display: block;
+}
+
+/* ── 放大鏡按鈕 ───────────────────────────────────────────────────────────── */
+#magnifier-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 70px;
+  z-index: 9999;
+  background: #2a3a50;
+  color: #4da6ff;
+  border: 1px solid #4da6ff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+#magnifier-btn:hover, #magnifier-btn.on {
+  background: #1a3055;
+}
+#magnifier-btn.on {
+  color: #50fa7b;
+  border-color: #50fa7b;
+}
+
+/* ── 進場標籤 Chip ────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-block;
+  background: #2a3a4a;
+  color: #7ec8ff;
+  border: 1px solid #3a5070;
+  border-radius: 20px;
+  padding: 0.1em 0.65em;
+  font-size: 0.72em;
+  margin: 0 0.2em;
+  vertical-align: middle;
+}
+.chip.green  { background: #1a3025; color: #80ffaa; border-color: #2a6040; }
+.chip.orange { background: #352510; color: #ffd0a0; border-color: #6a4420; }
+
+/* ── 段落間距 ─────────────────────────────────────────────────────────────── */
+.reveal section p { margin: 0.45em 0; line-height: 1.65; }
+.reveal section li { margin: 0.3em 0; line-height: 1.55; }
+
+/* ── 頁面填滿佈局 ─────────────────────────────────────────────────────────── */
+.reveal .slides section { padding: 0 40px; }

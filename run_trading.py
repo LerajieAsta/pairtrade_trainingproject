@@ -20,7 +20,7 @@ from strategies.preprocess_equity import DataProcessor
 from strategies.portfolio_manager import PortfolioManager
 from strategies.db_utils import get_db_connection
 from strategies.config import (
-    INITIAL_CAPITAL,
+    INITIAL_CAPITAL, CONCURRENT_PERIODS,
     FORCE_RERUN, CPU_LIMIT_PCT, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
     TICKER_COL, SECTOR_COL, BACKTEST_START, BACKTEST_END,
     FORMATION_WINDOW, FORWARD_DAYS, rolling_step,
@@ -144,11 +144,17 @@ def worker_task(
         # 更新實際的 total_periods
         progress_stream.total_steps = total_periods
 
-        pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL, max_pairs=params.get("top_n", 10))
+        # max_pairs = top_n × 並行期數，確保任意時點總部署 ≤ current_equity
+        pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL,
+                              max_pairs=params.get("top_n", 10) * CONCURRENT_PERIODS)
         all_trade_logs = []
 
         # Cache signature once — valid for all periods and pairs of the same Trading class
         _sig = inspect.signature(TradingClass.__init__)
+        _has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD
+            for p in _sig.parameters.values()
+        )
         _valid_kwargs_keys = set(_sig.parameters.keys())
 
         for i, (_, p_row) in enumerate(df_periods.iterrows()):
@@ -229,7 +235,11 @@ def worker_task(
                 for k, v in params.items():
                     kwargs[k] = v
 
-                valid_kwargs = {k: v for k, v in kwargs.items() if k in _valid_kwargs_keys}
+                # 若 class 接受 **kwargs，直接傳全部；否則過濾到 class 明確宣告的參數
+                if _has_var_keyword:
+                    valid_kwargs = kwargs
+                else:
+                    valid_kwargs = {k: v for k, v in kwargs.items() if k in _valid_kwargs_keys}
 
                 trading_instance = TradingClass(**valid_kwargs)
 
@@ -550,25 +560,36 @@ def run_all_trading():
             strategies_to_run.append(config)
             print(f"  ● 排入執行：{config['name']}", flush=True)
 
-    # ── 將策略分組 (依原始策略) 以便循序處理 ────────────────────────────────
+    # ── 將策略分組 (依原始策略) 以便循序處理，DRL 排在最後 ────────────────
     groups = []
     if strategies_to_run:
         from collections import defaultdict
         group_dict = defaultdict(list)
         for cfg in strategies_to_run:
+            # 取最長前綴匹配，避免 "SSD Rolling DRL" 誤入 "SSD Rolling" 組
             orig_name = None
+            best_len = 0
             for orig in original_strategies_config:
-                if cfg["name"].startswith(orig["name"]):
-                    orig_name = orig["name"]
-                    break
+                n = orig["name"]
+                if cfg["name"].startswith(n) and len(n) > best_len:
+                    orig_name = n
+                    best_len = len(n)
             if orig_name is None:
                 orig_name = cfg["name"]
             group_dict[orig_name].append(cfg)
-            
-        # 保持原始策略定義的順序
+
+        # 保持原始定義順序，DRL 移到最後
+        non_drl = []
+        drl_groups = []
         for orig in original_strategies_config:
-            if orig["name"] in group_dict:
-                groups.append(group_dict[orig["name"]])
+            if orig["name"] not in group_dict:
+                continue
+            grp = group_dict[orig["name"]]
+            if orig.get("trade_method") == "DRL":
+                drl_groups.append(grp)
+            else:
+                non_drl.append(grp)
+        groups = non_drl + drl_groups
 
     # 根據 CPU_LIMIT_PCT 限制 CPU 使用率
     max_cores = max(1, int((os.cpu_count() or 4) * CPU_LIMIT_PCT))

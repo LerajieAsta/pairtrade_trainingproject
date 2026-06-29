@@ -1,0 +1,542 @@
+---
+title: "S&P 500 配對交易｜形成期策略"
+subtitle: "Formation Period Strategies — 理論、公式與論文引述"
+date: "2026-06-29"
+author: "LerajieAsta"
+lang: zh-TW
+
+format:
+  revealjs:
+    theme: [dark, slides.scss]
+    slide-number: c/t
+    transition: slide
+    transition-speed: fast
+    controls: true
+    controls-layout: bottom-right
+    progress: true
+    history: true
+    chalkboard:
+      theme: whiteboard
+      boardmarker-width: 3
+    zoom: true          # Alt+Click 局部放大
+    touch: true
+    overview: true      # 'O' 鍵開啟縮圖總覽
+    pdf-separate-fragments: false
+    scrollable: true    # 單張超長時可捲動
+    html-math-method: katex
+    code-fold: false
+    highlight-style: dracula
+    self-contained: true
+    footer: "YZU｜S&P 500 Pairs Trading｜形成期策略"
+
+execute:
+  enabled: false
+  echo: false
+  warning: false
+---
+
+# 📐 形成期 (Formation Period) 策略概覽 {background-color="#111827"}
+
+## 核心任務
+
+在 **形成期**（$F = 252$ 天）從 S&P 500 成分股中篩選具備統計套利價值的配對
+
+$$\text{目標：} \quad \underbrace{\text{配對品質最大化}}_{\text{均值回歸 + 共整合}} \quad \text{s.t.} \quad \underbrace{p_\text{ADF} < \alpha, \quad H < 0.5, \quad 1 \le HL \le 42}_{\text{三道統計過濾}}$$
+
+## 五大形成期模組
+
+| # | 策略系列 | 核心方法 | 參考論著 |
+|:---:|:---|:---|:---|
+| 1–2 | **SSD** | 累積回報指數歐氏距離 | Gatev et al. (2006) |
+| 3–4 | **DTW** | 動態時間扭曲 + 共整合 | Zhu (2024) |
+| 5–8 | **HDBSCAN** | 密度分群 + UMAP 降維 | Krauss et al. (2016) |
+| 9–10 | **Ensemble** | 雙子策略交集集成 | Han et al. (2021) |
+| 11–13 | 交易期 DRL | （形成期同上，交易期差異） | — |
+
+---
+
+# 📚 核心參考論著 {background-color="#111827"}
+
+## Gatev, Goetzmann & Rouwenhorst (2006)
+
+::: {.ref-card}
+[**Pairs Trading: Performance of a Relative Value Arbitrage Rule**]{.ref-title}
+
+[*Review of Financial Studies*, 19(3), 797–827]{.ref-meta}
+
+**論著重點：**
+
+- 提出以**累積回報指數（normalized price index）**正規化股票，消除絕對價格差距
+- 採用**歐氏距離平方和（SSD）**篩選配對，計算簡單但效果穩健
+- 以固定等市值對沖比例（$\beta = 1.0$），實現美元中性策略
+- 1962–2002 年 S&P 500 資料，年化超額報酬約 **6%**（交易成本前）
+- 提出統計套利受限於**套利競爭加劇**，超額報酬隨時間衰退
+
+**本研究對應：** SSD Basic (`ssd_basic.py`)
+:::
+
+## Krauss, Do & Huck (2016)
+
+::: {.ref-card}
+[**The Profitability of Pairs Trading Strategies: Distance, Cointegration and Copula Methods**]{.ref-title}
+
+[*European Journal of Operational Research*, 2016]{.ref-meta}
+
+**論著重點：**
+
+- 系統比較三類配對選取方法：**距離法**（SSD）、**共整合法**（Engle-Granger）、**Copula 法**
+- 共整合法在風險調整後報酬上優於純距離法，因其捕捉長期均衡關係
+- 引入 **ADF 單根檢定**篩選真實共整合配對（$p < 0.05$ 或更嚴格的 $0.01$）
+- Hurst 指數（$H < 0.5$）驗證殘差均值回歸性
+- **OU 半衰期**（$1 \le HL \le 42$ 天）確保交易期內有足夠回歸次數
+
+**本研究對應：** 三道統計過濾（所有策略共用）
+:::
+
+## Zhu (2024)
+
+::: {.ref-card}
+[**Pairs Trading with Dynamic Time Warping**]{.ref-title}
+
+[Working Paper, 2024]{.ref-meta}
+
+**論著重點：**
+
+- 引入**動態時間扭曲（DTW）**度量股票走勢相似度，容忍時間滯後（最多 $W=15$ 天）
+- Sakoe-Chiba 帶約束防止不合理的長距離時間對齊
+- **雙向 OLS 共整合篩選**：同時計算 AB 與 BA 方向，取 ADF p 值較小者為主方向
+- SSD 與 DTW 距離的 PCA 融合（`ssd_dtw_pca` 模式）：取第一主成分排序
+- OLS 截距 $\alpha$ 顯式存入，交易期在原始 log-price 空間重建 Spread
+
+**本研究對應：** DTW Cointegration Paper (`DTW_Cointegration_Paper.py`)
+:::
+
+## Han, He, Rapach & Zhou (2021)
+
+::: {.ref-card}
+[**In Search of Pairs using Firm Fundamentals**]{.ref-title}
+
+[Working Paper, 2021]{.ref-meta}
+
+**論著重點：**
+
+- 以**企業基本面特徵**（財務比率、行業分類等）而非純價格序列來識別潛在配對
+- 提出**截面動量差（Mom1_Diff）**：篩除近期動量方向相同的配對，避免追漲追跌
+- 基本面驅動的配對策略在交易成本後仍保有顯著超額報酬
+- 對高流動性股票（大型股）效果更穩定
+
+**本研究對應：** Mom1_Diff 過濾（HDBSCAN MultiScale 可選項）
+:::
+
+---
+
+# 📏 SSD 策略系列 {background-color="#111827"}
+
+## SSD Basic — 理論基礎
+
+**來源：Gatev et al. (2006)** [Pairs Trading: Performance of a Relative Value Arbitrage Rule]{.chip}
+
+**步驟 1：累積回報指數正規化**
+
+$$P'_{i,t} = \frac{P_{i,t}}{P_{i,0}}, \quad P_{i,0} \text{ 為形成期首日價格}$$
+
+起點統一為 1.0，保留股票間絕對水準差異（不消除截距效應）
+
+**步驟 2：SSD 距離（僅限同 GICS 產業內）**
+
+$$\text{SSD}_{A,B} = \sum_{t=1}^{F} (P'_{A,t} - P'_{B,t})^2$$
+
+同產業限制避免行業結構性差異干擾，預篩選 $\max(200, 15N)$ 候選對再做統計計算
+
+## SSD Basic — 參數設計
+
+**步驟 3：固定等市值對沖**（$\beta = 1.0$）
+
+$$\epsilon_t = P'_{A,t} - P'_{B,t}, \quad W_{total} = 2.0, \quad v_A = v_B = \frac{C_{pair}}{2}$$
+
+**三道統計過濾：**
+
+| 過濾條件 | 閾值 |
+|:---|:---:|
+| ADF 共整合 $p$ 值 | $< 0.05$ |
+| OU 半衰期 | $1 \le HL \le 60$ 天 |
+| Hurst 指數 | $H < 0.50$ |
+
+> **存入 `Formation_Params`：** `Hedge_Ratio=1.0`、`Spread_Mean`、`Spread_Std`、`First_Price_A/B`
+
+## SSD Rolling — OLS 對沖升級
+
+**對數價格 Z-Score 標準化**（消除波動度量綱）
+
+$$P'_{i,t} = \frac{\ln P_{i,t} - \mu_{\ln P_i}}{\sigma_{\ln P_i}}$$
+
+**協方差矩陣 OLS 避險比例**（與 SSD 最重要的差異）
+
+$$\beta = \frac{\text{Cov}(P'_A,\, P'_B)}{\text{Var}(P'_B)}, \qquad \epsilon_t = P'_{A,t} - \beta \cdot P'_{B,t}$$
+
+**SSD Basic vs SSD Rolling 核心差異：**
+
+| 面向 | SSD Basic | SSD Rolling |
+|:---|:---:|:---:|
+| 正規化空間 | $P/P_0$（回報比值） | Z-Score log-price |
+| 對沖比例 $\beta$ | 固定 1.0 | OLS 估計 |
+| 交易期基準 | `First_Price_A/B` | `Log_Mean/Std_A/B` |
+
+---
+
+# ⏳ DTW 策略系列 {background-color="#111827"}
+
+## DTW 核心動機
+
+**來源：Zhu (2024)** [Pairs Trading with DTW]{.chip}
+
+**傳統 SSD 的問題：**
+
+- 要求兩支股票在**完全相同時點**走勢吻合
+- 無法處理領先/落後（lead-lag）效應
+- 暫時性的時間錯位會虛增 SSD 距離
+
+**DTW 的解決方案：**
+
+$$\text{DTW}_{A,B} = \min_{\text{path}} \sum_{(i,j) \in \text{path}} (P'_{A,i} - P'_{B,j})^2, \quad |i-j| \le W$$
+
+- Sakoe-Chiba 帶 $W = 15$ 天：容忍最多 3 周的時間錯位
+- 防止過度對齊（非合理的長距離扭曲）
+
+## DTW — 雙向共整合篩選
+
+**先做統計篩選，再計算慢速 DTW**（節省計算）
+
+分別計算兩個方向的 OLS：
+
+$$\text{方向 AB}: \quad \epsilon_{AB} = \ln P_A - \alpha_{AB} - \beta_{AB} \ln P_B$$
+$$\text{方向 BA}: \quad \epsilon_{BA} = \ln P_B - \alpha_{BA} - \beta_{BA} \ln P_A$$
+
+選擇 ADF $p$ 值**較小**（共整合性更強）的方向作為主方向
+
+> **關鍵設計：** OLS 截距 $\alpha$ 顯式存入，使交易期可在原始 log-price 空間重建 Spread
+> $$\text{Spread}_t = \ln P_{A,t} - \alpha - \beta \cdot \ln P_{B,t}$$
+
+## DTW — 兩種排序模式
+
+| 模式 | 排序依據 | 說明 |
+|:---|:---|:---|
+| `method="dtw"` | DTW 距離升序 | 時間彈性相似度（對照組） |
+| `method="ssd_dtw_pca"` | PCA 第一主成分升序 | SSD 與 DTW 正規化後融合排序（實驗組） |
+
+PCA 融合步驟：
+
+1. 各自標準化 SSD 與 DTW 為 $[0,1]$
+2. PCA 取第一主成分 PC1
+3. 若 loadings 方向為負則取反，確保「距離越小排名越前」
+
+---
+
+# 🌐 HDBSCAN 策略系列 {background-color="#111827"}
+
+## HDBSCAN 核心動機
+
+**密度分群超越「同產業」限制**
+
+> 傳統 SSD/DTW：只在同 GICS 產業內配對，錯過跨產業的統計套利機會
+> HDBSCAN：從行為特徵分群，相同「市場行為模式」的股票自然聚類
+
+**方法論來源：**
+
+- **HDBSCAN**：Campello, Moulavi & Sander (2013) — 層次密度分群，自動確定群數，噪音點不強制分配
+- **UMAP**：McInnes, Healy & Melville (2018) — 非線性降維，保留局部流形結構
+
+**兩種 HDBSCAN 策略的差異：**
+
+| | HDBSCAN UMAP | HDBSCAN MultiScale |
+|:---|:---:|:---:|
+| 特徵維度 | 10 維單股 + 10 維配對品質 | 多時間尺度跨期統計 |
+| 策略哲學 | **深度**（完整期品質） | **廣度**（跨期穩定性） |
+
+## HDBSCAN UMAP — 兩層評分
+
+**第一層：單股 10 維特徵**（UMAP+HDBSCAN 分群）
+
+| 特徵 | 說明 |
+|:---|:---|
+| `vol_21`, `vol_63`, `vol_all` | 短/中/全期收益率波動率 |
+| `vol_ratio_short_long` | 近期 vs 中期波動率比 |
+| `autocorr_1` | 日收益率 1 階自相關 |
+| `skew_all`, `kurt_all` | 偏態與峰態 |
+| `hurst` | R/S Hurst 指數（原始序列） |
+| `beta` | 對市場等權報酬的 Beta |
+| `log_price_level` | 形成期 log-price 均值 |
+
+分群流程：RobustScaler → UMAP（5 維）→ HDBSCAN（`min_cluster_size=5`）
+
+噪音點（`label=-1`）直接排除
+
+## HDBSCAN UMAP — 配對品質評分
+
+**第二層：10 維配對品質加權評分**
+
+$$\text{Quality\_Score} = \sum_{k} w_k \cdot s_k, \quad s_k \in [0,1]$$
+
+| 分項 | 計算 | 權重 |
+|:---|:---|:---:|
+| $s_\text{hurst}$ | $(0.5 - H) / 0.5$ | 0.20 |
+| $s_\text{halflife}$ | 滿分：$5 \le HL \le 30$ 天 | 0.15 |
+| $s_\text{corr\_mean}$ | $(\bar\rho - 0.5)/0.5$ | 0.15 |
+| $s_\text{corr\_stab}$ | $1 - \sigma_\rho/0.3$ | 0.15 |
+| $s_\text{zc}$ | $\min(1, ZC/200)$ | 0.10 |
+| $s_\text{beta}$ | $1 - |\Delta\beta|/1.0$ | 0.08 |
+| $s_\text{vol}$ | $1 - (r_\sigma-1)/2$ | 0.05 |
+| $s_\text{regime}$ | $1 - \Delta\rho/0.4$ | 0.05 |
+| $s_\text{vol\_corr}$ | $\max(0, \rho_\text{vol})$ | 0.04 |
+| $s_\text{adv}$ | adv\_ratio | 0.03 |
+
+## HDBSCAN MultiScale — 跨期穩定性
+
+**核心理念：篩選在多個市場週期均保持共整合的配對**
+
+**自適應子時期切分（$n_{splits}=4$）：**
+
+$$Q_k = \left[\frac{(k-1)}{4}F,\; \frac{k}{4}F\right], \quad k = 1,2,3,4$$
+
+每段約 63 天（¼ 形成期），以實際起訖日動態計算，無預知未來問題
+
+**動態熊市判斷：**
+
+$$\text{Bear}_t = \left(\exp\!\left(\frac{1}{N}\sum_i \ln P_{i,t}\right) < \text{MA}_{60}\right)$$
+
+等權 log-price 指數低於 60 日移動平均即判定熊市日
+
+## HDBSCAN MultiScale — 評分指標
+
+| 評分分項 | 說明 | 權重 |
+|:---|:---|:---:|
+| `corr_mean` 跨期均值 | 各子期間相關性均值 | 0.18 |
+| `coint_pass_rate` | 子期間共整合通過比例 | 0.15 |
+| `hurst_mean` | 子期間 Hurst 均值 | 0.12 |
+| `corr_std` | 子期間相關性標準差 | 0.10 |
+| `coint_worst_pval` | 最差子期間 ADF $p$ 值 | 0.10 |
+| `corr_min` | 最差子期間相關係數 | 0.08 |
+| `hurst_worst` | 最差子期間 Hurst | 0.08 |
+| `regime_diff` | 牛熊相關差值 | 0.06 |
+| `Mom1_Diff` | 截面動量差（Han et al. 2021） | 0.03 |
+
+> **與 HDBSCAN UMAP 互補：** UMAP 求「深度」（完整期最優），MultiScale 求「廣度」（跨期穩定）
+
+---
+
+# 🔗 Ensemble 集成策略 {background-color="#111827"}
+
+## Ensemble — 雙子策略交集集成
+
+**動機：提升配對篩選確定性，降低單策略的偶發誤選**
+
+**Han et al. (2021)** 的核心思想：從多個維度（基本面 + 技術面）同時確認的配對具更高套利可靠性
+
+## Ensemble — 排名邏輯
+
+兩個子策略各自用更大候選池（`top_n × 3` 倍）執行篩選：
+
+**Tier 1（交集，確定性最高）：**
+
+$$\text{avg\_rank} = \frac{\text{rank}_\text{sub1} + \text{rank}_\text{sub2}}{2}$$
+
+兩個子策略均選出的配對，依平均排名升序
+
+**Tier 2（聯集補足）：**
+
+僅一個子策略選出的配對，依最小排名升序，補足至 `top_n`
+
+> **方向正則化：** 當兩子策略方向衝突時翻轉 OLS 係數：
+> $$\beta_\text{new} = \frac{1}{\beta}, \quad \alpha_\text{new} = \frac{-\alpha}{\beta}$$
+
+---
+
+# 📊 策略對比總表 {background-color="#111827"}
+
+## 各策略關鍵設計對比
+
+| 特徵 | SSD Basic | SSD Rolling | DTW | HDBSCAN UMAP | MultiScale |
+|:---|:---:|:---:|:---:|:---:|:---:|
+| 跨產業配對 | ✗ | ✗ | ✗ | ✓ | ✓ |
+| 對沖比例 $\beta$ | 固定 1.0 | OLS | OLS 雙向 | OLS | OLS |
+| 存 `OLS_Alpha` | ✗ | ✗ | ✓ | ✓ | ✓ |
+| ADF 閾值 | 0.05 | 0.05 | **0.01** | **0.01** | 0.05 |
+| 降維聚類 | 無 | 無 | 無 | UMAP+HDBSCAN | UMAP+HDBSCAN |
+| 排序依據 | SSD↑ | SSD↑ | DTW/PCA↑ | Quality↓ | Quality↓ |
+
+## 交易期 Spread 重建路徑
+
+**由形成期存入的欄位決定交易期計算空間：**
+
+```
+有 OLS_Alpha  → 路徑 A（log-price OLS 殘差）
+  Spread = ln(P_A) - α - β·ln(P_B)
+  → DTW、HDBSCAN UMAP、HDBSCAN MultiScale
+
+有 First_Price_A/B  → 路徑 B1（累積回報比值）
+  Spread = P_A/P_A0 - P_B/P_B0
+  → SSD Basic
+
+其餘  → 路徑 B2（Z-Score 標準化 log 空間）
+  Spread = Z(ln P_A) - β·Z(ln P_B)
+  → SSD Rolling
+```
+
+> 三條路徑確保交易期 Z-Score 的基準空間與形成期完全一致
+
+---
+
+# 📖 參考文獻 {background-color="#111827"}
+
+## References
+
+::: {style="font-size: 0.78em; line-height: 1.8;"}
+
+**[1]** Gatev, E., Goetzmann, W. N., & Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. *Review of Financial Studies*, 19(3), 797–827.
+
+**[2]** Krauss, C., Do, X. A., & Huck, N. (2016). The profitability of pairs trading strategies: Distance, cointegration and copula methods. *European Journal of Operational Research*.
+
+**[3]** Zhu, M. (2024). Pairs trading with dynamic time warping. Working Paper.
+
+**[4]** Han, Y., He, A., Rapach, D., & Zhou, G. (2021). In search of pairs using firm fundamentals. Working Paper.
+
+**[5]** Campello, R. J., Moulavi, D., & Sander, J. (2013). Density-based clustering based on hierarchical density estimates. *PAKDD*.
+
+**[6]** McInnes, L., Healy, J., & Melville, J. (2018). UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. *arXiv:1802.03426*.
+
+**[7]** Vidyamurthy, G. (2004). *Pairs Trading: Quantitative Methods and Analysis*. Wiley.
+
+**[8]** Engle, R. F., & Granger, C. W. J. (1987). Co-integration and error correction. *Econometrica*, 55(2), 251–276.
+
+:::
+
+---
+
+# {background-color="#111827"}
+
+::: {style="text-align: center; padding-top: 3em;"}
+
+**S&P 500 Pairs Trading — 形成期策略**
+
+::: {style="font-size: 0.9em; color: #8888aa; margin-top: 1em;"}
+操作說明：`Alt + Click` 局部放大 ｜ `O` 鍵縮圖總覽 ｜ `B` 鍵黑幕 ｜ `F` 鍵全螢幕
+:::
+
+::: {style="font-size: 0.85em; color: #4da6ff; margin-top: 0.5em;"}
+使用畫面右下角 🔍 按鈕可啟用跟隨式放大鏡
+:::
+
+:::
+
+```{=html}
+<script>
+/* ── 跟隨式放大鏡 ──────────────────────────────────────────────────────── */
+(function () {
+  const SIZE   = 260;   /* 放大鏡直徑 (px) */
+  const ZOOM   = 2.8;   /* 放大倍率      */
+  const OFFSET = 20;    /* 游標偏移量    */
+
+  let active = false;
+  let overlay, btn;
+
+  function init() {
+    /* 建立遮罩圓形 */
+    overlay = document.createElement('div');
+    overlay.id = 'magnifier-overlay';
+    overlay.style.cssText =
+      `width:${SIZE}px;height:${SIZE}px;` +
+      `transform-origin:top left;`;
+    document.body.appendChild(overlay);
+
+    /* 建立開關按鈕 */
+    btn = document.createElement('button');
+    btn.id = 'magnifier-btn';
+    btn.textContent = '🔍 放大鏡';
+    btn.title = '啟用跟隨式放大鏡（Ctrl+M）';
+    btn.addEventListener('click', toggle);
+    document.body.appendChild(btn);
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm') { e.preventDefault(); toggle(); }
+    });
+  }
+
+  function toggle() {
+    active = !active;
+    btn.classList.toggle('on', active);
+    btn.textContent = active ? '🔍 關閉放大鏡' : '🔍 放大鏡';
+    overlay.classList.toggle('active', active);
+  }
+
+  function onMove(e) {
+    if (!active) return;
+    const mx = e.clientX, my = e.clientY;
+    const hw = SIZE / 2;
+
+    /* 放大鏡視窗位置（游標右下方偏移） */
+    let lx = mx + OFFSET, ly = my + OFFSET;
+    if (lx + SIZE > window.innerWidth)  lx = mx - SIZE - OFFSET;
+    if (ly + SIZE > window.innerHeight) ly = my - SIZE - OFFSET;
+
+    /* 放大內容的偏移：讓游標所在點顯示在圓心 */
+    const bx = -(mx * ZOOM - hw);
+    const by = -(my * ZOOM - hw);
+
+    overlay.style.left = lx + 'px';
+    overlay.style.top  = ly + 'px';
+
+    /* 使用 body 的截圖方式：用 scale + translate 模擬放大 */
+    overlay.style.background = `#1a1a1a`;
+    overlay.style.overflow   = 'hidden';
+
+    /* 在 overlay 裡用 iframe-less 方式：直接把 document.body clone 放入 */
+    /* 輕量方案：使用 CSS transform 截取區域 */
+    overlay.innerHTML =
+      `<div style="
+        position:absolute;
+        top:0;left:0;
+        width:${window.innerWidth}px;
+        height:${window.innerHeight}px;
+        transform:scale(${ZOOM}) translate(${bx / ZOOM}px,${by / ZOOM}px);
+        transform-origin:0 0;
+        pointer-events:none;
+        ">` +
+      `<img src="" id="_mg_snap" style="width:100%;height:100%;display:none">` +
+      `</div>`;
+
+    /* 替代方案：直接用 backdrop-filter + box-shadow 提示區域（輕量） */
+    renderZoom(mx, my, lx, ly, bx, by);
+  }
+
+  function renderZoom(mx, my, lx, ly, bx, by) {
+    /* 直接截取 viewport 並縮放顯示 — 使用 CSS zoom hack */
+    overlay.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.style.cssText =
+      `position:absolute;` +
+      `width:${window.innerWidth}px;` +
+      `height:${window.innerHeight}px;` +
+      `transform:scale(${ZOOM});` +
+      `transform-origin:${mx}px ${my}px;` +
+      `top:${-(my * (ZOOM - 1)) + (my - ly)}px;` +
+      `left:${-(mx * (ZOOM - 1)) + (mx - lx)}px;` +
+      `pointer-events:none;`;
+
+    /* Clone visible slides */
+    const clone = document.querySelector('.reveal').cloneNode(true);
+    clone.style.cssText =
+      'position:static;width:' + window.innerWidth + 'px;' +
+      'height:' + window.innerHeight + 'px;overflow:hidden;';
+    inner.appendChild(clone);
+    overlay.appendChild(inner);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+```

@@ -78,6 +78,8 @@ rolling_step     = 21
 use_vol_adjust = False
 
 INITIAL_CAPITAL = 10000.0
+# 最大同時重疊交易期數（rolling_step 整除 FORWARD_DAYS）
+CONCURRENT_PERIODS = max(1, FORWARD_DAYS // rolling_step)
 
 base_params = {
     "entry_z":                      2.0,

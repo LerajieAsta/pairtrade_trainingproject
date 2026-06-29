@@ -44,11 +44,19 @@
       color: #2e7d32;
       margin-top: 0.75rem;
     }
+    .section-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #6c757d;
+      margin: 1.8rem 0 0.6rem;
+    }
     .cards {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
-      margin-bottom: 2rem;
+      margin-bottom: 0;
     }
     .card {
       background: #fff;
@@ -121,9 +129,10 @@
     <div class="header">
       <h1>S&amp;P 500 Pairs Trading</h1>
       <p>配對交易量化回測平台 — 策略邏輯技術文件</p>
-      <span class="badge">目前啟用 3 個策略</span>
+      <span class="badge">目前啟用 15 個策略</span>
     </div>
 
+    <p class="section-label">📄 詳細技術文件</p>
     <div class="cards">
       <a class="card" href="formation.html">
         <div class="card-icon">🔍</div>
@@ -137,20 +146,37 @@
       </a>
     </div>
 
+    <p class="section-label">🎞 投影片（報告用）</p>
+    <div class="cards">
+      <a class="card" href="formation_slides.html" target="_blank">
+        <div class="card-icon">📐</div>
+        <h2>形成期 — 投影片</h2>
+        <p>論文引述、公式推導、策略對比表；含放大鏡與黑板標注功能</p>
+      </a>
+      <a class="card" href="trading_slides.html" target="_blank">
+        <div class="card-icon">🤖</div>
+        <h2>交易期 — 投影片</h2>
+        <p>Z-Score、DRL LSTM-DQN、六大風控；含論文引述與互動放大功能</p>
+      </a>
+    </div>
+
     <div class="strategies">
       <h3>目前啟用策略</h3>
-      <div class="strategy-item">
-        <span class="dot"></span>
-        <span>SSD Rolling DRL — Z-Score 標準化 log-price 空間 + LSTM-DQN</span>
-      </div>
-      <div class="strategy-item">
-        <span class="dot"></span>
-        <span>HDBSCAN UMAP DRL — 10 維 Quality Score 分群 + LSTM-DQN</span>
-      </div>
-      <div class="strategy-item">
-        <span class="dot"></span>
-        <span>HDBSCAN MultiScale DRL — 形成期內部 4 等分子期間 + 動態熊市 + LSTM-DQN</span>
-      </div>
+      <div class="strategy-item"><span class="dot"></span><span>#1 SSD Basic — 累積回報指數 SSD + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#2 SSD Rolling — Z-Score log-price SSD + OLS + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#3 DTW Paper (DTW) — Sakoe-Chiba DTW + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#4 DTW Paper (SSD-DTW-PCA) — SSD + DTW PCA 融合 + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#5 HDBSCAN MultiScale — 跨期穩定性分群 + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#6 HDBSCAN MultiScale PCA-UMAP — 跨期穩定性 + PCA-UMAP + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#7 HDBSCAN UMAP — 10 維 Quality Score 分群 + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#8 HDBSCAN UMAP PCA-UMAP — Quality Score + PCA-UMAP + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#9 Ensemble HDBSCAN — UMAP × MultiScale 交集 + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#10 Ensemble SSD-DTW — SSD Rolling × DTW 交集 + Z-Score</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#11 SSD Rolling DRL — SSD Rolling 形成期 + LSTM-DQN</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#12 HDBSCAN UMAP DRL — HDBSCAN UMAP 形成期 + LSTM-DQN</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#13 HDBSCAN MultiScale DRL — MultiScale 形成期 + LSTM-DQN</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#14 SSD Rolling Kalman — SSD Rolling 形成期 + Kalman Filter</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#15 HDBSCAN UMAP Kalman — HDBSCAN UMAP 形成期 + Kalman Filter</span></div>
     </div>
 
     <div class="footer">

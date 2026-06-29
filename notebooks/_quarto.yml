@@ -1,6 +1,11 @@
 project:
   type: default
   output-dir: ../docs
+  render:
+    - formation.ipynb
+    - trading.ipynb
+    - formation_slides.qmd
+    - trading_slides.qmd
 
 format:
   html:

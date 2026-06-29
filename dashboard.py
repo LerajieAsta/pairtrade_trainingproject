@@ -49,7 +49,17 @@ st.markdown("""
 # CONSTANTS & CONFIG
 # ==========================================
 RESULTS_DIR = "results"
-from strategies.config import INITIAL_CAPITAL
+from strategies.config import INITIAL_CAPITAL, FORWARD_DAYS, rolling_step, CONCURRENT_PERIODS
+
+# 最大並行部署資本（用於 daily return 正規化）= INITIAL_CAPITAL（run_trading 已修正）
+_CONCURRENT_PERIODS = CONCURRENT_PERIODS
+
+
+def _portfolio_capital() -> float:
+    """正規化用的總部署資本基準（= INITIAL_CAPITAL，因為 run_trading 的 PM
+    已將 max_pairs 乘以 CONCURRENT_PERIODS，Daily_Delta 總量不超過 INITIAL_CAPITAL）
+    """
+    return INITIAL_CAPITAL
 
 
 def natural_sort_key(s):
@@ -272,7 +282,7 @@ def calculate_metrics_raw(strategy_path):
     dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val = \
         extract_features_from_path(strategy_path)
     top_n_int = int(top_n.replace('Top ', '')) if 'Top' in top_n else 20
-    c_period = INITIAL_CAPITAL
+    c_period = _portfolio_capital()   # 任意時點最大並行部署資本（6 × $10,000）
 
     if 'Daily_Delta' in df.columns:
         portfolio_daily = df.groupby('Date')['Daily_Delta'].sum().reset_index()
@@ -281,9 +291,10 @@ def calculate_metrics_raw(strategy_path):
         portfolio_daily = pd.DataFrame({'Date': df['Date'].unique(), 'Daily_Delta': 0})
 
     portfolio_daily['Cumulative_PnL'] = portfolio_daily['Daily_Delta'].cumsum()
+    # 複利資本模型：PM 已確保 Daily_Delta 總量 ≤ current_equity，直接累加即反映真實複利
     portfolio_daily['Equity'] = INITIAL_CAPITAL + portfolio_daily['Cumulative_PnL']
 
-    final_pnl = portfolio_daily['Cumulative_PnL'].iloc[-1] if not portfolio_daily.empty else 0
+    final_pnl = float(portfolio_daily['Cumulative_PnL'].iloc[-1]) if not portfolio_daily.empty else 0.0
     final_equity = INITIAL_CAPITAL + final_pnl
 
     t_stat = t_pval = nw_t_stat = nw_t_pval = np.nan
@@ -299,7 +310,15 @@ def calculate_metrics_raw(strategy_path):
             monthly_returns = monthly_equity.pct_change().fillna(0)
             cum_ret = float(np.prod(1 + monthly_returns) - 1)
             n_months = len(monthly_returns)
-            ann_ret = float(((1 + cum_ret) ** (12 / n_months)) - 1) if n_months > 0 else 0.0
+            if n_months > 0:
+                base = 1 + cum_ret
+                if base > 0:
+                    ann_ret = float(base ** (12 / n_months) - 1)
+                else:
+                    # 累積虧損超過 100%，無法計算幾何年化報酬，改用算術近似
+                    ann_ret = float(cum_ret * (12 / n_months))
+            else:
+                ann_ret = 0.0
 
             mr = monthly_returns.values
             n = len(mr)
@@ -320,7 +339,7 @@ def calculate_metrics_raw(strategy_path):
                 nw_t_pval = float(1 - stats.t.cdf(nw_t_stat, df=n - 1))
 
         # Sharpe：全期含空置日（與 buy-and-hold 可比）
-        prev_equity = portfolio_daily_idx['Equity'].shift(1).fillna(INITIAL_CAPITAL)
+        prev_equity = portfolio_daily_idx['Equity'].shift(1).fillna(c_period)
         daily_returns = portfolio_daily_idx['Daily_Delta'] / prev_equity
         sharpe_full = float(
             np.sqrt(252) * daily_returns.mean() / daily_returns.std()
@@ -337,7 +356,7 @@ def calculate_metrics_raw(strategy_path):
         roll_max = portfolio_daily['Equity'].cummax()
         mdd_pct = float((portfolio_daily['Equity'] - roll_max).divide(roll_max).min())
 
-    rcc = final_pnl / c_period if c_period > 0 else 0
+    rcc = final_pnl / INITIAL_CAPITAL if INITIAL_CAPITAL > 0 else 0
 
     n_traded = n_entries = n_normal_exits = 0
     n_stop_loss = -1
@@ -387,7 +406,7 @@ def calculate_metrics_raw(strategy_path):
                 n_total_trades = len(trade_pnls)
                 win_rate     = n_wins / n_total_trades if n_total_trades > 0 else 0.0
 
-    c_pair = c_period / top_n_int if top_n_int > 0 else c_period
+    c_pair = INITIAL_CAPITAL / top_n_int if top_n_int > 0 else INITIAL_CAPITAL
     engaged_capital = n_traded * c_pair
     rec = final_pnl / engaged_capital if engaged_capital > 0 else 0
 
@@ -1358,8 +1377,9 @@ def main():
     def color_equity(val):
         try:
             v = float(val)
-            if v > INITIAL_CAPITAL: return 'color: #4ade80; font-weight: bold;'
-            if v < INITIAL_CAPITAL: return 'color: #f87171; font-weight: bold;'
+            # 以 0 為基準（Final_Equity 已是 PnL + portfolio_capital，正值代表獲利）
+            if v > 0: return 'color: #4ade80; font-weight: bold;'
+            if v < 0: return 'color: #f87171; font-weight: bold;'
         except Exception:
             pass
         return ''
@@ -1507,7 +1527,7 @@ def main():
         else:
             fig_eq.add_hline(y=INITIAL_CAPITAL,
                              line=dict(color='rgba(128,128,128,0.5)', dash='dash', width=1),
-                             annotation_text=f"Initial Capital ${INITIAL_CAPITAL:,}",
+                             annotation_text=f"Initial Capital ${INITIAL_CAPITAL:,.0f}",
                              annotation_position="bottom right",
                              row=1, col=1)
         if show_drawdown:

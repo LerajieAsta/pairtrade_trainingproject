@@ -35,10 +35,30 @@ from strategies.config import (
 def check_formation_completed(config: dict, db_path: str, log_dir: str, formation_db_path: str) -> bool:
     """
     智慧判定策略形成期是否已完整跑完（斷點續傳）。
+    優先查 DB（比標記檔更可靠，標記檔遺失時仍可正確跳過）。
     """
     if FORCE_RERUN:
         return False
-        
+
+    # ── 優先路徑：DB 中已有該策略的配對資料 ────────────────────────────────
+    if os.path.exists(formation_db_path):
+        try:
+            with get_db_connection(formation_db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='formation_pairs';"
+                )
+                if cursor.fetchone()[0] > 0:
+                    cursor.execute(
+                        "SELECT count(*) FROM formation_pairs WHERE strategy_id = ?;",
+                        (config["name"],),
+                    )
+                    if cursor.fetchone()[0] > 0:
+                        return True  # DB 有資料，直接跳過
+        except Exception:
+            pass
+
+    # ── 退回路徑：標記檔（兼容舊版流程） ────────────────────────────────────
     safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in config["name"])
     mark_path = os.path.join(log_dir, f"{safe_name}_completed.json")
 
@@ -49,35 +69,13 @@ def check_formation_completed(config: dict, db_path: str, log_dir: str, formatio
         with open(mark_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # 1. 價格資料庫路徑與 mtime
         if data.get("db_path") != db_path:
             return False
         current_db_mtime = os.path.getmtime(db_path) if os.path.exists(db_path) else 0.0
         if abs(data.get("db_mtime", -1.0) - current_db_mtime) > 1.0:
             return False
-
-        # 2. 策略參數
         if data.get("strategy_params") != config["params"]:
             return False
-
-        # 3. 檢查 SQLite 中確實存有該策略的數據
-        if not os.path.exists(formation_db_path):
-            return False
-
-        with get_db_connection(formation_db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='formation_pairs';"
-            )
-            if cursor.fetchone()[0] == 0:
-                return False
-
-            cursor.execute(
-                "SELECT count(*) FROM formation_pairs WHERE strategy_id = ?;",
-                (config["name"],),
-            )
-            if cursor.fetchone()[0] == 0:
-                return False
 
         return True
 
