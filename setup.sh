@@ -11,6 +11,21 @@ echo "[INFO] Step 1: Checking Git LFS and fetching files..."
 if ! command -v git &> /dev/null; then
     echo "[WARNING] Git command not found!"
 else
+    # Auto-install git-lfs if not available
+    if ! git lfs version &> /dev/null; then
+        echo "[INFO] git-lfs not found. Installing to ~/bin ..."
+        mkdir -p "$HOME/bin"
+        LFS_TAR="$HOME/git-lfs.tar.gz"
+        LFS_DIR="$HOME/git-lfs-3.5.1"
+        curl -L https://github.com/git-lfs/git-lfs/releases/download/v3.5.1/git-lfs-linux-amd64-v3.5.1.tar.gz -o "$LFS_TAR"
+        tar -xzf "$LFS_TAR" -C "$HOME"
+        cp "$LFS_DIR/git-lfs" "$HOME/bin/git-lfs"
+        rm -f "$LFS_TAR"
+        export PATH="$HOME/bin:$PATH"
+        echo "[SUCCESS] git-lfs installed to ~/bin"
+        echo "[INFO] Add the following line to your ~/.bashrc to make it permanent:"
+        echo "       export PATH=\"\$HOME/bin:\$PATH\""
+    fi
     echo "[INFO] Initializing Git LFS..."
     git lfs install
     echo "[INFO] Fetching Git LFS files..."
