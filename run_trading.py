@@ -21,7 +21,7 @@ from strategies.portfolio_manager import PortfolioManager
 from strategies.db_utils import get_db_connection
 from strategies.config import (
     INITIAL_CAPITAL, CONCURRENT_PERIODS,
-    FORCE_RERUN, CPU_LIMIT_PCT, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
+    FORCE_RERUN, CPU_LIMIT_PCT, DRL_MAX_WORKERS, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
     TICKER_COL, SECTOR_COL, BACKTEST_START, BACKTEST_END,
     FORMATION_WINDOW, FORWARD_DAYS, rolling_step,
     base_params, hdbscan_common, strategies_raw,
@@ -620,7 +620,7 @@ def run_all_trading():
             for group_cfgs in groups:
                 # DRL 策略記憶體需求大，強制循序執行避免 OOM
                 is_drl_group = any(cfg.get("trade_method") == "DRL" for cfg in group_cfgs)
-                group_workers = 1 if is_drl_group else max_workers
+                group_workers = min(DRL_MAX_WORKERS, max_workers) if is_drl_group else max_workers
 
                 futures = {}
                 pending = list(group_cfgs)
