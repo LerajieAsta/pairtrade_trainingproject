@@ -1,6 +1,10 @@
+import inspect
 import numpy as np
 import pandas as pd
 from strategies.trading.zscore_trading import Trading as BaseTrading
+
+# 基底類別接受的參數集合（一次計算，避免每次實例化重複 introspect）
+_BASE_INIT_PARAMS = set(inspect.signature(BaseTrading.__init__).parameters.keys()) - {"self"}
 
 
 class Trading(BaseTrading):
@@ -18,7 +22,9 @@ class Trading(BaseTrading):
                  kalman_delta: float = 1e-4,
                  kalman_R: float = 1e-2,
                  **kwargs):
-        super().__init__(*args, **kwargs)
+        # 只傳基底類別明確接受的參數，過濾掉 DRL/formation 等額外 kwargs
+        base_kwargs = {k: v for k, v in kwargs.items() if k in _BASE_INIT_PARAMS}
+        super().__init__(*args, **base_kwargs)
         self.kalman_delta = kalman_delta
         self.kalman_R = kalman_R
 
