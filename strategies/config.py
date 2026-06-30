@@ -45,7 +45,7 @@ if hasattr(sys.stdout, "reconfigure"):
 # ── 共用常數 ─────────────────────────────────────────────────────────────
 FORCE_RERUN = False
 CPU_LIMIT_PCT = 0.8
-DRL_MAX_WORKERS = 2  # DRL 策略最大並行數，調低可避免 OOM
+DRL_MAX_WORKERS = 128  # DRL 策略最大並行數
 DB_PROFILES = {
     "sp500_Current": {
         "db_path":     "./dataset/sp500_Current.db",
