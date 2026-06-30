@@ -13,6 +13,9 @@ classifiers = [
 ]
 dependencies = []
 
+[tool.setuptools.packages.find]
+exclude = ["Project*", "archive*", "notebooks*", "fetch*", "dataset*"]
+
 [tool.pyright]
 extraPaths = ["."]
 
