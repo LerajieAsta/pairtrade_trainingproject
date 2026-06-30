@@ -197,7 +197,7 @@ class LSTM_DQN(nn.Module):
 class DQNAgent:
     def __init__(self, state_dim, action_dim, hidden_dim=64, num_layers=1, lr=1e-3, gamma=0.99,
                  epsilon_start=1.0, epsilon_end=0.05, epsilon_decay=0.995):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cpu")  # force CPU to avoid GPU contention in multiprocessing
         self.gamma = gamma
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
