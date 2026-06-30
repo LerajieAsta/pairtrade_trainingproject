@@ -670,14 +670,6 @@ class Formation:
                         rejected_count += 1
                         continue
 
-                    # 步驟 4b：分段 Hurst（3 段均需 < hurst_threshold，確保全期均值回歸一致）
-                    seg_len = len(best_resid) // 3
-                    if seg_len >= 20 and any(
-                        _compute_hurst(best_resid[k * seg_len:(k + 1) * seg_len], already_stationary=True)
-                        >= self.hurst_threshold for k in range(3)
-                    ):
-                        rejected_count += 1
-                        continue
 
                     # 步驟 5：零穿越次數
                     demeaned = best_resid - np.mean(best_resid)
@@ -712,6 +704,8 @@ class Formation:
                         "Form_Start":       self.form_start,
                         "Form_End":         self.form_end,
                         "Sector":           assigned_sector,
+                        "Sector_A":         sec_a,
+                        "Sector_B":         sec_b,
                         "Cluster_Label":    cluster_lbl,
                         "Ticker_A":         best_a,
                         "Ticker_B":         best_b,
@@ -805,15 +799,20 @@ class Formation:
             return self.selected_pairs
 
         if self.max_sector_ratio > 0:
+            # 以真實產業（Sector_A / Sector_B）計算曝險，而非群集標籤，
+            # 避免跨產業配對因 Sector 欄位被改填為 Cluster_N 而規避產業集中度上限
             max_per_sec = max(1, int(self.top_n * self.max_sector_ratio))
-            sec_counts: dict[str, int] = {}
+            sec_exposure: dict[str, int] = {}
             diversified = []
             for _, row in eg_df.iterrows():
-                sec = row["Sector"]
-                sec_counts[sec] = sec_counts.get(sec, 0)
-                if sec_counts[sec] < max_per_sec:
+                sa, sb = row["Sector_A"], row["Sector_B"]
+                exp_a = sec_exposure.get(sa, 0)
+                exp_b = sec_exposure.get(sb, 0)
+                if exp_a < max_per_sec and exp_b < max_per_sec:
                     diversified.append(row)
-                    sec_counts[sec] += 1
+                    sec_exposure[sa] = exp_a + 1
+                    if sb != sa:
+                        sec_exposure[sb] = exp_b + 1
                 if len(diversified) >= self.top_n:
                     break
             selected = pd.DataFrame(diversified).copy()
