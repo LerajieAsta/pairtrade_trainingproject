@@ -574,7 +574,8 @@ def run_all_formations():
     # 4. 多行程並行運算（一個原始策略的所有 MSR 變體並行，策略與策略之間串行）
     try:
         try:
-            with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+            executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+            try:
                 for group_cfgs in groups:
                     futures = {}
                     for config in group_cfgs:
@@ -604,6 +605,9 @@ def run_all_formations():
                                 "elapsed": 0.0,
                                 "error":   str(exc),
                             })
+            finally:
+                # 所有結果已收集，不等待 worker processes 自然終止（避免 PyTorch/CUDA 清理卡死）
+                executor.shutdown(wait=False, cancel_futures=False)
         finally:
             # 停止儀表板並重繪最終狀態
             stop_event.set()

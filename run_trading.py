@@ -616,7 +616,8 @@ def run_all_trading():
 
     # 4. 多行程並行運算
     try:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+        try:
             for group_cfgs in groups:
                 # DRL 策略記憶體需求大，強制循序執行避免 OOM
                 is_drl_group = any(cfg.get("trade_method") == "DRL" for cfg in group_cfgs)
@@ -658,6 +659,9 @@ def run_all_trading():
                                 "error": str(exc),
                                 "final_equity": 0.0,
                             })
+        finally:
+            # 所有結果已收集，不等待 worker processes 自然終止（避免 PyTorch/CUDA 清理卡死）
+            executor.shutdown(wait=False, cancel_futures=False)
     finally:
         # 停止儀表板並重繪最終狀態
         stop_event.set()
