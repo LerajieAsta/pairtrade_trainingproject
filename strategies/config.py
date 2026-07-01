@@ -45,7 +45,7 @@ if hasattr(sys.stdout, "reconfigure"):
 # ── 共用常數 ─────────────────────────────────────────────────────────────
 FORCE_RERUN = False
 CPU_LIMIT_PCT = 0.8
-DRL_MAX_WORKERS = 1  # DRL 一次只跑一個，避免多 process 搶 GPU (HAMI 會 kill)
+DRL_MAX_WORKERS = 45  # H200 143GB VRAM，每個 worker ~856MiB，45組同時跑綽綽有餘
 DB_PROFILES = {
     "sp500_Current": {
         "db_path":     "./dataset/sp500_Current.db",
@@ -312,7 +312,10 @@ strategies_raw_all = [
         "trade_method":     "DRL",
         "params":  {
             **base_params,
-            "drl_episodes": 40,
+            "drl_episodes":     150,
+            "drl_hidden_size":  256,
+            "drl_num_layers":   2,
+            "drl_batch_size":   512,
         },
     },
     # 12. HDBSCAN UMAP DRL
@@ -323,7 +326,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_UMAP_DRL",
         "db_method":        "HDBSCAN (UMAP-DRL)",
         "trade_method":     "DRL",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap", "drl_episodes": 40},
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap", "drl_episodes": 150, "drl_hidden_size": 256, "drl_num_layers": 2, "drl_batch_size": 512},
     },
     # 13. HDBSCAN MultiScale DRL
     {
@@ -333,7 +336,7 @@ strategies_raw_all = [
         "sub_dir":          "HDBSCAN_MultiScale_DRL",
         "db_method":        "HDBSCAN (MultiScale-DRL)",
         "trade_method":     "DRL",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap", "drl_episodes": 40},
+        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap", "drl_episodes": 150, "drl_hidden_size": 256, "drl_num_layers": 2, "drl_batch_size": 512},
     },
     # ── Kalman Filter ─────────────────────────────────────────────────────────
     # 14. SSD Rolling Kalman
