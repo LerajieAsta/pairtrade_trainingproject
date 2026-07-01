@@ -15,7 +15,25 @@ import concurrent.futures
 import threading
 import re
 import random
+import signal
 import traceback
+
+_active_executor = None  # 全域參照，供 signal handler 清理用
+
+def _kill_all_workers(signum=None, frame=None):
+    global _active_executor
+    print("\n[INFO] 收到中斷訊號，正在終止所有 worker processes...", flush=True)
+    if _active_executor is not None:
+        for proc in _active_executor._processes.values():
+            try:
+                proc.kill()
+            except Exception:
+                pass
+        _active_executor.shutdown(wait=False, cancel_futures=True)
+    sys.exit(1)
+
+signal.signal(signal.SIGINT, _kill_all_workers)
+signal.signal(signal.SIGTERM, _kill_all_workers)
 
 from strategies.preprocess_equity import DataProcessor
 from strategies.portfolio_manager import PortfolioManager
@@ -616,8 +634,10 @@ def run_all_trading():
     )
 
     # 4. 多行程並行運算
+    global _active_executor
     try:
         executor = concurrent.futures.ProcessPoolExecutor(max_workers=max_workers)
+        _active_executor = executor
         try:
             for group_cfgs in groups:
                 # DRL 策略記憶體需求大，強制循序執行避免 OOM
@@ -661,8 +681,14 @@ def run_all_trading():
                                 "final_equity": 0.0,
                             })
         finally:
-            # 所有結果已收集，不等待 worker processes 自然終止（避免 PyTorch/CUDA 清理卡死）
-            executor.shutdown(wait=False, cancel_futures=False)
+            # 強制終止所有 worker processes（避免 PyTorch/CUDA 清理卡死留下殭屍）
+            for proc in executor._processes.values():
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            executor.shutdown(wait=False, cancel_futures=True)
+            _active_executor = None
     finally:
         # 停止儀表板並重繪最終狀態
         stop_event.set()
