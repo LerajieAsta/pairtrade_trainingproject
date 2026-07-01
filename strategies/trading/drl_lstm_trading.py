@@ -13,6 +13,20 @@ from dataclasses import dataclass
 # Avoid CPU thread thrashing when running PyTorch in multiprocessing
 torch.set_num_threads(1)
 
+def _get_best_gpu(min_free_pct: float = 0.2) -> torch.device:
+    """挑選空閒記憶體比例最高的 GPU；若所有 GPU 空閒率低於 min_free_pct 則退回 CPU。"""
+    if not torch.cuda.is_available():
+        return torch.device("cpu")
+    best_idx, best_free = 0, -1
+    for i in range(torch.cuda.device_count()):
+        free, total = torch.cuda.mem_get_info(i)
+        free_pct = free / total if total > 0 else 0
+        if free_pct > best_free:
+            best_free, best_idx = free_pct, i
+    if best_free < min_free_pct:
+        return torch.device("cpu")
+    return torch.device(f"cuda:{best_idx}")
+
 # ══════════════════════════════════════════════════════════════════════
 # Data Classes
 # ══════════════════════════════════════════════════════════════════════
@@ -197,7 +211,7 @@ class LSTM_DQN(nn.Module):
 class DQNAgent:
     def __init__(self, state_dim, action_dim, hidden_dim=64, num_layers=1, lr=1e-3, gamma=0.99,
                  epsilon_start=1.0, epsilon_end=0.05, epsilon_decay=0.995):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = _get_best_gpu()
         self.gamma = gamma
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
@@ -211,7 +225,7 @@ class DQNAgent:
         self.target_model.eval()
         
         self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
-        self.memory = deque(maxlen=10000)
+        self.memory = deque(maxlen=100000)
         self.loss_fn = nn.MSELoss()
         
     def act(self, state_seq):
@@ -262,7 +276,7 @@ class Trading:
     """DRL LSTM Trading Strategy Interface for run_trading.py"""
 
     _shared_agents: dict = {}  # class-level cache: {formation+trade+pair key -> DQNAgent}
-    _MAX_CACHED_AGENTS: int = 120  # cap to prevent OOM on long backtests
+    _MAX_CACHED_AGENTS: int = 500
 
     def __init__(self, price_df: pd.DataFrame, trade_dates: pd.DatetimeIndex, selected_pairs: pd.DataFrame, capital_per_pair: float,
                  fee_rate: float, slippage_rate: float,
