@@ -92,10 +92,6 @@ def worker_task(
     params        = strategy_config["params"]
     sub_dir       = strategy_config["sub_dir"]
 
-    # 錯開 GPU 初始化時間，避免大量 worker 同時搶 VRAM 觸發 HAMI kill
-    if "DRL" in module_name:
-        time.sleep(random.uniform(0, 5))
-
     # 建立日誌與 CSV 輸出路徑
     safe_name     = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
     log_dir       = f"{output_root}/logs/run_trading"
