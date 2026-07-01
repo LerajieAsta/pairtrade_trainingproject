@@ -21,7 +21,7 @@ from strategies.portfolio_manager import PortfolioManager
 from strategies.db_utils import get_db_connection
 from strategies.config import (
     INITIAL_CAPITAL, CONCURRENT_PERIODS,
-    FORCE_RERUN, CPU_LIMIT_PCT, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
+    FORCE_RERUN, CPU_LIMIT_PCT, DRL_MAX_WORKERS, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
     TICKER_COL, SECTOR_COL, BACKTEST_START, BACKTEST_END,
     FORMATION_WINDOW, FORWARD_DAYS, rolling_step,
     base_params, hdbscan_common, strategies_raw,
@@ -618,38 +618,46 @@ def run_all_trading():
     try:
         with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
             for group_cfgs in groups:
-                futures = {}
-                for config in group_cfgs:
-                    f = executor.submit(
-                        worker_task,
-                        config,
-                        price_pivot,
-                        all_dates,
-                        total_days,
-                        local_first_trade_idx,
-                        sector_mapping,
-                        formation_db_path,
-                        OUTPUT_ROOT,
-                        results_db_path,
-                        dataset_name,
-                        progress_dict,
-                    )
-                    futures[f] = config
+                # DRL 策略記憶體需求大，強制循序執行避免 OOM
+                is_drl_group = any(cfg.get("trade_method") == "DRL" for cfg in group_cfgs)
+                group_workers = min(DRL_MAX_WORKERS, max_workers) if is_drl_group else max_workers
 
-                for f in concurrent.futures.as_completed(futures):
-                    config = futures[f]
-                    try:
-                        res = f.result()
-                        results.append(res)
-                    except Exception as exc:
-                        results.append({
-                            "name": config["name"],
-                            "status": "FAILED",
-                            "skipped": False,
-                            "elapsed": 0.0,
-                            "error": str(exc),
-                            "final_equity": 0.0,
-                        })
+                futures = {}
+                pending = list(group_cfgs)
+                while pending:
+                    batch, pending = pending[:group_workers], pending[group_workers:]
+                    batch_futures = {}
+                    for config in batch:
+                        f = executor.submit(
+                            worker_task,
+                            config,
+                            price_pivot,
+                            all_dates,
+                            total_days,
+                            local_first_trade_idx,
+                            sector_mapping,
+                            formation_db_path,
+                            OUTPUT_ROOT,
+                            results_db_path,
+                            dataset_name,
+                            progress_dict,
+                        )
+                        batch_futures[f] = config
+
+                    for f in concurrent.futures.as_completed(batch_futures):
+                        config = batch_futures[f]
+                        try:
+                            res = f.result()
+                            results.append(res)
+                        except Exception as exc:
+                            results.append({
+                                "name": config["name"],
+                                "status": "FAILED",
+                                "skipped": False,
+                                "elapsed": 0.0,
+                                "error": str(exc),
+                                "final_equity": 0.0,
+                            })
     finally:
         # 停止儀表板並重繪最終狀態
         stop_event.set()
