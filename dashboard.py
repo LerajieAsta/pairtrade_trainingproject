@@ -1171,6 +1171,19 @@ def main():
     with qf2:
         qf_high_sharpe = st.checkbox("Sharpe > 1.0", value=False)
 
+    # 年份篩選（影響 Equity Curve 顯示，表格仍為全期績效）
+    st.markdown("**Year Range (affects Equity Curve display):**")
+    yr_c1, yr_c2, yr_c3 = st.columns([1, 1, 3])
+    with yr_c1:
+        yr_start = st.number_input("Start Year", min_value=2001, max_value=2025,
+                                   value=2001, step=1, key="yr_start")
+    with yr_c2:
+        yr_end = st.number_input("End Year", min_value=2001, max_value=2025,
+                                 value=2025, step=1, key="yr_end")
+    if yr_start > yr_end:
+        yr_start, yr_end = yr_end, yr_start
+    yr_filter_active = (yr_start > 2001 or yr_end < 2025)
+
     # 套用所有篩選
     filtered_df = master_df.copy()
     if sel_methods:
@@ -1263,8 +1276,23 @@ def main():
         st.info("No data matches current filters.")
         return
 
+    _sort_options = {
+        "Ann. Return":   ("Ann_Ret_Raw",  False),
+        "Final Equity":  ("Final_Equity", False),
+        "Sharpe":        ("Sharpe_Raw",   False),
+        "Calmar":        ("Calmar_Raw",   False),
+        "Max Drawdown":  ("MDD_Raw",      True),   # ascending = least negative first
+        "Win Rate":      ("Win_Rate",     False),
+        "Profit Factor": ("Profit_Factor",False),
+        "Entries":       ("Entries",      False),
+    }
+    _sort_key = st.selectbox(
+        "Sort table by", list(_sort_options.keys()), index=0, key="perf_sort_col"
+    )
+    _col, _asc = _sort_options[_sort_key]
+
     display_df = (filtered_df.copy()
-                  .sort_values('Ann_Ret_Raw', ascending=False)
+                  .sort_values(_col, ascending=_asc)
                   .reset_index(drop=True))
 
     # 排名欄
@@ -1464,7 +1492,10 @@ def main():
     # EQUITY CURVE + DRAWDOWN CHART
     # ══════════════════════════════════════════════
     if len(selected_rows) > 0:
-        st.markdown("### Equity Curves")
+        eq_title = f"### Equity Curves"
+        if yr_filter_active:
+            eq_title += f" &nbsp;<span style='font-size:0.85em;color:#94a3b8'>({yr_start}–{yr_end}, re-based to ${INITIAL_CAPITAL:,.0f})</span>"
+        st.markdown(eq_title, unsafe_allow_html=True)
 
         eq_ctrl1, eq_ctrl2 = st.columns(2)
         with eq_ctrl1:
@@ -1500,6 +1531,23 @@ def main():
             port = raw_df.groupby('Date')['Daily_Delta'].sum().reset_index()
             port = port.sort_values('Date').reset_index(drop=True)
             port['Equity'] = INITIAL_CAPITAL + port['Daily_Delta'].cumsum()
+
+            # 年份範圍篩選：重設基準至 INITIAL_CAPITAL，方便同期比較
+            if yr_filter_active:
+                port = port[
+                    (port['Date'].dt.year >= yr_start) &
+                    (port['Date'].dt.year <= yr_end)
+                ].copy().reset_index(drop=True)
+                if not port.empty:
+                    port['Equity'] = INITIAL_CAPITAL + (
+                        port['Daily_Delta'].cumsum()
+                        - port['Daily_Delta'].cumsum().iloc[0]
+                        + port['Equity'].iloc[0]
+                        - INITIAL_CAPITAL
+                    )
+
+            if port.empty:
+                continue
 
             if equity_pct_mode:
                 y_vals = (port['Equity'] - INITIAL_CAPITAL) / INITIAL_CAPITAL

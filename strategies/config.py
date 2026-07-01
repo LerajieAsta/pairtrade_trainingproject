@@ -128,10 +128,10 @@ _HDBSCAN_UMAP_COMMON = {
 _HDBSCAN_UMAP_FILTERS = {
     "adf_pvalue_threshold": 0.01,
     "min_corr":             0.50,
-    "min_zero_crossings":   5,
-    "hurst_threshold":      0.5,
+    "min_zero_crossings":   3,              # 放寬：5 → 3（允許訊號較少的 window）
+    "hurst_threshold":      0.55,           # 放寬：0.5 → 0.55（允許稍弱的均值回歸）
     "halflife_min":         1.0,
-    "halflife_max":         FORWARD_DAYS / 3,
+    "halflife_max":         FORWARD_DAYS / 2,  # 放寬：/3(42d) → /2(63d)
     "roll_corr_window":     60,
     "max_beta_diff":        0.8,
     "max_vol_ratio":        3.0,
@@ -152,7 +152,7 @@ _HDBSCAN_MS_FILTERS = {
     "max_vol_ratio_std":    0.80,
     "use_mom1_filter":      True,
     "halflife_min":         1.0,
-    "halflife_max":         FORWARD_DAYS / 3,
+    "halflife_max":         FORWARD_DAYS / 2,  # 放寬：/3(42d) → /2(63d)
 }
 
 strategies_raw_all = [
