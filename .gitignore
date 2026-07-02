@@ -65,3 +65,6 @@ data/
 # formation_data: exclude unmerged per-strategy test DBs, keep main merged DB
 formation_data/formation_pairs_sp500_yF_*.db
 formation_data/formation_pairs_sp500_Tiingo.db
+
+# Distribution / packaging
+*.egg-info/

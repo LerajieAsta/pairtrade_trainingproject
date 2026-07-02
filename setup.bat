@@ -16,7 +16,7 @@ if %errorlevel% neq 0 (
     git lfs install
     echo [INFO] Fetching Git LFS files...
     git lfs pull
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo [WARNING] Git LFS pull failed or LFS is not installed. 
         echo [WARNING] Large data files might be missing. Please make sure git-lfs is installed.
     ) else (
@@ -34,7 +34,7 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-for /f "tokens=2 delims= " %%I in ('python --version 2^>&1') do set PY_VER=%%I
+for /f "tokens=2 delims= " %%I in ('python --version') do set PY_VER=%%I
 echo [INFO] Found Python version: !PY_VER!
 echo.
 
@@ -45,7 +45,7 @@ if exist "Project\Scripts\activate.bat" (
 ) else (
     echo [INFO] Creating virtual environment 'Project'...
     python -m venv Project
-    if %errorlevel% neq 0 (
+    if !errorlevel! neq 0 (
         echo [ERROR] Failed to create virtual environment!
         pause
         exit /b 1
