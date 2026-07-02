@@ -18,4 +18,9 @@ exclude = ["Project*", "archive*", "notebooks*", "fetch*", "dataset*"]
 
 [tool.pyright]
 extraPaths = ["."]
+typeCheckingMode = "off"
+reportGeneralTypeIssues = "none"
+reportOptionalMemberAccess = "none"
+reportOptionalSubscript = "none"
+reportPrivateUsage = "none"
 

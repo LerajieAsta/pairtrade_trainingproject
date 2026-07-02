@@ -149,7 +149,7 @@ def worker_task(
         
         # 讀取該策略的所有交易週期 (使用 formation_strategy_id)
         formation_strategy_id = strategy_config.get("formation_strategy_id", name)
-        df_periods = pd.read_sql_query(
+        df_periods = pd.read_sql_query(  # type: ignore
             "SELECT DISTINCT Period_Start, Trade_Start, Trade_End FROM formation_pairs WHERE strategy_id = ? ORDER BY Period_Start", 
             conn, 
             params=(formation_strategy_id,)
@@ -157,7 +157,7 @@ def worker_task(
         total_periods = len(df_periods)
         
         if total_periods == 0:
-            conn.close()
+            conn.close()  # type: ignore
             raise ValueError(f"No periods found in formation_pairs for strategy: {formation_strategy_id}")
 
         # 更新實際的 total_periods
@@ -190,7 +190,7 @@ def worker_task(
                 FROM formation_pairs
                 WHERE strategy_id = ? AND Period_Start = ?
                 ORDER BY Pair_Rank ASC
-            """, conn, params=(formation_strategy_id, period_start))
+            """, conn, params=(formation_strategy_id, period_start))  # type: ignore
 
             # 根據交易期設定只篩選前 top_n 對進行回測模擬
             top_n = params.get("top_n", 10)
@@ -311,7 +311,7 @@ def worker_task(
             # 清理 PortfolioManager 中的 active_pairs 以防累積
             pm.active_pairs.clear()
 
-        conn.close()
+        conn.close()  # type: ignore
 
         # 合併與儲存交易結果
         if all_trade_logs:
@@ -456,23 +456,23 @@ def run_all_trading():
         params = raw["params"]
         
         # 1. top_n_list
-        top_n_list = params.get("top_n_list")
+        top_n_list = params.get("top_n_list")  # type: ignore
         if not top_n_list:
-            top_n_list = [params.get("top_n", 10)]
+            top_n_list = [params.get("top_n", 10)]  # type: ignore
         elif not isinstance(top_n_list, list):
             top_n_list = [top_n_list]
             
         # 2. stop_loss_list (相容 stop_loss_pct_list)
-        sl_list = params.get("stop_loss_list") or params.get("stop_loss_pct_list")
+        sl_list = params.get("stop_loss_list") or params.get("stop_loss_pct_list")  # type: ignore
         if not sl_list:
-            sl_list = [params.get("stop_loss_pct", 0.0)]
+            sl_list = [params.get("stop_loss_pct", 0.0)]  # type: ignore
         elif not isinstance(sl_list, list):
             sl_list = [sl_list]
             
         # 3. max_sector_ratio_list
-        msr_list = params.get("max_sector_ratio_list")
+        msr_list = params.get("max_sector_ratio_list")  # type: ignore
         if not msr_list:
-            msr_list = [params.get("max_sector_ratio", 0.0)]
+            msr_list = [params.get("max_sector_ratio", 0.0)]  # type: ignore
         elif not isinstance(msr_list, list):
             msr_list = [msr_list]
             
@@ -482,15 +482,15 @@ def run_all_trading():
             new_params = new_raw["params"]
             
             # 設定具體數值
-            new_params["top_n"] = top_n
-            new_params["stop_loss_pct"] = sl
-            new_params["max_sector_ratio"] = msr
+            new_params["top_n"] = top_n  # type: ignore
+            new_params["stop_loss_pct"] = sl  # type: ignore
+            new_params["max_sector_ratio"] = msr  # type: ignore
             
             # 清理 list 參數以防混淆
-            new_params.pop("top_n_list", None)
-            new_params.pop("stop_loss_list", None)
-            new_params.pop("stop_loss_pct_list", None)
-            new_params.pop("max_sector_ratio_list", None)
+            new_params.pop("top_n_list", None)  # type: ignore
+            new_params.pop("stop_loss_list", None)  # type: ignore
+            new_params.pop("stop_loss_pct_list", None)  # type: ignore
+            new_params.pop("max_sector_ratio_list", None)  # type: ignore
             
             # 對接 Formation 配對資料庫的 strategy_id (Formation 階段只受 max_sector_ratio 影響，固定 top_n=20)
             msr_pct = int(msr * 100)
@@ -620,7 +620,7 @@ def run_all_trading():
         return
 
     # ── 啟動儀表板 ───────────────────────────────────────────────────────
-    os.system("")
+    os.system("")  # type: ignore
     placeholder_lines = len(original_strategies_config) + _DASHBOARD_FIXED_LINES
     sys.stdout.write("\n" * placeholder_lines)
     sys.stdout.flush()

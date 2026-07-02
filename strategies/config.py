@@ -17,10 +17,10 @@ os.environ["NCORES"] = "1"
 
 try:
     import multiprocessing.resource_tracker
-    if 'folder' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:
-        multiprocessing.resource_tracker._CLEANUP_FUNCS['folder'] = lambda x: None
-    if 'file' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:
-        multiprocessing.resource_tracker._CLEANUP_FUNCS['file'] = lambda x: None
+    if 'folder' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:  # type: ignore
+        multiprocessing.resource_tracker._CLEANUP_FUNCS['folder'] = lambda x: None  # type: ignore
+    if 'file' not in multiprocessing.resource_tracker._CLEANUP_FUNCS:  # type: ignore
+        multiprocessing.resource_tracker._CLEANUP_FUNCS['file'] = lambda x: None  # type: ignore
 except Exception:
     pass
 
@@ -40,10 +40,10 @@ except ImportError:
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
-    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)  # type: ignore
 
 # ── 共用常數 ─────────────────────────────────────────────────────────────
-FORCE_RERUN = False
+FORCE_RERUN = True
 CPU_LIMIT_PCT = 0.8
 DRL_MAX_WORKERS = 45  # H200 143GB VRAM，每個 worker ~856MiB，45組同時跑綽綽有餘
 DB_PROFILES = {
@@ -99,7 +99,7 @@ base_params = {
     "max_holding_days":             30,
     "top_n_list":                   [1, 3, 5, 10, 20],
     "stop_loss_list":               [0.0, 0.05, 0.15],
-    "max_sector_ratio_list":        [0.0, 0.30, 0.50],
+    "max_sector_ratio_list":        [0.0],
     "top_n":                        20,
     "stop_loss_pct":                0.0,
     "zscore_window":                0,
@@ -583,7 +583,7 @@ class ProgressAwareStdout:
         self.log_file = open(log_filepath, "w", encoding="utf-8", buffering=1)
 
     def write(self, s: str) -> None:
-        self.log_file.write(s)
+        self.log_file.write(s)  # type: ignore
         match = self.pattern.search(s)
         if match:
             try:

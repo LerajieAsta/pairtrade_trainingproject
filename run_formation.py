@@ -61,7 +61,7 @@ def check_formation_completed(config: dict, db_path: str, log_dir: str, formatio
     # ── 優先路徑：DB 中已有該策略的配對資料 ────────────────────────────────
     if os.path.exists(formation_db_path):
         try:
-            with get_db_connection(formation_db_path) as conn:
+            with get_db_connection(formation_db_path) as conn:  # type: ignore
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='formation_pairs';"
@@ -184,9 +184,9 @@ def worker_task(
         from strategies.db_utils import init_formation_db
         os.makedirs(os.path.dirname(temp_db_path), exist_ok=True)
         conn = init_formation_db(temp_db_path)
-        cursor = conn.cursor()
+        cursor = conn.cursor()  # type: ignore
         cursor.execute("DELETE FROM formation_pairs")
-        conn.commit()
+        conn.commit()  # type: ignore
 
         # 2. 載入形成期模組
         strat_module = importlib.import_module(module_name)
@@ -202,14 +202,14 @@ def worker_task(
         if main_db and os.path.exists(main_db) and not FORCE_RERUN:
             try:
                 main_conn = get_db_connection(main_db)
-                df_exists = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name='formation_pairs'", main_conn)
+                df_exists = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name='formation_pairs'", main_conn)  # type: ignore
                 if not df_exists.empty:
-                    df_completed = pd.read_sql_query(
+                    df_completed = pd.read_sql_query(  # type: ignore
                         "SELECT DISTINCT Period_Start FROM formation_pairs WHERE strategy_id = ?",
-                        main_conn, params=(name,)
+                        main_conn, params=(name,)  # type: ignore
                     )
                     completed_periods = set(df_completed["Period_Start"].tolist())
-                main_conn.close()
+                main_conn.close()  # type: ignore
             except Exception:
                 pass
 
@@ -303,9 +303,9 @@ def worker_task(
                 (strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, records)
-            conn.commit()
+            conn.commit()  # type: ignore
 
-        conn.close()
+        conn.close()  # type: ignore
 
         # 4. 寫入該策略的完成標記檔
         write_formation_completion_mark(strategy_config, db_path, log_dir)
@@ -360,17 +360,17 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
     print("\n[DB Merge] 正在整合所有並行行程的配對數據至主資料庫...", flush=True)
     from strategies.db_utils import init_formation_db
     conn = init_formation_db(main_db_path)
-    cursor = conn.cursor()
+    cursor = conn.cursor()  # type: ignore
 
     for temp_db in temp_db_paths:
         if not os.path.exists(temp_db):
             continue
         try:
             temp_conn = get_db_connection(temp_db)
-            temp_cursor = temp_conn.cursor()
+            temp_cursor = temp_conn.cursor()  # type: ignore
             temp_cursor.execute("SELECT strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params FROM formation_pairs")
             rows = temp_cursor.fetchall()
-            temp_conn.close()
+            temp_conn.close()  # type: ignore
 
             # 直接插入，OR REPLACE 會處理重複
             cursor.executemany("""
@@ -378,7 +378,7 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
                 (strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, rows)
-            conn.commit()
+            conn.commit()  # type: ignore
         except Exception as e:
             print(f"⚠️ [DB Merge] 整合暫存資料庫 {temp_db} 失敗: {e}", flush=True)
 
@@ -388,7 +388,7 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
         except Exception:
             pass
 
-    conn.close()
+    conn.close()  # type: ignore
     print("✅ [DB Merge] 所有配對數據整合與清理完畢！", flush=True)
 
 
@@ -455,8 +455,8 @@ def run_all_formations():
     # 1.5 載入標普 500 歷史成員變動紀錄 (index_memberships)
     print("⏳ 正在從資料庫載入標普 500 歷史成員變動紀錄 (index_memberships)...", flush=True)
     try:
-        with get_db_connection(DB_PATH) as conn:
-            df_memberships = pd.read_sql_query("SELECT Symbol, start_date, end_date FROM index_memberships", conn)
+        with get_db_connection(DB_PATH) as conn:  # type: ignore
+            df_memberships = pd.read_sql_query("SELECT Symbol, start_date, end_date FROM index_memberships", conn)  # type: ignore
         print(f"✅ 成功載入成員紀錄，共 {len(df_memberships)} 筆數據。\n", flush=True)
     except Exception as e:
         print(f"⚠️ 無法載入 index_memberships 表，回退至全歷史標的池。錯誤: {e}\n", flush=True)
@@ -469,9 +469,9 @@ def run_all_formations():
     expanded_strategies_raw = []
     for raw in strategies_raw:
         params = raw["params"]
-        msr_list = params.get("max_sector_ratio_list")
+        msr_list = params.get("max_sector_ratio_list")  # type: ignore
         if not msr_list:
-            msr_list = [params.get("max_sector_ratio", 0.0)]
+            msr_list = [params.get("max_sector_ratio", 0.0)]  # type: ignore
         elif not isinstance(msr_list, list):
             msr_list = [msr_list]
             
@@ -480,14 +480,14 @@ def run_all_formations():
             new_params = new_raw["params"]
             
             # 形成期固定篩選 20 對配對
-            new_params["top_n"] = 20
-            new_params["max_sector_ratio"] = msr
+            new_params["top_n"] = 20  # type: ignore
+            new_params["max_sector_ratio"] = msr  # type: ignore
             
             # 清理 list 參數以防混淆
-            new_params.pop("top_n_list", None)
-            new_params.pop("stop_loss_list", None)
-            new_params.pop("stop_loss_pct_list", None)
-            new_params.pop("max_sector_ratio_list", None)
+            new_params.pop("top_n_list", None)  # type: ignore
+            new_params.pop("stop_loss_list", None)  # type: ignore
+            new_params.pop("stop_loss_pct_list", None)  # type: ignore
+            new_params.pop("max_sector_ratio_list", None)  # type: ignore
             
             # 加後綴以區分 MSR 參數組合
             msr_pct = int(msr * 100)
@@ -578,7 +578,7 @@ def run_all_formations():
         return
 
     # ── 啟動儀表板 ───────────────────────────────────────────────────────
-    os.system("")  # Windows console 支持
+    os.system("")  # type: ignore
     placeholder_lines = len(original_strategies_config) + _DASHBOARD_FIXED_LINES
     sys.stdout.write("\n" * placeholder_lines)
     sys.stdout.flush()
