@@ -18,6 +18,7 @@ Papper/
 │   │   ├── DTW_Cointegration_Paper.py  # DTW + ADF 雙重篩選
 │   │   ├── HDBSCAN_UMAP.py        # HDBSCAN UMAP：10 維特徵 Quality Score
 │   │   ├── HDBSCAN_MultiScale.py  # HDBSCAN MultiScale：形成期內部 n_splits 等分子期間
+│   │   ├── HDBSCAN_PCA_Loadings.py # HDBSCAN PCA-Loadings：報酬 PCA 因子載荷特徵（消融實驗）
 │   │   └── ensemble.py            # Ensemble：Tier-1 交集 + Tier-2 聯集補足
 │   └── trading/
 │       ├── zscore_trading.py      # Z-Score 狀態機（基礎類，三條 Spread 路徑）

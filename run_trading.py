@@ -265,7 +265,13 @@ def worker_task(
                 if hasattr(trading_instance, '_simulate_pair'):
                     try:
                         # OLS_Alpha 存在時（HDBSCAN）走 log-price 路徑；不存在時（SSD/DTW）走向下相容路徑
-                        raw_alpha = form_params.get("OLS_Alpha", None)
+                        # ignore_ols_alpha：強制走路徑 B（標準化空間）。用於修正 DTW Paper 的
+                        # 座標系錯位——其 OLS 在標準化 log-price 空間擬合，卻因輸出 OLS_Alpha
+                        # 被路徑 A 以原始 log-price 空間重建 spread，產生常數 Z-Score 偏移。
+                        if params.get("ignore_ols_alpha", False):
+                            raw_alpha = None
+                        else:
+                            raw_alpha = form_params.get("OLS_Alpha", None)
                         try:
                             ols_alpha_val = float(raw_alpha) if raw_alpha is not None and not pd.isna(float(raw_alpha)) else None
                         except (TypeError, ValueError):
@@ -493,8 +499,11 @@ def run_all_trading():
             new_params.pop("max_sector_ratio_list", None)  # type: ignore
             
             # 對接 Formation 配對資料庫的 strategy_id (Formation 階段只受 max_sector_ratio 影響，固定 top_n=20)
+            # formation_strategy_id_base：允許策略借用另一個策略的形成期配對
+            # （例如 DTW Paper Fixed 重用 DTW Paper 的配對，只改變交易期的 spread 空間解讀）
             msr_pct = int(msr * 100)
-            new_raw["formation_strategy_id"] = f"{raw['name']}_MSR{msr_pct}"
+            form_base = raw.get("formation_strategy_id_base") or raw["name"]
+            new_raw["formation_strategy_id"] = f"{form_base}_MSR{msr_pct}"
             
             # 回測唯一的任務名稱字串 (加上後綴)
             sl_pct = int(sl * 100)

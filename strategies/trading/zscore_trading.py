@@ -25,7 +25,8 @@ class Trading:
                  allow_reentry: bool = False, zscore_clip: float = 10.0, min_spread_std: float = 1e-6,
                  use_dynamic_stop: bool = False, dynamic_stop_z: float = 3.0,
                  portfolio_stop_loss_pct: float = 0.10, use_vol_adjust: bool = False,
-                 vol_regime_threshold: float = 0.0):
+                 vol_regime_threshold: float = 0.0,
+                 hold_to_period_end: bool = False):
         self.price_df = price_df.copy()
         # Pre-clean 50%+ daily moves once for the full matrix — avoids repeating per pair
         _pct = self.price_df.pct_change().abs()
@@ -46,6 +47,9 @@ class Trading:
         self.dynamic_stop_z = dynamic_stop_z
         self.portfolio_stop_loss_pct = portfolio_stop_loss_pct
         self.use_vol_adjust = use_vol_adjust
+        # 收斂持有模式（GGR 式）：進場後不做 Z-Score 回歸出場，持有至期末強制平倉
+        # （停損機制仍然有效）。用於測試「長持收斂」相對「快進快出均值回歸」的貢獻。
+        self.hold_to_period_end = hold_to_period_end
 
         # 市場波動政體過濾：vol_regime_threshold > 0 時，年化波動率超過閾值期間暫停新開倉
         self.vol_regime_threshold = vol_regime_threshold
@@ -294,8 +298,12 @@ class Trading:
                     closed_trade_pnl = current_trade_pnl
                     current_status = "STOP_LOSS_TRIGGERED"
                 else:
-                    is_exit_short = (state.position == -1) and (z <= self.exit_z)
-                    is_exit_long  = (state.position == 1)  and (z >= -self.exit_z)
+                    if self.hold_to_period_end:
+                        # 收斂持有模式：不做 Z-Score 出場，持有至期末（PERIOD_END_EXIT 結算）
+                        is_exit_short = is_exit_long = False
+                    else:
+                        is_exit_short = (state.position == -1) and (z <= self.exit_z)
+                        is_exit_long  = (state.position == 1)  and (z >= -self.exit_z)
 
                     if is_exit_short or is_exit_long:
                         self._execute_close(state, current_trade_pnl, stop_loss=False)

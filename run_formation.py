@@ -468,6 +468,10 @@ def run_all_formations():
     # ── 展開策略網格（形成期配對數固定為 20，不受 top_n_list 影響，僅依據 max_sector_ratio_list 展開） ──
     expanded_strategies_raw = []
     for raw in strategies_raw:
+        # 借用其他策略形成期配對的策略（formation_strategy_id_base）無需自行計算
+        if raw.get("formation_strategy_id_base"):
+            print(f"  ⟳ 跳過形成期（借用 {raw['formation_strategy_id_base']} 的配對）：{raw['name']}", flush=True)
+            continue
         params = raw["params"]
         msr_list = params.get("max_sector_ratio_list")  # type: ignore
         if not msr_list:
@@ -497,6 +501,8 @@ def run_all_formations():
     # 建立未展開前的原始策略配置列表，用於儀表板統合呈現
     original_strategies_config = []
     for raw in strategies_raw:
+        if raw.get("formation_strategy_id_base"):
+            continue  # 借用配對的策略不參與形成期儀表板
         original_strategies_config.append({
             "name":             raw["name"],
             "formation_module": raw["formation_module"],

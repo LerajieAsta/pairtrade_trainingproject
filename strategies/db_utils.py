@@ -27,7 +27,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 # 定義策略初始資金常數，用於計算報酬率與部位佔比
-from strategies.config import INITIAL_CAPITAL
+from strategies.config import INITIAL_CAPITAL, CONCURRENT_PERIODS, RF_ANNUAL
 
 
 def get_db_connection(db_path="results/result.db", max_retries=5, retry_delay=0.5):
@@ -141,7 +141,10 @@ def init_db(db_path="results/result.db"):
         "Stop_Losses" INTEGER,
         "Forced_Closes" INTEGER,
         "Gross_Profit" REAL,
-        "Gross_Loss" REAL
+        "Gross_Loss" REAL,
+        "Avg_Utilization" REAL,
+        "Ann_Ret_Employed" REAL,
+        "Excess_Ret_RF" REAL
     );
     """)
 
@@ -149,6 +152,13 @@ def init_db(db_path="results/result.db"):
         cursor.execute('ALTER TABLE strategy_summaries ADD COLUMN "TRADE_METHOD" TEXT;')
     except Exception:
         pass
+
+    # 舊資料庫遷移：文獻口徑績效欄位（GGR fully-invested / rf 計息超額）
+    for _col in ("Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF"):
+        try:
+            cursor.execute(f'ALTER TABLE strategy_summaries ADD COLUMN "{_col}" REAL;')
+        except Exception:
+            pass
 
     # 2. 建立 trade_logs 表：存放每日明細，包含價格、Z-Score、部位及未實現/已實現損益等
     cursor.execute("""
@@ -292,6 +302,27 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
 
     rcc = final_pnl / c_period if c_period > 0 else 0
 
+    # ── 文獻口徑績效（GGR 2006 fully-invested measure / rf 計息超額） ──────
+    # Avg_Utilization：平均資金利用率 = 日均持倉配對數 / 最大配對槽位
+    # Ann_Ret_Employed：動用資本年化 = 總損益 / (日均動用資金 × 年數)
+    # Excess_Ret_RF：閒置現金計 rf 利息後的超額年化
+    #   = 承諾資本算術年化 + rf×(1−利用率) − rf = 算術年化 − rf×利用率
+    max_pairs = top_n_int * CONCURRENT_PERIODS
+    avg_utilization = ann_ret_employed = excess_ret_rf = 0.0
+    if 'Position' in df.columns and max_pairs > 0 and len(portfolio_daily) > 0:
+        _daily_open = (
+            df[df['Position'] != 0].groupby('Date').size()
+            .reindex(portfolio_daily['Date'], fill_value=0)
+        )
+        years = len(portfolio_daily) / 252.0
+        if years > 0:
+            avg_utilization = float(_daily_open.mean() / max_pairs)
+            ann_ret_arith = final_pnl / c_period / years
+            avg_employed = _daily_open.mean() * (c_period / max_pairs)
+            if avg_employed > 0:
+                ann_ret_employed = float(final_pnl / avg_employed / years)
+            excess_ret_rf = float(ann_ret_arith - RF_ANNUAL * avg_utilization)
+
     # 計算交易統計
     if 'Position' in df.columns and 'Ticker_A' in df.columns:
         n_traded = len(df[df['Position'] != 0].drop_duplicates(subset=['Ticker_A', 'Ticker_B']))
@@ -362,6 +393,9 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         'Entries': int(n_entries), 'Exits': int(n_normal_exits),
         'Stop_Losses': int(n_stop_loss), 'Forced_Closes': int(n_forced_close),
         'Gross_Profit': float(gross_profit), 'Gross_Loss': float(gross_loss),
+        'Avg_Utilization': float(avg_utilization),
+        'Ann_Ret_Employed': float(ann_ret_employed),
+        'Excess_Ret_RF': float(excess_ret_rf),
         '_path': path_key
     }
 
@@ -410,8 +444,9 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             "MAX SEC %", "Final_Equity", "RCC_Raw",
             "REC_Raw", "Cum_Ret_Raw", "Ann_Ret_Raw", "Sharpe_Raw", "Sortino_Raw", "Calmar_Raw", "MDD_Raw",
             "Win_Rate", "Profit_Factor", "Avg_Trade_Days",
-            "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss",
+            "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             metrics['_path'], metrics['DATASET'],
             metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
@@ -421,7 +456,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             metrics['Sortino_Raw'], metrics['Calmar_Raw'], metrics['MDD_Raw'],
             metrics['Win_Rate'], metrics['Profit_Factor'], metrics['Avg_Trade_Days'],
             metrics['Entries'], metrics['Exits'], metrics['Stop_Losses'], metrics['Forced_Closes'],
-            metrics['Gross_Profit'], metrics['Gross_Loss']
+            metrics['Gross_Profit'], metrics['Gross_Loss'],
+            metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF']
         ))
 
         df_db = df.copy()
