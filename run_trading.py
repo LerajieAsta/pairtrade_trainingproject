@@ -652,6 +652,16 @@ def run_all_trading():
                 # DRL 策略記憶體需求大，強制循序執行避免 OOM
                 is_drl_group = any(cfg.get("trade_method") == "DRL" for cfg in group_cfgs)
                 group_workers = min(DRL_MAX_WORKERS, max_workers) if is_drl_group else max_workers
+                if is_drl_group:
+                    # 無 CUDA（本機 CPU）時大幅限制 DRL 併發：
+                    # 每個 torch worker 常駐 1–2GB+，FQI 全域緩衝隨期數成長，
+                    # 15+ worker 會耗盡 RAM 導致子行程被系統終止（BrokenProcessPool）
+                    try:
+                        import torch as _torch
+                        if not _torch.cuda.is_available():
+                            group_workers = min(group_workers, 4)
+                    except ImportError:
+                        group_workers = min(group_workers, 4)
 
                 futures = {}
                 pending = list(group_cfgs)

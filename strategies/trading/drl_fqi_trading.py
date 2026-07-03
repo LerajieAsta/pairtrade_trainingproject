@@ -212,6 +212,16 @@ class Trading:
         dn_g = torch.from_numpy(np.concatenate([d["done"] for d in datasets])).to(self.device).float()
         N = len(t_g)
 
+        # 分塊索引（依序列位置切塊，每塊 ≤ batch_size 條序列）：
+        # backward 活化記憶體以塊為上界，不隨全域緩衝成長 → 修復多 worker OOM
+        n_seq = seq_pool.shape[0]
+        chunk = max(1024, int(self.batch_size))
+        chunk_bounds = list(range(0, n_seq, chunk))
+        chunk_idx = []
+        for lo in chunk_bounds:
+            hi = min(lo + chunk, n_seq)
+            chunk_idx.append(((t_g >= lo) & (t_g < hi)).nonzero(as_tuple=True)[0])
+
         model.train()
         for sweep in range(n_sweeps):
             # target 每 15 sweep 同步；y 每 5 sweep 以 Double-Q 重算：
@@ -232,15 +242,19 @@ class Trading:
                     q_next = torch.stack(q_next_cols, dim=1)           # (N, 3)
                     y_all = r_g + self.gamma * q_next.gather(1, a_g.unsqueeze(1)).squeeze(1) * (1 - dn_g)
 
-            # 全批次 GD：每 sweep 僅一次 LSTM forward（每日序列編碼一次，
-            # 同日的 9 個 (持倉×動作) 轉移共用 embedding）→ 消除 minibatch 重複編碼
-            H = model.encode(seq_pool)                                 # (ΣT, H)
-            q = model.q_from_h(H[t_g], eye3[p_g])                      # (N, 3)
-            q_sa = q.gather(1, a_g.unsqueeze(1)).squeeze(1)
-            loss = loss_fn(q_sa, y_all)
-            opt.zero_grad()
-            loss.backward()
-            opt.step()
+            # 分塊批次 GD：每塊一次 LSTM forward（每日序列編碼一次，
+            # 同日的 9 個 (持倉×動作) 轉移共用 embedding），逐塊 step
+            for lo, idx in zip(chunk_bounds, chunk_idx):
+                if idx.numel() == 0:
+                    continue
+                hi = min(lo + chunk, n_seq)
+                H = model.encode(seq_pool[lo:hi])                      # (≤chunk, H)
+                q = model.q_from_h(H[t_g[idx] - lo], eye3[p_g[idx]])
+                q_sa = q.gather(1, a_g[idx].unsqueeze(1)).squeeze(1)
+                loss = loss_fn(q_sa, y_all[idx])
+                opt.zero_grad()
+                loss.backward()
+                opt.step()
         target.load_state_dict(model.state_dict())
         target.eval()
 
