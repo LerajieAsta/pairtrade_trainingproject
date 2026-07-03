@@ -80,8 +80,11 @@ def check_trading_completed(strategy_config: dict, output_root: str, results_db_
     if not os.path.exists(csv_path):
         return False
 
-    # Also verify the result is registered in result.db to catch stale CSV
-    if results_db_path and os.path.exists(results_db_path) and dataset_name:
+    # result.db 為完成與否的唯一真相來源：DB 檔不存在（重建情境）或該列未登記
+    # 一律視為未完成，CSV 僅為必要非充分條件（防 stale CSV / 重建時誤跳過）
+    if results_db_path and dataset_name:
+        if not os.path.exists(results_db_path):
+            return False
         try:
             path_key = f"{dataset_name.lower()}/{sub_dir}/{filename}"
             with sqlite3.connect(results_db_path, timeout=5.0) as _conn:
@@ -90,7 +93,7 @@ def check_trading_completed(strategy_config: dict, output_root: str, results_db_
                 ).fetchone()
                 return row is not None
         except Exception:
-            pass
+            return False
 
     return True
 
