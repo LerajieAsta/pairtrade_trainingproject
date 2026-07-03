@@ -43,7 +43,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)  # type: ignore
 
 # ── 共用常數 ─────────────────────────────────────────────────────────────
-FORCE_RERUN = True
+FORCE_RERUN = False
 CPU_LIMIT_PCT = 0.8
 DRL_MAX_WORKERS = 45  # H200 143GB VRAM，每個 worker ~856MiB，45組同時跑綽綽有餘
 DB_PROFILES = {
@@ -292,11 +292,38 @@ strategies_raw_all = [
             "drl_scope": "global", "drl_buffer_periods": 24,
         },
     },
+    # 8. HDBSCAN PCA-Loadings DRL FQI XL（H200 壓力測試 + 容量縮放消融）
+    #    網路/緩衝/sweep 全面放大：全批次 LSTM forward ≈ 18 萬序列/sweep，
+    #    單 worker 即可吃滿 GPU SM 並常駐 ~30GB VRAM。
+    #    ⚠️ 單獨執行（strategies_raw = strategies_raw_all[-1:]），
+    #      網格固定為 1 組（Top20/SL0/MSR0），勿與其他 DRL 併跑以免 OOM。
+    #    純硬體基準測試另見根目錄 benchmark_h200.py。
+    {
+        "name":             "HDBSCAN PCA-Loadings DRL FQI XL",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
+        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI_XL",
+        "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI-XL)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "top_n_list":        [20],     # 單一網格配置（壓測專用）
+            "stop_loss_list":    [0.0],
+            "drl_episodes":      400,      # 首期全量 sweep（×2.7）
+            "drl_finetune_episodes": 120,  # 每期增量 sweep（×2.4）
+            "drl_hidden_size":   512,      # 128 → 512
+            "drl_num_layers":    2,        # 1 → 2
+            "drl_scope":         "global",
+            "drl_buffer_periods": 36,      # 24 → 36 期（≈3 年形成軌跡）
+        },
+    },
 ]
-# 精簡後共 7 個策略（#1–#5 Z-Score 已有完整結果；#6–#7 DRL-FQI 待跑）
-# 下一步：DRL-FQI 於 GPU 機器執行 strategies_raw_all[-2:]；跑全部改 [:]
-# ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算，執行前請確認
-strategies_raw = strategies_raw_all[-2:]
+# 共 8 個策略（#1–#5 Z-Score 已有完整結果；#6–#7 DRL-FQI 待跑；#8 = H200 壓測）
+# DRL-FQI 正式實驗：strategies_raw_all[5:7]（#6–#7）
+# H200 壓測（單獨跑）：strategies_raw_all[-1:]（#8）
+# 跑全部改 [:]；⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
+strategies_raw = strategies_raw_all[5:7]
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
