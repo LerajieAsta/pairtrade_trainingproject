@@ -327,26 +327,40 @@ strategies_raw_all = [
         },
     },
 ]
-# 共 8 個策略（#1–#5 Z-Score 已有完整結果；#6–#7 DRL-FQI 待跑；#8 = H200 壓測）
-# DRL-FQI 正式實驗：strategies_raw_all[5:7]（#6–#7）
-# H200 壓測（單獨跑）：strategies_raw_all[-1:]（#8）
-# 跑全部改 [:]；⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
+# ── 全量重建 result.db 用：自封存檔拉回論文必要的對照策略（2026-07-03） ──
+# DTW 原版×2 = artifact 揭露表的對照組；CONV×2 = 否決假設表的負面結果。
+# 形成期資料皆已在 formation DB（原版自有、CONV 借用），只會重跑交易期。
+# 重建完成後可移除此段恢復 8 策略精簡池。
+from archive.config_archived_strategies import strategies_raw_archived as _archived
+_revive = {"DTW Paper (DTW)", "DTW Paper (SSD-DTW-PCA)",
+           "DTW Paper Fixed CONV (DTW)", "HDBSCAN PCA-Loadings CONV"}
+strategies_raw_all += [s for s in _archived if s["name"] in _revive]
+
+# 共 12 個策略（8 現役 + 4 拉回；#6–#7 DRL-FQI 於 H200 跑；#8 = H200 壓測，單獨跑）
+# DRL-FQI 正式實驗：STRATEGIES_SLICE="5:7"；H200 壓測："7:8"
+# 本機 Z-Score 全量重建：STRATEGIES_SLICE 不設（預設全部）後手動排除 DRL —
+#   或直接跑全部：DRL 三個在無 CUDA 機器會自動限流（4 workers）
+# ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
 strategies_raw = strategies_raw_all[:]
 
 # ── 跨機器免改檔覆寫：環境變數 STRATEGIES_SLICE ───────────────────────────
 # 本機 PowerShell：  $env:STRATEGIES_SLICE="5:7"; python run_trading.py
 # H200 Linux：       STRATEGIES_SLICE="-1:" python run_trading.py
-# 語法同 Python 切片："5:7"（#6–#7）、"-1:"（#8 壓測）、":"（全部）、"2"（單一 #3）
+# 語法同 Python 切片，支援逗號複合："5:7"、"-1:"、":"、"2"、"0:5,8:12"
 _env_slice = os.environ.get("STRATEGIES_SLICE", "").strip()
 if _env_slice:
     try:
-        if ":" in _env_slice:
-            _lo, _hi = _env_slice.split(":", 1)
-            strategies_raw = strategies_raw_all[
-                int(_lo) if _lo else None : int(_hi) if _hi else None
-            ]
-        else:
-            strategies_raw = [strategies_raw_all[int(_env_slice)]]
+        _picked = []
+        for _part in _env_slice.split(","):
+            _part = _part.strip()
+            if ":" in _part:
+                _lo, _hi = _part.split(":", 1)
+                _picked += strategies_raw_all[
+                    int(_lo) if _lo else None : int(_hi) if _hi else None
+                ]
+            else:
+                _picked.append(strategies_raw_all[int(_part)])
+        strategies_raw = _picked
         print(f"[config] STRATEGIES_SLICE={_env_slice} → 執行 {[s['name'] for s in strategies_raw]}")
     except (ValueError, IndexError):
         print(f"⚠️ [config] STRATEGIES_SLICE='{_env_slice}' 無法解析，使用預設範圍")
