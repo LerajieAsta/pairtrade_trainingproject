@@ -160,21 +160,13 @@ _HDBSCAN_MS_FILTERS = {
     "halflife_max":         FORWARD_DAYS / 2,  # 放寬：/3(42d) → /2(63d)
 }
 
+# 2026-07-03 精簡：16 個已淘汰/驗證無效的策略移至 archive/config_archived_strategies.py
+# （SSD Basic、DTW 原版×2〔座標 artifact，形成配對仍被 Fixed 版借用〕、
+#   HDBSCAN stats10 系×4、Ensemble×2、DRLv1×3、Kalman×2、CONV×2）。
+# 歷史回測結果保留於 results/result.db；復活方式見封存檔 docstring。
 strategies_raw_all = [
-    # ── SSD ──────────────────────────────────────────────────────────────────
-    # 1. SSD Basic
-    {
-        "name":             "SSD Basic",
-        "formation_module": "strategies.formation.ssd_basic",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_Basic",
-        "db_method":        "SSD (Basic)",
-        "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-        },
-    },
-    # 2. SSD Rolling
+    # ── 基準 ────────────────────────────────────────────────────────────────
+    # 1. SSD Rolling（SSD 家族代表基準；亦為 #7 DRL 對照的形成來源）
     {
         "name":             "SSD Rolling",
         "formation_module": "strategies.formation.ssd_rolling",
@@ -186,193 +178,8 @@ strategies_raw_all = [
             **base_params,
         },
     },
-    # ── DTW ──────────────────────────────────────────────────────────────────
-    # 3. DTW Paper (DTW)
-    {
-        "name":             "DTW Paper (DTW)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "DTW_Paper",
-        "db_method":        "DTW (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-            "method": "dtw",
-        },
-    },
-    # 4. DTW Paper (SSD-DTW-PCA)
-    {
-        "name":             "DTW Paper (SSD-DTW-PCA)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_DTW_PCA_Paper",
-        "db_method":        "SSD-DTW-PCA (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-            "method": "ssd_dtw_pca",
-        },
-    },
-    # ── HDBSCAN ──────────────────────────────────────────────────────────────
-    # 5. HDBSCAN MultiScale
-    {
-        "name":             "HDBSCAN MultiScale",
-        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_MultiScale",
-        "db_method":        "HDBSCAN (MultiScale)",
-        "trade_method":     "Z-Score",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap"},
-    },
-    # 6. HDBSCAN MultiScale PCA-UMAP
-    {
-        "name":             "HDBSCAN MultiScale PCA-UMAP",
-        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_MultiScale_PCA_UMAP",
-        "db_method":        "HDBSCAN (MultiScale-PCA-UMAP)",
-        "trade_method":     "Z-Score",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "pca_umap"},
-    },
-    # 7. HDBSCAN UMAP
-    {
-        "name":             "HDBSCAN UMAP",
-        "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_UMAP",
-        "db_method":        "HDBSCAN (UMAP)",
-        "trade_method":     "Z-Score",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap"},
-    },
-    # 8. HDBSCAN UMAP PCA-UMAP
-    {
-        "name":             "HDBSCAN UMAP PCA-UMAP",
-        "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_UMAP_PCA_UMAP",
-        "db_method":        "HDBSCAN (UMAP-PCA-UMAP)",
-        "trade_method":     "Z-Score",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "pca_umap"},
-    },
-    # ── Ensemble ─────────────────────────────────────────────────────────────
-    # 9. Ensemble: HDBSCAN UMAP × HDBSCAN MultiScale
-    {
-        "name":             "Ensemble HDBSCAN",
-        "formation_module": "strategies.formation.ensemble",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "Ensemble_HDBSCAN",
-        "db_method":        "Ensemble (HDBSCAN)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "sub_top_n_multiplier": 3,
-            "sub_strategies": [
-                {
-                    "name":   "HDBSCAN UMAP",
-                    "module": "strategies.formation.HDBSCAN_UMAP",
-                    "params": {**_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap"},
-                },
-                {
-                    "name":   "HDBSCAN MultiScale",
-                    "module": "strategies.formation.HDBSCAN_MultiScale",
-                    "params": {**_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap"},
-                },
-            ],
-        },
-    },
-    # 10. Ensemble: SSD Rolling × DTW Paper
-    {
-        "name":             "Ensemble SSD-DTW",
-        "formation_module": "strategies.formation.ensemble",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "Ensemble_SSD_DTW",
-        "db_method":        "Ensemble (SSD-DTW)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "sub_top_n_multiplier": 3,
-            "sub_strategies": [
-                {
-                    "name":   "SSD Rolling",
-                    "module": "strategies.formation.ssd_rolling",
-                    "params": {},
-                },
-                {
-                    "name":   "DTW Paper",
-                    "module": "strategies.formation.DTW_Cointegration_Paper",
-                    "params": {"method": "dtw"},
-                },
-            ],
-        },
-    },
-    # ── DRL ──────────────────────────────────────────────────────────────────
-    # 11. SSD Rolling DRL
-    {
-        "name":             "SSD Rolling DRL",
-        "formation_module": "strategies.formation.ssd_rolling",
-        "trading_module":   "strategies.trading.drl_lstm_trading",
-        "sub_dir":          "SSD_Rolling_DRL",
-        "db_method":        "SSD (Rolling-DRL)",
-        "trade_method":     "DRL",
-        "params":  {
-            **base_params,
-            "drl_episodes":     150,
-            "drl_hidden_size":  256,
-            "drl_num_layers":   2,
-            "drl_batch_size":   512,
-        },
-    },
-    # 12. HDBSCAN UMAP DRL
-    {
-        "name":             "HDBSCAN UMAP DRL",
-        "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.drl_lstm_trading",
-        "sub_dir":          "HDBSCAN_UMAP_DRL",
-        "db_method":        "HDBSCAN (UMAP-DRL)",
-        "trade_method":     "DRL",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS, "reduce_method": "umap", "drl_episodes": 150, "drl_hidden_size": 256, "drl_num_layers": 2, "drl_batch_size": 512},
-    },
-    # 13. HDBSCAN MultiScale DRL
-    {
-        "name":             "HDBSCAN MultiScale DRL",
-        "formation_module": "strategies.formation.HDBSCAN_MultiScale",
-        "trading_module":   "strategies.trading.drl_lstm_trading",
-        "sub_dir":          "HDBSCAN_MultiScale_DRL",
-        "db_method":        "HDBSCAN (MultiScale-DRL)",
-        "trade_method":     "DRL",
-        "params": {**base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_MS_FILTERS, "reduce_method": "umap", "drl_episodes": 150, "drl_hidden_size": 256, "drl_num_layers": 2, "drl_batch_size": 512},
-    },
-    # ── Kalman Filter ─────────────────────────────────────────────────────────
-    # 14. SSD Rolling Kalman
-    {
-        "name":             "SSD Rolling Kalman",
-        "formation_module": "strategies.formation.ssd_rolling",
-        "trading_module":   "strategies.trading.kalman_trading",
-        "sub_dir":          "SSD_Rolling_Kalman",
-        "db_method":        "SSD (Rolling-Kalman)",
-        "trade_method":     "Kalman",
-        "params":  {
-            **base_params,
-            "kalman_delta": 1e-4,
-            "kalman_R":     1e-2,
-        },
-    },
-    # 15. HDBSCAN UMAP Kalman
-    {
-        "name":             "HDBSCAN UMAP Kalman",
-        "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.kalman_trading",
-        "sub_dir":          "HDBSCAN_UMAP_Kalman",
-        "db_method":        "HDBSCAN (UMAP-Kalman)",
-        "trade_method":     "Kalman",
-        "params": {
-            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
-            "reduce_method": "umap",
-            "kalman_delta":  1e-4,
-            "kalman_R":      1e-2,
-        },
-    },
-    # 16. HDBSCAN PCA-Loadings（消融實驗：第一層特徵改為報酬 PCA 因子載荷，
+    # ── HDBSCAN 形成法（命題 1 主線） ────────────────────────────────────────
+    # 2. HDBSCAN PCA-Loadings（第一層特徵 = 報酬 PCA 因子載荷，
     #     reduce_method="none" 跳過 UMAP，直接以 loadings 餵 HDBSCAN）
     {
         "name":             "HDBSCAN PCA-Loadings",
@@ -388,19 +195,12 @@ strategies_raw_all = [
             "feature_mode":      "pca_loadings",
         },
     },
-    # ══════════════════════════════════════════════════════════════════════
-    # 座標系錯位消融實驗（2026-07）：
-    # DTW Paper 的 OLS 在「標準化 log-price 空間」擬合，但輸出 OLS_Alpha 導致
-    # zscore_trading 路徑 A 以「原始 log-price 空間」重建 spread，產生常數
-    # Z-Score 偏移（進場中位 |Z|=3.24、85% 期初 3 天內進場、99% 期末強平）。
-    # #17–#19 借用既有形成期配對（formation_strategy_id_base，無需重跑形成期），
-    # 只改變交易期解讀，用於分離「座標 bug」與「長持收斂」的貢獻：
-    #   #17 DTW Fixed        = 修正座標（誠實 Z-Score 均值回歸）
-    #   #18 DTW Fixed CONV   = 修正座標 + 持有至期末（誠實長持收斂）
-    #   #19 SSD-DTW-PCA Fixed = 同 #17，次要基準
-    #   #20 HDBSCAN CONV     = HDBSCAN PCA-Loadings 配對 + 持有至期末
-    # ══════════════════════════════════════════════════════════════════════
-    # 17. DTW Paper Fixed（座標修正版）
+    # ── DTW 基準（座標修正版；原版為 artifact 已封存） ───────────────────────
+    # DTW Paper 原版的 OLS 在標準化空間擬合但輸出 OLS_Alpha → 交易端路徑 A
+    # 以原始 log-price 空間重建 spread → 常數 Z 偏移（詳見封存檔說明）。
+    # #3/#4 借用原版的形成期配對（formation_strategy_id_base），
+    # 以 ignore_ols_alpha 強制路徑 B（標準化空間），為誠實的 Z-Score 基準。
+    # 3. DTW Paper Fixed（座標修正版）
     {
         "name":             "DTW Paper Fixed (DTW)",
         "formation_module": "strategies.formation.DTW_Cointegration_Paper",
@@ -415,23 +215,7 @@ strategies_raw_all = [
             "ignore_ols_alpha": True,   # 強制路徑 B：與形成期一致的標準化空間
         },
     },
-    # 18. DTW Paper Fixed CONV（座標修正 + 收斂持有）
-    {
-        "name":             "DTW Paper Fixed CONV (DTW)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "formation_strategy_id_base": "DTW Paper (DTW)",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "DTW_Paper_Fixed_CONV",
-        "db_method":        "DTW (Paper-Fixed-CONV)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "method": "dtw",
-            "ignore_ols_alpha":   True,
-            "hold_to_period_end": True,  # GGR 式：進場後持有至期末
-        },
-    },
-    # 19. SSD-DTW-PCA Paper Fixed（座標修正版，次要基準）
+    # 4. SSD-DTW-PCA Paper Fixed（座標修正版，目前最佳誠實基準：Top3 Sharpe 0.49）
     {
         "name":             "SSD-DTW-PCA Paper Fixed",
         "formation_module": "strategies.formation.DTW_Cointegration_Paper",
@@ -446,27 +230,9 @@ strategies_raw_all = [
             "ignore_ols_alpha": True,
         },
     },
-    # 20. HDBSCAN PCA-Loadings CONV（收斂持有）
-    {
-        "name":             "HDBSCAN PCA-Loadings CONV",
-        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
-        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings_CONV",
-        "db_method":        "HDBSCAN (PCA-Loadings-CONV)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
-            "reduce_method":      "none",
-            "pca_n_components":   15,
-            "feature_mode":       "pca_loadings",
-            "hold_to_period_end": True,
-        },
-    },
-    # 21. HDBSCAN Cluster SSD-DTW-PCA（分組消融實驗）
-    #     對照組 = #19 SSD-DTW-PCA Paper Fixed（GICS 產業分組）
-    #     實驗組 = 本策略（HDBSCAN 聚類分組），排序與交易端完全相同（路徑 B）
-    #     若本策略勝出 → 直接證明 HDBSCAN 聚類優於 GICS 靜態產業分類
+    # 5. HDBSCAN Cluster SSD-DTW-PCA（分組消融：對照組 = #4 GICS 分組，
+    #    排序與交易端完全相同。295 期結果：報酬統計上等效（月配對 t 檢定不顯著），
+    #    但不依賴 GICS 元資料、可救回 Unknown 股、形成期快 2 倍）
     {
         "name":             "HDBSCAN Cluster SSD-DTW-PCA",
         "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
@@ -485,46 +251,52 @@ strategies_raw_all = [
             "ignore_ols_alpha":     True,   # 路徑 B：與對照組交易端一致
         },
     },
-    # ══════════════════════════════════════════════════════════════════════
-    # DRL v2 消融實驗：修復 v1 四缺陷（假共享/獎勵重複/epsilon 未退完/觀測未標準化）
-    #   #22 vs #16（同 HDBSCAN PCA-Loadings 配對，DRLv2 vs Z-Score）→ 命題 2
-    #   #23 vs #11（同 SSD Rolling 配對，DRLv2 vs DRLv1）→ 修復有效性
-    # ══════════════════════════════════════════════════════════════════════
-    # 22. HDBSCAN PCA-Loadings DRLv2
+    # ── DRL v3：FQI 批次化 + walk-forward 全域 agent（命題 2 主線） ──────────
+    #   v1（已封存）缺陷：假共享/獎勵重複/epsilon/觀測尺度 → 中位 Sharpe −0.71
+    #   v3 = Fitted Q-Iteration：枚舉歷史軌跡全部 (t,持倉,動作) 轉移批次 Q 迭代，
+    #        LSTM 只編碼市場序列、持倉進 Q-head；drl_scope="global" 跨期累積訓練。
+    #        （v2 過渡版保留於 strategies/trading/drl_lstm_v2_trading.py）
+    #   #6 vs #2（同 HDBSCAN PCA-Loadings 配對，DRL vs Z-Score）→ 命題 2
+    #   #7 vs 封存 DRLv1 結果（result.db: SSD (Rolling-DRL)）→ 架構修復有效性
+    # 6. HDBSCAN PCA-Loadings DRL-FQI
     {
-        "name":             "HDBSCAN PCA-Loadings DRLv2",
+        "name":             "HDBSCAN PCA-Loadings DRL FQI",
         "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
         "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.drl_lstm_v2_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings_DRLv2",
-        "db_method":        "HDBSCAN (PCA-Loadings-DRLv2)",
+        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI",
+        "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI)",
         "trade_method":     "DRL",
         "params": {
             **base_params,
-            "drl_episodes": 150, "drl_hidden_size": 256,
-            "drl_num_layers": 2, "drl_batch_size": 512,
+            "drl_episodes": 150,          # FQI sweep 數（首期全量）
+            "drl_hidden_size": 128,
+            "drl_num_layers": 1,
+            "drl_scope": "global",        # walk-forward 全域 agent（跨期累積訓練，抗單期過擬合）
+            "drl_buffer_periods": 24,     # 訓練緩衝：最近 24 期 ≈ 2 年形成期軌跡
         },
     },
-    # 23. SSD Rolling DRLv2（與 #11 DRLv1 對照，驗證修復有效性）
+    # 7. SSD Rolling DRL-FQI（與封存 DRLv1 對照，驗證架構修復有效性）
     {
-        "name":             "SSD Rolling DRLv2",
+        "name":             "SSD Rolling DRL FQI",
         "formation_module": "strategies.formation.ssd_rolling",
         "formation_strategy_id_base": "SSD Rolling",
-        "trading_module":   "strategies.trading.drl_lstm_v2_trading",
-        "sub_dir":          "SSD_Rolling_DRLv2",
-        "db_method":        "SSD (Rolling-DRLv2)",
+        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "sub_dir":          "SSD_Rolling_DRL_FQI",
+        "db_method":        "SSD (Rolling-DRL-FQI)",
         "trade_method":     "DRL",
         "params": {
             **base_params,
-            "drl_episodes": 150, "drl_hidden_size": 256,
-            "drl_num_layers": 2, "drl_batch_size": 512,
+            "drl_episodes": 150, "drl_hidden_size": 128,
+            "drl_num_layers": 1,
+            "drl_scope": "global", "drl_buffer_periods": 24,
         },
     },
 ]
-# 目前只跑 #21（分組消融實驗，本機 CPU）
-# DRLv2（#22–#23）需在 GPU 機器跑：strategies_raw = strategies_raw_all[-2:]
-# 跑全部改回 strategies_raw_all[:]
-strategies_raw = strategies_raw_all[-3:-2]
+# 精簡後共 7 個策略（#1–#5 Z-Score 已有完整結果；#6–#7 DRL-FQI 待跑）
+# 下一步：DRL-FQI 於 GPU 機器執行 strategies_raw_all[-2:]；跑全部改 [:]
+# ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算，執行前請確認
+strategies_raw = strategies_raw_all[-2:]
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
