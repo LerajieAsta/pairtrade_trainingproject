@@ -653,15 +653,19 @@ def run_all_trading():
                 is_drl_group = any(cfg.get("trade_method") == "DRL" for cfg in group_cfgs)
                 group_workers = min(DRL_MAX_WORKERS, max_workers) if is_drl_group else max_workers
                 if is_drl_group:
-                    # 無 CUDA（本機 CPU）時大幅限制 DRL 併發：
-                    # 每個 torch worker 常駐 1–2GB+，FQI 全域緩衝隨期數成長，
+                    # DRL 併發自動適配：環境變數 DRL_WORKERS 優先（免改檔跨機器調整），
+                    # 否則無 CUDA（本機 CPU）時限制為 4——每個 torch worker 常駐 1–2GB+，
                     # 15+ worker 會耗盡 RAM 導致子行程被系統終止（BrokenProcessPool）
-                    try:
-                        import torch as _torch
-                        if not _torch.cuda.is_available():
+                    _env_w = os.environ.get("DRL_WORKERS", "").strip()
+                    if _env_w.isdigit() and int(_env_w) > 0:
+                        group_workers = min(int(_env_w), max_workers)
+                    else:
+                        try:
+                            import torch as _torch
+                            if not _torch.cuda.is_available():
+                                group_workers = min(group_workers, 4)
+                        except ImportError:
                             group_workers = min(group_workers, 4)
-                    except ImportError:
-                        group_workers = min(group_workers, 4)
 
                 futures = {}
                 pending = list(group_cfgs)

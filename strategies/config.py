@@ -323,7 +323,25 @@ strategies_raw_all = [
 # DRL-FQI 正式實驗：strategies_raw_all[5:7]（#6–#7）
 # H200 壓測（單獨跑）：strategies_raw_all[-1:]（#8）
 # 跑全部改 [:]；⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
-strategies_raw = strategies_raw_all[5:7]
+strategies_raw = strategies_raw_all[:]
+
+# ── 跨機器免改檔覆寫：環境變數 STRATEGIES_SLICE ───────────────────────────
+# 本機 PowerShell：  $env:STRATEGIES_SLICE="5:7"; python run_trading.py
+# H200 Linux：       STRATEGIES_SLICE="-1:" python run_trading.py
+# 語法同 Python 切片："5:7"（#6–#7）、"-1:"（#8 壓測）、":"（全部）、"2"（單一 #3）
+_env_slice = os.environ.get("STRATEGIES_SLICE", "").strip()
+if _env_slice:
+    try:
+        if ":" in _env_slice:
+            _lo, _hi = _env_slice.split(":", 1)
+            strategies_raw = strategies_raw_all[
+                int(_lo) if _lo else None : int(_hi) if _hi else None
+            ]
+        else:
+            strategies_raw = [strategies_raw_all[int(_env_slice)]]
+        print(f"[config] STRATEGIES_SLICE={_env_slice} → 執行 {[s['name'] for s in strategies_raw]}")
+    except (ValueError, IndexError):
+        print(f"⚠️ [config] STRATEGIES_SLICE='{_env_slice}' 無法解析，使用預設範圍")
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
