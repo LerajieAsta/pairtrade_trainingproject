@@ -160,6 +160,13 @@ def init_db(db_path="results/result.db"):
         except Exception:
             pass
 
+    # 舊資料庫遷移：T2 網格維度（進場門檻 × 發散停損）；舊列 NULL 視同 2.0 / 0.0
+    for _col in ("ENTRY Z", "DYN Z NUM"):
+        try:
+            cursor.execute(f'ALTER TABLE strategy_summaries ADD COLUMN "{_col}" REAL;')
+        except Exception:
+            pass
+
     # 2. 建立 trade_logs 表：存放每日明細，包含價格、Z-Score、部位及未實現/已實現損益等
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS trade_logs (
@@ -396,6 +403,8 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         'Avg_Utilization': float(avg_utilization),
         'Ann_Ret_Employed': float(ann_ret_employed),
         'Excess_Ret_RF': float(excess_ret_rf),
+        'ENTRY Z': float(params.get('entry_z', 2.0)),
+        'DYN Z NUM': float(params.get('dynamic_stop_z', 0.0)),
         '_path': path_key
     }
 
@@ -445,8 +454,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             "REC_Raw", "Cum_Ret_Raw", "Ann_Ret_Raw", "Sharpe_Raw", "Sortino_Raw", "Calmar_Raw", "MDD_Raw",
             "Win_Rate", "Profit_Factor", "Avg_Trade_Days",
             "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss",
-            "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF", "ENTRY Z", "DYN Z NUM"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             metrics['_path'], metrics['DATASET'],
             metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
@@ -457,7 +466,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             metrics['Win_Rate'], metrics['Profit_Factor'], metrics['Avg_Trade_Days'],
             metrics['Entries'], metrics['Exits'], metrics['Stop_Losses'], metrics['Forced_Closes'],
             metrics['Gross_Profit'], metrics['Gross_Loss'],
-            metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF']
+            metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF'],
+            metrics['ENTRY Z'], metrics['DYN Z NUM']
         ))
 
         df_db = df.copy()

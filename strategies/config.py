@@ -193,6 +193,10 @@ strategies_raw_all = [
             "reduce_method":     "none",
             "pca_n_components":  15,   # 報酬 PCA 因子數（Avellaneda & Lee 2010 用 ~15）
             "feature_mode":      "pca_loadings",
+            # T2 實驗：進場門檻 × 發散停損聯合掃描（SL 固定 0 以控制網格大小）
+            "stop_loss_list":       [0.0],
+            "entry_z_list":         [1.5, 2.0, 2.5],
+            "dynamic_stop_z_list":  [0.0, 3.0, 4.0],
         },
     },
     # ── DTW 基準（座標修正版；原版為 artifact 已封存） ───────────────────────
@@ -228,6 +232,10 @@ strategies_raw_all = [
             **base_params,
             "method": "ssd_dtw_pca",
             "ignore_ols_alpha": True,
+            # T2 實驗：進場門檻 × 發散停損聯合掃描（SL 固定 0 以控制網格大小）
+            "stop_loss_list":       [0.0],
+            "entry_z_list":         [1.5, 2.0, 2.5],
+            "dynamic_stop_z_list":  [0.0, 3.0, 4.0],
         },
     },
     # 5. HDBSCAN Cluster SSD-DTW-PCA（分組消融：對照組 = #4 GICS 分組，

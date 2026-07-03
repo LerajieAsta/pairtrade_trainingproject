@@ -59,7 +59,14 @@ def _build_filename(params: dict) -> str:
     sl    = int(params.get("stop_loss_pct", 0.0) * 100)
     zwin  = params.get("zscore_window", 0)
     msr   = int(params.get("max_sector_ratio", 0.0) * 100)
-    return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}.csv"
+    # entry_z / dynamic_stop_z 非預設值時附加後綴（預設 2.0/0.0 維持舊檔名，
+    # 保持既有結果的斷點續傳有效）
+    ez  = float(params.get("entry_z", 2.0))
+    dsz = float(params.get("dynamic_stop_z", 0.0))
+    suffix = ""
+    if abs(ez - 2.0) > 1e-9 or dsz > 0:
+        suffix = f"_EZ{int(round(ez * 10))}_DSZ{int(round(dsz * 10))}"
+    return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def check_trading_completed(strategy_config: dict, output_root: str, results_db_path: str = "", dataset_name: str = "") -> bool:
     if FORCE_RERUN:
@@ -481,34 +488,55 @@ def run_all_trading():
             msr_list = [params.get("max_sector_ratio", 0.0)]  # type: ignore
         elif not isinstance(msr_list, list):
             msr_list = [msr_list]
-            
+
+        # 4. entry_z_list / dynamic_stop_z_list（T2 實驗：進場門檻 × 發散停損聯合掃描；
+        #    未指定時退化為單一現值，網格不膨脹）
+        ez_list = params.get("entry_z_list")  # type: ignore
+        if not ez_list:
+            ez_list = [params.get("entry_z", 2.0)]  # type: ignore
+        elif not isinstance(ez_list, list):
+            ez_list = [ez_list]
+        dsz_list = params.get("dynamic_stop_z_list")  # type: ignore
+        if not dsz_list:
+            dsz_list = [params.get("dynamic_stop_z", 0.0)]  # type: ignore
+        elif not isinstance(dsz_list, list):
+            dsz_list = [dsz_list]
+
         # (itertools and copy imports moved to top of file)
-        for top_n, sl, msr in itertools.product(top_n_list, sl_list, msr_list):
+        for top_n, sl, msr, ez, dsz in itertools.product(top_n_list, sl_list, msr_list, ez_list, dsz_list):
             new_raw = copy.deepcopy(raw)
             new_params = new_raw["params"]
-            
+
             # 設定具體數值
             new_params["top_n"] = top_n  # type: ignore
             new_params["stop_loss_pct"] = sl  # type: ignore
             new_params["max_sector_ratio"] = msr  # type: ignore
-            
+            new_params["entry_z"] = ez  # type: ignore
+            new_params["dynamic_stop_z"] = dsz  # type: ignore
+            new_params["use_dynamic_stop"] = dsz > 0  # type: ignore
+
             # 清理 list 參數以防混淆
             new_params.pop("top_n_list", None)  # type: ignore
             new_params.pop("stop_loss_list", None)  # type: ignore
             new_params.pop("stop_loss_pct_list", None)  # type: ignore
             new_params.pop("max_sector_ratio_list", None)  # type: ignore
-            
+            new_params.pop("entry_z_list", None)  # type: ignore
+            new_params.pop("dynamic_stop_z_list", None)  # type: ignore
+
             # 對接 Formation 配對資料庫的 strategy_id (Formation 階段只受 max_sector_ratio 影響，固定 top_n=20)
             # formation_strategy_id_base：允許策略借用另一個策略的形成期配對
             # （例如 DTW Paper Fixed 重用 DTW Paper 的配對，只改變交易期的 spread 空間解讀）
             msr_pct = int(msr * 100)
             form_base = raw.get("formation_strategy_id_base") or raw["name"]
             new_raw["formation_strategy_id"] = f"{form_base}_MSR{msr_pct}"
-            
-            # 回測唯一的任務名稱字串 (加上後綴)
+
+            # 回測唯一的任務名稱字串（EZ/DSZ 僅非預設時附加後綴，與檔名規則一致，
+            # 保持既有結果的斷點續傳有效）
             sl_pct = int(sl * 100)
             new_raw["name"] = f"{raw['name']}_Top{top_n}_SL{sl_pct}_MSR{msr_pct}"
-            
+            if abs(float(ez) - 2.0) > 1e-9 or float(dsz) > 0:
+                new_raw["name"] += f"_EZ{int(round(float(ez) * 10))}_DSZ{int(round(float(dsz) * 10))}"
+
             expanded_strategies_raw.append(new_raw)
 
     # 建立未展開前的原始策略配置列表，用於儀表板統合呈現
