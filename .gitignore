@@ -62,9 +62,10 @@ result/
 results/
 data/
 
-# formation_data: exclude unmerged per-strategy test DBs, keep main merged DB
+# formation_data: exclude unmerged per-strategy test DBs, keep main merged DBs
+# (Tiingo 主形成庫 2026-07-03 起納入 LFS 追蹤，跨機器共享形成配對)
 formation_data/formation_pairs_sp500_yF_*.db
-formation_data/formation_pairs_sp500_Tiingo.db
+formation_data/formation_pairs_sp500_Tiingo_*.db
 
 # Distribution / packaging
 *.egg-info/
