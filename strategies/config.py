@@ -298,12 +298,33 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
+    # 8. HDBSCAN Cluster SSD-DTW-PCA DRL THR —— 命題 2 的第二個 ML 配對底。
+    #    #6（PCA-Loadings 分群 + DRL）已證實：即使修好 _shared 跨變體污染的 bug，
+    #    15 組全負 Sharpe（中位數 −0.41）維持不變，問題在配對訊號本身太弱，不是
+    #    交易端。#5 的 Z-Score 基準（Sharpe 0.15、年化 0.82%）是 #2 的 2–3 倍，
+    #    換成這個更穩的 ML 分群底再疊 DRL-THR，看能不能重現 #7（SSD+DRL）
+    #    那種「疊加後全網格轉正、且優於自身 Z-Score 基準」的效果。
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA DRL THR",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "formation_strategy_id_base": "HDBSCAN Cluster SSD-DTW-PCA",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_DRL_THR",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
 ]
 # 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
 # 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
 # 歷史結果均在 results/result.db；復活方式見封存檔 docstring。
 
-# 共 7 個策略（#1–#5 Z-Score 完整；#6–#7 DRL THR 待跑 = STRATEGIES_SLICE="5:7"）
+# 共 8 個策略（#1–#5 Z-Score 完整；#6–#8 DRL THR = STRATEGIES_SLICE="5:8"）
 # ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
 strategies_raw = strategies_raw_all[:]
 
