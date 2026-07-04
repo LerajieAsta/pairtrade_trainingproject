@@ -319,6 +319,50 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
+    # 命題 2 方案 C：#4 的 Z-Score 基準（Sharpe 0.15~0.22）平均每期有 30.9%
+    # （中位數 35.8%）標的被 HDBSCAN 判為雜訊（label=-1）排除，群數在 2~25
+    # 之間劇烈震盪；15 維 PCA loadings 平均僅解釋 58.6% 報酬變異，後段主成分
+    # 訊號弱、卻仍等權參與歐氏距離計算，可能是維度詛咒稀釋了密度訊號的元兇。
+    # 診斷驗證有效：雜訊比例中位數 35.8%→8.1%、群數標準差 6.4→4.3；
+    # Z-Score 基準正 Sharpe 比例 60%→73%、中位數 Sharpe 0.07→0.13、
+    # 最佳 Sharpe 0.22→0.29、最佳年化 0.82%→1.08%，全面優於 15 維版本。
+    # 接下來疊 DRL-THR 驗證方案 C 是否能真正跨過 2% 門檻。
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-PCA5)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "method":               "ssd_dtw_pca",
+            "pca_n_components":     5,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":  2,
+            "umap_random_state":    42,
+            "adf_pvalue_threshold": 0.01,
+            "ignore_ols_alpha":     True,
+        },
+    },
+    # 9. HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR —— 命題 2 方案 C 的完整驗證：
+    #    在降維後更穩的 ML 配對底上疊 DRL-THR，看正 Sharpe 比例是否再被推到
+    #    100%（重現 #7/#9 的模式），年化報酬是否真的跨過 2% 且同時贏過 SSD。
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "formation_strategy_id_base": "HDBSCAN Cluster SSD-DTW-PCA PCA5",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5_DRL_THR",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-PCA5-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
 ]
 # 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
 # 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
