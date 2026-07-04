@@ -367,6 +367,27 @@ strategies_raw_all = [
             "adf_pvalue_threshold":        0.05,
         },
     },
+    # 10. Agglomerative Fundamentals DRL THR —— 目前 Z-Score 基準本身已是
+    #     全組最佳「ML 配對」結果（最佳 Sharpe 0.35、最佳年化 2.70%，雙指標
+    #     都贏過 SSD (Rolling) 的 2.30%/0.26，但基本面前視偏誤限制仍在，見
+    #     #9 註解）。比照 #4→#5、#6→#7→#8 的既有模式，把 DRL-THR 疊在這個
+    #     目前最強的 ML 配對底上，驗證是否能重現「疊加後全網格轉正、且優於
+    #     自身 Z-Score 基準」的效果。借用 #9 的形成期配對，不需重跑形成期。
+    {
+        "name":             "Agglomerative Fundamentals DRL THR",
+        "formation_module": "strategies.formation.agglomerative_fundamentals",
+        "formation_strategy_id_base": "Agglomerative Fundamentals",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_DRL_THR",
+        "db_method":        "Agglomerative (Fundamentals-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
 ]
 # 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
 # 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
@@ -374,7 +395,7 @@ strategies_raw_all = [
 # PCA-Loadings DRL THR、ML Pair Quality 三個確認無效的策略歸位封存檔。
 # 歷史結果均在 results/result.db；復活方式見封存檔 docstring。
 
-# 共 9 個策略（#1–#4、#7、#9 Z-Score；#5、#6、#8 DRL THR = STRATEGIES_SLICE="4:8"）
+# 共 10 個策略（#1–#4、#7、#9 Z-Score；#5、#6、#8、#10 DRL THR）
 # ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
 strategies_raw = strategies_raw_all[:]
 
