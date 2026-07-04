@@ -35,6 +35,14 @@
   DTW Paper Fixed CONV（−0.11）、HDBSCAN PCA-Loadings CONV（−0.33）：
     長持收斂無法誠實重現 artifact 版獲利。負面結果已記錄，可寫入論文。
 
+【DRL v3 FQI — 逐日定位動作空間已系統性證偽（2026-07-04 封存）】
+  HDBSCAN PCA-Loadings DRL FQI（中位 Sharpe −2.30）、SSD Rolling DRL FQI（−1.10）：
+    FQI 修復了 v1 的訓練計算與統計缺陷（持有 0.5→5.7 天、PF 0.63→0.82），
+    但「每日自由決定持倉」的動作空間讓模型對日級噪音計時，OOS 換手
+    3700+ 次（基準 617）被費用磨死。v1→v2→v3 構成完整架構消融鏈：
+    失敗根因 = 動作空間設計，非訓練方法。由 v4 門檻選擇式（現役）取代。
+  DRL FQI XL：H200 壓測 + 容量縮放用，隨 FQI 架構一併封存。
+
 復活方式：from archive.config_archived_strategies import strategies_raw_archived
           strategies_raw_all += strategies_raw_archived（或挑選單一項目加回）
 """
@@ -214,6 +222,57 @@ strategies_raw_archived = [
             "reduce_method": "umap",
             "kalman_delta":  1e-4,
             "kalman_R":      1e-2,
+        },
+    },
+    # ── DRL v3 FQI（逐日定位動作空間已證偽；2026-07-04 封存） ────────────────
+    {
+        "name":             "HDBSCAN PCA-Loadings DRL FQI",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
+        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI",
+        "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_episodes": 150, "drl_hidden_size": 128,
+            "drl_num_layers": 1,
+            "drl_scope": "global", "drl_buffer_periods": 24,
+        },
+    },
+    {
+        "name":             "SSD Rolling DRL FQI",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "formation_strategy_id_base": "SSD Rolling",
+        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "sub_dir":          "SSD_Rolling_DRL_FQI",
+        "db_method":        "SSD (Rolling-DRL-FQI)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_episodes": 150, "drl_hidden_size": 128,
+            "drl_num_layers": 1,
+            "drl_scope": "global", "drl_buffer_periods": 24,
+        },
+    },
+    {
+        "name":             "HDBSCAN PCA-Loadings DRL FQI XL",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
+        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI_XL",
+        "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI-XL)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "top_n_list":        [20],
+            "stop_loss_list":    [0.0],
+            "drl_episodes":      400,
+            "drl_finetune_episodes": 120,
+            "drl_hidden_size":   512,
+            "drl_num_layers":    2,
+            "drl_scope":         "global",
+            "drl_buffer_periods": 36,
         },
     },
     # ── 舊 #18 / #20：CONV 收斂持有（假設已檢驗並否決的負面結果） ────────────

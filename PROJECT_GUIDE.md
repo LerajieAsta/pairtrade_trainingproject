@@ -85,11 +85,11 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 
 ## 3. 策略清單（`config.py`）
 
-`strategies_raw_all` 為現役策略池（共 7 個），`strategies_raw` 決定實際執行範圍：
+`strategies_raw_all` 為現役策略池（共 7 個），`strategies_raw` 決定實際執行範圍
+（或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片）：
 
-```python
-strategies_raw = strategies_raw_all[-2:]   # 只跑 DRL-FQI 兩策略
-# strategies_raw = strategies_raw_all      # 跑全部 7 個
+```bash
+STRATEGIES_SLICE="5:7" python run_trading.py   # 只跑 DRL THR 兩策略
 ```
 
 | # | 策略名稱 | 形成期 | 交易期 | 角色 |
@@ -99,13 +99,14 @@ strategies_raw = strategies_raw_all[-2:]   # 只跑 DRL-FQI 兩策略
 | 3 | DTW Paper Fixed (DTW) | 借用 DTW Paper 配對 | `zscore_trading.py`（路徑 B） | 誠實 DTW 基準 |
 | 4 | SSD-DTW-PCA Paper Fixed | 借用配對 | `zscore_trading.py`（路徑 B） | 最佳誠實基準 |
 | 5 | HDBSCAN Cluster SSD-DTW-PCA | `HDBSCAN_Cluster_SSD_DTW.py` | `zscore_trading.py` | 分組消融（vs #4） |
-| 6 | HDBSCAN PCA-Loadings DRL FQI | 借用 #2 配對 | `drl_fqi_trading.py` | 命題 2 主線 |
-| 7 | SSD Rolling DRL FQI | 借用 #1 配對 | `drl_fqi_trading.py` | 命題 2 對照 |
+| 6 | HDBSCAN PCA-Loadings DRL THR | 借用 #2 配對 | `drl_threshold_trading.py` | 命題 2 主線（v4 門檻選擇式） |
+| 7 | SSD Rolling DRL THR | 借用 #1 配對 | `drl_threshold_trading.py` | 命題 2 對照 |
 
-**已封存策略（16 個）**：2026-07-03 移至 `archive/config_archived_strategies.py`
+**已封存策略（19 個）**：`archive/config_archived_strategies.py`
 （SSD Basic、DTW 原版×2〔座標 artifact〕、HDBSCAN stats10 系×4、Ensemble×2、
-DRLv1×3、Kalman×2、CONV×2），封存理由見該檔 docstring，歷史回測結果保留於
-`results/result.db`。⚠️ DTW 原版的形成期配對仍被 #3/#4 借用，formation DB 資料列不可刪。
+DRLv1×3、Kalman×2、CONV×2、**DRL FQI 系×3〔逐日定位動作空間已證偽〕**），
+封存理由見該檔 docstring，歷史回測結果保留於 `results/result.db`。
+⚠️ DTW 原版的形成期配對仍被 #3/#4 借用，formation DB 資料列不可刪。
 
 ---
 

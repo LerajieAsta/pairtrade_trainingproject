@@ -259,53 +259,14 @@ strategies_raw_all = [
             "ignore_ols_alpha":     True,   # 路徑 B：與對照組交易端一致
         },
     },
-    # ── DRL v3：FQI 批次化 + walk-forward 全域 agent（命題 2 主線） ──────────
-    #   v1（已封存）缺陷：假共享/獎勵重複/epsilon/觀測尺度 → 中位 Sharpe −0.71
-    #   v3 = Fitted Q-Iteration：枚舉歷史軌跡全部 (t,持倉,動作) 轉移批次 Q 迭代，
-    #        LSTM 只編碼市場序列、持倉進 Q-head；drl_scope="global" 跨期累積訓練。
-    #        （v2 過渡版保留於 strategies/trading/drl_lstm_v2_trading.py）
-    #   #6 vs #2（同 HDBSCAN PCA-Loadings 配對，DRL vs Z-Score）→ 命題 2
-    #   #7 vs 封存 DRLv1 結果（result.db: SSD (Rolling-DRL)）→ 架構修復有效性
-    # 6. HDBSCAN PCA-Loadings DRL-FQI
-    {
-        "name":             "HDBSCAN PCA-Loadings DRL FQI",
-        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
-        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.drl_fqi_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI",
-        "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI)",
-        "trade_method":     "DRL",
-        "params": {
-            **base_params,
-            "drl_episodes": 150,          # FQI sweep 數（首期全量）
-            "drl_hidden_size": 128,
-            "drl_num_layers": 1,
-            "drl_scope": "global",        # walk-forward 全域 agent（跨期累積訓練，抗單期過擬合）
-            "drl_buffer_periods": 24,     # 訓練緩衝：最近 24 期 ≈ 2 年形成期軌跡
-        },
-    },
-    # 7. SSD Rolling DRL-FQI（與封存 DRLv1 對照，驗證架構修復有效性）
-    {
-        "name":             "SSD Rolling DRL FQI",
-        "formation_module": "strategies.formation.ssd_rolling",
-        "formation_strategy_id_base": "SSD Rolling",
-        "trading_module":   "strategies.trading.drl_fqi_trading",
-        "sub_dir":          "SSD_Rolling_DRL_FQI",
-        "db_method":        "SSD (Rolling-DRL-FQI)",
-        "trade_method":     "DRL",
-        "params": {
-            **base_params,
-            "drl_episodes": 150, "drl_hidden_size": 128,
-            "drl_num_layers": 1,
-            "drl_scope": "global", "drl_buffer_periods": 24,
-        },
-    },
     # ── DRL v4：門檻選擇式（Kim & Kim 2019）──────────────────────────────
-    #   v1–v3 逐日定位動作空間已系統性證偽（OOS 過度交易，Sharpe −1.1~−2.3）。
+    #   v1–v3 逐日定位動作空間已系統性證偽（OOS 過度交易，Sharpe −1.1~−2.3，
+    #   FQI 系列 2026-07-04 封存至 archive/config_archived_strategies.py）。
     #   v4 每配對每期只選一個動作：SKIP + 8 組 (entry_z, exit_z) 門檻，
     #   選單包含基準 (2.0, 0.0) → 策略空間 ⊇ Z-Score；訓練樣本不足時自動用基準。
     #   反事實全資訊標籤 + walk-forward 監督回歸（無探索問題）。
-    # 8. HDBSCAN PCA-Loadings DRL THR
+    #   #6 vs #2（同 HDBSCAN PCA-Loadings 配對，DRL vs Z-Score）→ 命題 2
+    # 6. HDBSCAN PCA-Loadings DRL THR
     {
         "name":             "HDBSCAN PCA-Loadings DRL THR",
         "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
@@ -321,7 +282,7 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
-    # 9. SSD Rolling DRL THR
+    # 7. SSD Rolling DRL THR
     {
         "name":             "SSD Rolling DRL THR",
         "formation_module": "strategies.formation.ssd_rolling",
@@ -337,46 +298,12 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
-    # 10. HDBSCAN PCA-Loadings DRL FQI XL（H200 壓力測試 + 容量縮放消融）
-    #    網路/緩衝/sweep 全面放大：全批次 LSTM forward ≈ 18 萬序列/sweep，
-    #    單 worker 即可吃滿 GPU SM 並常駐 ~30GB VRAM。
-    #    ⚠️ 單獨執行（strategies_raw = strategies_raw_all[-1:]），
-    #      網格固定為 1 組（Top20/SL0/MSR0），勿與其他 DRL 併跑以免 OOM。
-    #    純硬體基準測試另見根目錄 benchmark_h200.py。
-    {
-        "name":             "HDBSCAN PCA-Loadings DRL FQI XL",
-        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
-        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.drl_fqi_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI_XL",
-        "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI-XL)",
-        "trade_method":     "DRL",
-        "params": {
-            **base_params,
-            "top_n_list":        [20],     # 單一網格配置（壓測專用）
-            "stop_loss_list":    [0.0],
-            "drl_episodes":      400,      # 首期全量 sweep（×2.7）
-            "drl_finetune_episodes": 120,  # 每期增量 sweep（×2.4）
-            "drl_hidden_size":   512,      # 128 → 512
-            "drl_num_layers":    2,        # 1 → 2
-            "drl_scope":         "global",
-            "drl_buffer_periods": 36,      # 24 → 36 期（≈3 年形成軌跡）
-        },
-    },
 ]
-# ── 全量重建 result.db 用：自封存檔拉回論文必要的對照策略（2026-07-03） ──
-# DTW 原版×2 = artifact 揭露表的對照組；CONV×2 = 否決假設表的負面結果。
-# 形成期資料皆已在 formation DB（原版自有、CONV 借用），只會重跑交易期。
-# 重建完成後可移除此段恢復 8 策略精簡池。
-from archive.config_archived_strategies import strategies_raw_archived as _archived
-_revive = {"DTW Paper (DTW)", "DTW Paper (SSD-DTW-PCA)",
-           "DTW Paper Fixed CONV (DTW)", "HDBSCAN PCA-Loadings CONV"}
-strategies_raw_all += [s for s in _archived if s["name"] in _revive]
+# 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
+# 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
+# 歷史結果均在 results/result.db；復活方式見封存檔 docstring。
 
-# 共 12 個策略（8 現役 + 4 拉回；#6–#7 DRL-FQI 於 H200 跑；#8 = H200 壓測，單獨跑）
-# DRL-FQI 正式實驗：STRATEGIES_SLICE="5:7"；H200 壓測："7:8"
-# 本機 Z-Score 全量重建：STRATEGIES_SLICE 不設（預設全部）後手動排除 DRL —
-#   或直接跑全部：DRL 三個在無 CUDA 機器會自動限流（4 workers）
+# 共 7 個策略（#1–#5 Z-Score 完整；#6–#7 DRL THR 待跑 = STRATEGIES_SLICE="5:7"）
 # ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
 strategies_raw = strategies_raw_all[:]
 
