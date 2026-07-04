@@ -1,66 +1,68 @@
 # S&P 500 Pairs Trading 量化回測平台
 
-本專案針對 S&P 500 成分股實作配對交易 (Pairs Trading) 滾動回測系統，支援多種形成期策略、深度強化學習交易期模組與互動式績效視覺化儀表板。
+本專案針對 S&P 500 成分股實作配對交易 (Pairs Trading) 滾動回測系統，支援多種形成期策略（含機器學習配對）、深度強化學習交易期模組與互動式績效視覺化儀表板。
 
 ---
 
-## 策略清單（`strategies_raw_all`，共 13 個）
+## 策略清單（`strategies_raw_all`，共 10 個）
 
-| # | 策略 | 形成期模組 | 交易期 |
-| :---: | :--- | :--- | :--- |
-| 1 | SSD Basic | `ssd_basic.py` | Z-Score |
-| 2 | SSD Rolling | `ssd_rolling.py` | Z-Score |
-| 3 | DTW Paper (DTW) | `DTW_Cointegration_Paper.py` | Z-Score |
-| 4 | DTW Paper (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | Z-Score |
-| 5 | HDBSCAN MultiScale | `HDBSCAN_MultiScale.py` | Z-Score |
-| 6 | HDBSCAN MultiScale PCA-UMAP | `HDBSCAN_MultiScale.py` | Z-Score |
-| 7 | HDBSCAN UMAP | `HDBSCAN_UMAP.py` | Z-Score |
-| 8 | HDBSCAN UMAP PCA-UMAP | `HDBSCAN_UMAP.py` | Z-Score |
-| 9 | Ensemble HDBSCAN | `ensemble.py` | Z-Score |
-| 10 | Ensemble SSD-DTW | `ensemble.py` | Z-Score |
-| 11 | SSD Rolling DRL | `ssd_rolling.py` | DRL |
-| 12 | HDBSCAN UMAP DRL | `HDBSCAN_UMAP.py` | DRL |
-| 13 | HDBSCAN MultiScale DRL | `HDBSCAN_MultiScale.py` | DRL |
+| # | 策略 | 形成期模組 | 交易期 | 角色 |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | SSD Rolling | `ssd_rolling.py` | Z-Score | SSD 家族基準 |
+| 2 | DTW Paper Fixed (DTW) | 借用配對 | Z-Score | 誠實 DTW 基準 |
+| 3 | SSD-DTW-PCA Paper Fixed | 借用配對 | Z-Score | 全組最佳誠實基準（Sharpe 0.56） |
+| 4 | HDBSCAN Cluster SSD-DTW-PCA | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | 分組消融：HDBSCAN vs GICS |
+| 5 | SSD Rolling DRL THR | 借用 #1 配對 | DRL | DRL 疊加對照組 |
+| 6 | HDBSCAN Cluster SSD-DTW-PCA DRL THR | 借用 #4 配對 | DRL | DRL 疊加實驗組 |
+| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | Z-Score | 維度詛咒修復版 |
+| 8 | HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR | 借用 #7 配對 | DRL | 全組 DRL 疊加次高 Sharpe（0.54） |
+| 9 | Agglomerative Fundamentals | `agglomerative_fundamentals.py` | Z-Score | 分組消融：價格 PCA ⊕ 公司基本面 |
+| 10 | Agglomerative Fundamentals DRL THR | 借用 #9 配對 | DRL | 全組最佳年化報酬（3.03%） |
 
-切換執行範圍：修改 `strategies/config.py` 中的 `strategies_raw`，例如 `strategies_raw_all[-3:]` 只跑後 3 個，`strategies_raw_all` 跑全部 13 個。
+切換執行範圍：修改 `strategies/config.py` 中的 `strategies_raw`，或用環境變數免改檔覆寫（如 `STRATEGIES_SLICE="5:7" python run_trading.py` 只跑 #5–#6）。
+
+**已封存策略（22 個 config 條目 + 2 個從未賦予策略身分的孤兒模組）**：完整清單、失敗根因診斷與復活方式見 `archive/config_archived_strategies.py` docstring；歷史回測結果保留於 `results/result.db`。策略邏輯與封存摘要見 [notebooks/formation.ipynb](notebooks/formation.ipynb) 第五節。
 
 ---
 
 ## 專案目錄結構
 
 ```text
-Papper/
+pairtrade_trainingproject/
 ├── strategies/
-│   ├── config.py                  # 全域回測參數與策略清單
+│   ├── config.py                  # 全域回測參數與現役策略清單（10 個）
 │   ├── db_utils.py                # SQLite 讀寫工具
 │   ├── portfolio_manager.py       # 組合層級資金管理
 │   ├── preprocess_equity.py       # 權益曲線前處理
 │   ├── formation/
-│   │   ├── ssd_basic.py           # SSD Basic 形成期
-│   │   ├── ssd_rolling.py         # SSD Rolling 形成期
-│   │   ├── DTW_Cointegration_Paper.py  # DTW 形成期
-│   │   ├── HDBSCAN_UMAP.py        # HDBSCAN UMAP 形成期
-│   │   ├── HDBSCAN_MultiScale.py  # HDBSCAN MultiScale 形成期（自適應子期間）
-│   │   ├── ensemble.py            # Ensemble 形成期（取交集/聯集）
-│   │   └── _utils.py              # 共用統計工具（OLS、ADF、Hurst）
+│   │   ├── ssd_rolling.py             # SSD Rolling 形成期（#1；亦被 #9 複用排序邏輯）
+│   │   ├── DTW_Cointegration_Paper.py # DTW 形成期（#2/#3 借用配對；#4/#7 複用排序邏輯）
+│   │   ├── HDBSCAN_PCA_Loadings.py    # 報酬 PCA 因子載荷特徵萃取（被 #4/#7/#9 組合複用）
+│   │   ├── HDBSCAN_Cluster_SSD_DTW.py # HDBSCAN 聚類 + SSD-DTW-PCA 排序組合模組（#4/#7）
+│   │   ├── agglomerative_fundamentals.py # Agglomerative 聚類（價格⊕基本面）+ SSD 排序（#9）
+│   │   ├── ml_pair_quality.py         # 監督式學習排序（已封存，程式碼保留）
+│   │   ├── HDBSCAN_MultiScale.py / HDBSCAN_UMAP.py / ensemble.py / ssd_basic.py  # 已封存
+│   │   └── _utils.py                  # 共用統計工具（OLS、ADF、Hurst）
 │   └── trading/
-│       ├── zscore_trading.py      # Z-Score 狀態機（基礎類）
-│       ├── drl_lstm_trading.py    # DRL LSTM-DQN 交易（目前啟用）
-│       └── pure_dtw_trading.py    # 純 DTW 交叉進場（保留備用）
+│       ├── zscore_trading.py          # Z-Score 狀態機（基礎類，#1–#4、#7、#9 使用）
+│       ├── drl_threshold_trading.py   # DRL 門檻選擇式 v4（#5、#6、#8、#10 使用）
+│       ├── drl_lstm_trading.py / drl_fqi_trading.py / kalman_trading.py  # 已封存
+│       └── pure_dtw_trading.py / drl_lstm_v2_trading.py  # 孤兒模組（從未賦予策略身分）
 ├── fetch/
 │   ├── SP500_Tiingo.py            # Tiingo API 歷史數據下載
-│   └── sp500_yf_now.py            # yFinance 當日數據更新
+│   ├── sp500_yf_now.py            # yFinance 當日數據更新
+│   └── fundamentals_yfinance.py   # 公司基本面快照下載（市值、本益比）
 ├── dataset/
-│   ├── sp500_yF.db                # 主要資料庫（yFinance，LFS 追蹤）
-│   ├── sp500_Tiingo.db            # Tiingo 資料庫（LFS 追蹤）
-│   ├── sp500_Current.db           # 現行成分股資料庫
+│   ├── sp500_Tiingo.db             # 主要資料庫（LFS 追蹤，`DB_PATH` 預設指向此）
+│   ├── sp500_yF.db / sp500_Current.db  # 備用資料庫（LFS 追蹤）
+│   ├── fundamentals_sp500.db      # 公司基本面快照（Agglomerative Fundamentals 使用）
 │   └── audit_report.csv           # 資料品質審計報告
 ├── formation_data/
-│   └── formation_pairs_sp500_yF.db  # 形成期主合併資料庫（LFS 追蹤）
+│   └── formation_pairs_sp500_Tiingo.db  # 形成期主合併資料庫（LFS 追蹤）
 ├── notebooks/
-│   ├── formation.ipynb            # 所有形成期策略邏輯完整說明
-│   └── trading.ipynb              # 所有交易期策略邏輯完整說明
-├── archive/                       # 歷史存檔（舊版 notebook、docs 簡報等）
+│   ├── formation.ipynb            # 現役 10 策略形成期邏輯完整說明 + 論文引述
+│   └── trading.ipynb              # 交易期邏輯說明 + DRL-THR 架構 + 績效總比較
+├── archive/                       # 歷史存檔（已封存策略 config、舊版 notebook、docs 簡報）
 ├── dashboard.py                   # Streamlit 績效比對儀表板
 ├── run_formation.py               # 形成期主程式（多行程平行）
 ├── run_trading.py                 # 交易期主程式（多行程平行）
@@ -93,8 +95,9 @@ python run_trading.py
 
 兩個主程式均支援：
 - **智慧續傳**：完成的期數自動跳過（JSON 完成標記 + SQLite 期數雙重驗證）
-- **多行程平行**：每個策略的滾動期獨立平行計算
+- **多行程平行**：每個策略的滾動期獨立平行計算（`spawn` context，避免 CUDA fork 污染）
 - **網格搜尋**：自動搜尋 Top N / Stop Loss / MSR 等參數組合
+- **免改檔範圍覆寫**：環境變數 `STRATEGIES_SLICE`（如 `"5:7"`、`"0:5,8:12"`）
 
 ### 3. 查看結果
 
@@ -122,8 +125,21 @@ run.bat
 
 ---
 
+## 現役策略績效摘要（`results/result.db`，2026-07-04）
+
+| 指標 | 策略 | 數值 |
+| :--- | :--- | :---: |
+| 最佳 Sharpe | SSD-DTW-PCA (Paper-Fixed) | 0.558 |
+| 最佳年化報酬 | Agglomerative (Fundamentals-DRL-THR) | 3.03% |
+| 唯一同時優於 SSD 基準（Sharpe + 年化）的 ML 配對法 | Agglomerative (Fundamentals) | Sharpe 0.35 / 年化 2.70%（⚠️ 基本面前視偏誤限制） |
+
+完整比較表與逐項解讀見 [notebooks/trading.ipynb](notebooks/trading.ipynb) 第五節「現役策略績效總比較」。
+
+---
+
 ## 策略說明文件
 
-- 形成期邏輯：[notebooks/formation.ipynb](notebooks/formation.ipynb)
-- 交易期邏輯：[notebooks/trading.ipynb](notebooks/trading.ipynb)
+- 形成期邏輯與論文引述：[notebooks/formation.ipynb](notebooks/formation.ipynb)
+- 交易期邏輯、DRL-THR 架構與績效總比較：[notebooks/trading.ipynb](notebooks/trading.ipynb)
 - 詳細開發指南：[PROJECT_GUIDE.md](PROJECT_GUIDE.md)
+- 已封存策略完整診斷：[archive/config_archived_strategies.py](archive/config_archived_strategies.py)

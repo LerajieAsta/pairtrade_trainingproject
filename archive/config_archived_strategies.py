@@ -98,6 +98,25 @@
 
 復活方式：from archive.config_archived_strategies import strategies_raw_archived
           strategies_raw_all += strategies_raw_archived（或挑選單一項目加回）
+
+【從未進入策略清單的孤兒模組 — 2026-07-04 盤點記錄】
+  以下兩個 `strategies/trading/` 檔案不對應任何 `strategies_raw_all` 或本檔
+  `strategies_raw_archived` 條目（現役與封存皆無），亦即從未被 `run_trading.py`
+  正式跑過一次完整回測，`results/result.db` 中不存在對應的 METHOD/TRADE_METHOD
+  組合。盤點結論：兩者皆為架構演進過程中的中繼草稿，在被賦予正式策略身分
+  （config 條目）之前就已被下一代設計取代，程式碼保留供架構脈絡參考，
+  不建議直接啟用（缺乏基準回測數據佐證）：
+
+  - `pure_dtw_trading.py`：早期「Z-Score 交叉回穿波帶內才進場」構想的獨立
+    交易類別，繼承 `zscore_trading.Trading` 並覆寫進出場條件。設計目的是
+    搭配已封存的 DTW Paper 原版（座標 artifact 版）；DTW 系列改用誠實座標
+    的 Fixed 版後，此交易邏輯未被重新接上，也從未取得自己的 config 條目。
+  - `drl_lstm_v2_trading.py`：DRL v1（`drl_lstm_trading.py`，已封存）→ v2
+    （本檔，修復假共享/獎勵重複計算/epsilon 排程三個缺陷）→ v3 FQI
+    （`drl_fqi_trading.py`，已封存）→ v4 門檻選擇式（`drl_threshold_trading.py`，
+    現役）演進鏈中的中間產物。v2 的修復在 v3 FQI 的 docstring 開頭有摘要
+    引用，但 v2 本身在被 v3 取代前未被賦予獨立的策略 config 條目，因此
+    `result.db` 沒有 v2 的基準回測數據。
 """
 
 from strategies.config import (
