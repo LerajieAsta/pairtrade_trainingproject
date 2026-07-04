@@ -163,10 +163,13 @@ _HDBSCAN_MS_FILTERS = {
 # 2026-07-03 精簡：16 個已淘汰/驗證無效的策略移至 archive/config_archived_strategies.py
 # （SSD Basic、DTW 原版×2〔座標 artifact，形成配對仍被 Fixed 版借用〕、
 #   HDBSCAN stats10 系×4、Ensemble×2、DRLv1×3、Kalman×2、CONV×2）。
+# 2026-07-04 二次精簡：再封存 3 個確認無效的策略（HDBSCAN PCA-Loadings 及其
+# DRL THR 變體、ML Pair Quality）——原因與數據見 archive/config_archived_strategies.py
+# docstring「HDBSCAN PCA-Loadings 系列」「ML Pair Quality」兩節。
 # 歷史回測結果保留於 results/result.db；復活方式見封存檔 docstring。
 strategies_raw_all = [
     # ── 基準 ────────────────────────────────────────────────────────────────
-    # 1. SSD Rolling（SSD 家族代表基準；亦為 #7 DRL 對照的形成來源）
+    # 1. SSD Rolling（SSD 家族代表基準；亦為 #5 DRL 對照的形成來源）
     {
         "name":             "SSD Rolling",
         "formation_module": "strategies.formation.ssd_rolling",
@@ -178,33 +181,12 @@ strategies_raw_all = [
             **base_params,
         },
     },
-    # ── HDBSCAN 形成法（命題 1 主線） ────────────────────────────────────────
-    # 2. HDBSCAN PCA-Loadings（第一層特徵 = 報酬 PCA 因子載荷，
-    #     reduce_method="none" 跳過 UMAP，直接以 loadings 餵 HDBSCAN）
-    {
-        "name":             "HDBSCAN PCA-Loadings",
-        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings",
-        "db_method":        "HDBSCAN (PCA-Loadings)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
-            "reduce_method":     "none",
-            "pca_n_components":  15,   # 報酬 PCA 因子數（Avellaneda & Lee 2010 用 ~15）
-            "feature_mode":      "pca_loadings",
-            # T2 實驗：進場門檻 × 發散停損聯合掃描（SL 固定 0 以控制網格大小）
-            "stop_loss_list":       [0.0],
-            "entry_z_list":         [1.5, 2.0, 2.5],
-            "dynamic_stop_z_list":  [0.0, 3.0, 4.0],
-        },
-    },
     # ── DTW 基準（座標修正版；原版為 artifact 已封存） ───────────────────────
     # DTW Paper 原版的 OLS 在標準化空間擬合但輸出 OLS_Alpha → 交易端路徑 A
     # 以原始 log-price 空間重建 spread → 常數 Z 偏移（詳見封存檔說明）。
-    # #3/#4 借用原版的形成期配對（formation_strategy_id_base），
+    # #2/#3 借用原版的形成期配對（formation_strategy_id_base），
     # 以 ignore_ols_alpha 強制路徑 B（標準化空間），為誠實的 Z-Score 基準。
-    # 3. DTW Paper Fixed（座標修正版）
+    # 2. DTW Paper Fixed（座標修正版）
     {
         "name":             "DTW Paper Fixed (DTW)",
         "formation_module": "strategies.formation.DTW_Cointegration_Paper",
@@ -219,7 +201,7 @@ strategies_raw_all = [
             "ignore_ols_alpha": True,   # 強制路徑 B：與形成期一致的標準化空間
         },
     },
-    # 4. SSD-DTW-PCA Paper Fixed（座標修正版，目前最佳誠實基準：Top3 Sharpe 0.49）
+    # 3. SSD-DTW-PCA Paper Fixed（座標修正版，目前最佳誠實基準：Top3 Sharpe 0.56）
     {
         "name":             "SSD-DTW-PCA Paper Fixed",
         "formation_module": "strategies.formation.DTW_Cointegration_Paper",
@@ -238,7 +220,7 @@ strategies_raw_all = [
             "dynamic_stop_z_list":  [0.0, 3.0, 4.0],
         },
     },
-    # 5. HDBSCAN Cluster SSD-DTW-PCA（分組消融：對照組 = #4 GICS 分組，
+    # 4. HDBSCAN Cluster SSD-DTW-PCA（分組消融：對照組 = #3 GICS 分組，
     #    排序與交易端完全相同。295 期結果：報酬統計上等效（月配對 t 檢定不顯著），
     #    但不依賴 GICS 元資料、可救回 Unknown 股、形成期快 2 倍）
     {
@@ -265,24 +247,12 @@ strategies_raw_all = [
     #   v4 每配對每期只選一個動作：SKIP + 8 組 (entry_z, exit_z) 門檻，
     #   選單包含基準 (2.0, 0.0) → 策略空間 ⊇ Z-Score；訓練樣本不足時自動用基準。
     #   反事實全資訊標籤 + walk-forward 監督回歸（無探索問題）。
-    #   #6 vs #2（同 HDBSCAN PCA-Loadings 配對，DRL vs Z-Score）→ 命題 2
-    # 6. HDBSCAN PCA-Loadings DRL THR
-    {
-        "name":             "HDBSCAN PCA-Loadings DRL THR",
-        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
-        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.drl_threshold_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_THR",
-        "db_method":        "HDBSCAN (PCA-Loadings-DRL-THR)",
-        "trade_method":     "DRL",
-        "params": {
-            **base_params,
-            "drl_hidden_size": 64,
-            "thr_train_epochs": 40,
-            "thr_min_train_samples": 200,
-        },
-    },
-    # 7. SSD Rolling DRL THR
+    #   HDBSCAN PCA-Loadings DRL THR（命題 2 的第一次嘗試，vs HDBSCAN PCA-Loadings
+    #   Z-Score）已封存：修好 _shared 跨變體污染的 bug 後結果不變（15 組全負
+    #   Sharpe，中位數 −0.41），確認是配對訊號本身太弱，非 DRL 交易端問題。
+    #   見 archive/config_archived_strategies.py。目前活躍對照改為 #1 vs #5、
+    #   #4 vs #6、#7 vs #8。
+    # 5. SSD Rolling DRL THR
     {
         "name":             "SSD Rolling DRL THR",
         "formation_module": "strategies.formation.ssd_rolling",
@@ -298,12 +268,13 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
-    # 8. HDBSCAN Cluster SSD-DTW-PCA DRL THR —— 命題 2 的第二個 ML 配對底。
-    #    #6（PCA-Loadings 分群 + DRL）已證實：即使修好 _shared 跨變體污染的 bug，
-    #    15 組全負 Sharpe（中位數 −0.41）維持不變，問題在配對訊號本身太弱，不是
-    #    交易端。#5 的 Z-Score 基準（Sharpe 0.15、年化 0.82%）是 #2 的 2–3 倍，
-    #    換成這個更穩的 ML 分群底再疊 DRL-THR，看能不能重現 #7（SSD+DRL）
-    #    那種「疊加後全網格轉正、且優於自身 Z-Score 基準」的效果。
+    # 6. HDBSCAN Cluster SSD-DTW-PCA DRL THR —— 命題 2 的第二個 ML 配對底。
+    #    HDBSCAN PCA-Loadings DRL THR（已封存）已證實：即使修好 _shared 跨變體
+    #    污染的 bug，15 組全負 Sharpe（中位數 −0.41）維持不變，問題在配對訊號
+    #    本身太弱，不是交易端。#4 的 Z-Score 基準（Sharpe 0.15、年化 0.82%）比
+    #    已封存的 HDBSCAN PCA-Loadings 基準高 2–3 倍，換成這個更穩的 ML 分群底
+    #    再疊 DRL-THR，看能不能重現 #5（SSD+DRL）那種「疊加後全網格轉正、且
+    #    優於自身 Z-Score 基準」的效果。
     {
         "name":             "HDBSCAN Cluster SSD-DTW-PCA DRL THR",
         "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
@@ -319,14 +290,14 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
-    # 命題 2 方案 C：#4 的 Z-Score 基準（Sharpe 0.15~0.22）平均每期有 30.9%
-    # （中位數 35.8%）標的被 HDBSCAN 判為雜訊（label=-1）排除，群數在 2~25
-    # 之間劇烈震盪；15 維 PCA loadings 平均僅解釋 58.6% 報酬變異，後段主成分
-    # 訊號弱、卻仍等權參與歐氏距離計算，可能是維度詛咒稀釋了密度訊號的元兇。
-    # 診斷驗證有效：雜訊比例中位數 35.8%→8.1%、群數標準差 6.4→4.3；
-    # Z-Score 基準正 Sharpe 比例 60%→73%、中位數 Sharpe 0.07→0.13、
-    # 最佳 Sharpe 0.22→0.29、最佳年化 0.82%→1.08%，全面優於 15 維版本。
-    # 接下來疊 DRL-THR 驗證方案 C 是否能真正跨過 2% 門檻。
+    # 7. HDBSCAN Cluster SSD-DTW-PCA PCA5 —— 命題 2 方案 C：#4 的 Z-Score 基準
+    #    （Sharpe 0.15~0.22）平均每期有 30.9%（中位數 35.8%）標的被 HDBSCAN
+    #    判為雜訊（label=-1）排除，群數在 2~25 之間劇烈震盪；15 維 PCA loadings
+    #    平均僅解釋 58.6% 報酬變異，後段主成分訊號弱、卻仍等權參與歐氏距離
+    #    計算，可能是維度詛咒稀釋了密度訊號的元兇。
+    #    診斷驗證有效：雜訊比例中位數 35.8%→8.1%、群數標準差 6.4→4.3；
+    #    Z-Score 基準正 Sharpe 比例 60%→73%、中位數 Sharpe 0.07→0.13、
+    #    最佳 Sharpe 0.22→0.29、最佳年化 0.82%→1.08%，全面優於 15 維版本。
     {
         "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5",
         "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
@@ -345,9 +316,12 @@ strategies_raw_all = [
             "ignore_ols_alpha":     True,
         },
     },
-    # 9. HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR —— 命題 2 方案 C 的完整驗證：
-    #    在降維後更穩的 ML 配對底上疊 DRL-THR，看正 Sharpe 比例是否再被推到
-    #    100%（重現 #7/#9 的模式），年化報酬是否真的跨過 2% 且同時贏過 SSD。
+    # 8. HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR —— 命題 2 方案 C 的完整驗證：
+    #    在降維後更穩的 ML 配對底上疊 DRL-THR。結果：Sharpe 0.54（全組第二高，
+    #    僅次於 #3 的 0.56），證明 DRL 疊加對「及格的 ML 配對底」有效；但最佳
+    #    年化報酬僅 1.30%，仍未跨過 2% 門檻、未贏過 SSD 家族。目前結論：DRL
+    #    交易端能穩定＋提升配對訊號的風險調整後報酬，但補不齊原始年化報酬的
+    #    差距——瓶頸在配對訊號本身，不在交易端。
     {
         "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR",
         "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
@@ -363,29 +337,44 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
-    # 10. ML Pair Quality —— 命題 2 的第三個方向：不模仿 SSD 的距離排序（那樣
-    #     天花板就是「跟 SSD 一樣好」），而是把 DRL-THR 的 walk-forward 反事實
-    #     監督回歸範式搬到形成期，直接學「候選配對在下一期會不會賺錢」。候選
-    #     池沿用 SSD Rolling 的同 GICS 產業分組（不用 HDBSCAN），只換排序函式，
-    #     交易端用純 Z-Score（跟 SSD (Rolling) 完全一致），才能乾淨對照
-    #     「ML 學出來的排序 vs SSD 距離排序」這一個變因。
+    # 9. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings
+    #     ⊕ GICS one-hot ⊕ log(市值) ⊕ 盈餘殖利率(1/PE)」混合特徵空間做
+    #     Agglomerative（average-linkage、依合併距離分位數校準
+    #     distance_threshold，非固定 n_clusters/ward，避免重現 HDBSCAN 的
+    #     群組不平衡問題）分群，取代 GICS 靜態分組；分群結果轉為
+    #     sector_mapping 餵給既有 SSD Rolling 排序/共整合流程完全不變
+    #     （min-SSD + Engle-Granger ADF + Hurst）。交易端沿用既有 Z-Score /
+    #     Beta-動態配重（EG Hedge Ratio）/ 停損引擎，未做任何修改。
+    #     基本面資料為單一時點靜態快照（yfinance，見
+    #     fetch/fundamentals_yfinance.py）——已知前視偏誤限制。
     {
-        "name":             "ML Pair Quality",
-        "formation_module": "strategies.formation.ml_pair_quality",
+        "name":             "Agglomerative Fundamentals",
+        "formation_module": "strategies.formation.agglomerative_fundamentals",
         "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "ML_Pair_Quality",
-        "db_method":        "ML (Pair-Quality)",
+        "sub_dir":          "Agglomerative_Fundamentals",
+        "db_method":        "Agglomerative (Fundamentals)",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
+            "pca_n_components":            5,
+            "fundamentals_db_path":        "./dataset/fundamentals_sp500.db",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
         },
     },
 ]
 # 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
 # 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
+# 2026-07-04 二次清理：HDBSCAN PCA-Loadings（Z-Score 基準）、HDBSCAN
+# PCA-Loadings DRL THR、ML Pair Quality 三個確認無效的策略歸位封存檔。
 # 歷史結果均在 results/result.db；復活方式見封存檔 docstring。
 
-# 共 8 個策略（#1–#5 Z-Score 完整；#6–#8 DRL THR = STRATEGIES_SLICE="5:8"）
+# 共 9 個策略（#1–#4、#7、#9 Z-Score；#5、#6、#8 DRL THR = STRATEGIES_SLICE="4:8"）
 # ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
 strategies_raw = strategies_raw_all[:]
 

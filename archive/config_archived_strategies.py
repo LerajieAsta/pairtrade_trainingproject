@@ -43,6 +43,59 @@
     失敗根因 = 動作空間設計，非訓練方法。由 v4 門檻選擇式（現役）取代。
   DRL FQI XL：H200 壓測 + 容量縮放用，隨 FQI 架構一併封存。
 
+【HDBSCAN PCA-Loadings 系列 — 命題 1/2 已被 Cluster-SSD-DTW-PCA 系列取代
+  （2026-07-04 二次封存）】
+  HDBSCAN PCA-Loadings（Z-Score 基準）：報酬 PCA 因子載荷 15 維直接餵 HDBSCAN
+    （reduce_method="none"），在 45 組 entry_z×dynamic_stop_z 網格中僅 4.4%
+    Sharpe 為正、中位數 −0.62，全組最不穩定的 Z-Score 基準。診斷：15 維空間
+    平均每期僅解釋 58.6% 報酬變異、後段主成分訊號弱卻等權參與歐氏距離計算，
+    疑似維度詛咒稀釋 HDBSCAN 密度估計（平均 30.9% 標的被判雜訊排除、群數在
+    2~25 間震盪）。已被 HDBSCAN Cluster SSD-DTW-PCA（改用 HDBSCAN 只做分組、
+    排序沿用 SSD-DTW-PCA 距離法）及其 PCA5 降維版取代，兩者 Z-Score 基準
+    Sharpe 分別為 0.22、0.29，全面優於本策略。
+  HDBSCAN PCA-Loadings DRL THR：疊加 DRL-THR 後 15 組全負 Sharpe（中位數
+    −0.41、最差 −0.67），是全部策略中表現最差者。曾懷疑是
+    strategies/trading/drl_threshold_trading.py 的 _shared 全域 key 跨策略
+    變體污染訓練資料所致（該 bug 已修復，見 commit 9ae56ec）；修復後重跑
+    30 組變體驗證：結果幾乎不變（中位數 Sharpe −0.41 → −0.41），排除訓練污染
+    假說，確認是配對訊號本身太弱、DRL 交易端救不回來。HDBSCAN Cluster
+    SSD-DTW-PCA（PCA5）+ DRL THR 的等效實驗則成功：Sharpe 0.42 → 0.54。
+  ⚠️ 兩者的 formation_strategy_id_base 互相借用（DRL THR 借用 Z-Score 基準的
+    形成期配對），一併封存、一併復活。"HDBSCAN PCA-Loadings_MSR0" 這個
+    strategy_id 在 formation_data 中的配對列保留不刪（比照 DTW 原版的慣例，
+    供未來復活時直接沿用，不需重新計算）。
+
+【ML Pair Quality — 監督式學習排序，兩次嘗試皆未驗證成功（2026-07-04 封存）】
+  假說：不模仿 SSD Rolling 的 SSD 距離排序（天花板頂多打平），改用
+  drl_threshold_trading.py（v4）已驗證有效的 walk-forward 反事實監督回歸
+  範式往形成期搬一格——用候選配對「下一期實際已實現報酬」（透過
+  zscore_trading.Trading._simulate_pair 算出）當標籤，訓練 MLP 學習配對
+  品質評分，取代 SSD 距離排序；候選池仍沿用 SSD Rolling 的同 GICS 產業分組，
+  只換排序函式，乾淨對照「學出來的排序 vs SSD 距離排序」。
+    第一次嘗試（原始報酬 % 當標籤，MSE 回歸）：15 組中 4 組正 Sharpe，
+      中位數 −0.155，最佳 Sharpe 0.203（Top1，跟 SSD 同量級），但 Top10/
+      Top20 排名快速惡化（Sharpe 至 −0.66）——模型抓得到「最強訊號」但
+      排序信心校準差。診斷：單一歷史實例的已實現報酬肥尾嚴重（標準差
+      28%、曾見 +314% 極端值），MSE 對這種分布容易被少數極端值主導梯度。
+    第二次嘗試（log 壓縮標籤 sign(x)*log1p(|x|)，其餘不變）：結果不僅沒有
+      改善，反而更差——15 組全負 Sharpe，中位數 −0.245。顯示問題可能不是
+      「MSE 被極端值主導」這個表面現象，而是這組特徵（SSD、DTW 距離、ADF
+      p-value/統計量、半衰期、Hurst、hedge ratio、spread 標準差、波動率比、
+      產業內 SSD 排名）對「這個配對下一期會不會賺錢」本身就缺乏可學習的
+      訊號——不同次訓練結果因隨機初始化而有落差，但都圍繞在「沒有真實優勢」
+      這條線附近震盪，不是單純的損失函數/標籤轉換問題。
+    若要復活，較有機會的方向：(a) 把回歸問題換成 pairwise ranking loss
+      （只要求排序正確，不要求預測數值，對極端值天然不敏感，更貼近實際
+      需求）；(b) 重新設計特徵（目前這組主要是共整合統計量，可能需要
+      加入能真正預測「持續性」而非「單次實現報酬」的訊號，例如形成期內
+      分段檢驗共整合強度的穩定度）。
+  過程中意外發現並修好一個真正的資料庫 bug（見 commit 01b6da4）：
+  run_formation.py 的 merge_databases 用 INSERT OR REPLACE 假設同一
+  strategy_id 重跑必然選出完全相同的配對（對 SSD/DTW 等決定性方法成立），
+  但對會迭代訓練、重跑會選出不同配對的模組（如本策略）不成立，導致新舊
+  兩批配對一起留在資料庫裡（同一期配對數超過 top_n）。此 bug 修復已保留
+  在現役程式碼中，不隨本策略封存而回退。
+
 復活方式：from archive.config_archived_strategies import strategies_raw_archived
           strategies_raw_all += strategies_raw_archived（或挑選單一項目加回）
 """
@@ -305,6 +358,54 @@ strategies_raw_archived = [
             "pca_n_components":   15,
             "feature_mode":       "pca_loadings",
             "hold_to_period_end": True,
+        },
+    },
+    # ── HDBSCAN PCA-Loadings 系列（2026-07-04 二次封存；被 Cluster-SSD-DTW-PCA
+    #    系列取代，見上方 docstring「HDBSCAN PCA-Loadings 系列」節） ──────────
+    {
+        "name":             "HDBSCAN PCA-Loadings",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings",
+        "db_method":        "HDBSCAN (PCA-Loadings)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
+            "reduce_method":     "none",
+            "pca_n_components":  15,   # 報酬 PCA 因子數（Avellaneda & Lee 2010 用 ~15）
+            "feature_mode":      "pca_loadings",
+            # T2 實驗：進場門檻 × 發散停損聯合掃描（SL 固定 0 以控制網格大小）
+            "stop_loss_list":       [0.0],
+            "entry_z_list":         [1.5, 2.0, 2.5],
+            "dynamic_stop_z_list":  [0.0, 3.0, 4.0],
+        },
+    },
+    {
+        "name":             "HDBSCAN PCA-Loadings DRL THR",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_THR",
+        "db_method":        "HDBSCAN (PCA-Loadings-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    # ── ML Pair Quality（2026-07-04 封存；兩次嘗試皆未驗證成功，
+    #    見上方 docstring「ML Pair Quality」節） ─────────────────────────────
+    {
+        "name":             "ML Pair Quality",
+        "formation_module": "strategies.formation.ml_pair_quality",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "ML_Pair_Quality",
+        "db_method":        "ML (Pair-Quality)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
         },
     },
 ]

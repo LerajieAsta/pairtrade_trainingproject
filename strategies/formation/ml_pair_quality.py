@@ -287,7 +287,12 @@ class Formation:
                             log_mean_b=float(mean_p[tb]), log_std_b=float(std_p[tb]),
                         )
                         if not df_log.empty:
-                            label = float(df_log["Realized_PnL"].iloc[-1]) / _LABEL_CAPITAL * 100.0
+                            raw_pct = float(df_log["Realized_PnL"].iloc[-1]) / _LABEL_CAPITAL * 100.0
+                            # log 壓縮：保留正負號與相對排序（單調變換），但壓低極端報酬
+                            # 對 MSE 梯度的主導性——單一實例的已實現報酬肥尾嚴重（曾見過
+                            # +314%），直接回歸原始百分比會讓少數極端值主導訓練，模型學到
+                            # 的是「追逐罕見暴漲」而非穩健的配對品質。
+                            label = float(np.sign(raw_pct) * np.log1p(abs(raw_pct)))
                     except Exception:
                         label = 0.0
                 sh["buffer"].append((row["feat"], label, trade_end))
