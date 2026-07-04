@@ -259,7 +259,9 @@ def worker_task(
                     "capital_per_pair": capital,
                     "full_price_df": price_pivot,
                     "formation_start": period_start,
-                    "formation_end": trade_start
+                    "formation_end": trade_start,
+                    "variant_id": name,  # 完整展開後的策略變體名稱（含 Top_n/停損/MSR），供需要行程內共享狀態的
+                                         # 交易模組（如 DRL-THR）區分彼此，避免不同變體共用同一份訓練狀態
                 }
                 for k, v in params.items():
                     kwargs[k] = v

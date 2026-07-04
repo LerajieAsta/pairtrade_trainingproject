@@ -116,7 +116,8 @@ class Trading:
                  thr_train_epochs: int = 40,       # 每期增量訓練 epoch 數
                  thr_min_train_samples: int = 200,  # 樣本不足時使用基準動作
                  full_price_df: pd.DataFrame = None,
-                 formation_start: str = None, formation_end: str = None, **kwargs):
+                 formation_start: str = None, formation_end: str = None,
+                 variant_id: str = "default", **kwargs):
 
         _pct_clean = lambda df: df.where(df.pct_change().abs() <= 0.50).ffill().bfill() if df is not None else None
         self.trade_prices = _pct_clean(price_df.copy())
@@ -133,6 +134,7 @@ class Trading:
 
         self.formation_start = formation_start
         self.formation_end = formation_end
+        self.variant_id = variant_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ── 形成期特徵（12 維，標準化 ~[-3,3]） ──────────────────────────────
@@ -172,14 +174,16 @@ class Trading:
         return np.where(np.isfinite(f), f, 0.0)
 
     def _get_shared(self):
-        key = "GLOBAL"
+        # 依 variant_id（含策略名稱、Top_n、停損、MSR）區分，避免同一 worker process
+        # 生命週期內依序處理的不同策略變體共用同一份網路/緩衝區，互相污染訓練資料。
+        key = self.variant_id
         sh = Trading._shared.get(key)
         if sh is None:
             net = ThresholdNet(N_FEAT, self.hidden).to(self.device)
             sh = {"net": net, "opt": optim.Adam(net.parameters(), lr=self.lr),
                   "buffer": [], "trained_n": 0}
             Trading._shared[key] = sh
-            print(f"    [DRL-THR] New walk-forward threshold net (device={self.device})")
+            print(f"    [DRL-THR] New walk-forward threshold net ({key}, device={self.device})")
         return sh
 
     def _train_if_ready(self, sh: dict, trade_start):
