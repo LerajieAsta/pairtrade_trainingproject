@@ -358,7 +358,19 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
             rows = temp_cursor.fetchall()
             temp_conn.close()  # type: ignore
 
-            # 直接插入，OR REPLACE 會處理重複
+            # 先清掉主資料庫裡這個 strategy_id 的舊資料，再插入這次產生的資料。
+            # INSERT OR REPLACE 只在 (strategy_id, Period_Start, Ticker_A, Ticker_B)
+            # 完全相同時才會取代舊列；對距離排序法（SSD/DTW）等決定性模組，重跑
+            # 永遠選出同一組配對，這個假設成立。但對會隨程式碼/標籤變動而改選不同
+            # 配對的模組（例如 ml_pair_quality 這種會迭代訓練的模型），新舊兩批
+            # 配對的主鍵不會完全相同，舊資料不會被取代，兩批會一起留在資料庫裡，
+            # 造成同一期配對數超過 top_n。這裡改成先刪除該 strategy_id 的全部舊
+            # 資料，再整批插入這次的結果，確保重跑後的資料庫忠實反映最新一次的
+            # 選股結果。
+            strategy_ids = {r[0] for r in rows}
+            for sid in strategy_ids:
+                cursor.execute("DELETE FROM formation_pairs WHERE strategy_id = ?", (sid,))
+
             cursor.executemany("""
                 INSERT OR REPLACE INTO formation_pairs 
                 (strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params)
