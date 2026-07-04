@@ -300,7 +300,44 @@ strategies_raw_all = [
             "drl_scope": "global", "drl_buffer_periods": 24,
         },
     },
-    # 8. HDBSCAN PCA-Loadings DRL FQI XL（H200 壓力測試 + 容量縮放消融）
+    # ── DRL v4：門檻選擇式（Kim & Kim 2019）──────────────────────────────
+    #   v1–v3 逐日定位動作空間已系統性證偽（OOS 過度交易，Sharpe −1.1~−2.3）。
+    #   v4 每配對每期只選一個動作：SKIP + 8 組 (entry_z, exit_z) 門檻，
+    #   選單包含基準 (2.0, 0.0) → 策略空間 ⊇ Z-Score；訓練樣本不足時自動用基準。
+    #   反事實全資訊標籤 + walk-forward 監督回歸（無探索問題）。
+    # 8. HDBSCAN PCA-Loadings DRL THR
+    {
+        "name":             "HDBSCAN PCA-Loadings DRL THR",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_THR",
+        "db_method":        "HDBSCAN (PCA-Loadings-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    # 9. SSD Rolling DRL THR
+    {
+        "name":             "SSD Rolling DRL THR",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "formation_strategy_id_base": "SSD Rolling",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "SSD_Rolling_DRL_THR",
+        "db_method":        "SSD (Rolling-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    # 10. HDBSCAN PCA-Loadings DRL FQI XL（H200 壓力測試 + 容量縮放消融）
     #    網路/緩衝/sweep 全面放大：全批次 LSTM forward ≈ 18 萬序列/sweep，
     #    單 worker 即可吃滿 GPU SM 並常駐 ~30GB VRAM。
     #    ⚠️ 單獨執行（strategies_raw = strategies_raw_all[-1:]），
