@@ -227,11 +227,19 @@ def worker_task(
 
             # 動態匹配建構子參數
             kwargs = {
-                "price_df":       form_prices,
-                "form_start":     form_start_dt,
-                "form_end":       form_end_dt,
-                "top_n":          params.get("top_n", 10),
-                "sector_mapping": sector_mapping
+                "price_df":        form_prices,
+                "form_start":      form_start_dt,
+                "form_end":        form_end_dt,
+                "top_n":           params.get("top_n", 10),
+                "sector_mapping":  sector_mapping,
+                # 交易期價格切片（供需要即時產生反事實訓練標籤的模組使用，例如
+                # ml_pair_quality；一般模組的建構子沒有宣告這個參數名，會被下面
+                # 的 valid_kwargs 過濾安全忽略）
+                "future_price_df": price_pivot.iloc[idx:trade_end_idx + 1],
+                # 跟 run_trading.py 的 variant_id 修復一致：需要行程內共享狀態
+                # 的模組（walk-forward 訓練緩衝區）用它區分彼此，避免同一個
+                # worker process 依序處理不同策略變體時互相污染
+                "variant_id":      name,
             }
             for k, v in params.items():
                 if k not in kwargs:

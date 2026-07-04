@@ -363,6 +363,23 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
+    # 10. ML Pair Quality —— 命題 2 的第三個方向：不模仿 SSD 的距離排序（那樣
+    #     天花板就是「跟 SSD 一樣好」），而是把 DRL-THR 的 walk-forward 反事實
+    #     監督回歸範式搬到形成期，直接學「候選配對在下一期會不會賺錢」。候選
+    #     池沿用 SSD Rolling 的同 GICS 產業分組（不用 HDBSCAN），只換排序函式，
+    #     交易端用純 Z-Score（跟 SSD (Rolling) 完全一致），才能乾淨對照
+    #     「ML 學出來的排序 vs SSD 距離排序」這一個變因。
+    {
+        "name":             "ML Pair Quality",
+        "formation_module": "strategies.formation.ml_pair_quality",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "ML_Pair_Quality",
+        "db_method":        "ML (Pair-Quality)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+        },
+    },
 ]
 # 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
 # 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
