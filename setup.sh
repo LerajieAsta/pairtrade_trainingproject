@@ -28,8 +28,19 @@ else
     fi
     echo "[INFO] Initializing Git LFS..."
     git lfs install
-    echo "[INFO] Fetching Git LFS files..."
-    git lfs pull
+    # "git lfs ls-files" marks files whose content is not yet downloaded with "-"
+    if git lfs ls-files | grep -q '^[0-9a-f]* - '; then
+        echo "[INFO] Fetching Git LFS files..."
+        if ! git lfs pull; then
+            echo "[WARNING] 'git lfs pull' failed (e.g. LFS bandwidth/storage quota exceeded)."
+            echo "          Continuing setup without these data files:"
+            git lfs ls-files | grep '^[0-9a-f]* - ' | awk '{print "            - " $3}'
+            echo "          You can rebuild them with the scripts in fetch/,"
+            echo "          or retry 'git lfs pull' once the LFS quota is restored."
+        fi
+    else
+        echo "[INFO] All Git LFS files already present. Skipping fetch."
+    fi
 fi
 echo
 
