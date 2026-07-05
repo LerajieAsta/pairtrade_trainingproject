@@ -388,6 +388,33 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
+    # ── DTW Paper 原版（formation-only：僅產生形成期配對供 #2/#3 借用） ──────
+    # 2026-07-05：repo LFS 額度用罄，formation_pairs DB 無法下載，原版配對
+    # 需本地重算。原版「交易端」為座標 artifact 已封存（見 archive/
+    # config_archived_strategies.py），故以 formation_only 旗標讓 run_trading
+    # 跳過回測，只由 run_formation 產生 DTW Paper (DTW)/(SSD-DTW-PCA) 配對。
+    # 置於清單尾端以保持 #1–#10 的 STRATEGIES_SLICE 索引穩定
+    # （注意："-1:" 之類的尾端切片現在會切到 formation-only 條目）。
+    {
+        "name":             "DTW Paper (DTW)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "formation_only":   True,
+        "sub_dir":          "DTW_Paper",
+        "db_method":        "DTW (Paper)",
+        "trade_method":     "Z-Score",
+        "params":  {**base_params, "method": "dtw"},
+    },
+    {
+        "name":             "DTW Paper (SSD-DTW-PCA)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "formation_only":   True,
+        "sub_dir":          "SSD_DTW_PCA_Paper",
+        "db_method":        "SSD-DTW-PCA (Paper)",
+        "trade_method":     "Z-Score",
+        "params":  {**base_params, "method": "ssd_dtw_pca"},
+    },
 ]
 # 2026-07-04 清理：FQI 系列×3（逐日定位動作空間已證偽）、重建任務完成的
 # 拉回策略×4（DTW 原版×2、CONV×2）歸位 archive/config_archived_strategies.py。
@@ -395,7 +422,8 @@ strategies_raw_all = [
 # PCA-Loadings DRL THR、ML Pair Quality 三個確認無效的策略歸位封存檔。
 # 歷史結果均在 results/result.db；復活方式見封存檔 docstring。
 
-# 共 10 個策略（#1–#4、#7、#9 Z-Score；#5、#6、#8、#10 DRL THR）
+# 共 10 個交易策略（#1–#4、#7、#9 Z-Score；#5、#6、#8、#10 DRL THR）
+# ＋ 2 個 formation-only 條目（DTW Paper 原版 ×2，只產生配對不回測）
 # ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
 strategies_raw = strategies_raw_all[:]
 

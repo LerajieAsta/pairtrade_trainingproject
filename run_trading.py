@@ -471,6 +471,10 @@ def run_all_trading():
     # ── 展開策略網格（依據 top_n_list, stop_loss_list/stop_loss_pct_list, max_sector_ratio_list 展開） ──
     expanded_strategies_raw = []
     for raw in strategies_raw:
+        # formation_only：僅供形成期產生配對（交易端已封存），不參與回測
+        if raw.get("formation_only"):
+            print(f"  ⟳ 跳過交易期（formation-only 條目）：{raw['name']}", flush=True)
+            continue
         params = raw["params"]
         
         # 1. top_n_list
@@ -547,6 +551,8 @@ def run_all_trading():
     # 建立未展開前的原始策略配置列表，用於儀表板統合呈現
     original_strategies_config = []
     for raw in strategies_raw:
+        if raw.get("formation_only"):
+            continue  # formation-only 條目不參與交易期儀表板
         original_strategies_config.append({
             "name": raw["name"],
             "trading_module": raw["trading_module"],

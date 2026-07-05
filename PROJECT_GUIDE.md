@@ -7,7 +7,7 @@
 ```text
 pairtrade_trainingproject/
 ├── strategies/
-│   ├── config.py                  # 策略清單（現役 10 個）、網格參數、全域回測設定
+│   ├── config.py                  # 策略清單（10 交易策略 + 2 formation-only）、網格參數、全域回測設定
 │   ├── db_utils.py                # SQLite 合併、讀寫工具
 │   ├── portfolio_manager.py       # 組合層級資金管理（MSR 產業上限）
 │   ├── preprocess_equity.py       # 權益曲線前處理
@@ -78,7 +78,7 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 - 讀取 `dataset/sp500_Tiingo.db`（或 config 指定資料庫，見 `DB_PROFILES`）
 - 多行程平行執行每個策略的每個滾動期形成期計算（`ProcessPoolExecutor`，`spawn` context 避免 CUDA fork 污染）
 - 結果寫入 `formation_data/formation_pairs_{db_basename}.db`
-- 智慧續傳：JSON 完成標記 + SQLite 期數計數雙重驗證，已完成的期數自動跳過
+- 智慧續傳：以 formation DB 為唯一真相來源（DB 中有該策略配對才視為完成；舊版 JSON 標記檔 fallback 已移除，避免「有標記無資料」誤跳過），已完成的策略/期數自動跳過
 - `merge_databases()`：合併前先刪除同 `strategy_id` 的既有列再 `INSERT OR REPLACE`——避免非決定性模組（如已封存的 `ml_pair_quality.py`）重跑選出不同配對時，新舊兩批配對同時留在資料庫（同一期配對數超過 `top_n`）
 - `FORCE_RERUN = False`（config.py）：正常模式，不強制重跑
 
@@ -94,11 +94,12 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 
 ## 3. 策略清單（`config.py`）
 
-`strategies_raw_all` 為現役策略池（共 10 個），`strategies_raw = strategies_raw_all[:]` 決定實際執行範圍
-（或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片）：
+`strategies_raw_all` 為現役策略池（10 個交易策略 + 尾端 2 個 formation-only 條目），
+`strategies_raw = strategies_raw_all[:]` 決定實際執行範圍
+（或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片；0-based Python 切片語意）：
 
 ```bash
-STRATEGIES_SLICE="5:7" python run_trading.py   # 只跑 SSD Rolling DRL THR、HDBSCAN Cluster ... DRL THR 兩策略
+STRATEGIES_SLICE="4:6" python run_trading.py   # 只跑 #5 SSD Rolling DRL THR、#6 HDBSCAN Cluster ... DRL THR
 ```
 
 | # | 策略名稱 | 形成期 | 交易期 | 角色 |
@@ -110,15 +111,21 @@ STRATEGIES_SLICE="5:7" python run_trading.py   # 只跑 SSD Rolling DRL THR、HD
 | 5 | SSD Rolling DRL THR | 借用 #1 配對 | `drl_threshold_trading.py` | DRL 疊加對照組 |
 | 6 | HDBSCAN Cluster SSD-DTW-PCA DRL THR | 借用 #4 配對 | `drl_threshold_trading.py` | DRL 疊加實驗組 |
 | 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | `zscore_trading.py` | 維度詛咒修復版（vs #4） |
-| 8 | HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR | 借用 #7 配對 | `drl_threshold_trading.py` | 全組 DRL 疊加 Sharpe 次高 0.54 |
+| 8 | HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR | 借用 #7 配對 | `drl_threshold_trading.py` | 全組 DRL 疊加最高 Sharpe 0.46 |
 | 9 | Agglomerative Fundamentals | `agglomerative_fundamentals.py` | `zscore_trading.py` | 分組消融第三支：價格 PCA⊕基本面 |
-| 10 | Agglomerative Fundamentals DRL THR | 借用 #9 配對 | `drl_threshold_trading.py` | 全組最佳年化報酬 3.03% |
+| 10 | Agglomerative Fundamentals DRL THR | 借用 #9 配對 | `drl_threshold_trading.py` | 全組最佳年化報酬 2.89% |
+| — | DTW Paper (DTW) / (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only（跳過回測） | 產生 #2/#3 借用的原版配對 |
 
-**已封存策略（22 個 config 條目）**：`archive/config_archived_strategies.py`
-（SSD Basic、DTW 原版×2〔座標 artifact〕、HDBSCAN 舊特徵系×4、Ensemble×2、DRL v1×3、Kalman×2、
+**formation-only 條目（2026-07-05）**：repo LFS 額度用罄致 formation DB 無法下載後，DTW Paper 原版
+兩條目以 `formation_only: True` 旗標回歸現役清單尾端——`run_formation.py` 計算其配對（供 #2/#3
+借用），`run_trading.py` 跳過（原版交易端為座標 artifact，維持封存）。全部形成期配對因此可在任何
+機器上以 `run_formation.py` 完整本地重算。
+
+**已封存策略（20 個 config 條目）**：`archive/config_archived_strategies.py`
+（SSD Basic、HDBSCAN 舊特徵系×4、Ensemble×2、DRL v1×3、Kalman×2、
 CONV×2、DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Loadings 系×2、ML Pair Quality×1），
 封存理由與完整診斷數據見該檔 docstring，歷史回測結果保留於 `results/result.db`。
-⚠️ DTW 原版與 HDBSCAN PCA-Loadings 的形成期配對仍分別被現役策略 #2/#3 與復活備用借用，formation DB 資料列不可刪。
+⚠️ HDBSCAN PCA-Loadings 的形成期配對仍被復活備用借用，formation DB 資料列不可刪。
 
 **孤兒模組（2 個，從未進入策略清單）**：`pure_dtw_trading.py`（早期交叉回穿波帶構想）、
 `drl_lstm_v2_trading.py`（DRL v1→v3 演進鏈中繼修復版）——程式碼保留供架構脈絡參考，
@@ -215,7 +222,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 | `sp500_Tiingo.db` | 主要資料庫，`DB_PATH` 預設指向此 |
 | `sp500_yF.db` | yFinance 備用（config `DB_PROFILES` 可切換） |
 | `sp500_Current.db` | 現行成分股查詢 |
-| `fundamentals_sp500.db` | 公司基本面快照（市值、本益比），供 `agglomerative_fundamentals.py` 使用；⚠️ 單一時點靜態資料，非歷史逐日序列 |
+| `fundamentals_sp500.db` | 公司基本面快照（市值、本益比），供 `agglomerative_fundamentals.py` 使用；⚠️ 單一時點靜態資料，非歷史逐日序列。2026-07-05 以 `fetch/fundamentals_yfinance.py` 重抓（843 檔：633 有效、210 已下市） |
 
 資料表：`Daily_Prices`（Date, Symbol, Open, High, Low, Close, Volume）、`Constituents`（Symbol, GICS_Sector）
 
@@ -261,5 +268,10 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 
 - 執行 `git add formation_data/*.db` 前確認已安裝 Git LFS（`git lfs install`）
 - 大型 DB 首次推送需要 LFS 儲存空間配額
+- ⚠️ **LFS 額度已用罄（2026-07-05 確認）**：`git lfs fetch/pull/push` 皆會失敗
+  （"This repository exceeded its LFS budget"）。在新環境 LFS 檔案只會是 pointer 檔
+  （~130 bytes），遇到 `file is not a database` 或 run_trading「No periods found」即為此因。
+  重建方式：`fetch/fundamentals_yfinance.py`（基本面）＋ `run_formation.py`（形成期配對，
+  formation-only 條目會一併產生 DTW 原版配對）。額度恢復前 **不要 commit/push .db 檔案**。
 - `results/` 整個目錄被忽略：回測結果只存在本機，`notebooks/trading.ipynb` 的績效比較表為手動同步的
   數據快照，重大回測更新後應一併更新該章節

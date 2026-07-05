@@ -10,8 +10,11 @@
     （進場中位 |Z|=3.24、85% 期初 3 天進場、99% 期末強平）。
     中位 Sharpe 0.45–0.46 為 bug 副產物；修正後（#Fixed 版）跌至 ≈0。
     ⚠️ 其形成期配對仍被現役 DTW Paper Fixed / SSD-DTW-PCA Paper Fixed 借用
-    （formation_strategy_id_base），formation DB 中的資料列不可刪除；
-    若需在全新資料庫重建形成配對，暫時將本檔對應項目加回 strategies_raw_all。
+    （formation_strategy_id_base），formation DB 中的資料列不可刪除。
+    【2026-07-05 更新】repo LFS 額度用罄致 formation DB 遺失、需本地重算，
+    兩個原版條目已以 formation_only 旗標回歸 strategies/config.py 現役清單
+    （run_formation 產生配對、run_trading 跳過回測），故自本檔
+    strategies_raw_archived 移除，避免日後整批復活時重複定義。
 
 【HDBSCAN 舊特徵系 — 已被 PCA-Loadings 取代】
   HDBSCAN MultiScale / MultiScale PCA-UMAP / UMAP / UMAP PCA-UMAP：
@@ -142,26 +145,9 @@ strategies_raw_archived = [
         "trade_method":     "Z-Score",
         "params":  {**base_params},
     },
-    # ── 舊 #3：DTW Paper (DTW)（座標 artifact；形成配對仍被 Fixed 版借用） ──
-    {
-        "name":             "DTW Paper (DTW)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "DTW_Paper",
-        "db_method":        "DTW (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {**base_params, "method": "dtw"},
-    },
-    # ── 舊 #4：DTW Paper (SSD-DTW-PCA)（座標 artifact；形成配對仍被借用） ───
-    {
-        "name":             "DTW Paper (SSD-DTW-PCA)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_DTW_PCA_Paper",
-        "db_method":        "SSD-DTW-PCA (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {**base_params, "method": "ssd_dtw_pca"},
-    },
+    # ── 舊 #3/#4：DTW Paper (DTW)/(SSD-DTW-PCA) ──────────────────────────────
+    # 2026-07-05 以 formation_only 旗標回歸 strategies/config.py 現役清單
+    # （見 docstring【座標系 artifact】節），自本清單移除。
     # ── 舊 #5–#8：HDBSCAN stats10 特徵系（被 PCA-Loadings 取代） ─────────────
     {
         "name":             "HDBSCAN MultiScale",
