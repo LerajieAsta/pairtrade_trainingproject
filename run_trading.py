@@ -700,6 +700,12 @@ def run_all_trading():
                         group_workers = min(int(_env_w), max_workers)
                     else:
                         try:
+                            # NVML 模式檢查：is_available() 不建立 CUDA context。
+                            # 否則父行程一旦初始化 CUDA，之後 fork 的 worker 全數
+                            # 「Cannot re-initialize CUDA in forked subprocess」——
+                            # 只在第一個群組就是 DRL 時觸發（如 STRATEGIES_SLICE
+                            # 只選 DRL 策略）；完整回測因 Z-Score 群組先 fork 而倖免
+                            os.environ.setdefault("PYTORCH_NVML_BASED_CUDA_CHECK", "1")
                             import torch as _torch
                             if not _torch.cuda.is_available():
                                 group_workers = min(group_workers, 4)
