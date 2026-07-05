@@ -99,8 +99,16 @@
 復活方式：from archive.config_archived_strategies import strategies_raw_archived
           strategies_raw_all += strategies_raw_archived（或挑選單一項目加回）
 
+【非現役交易模組檔案歸位 — 2026-07-05】
+  已封存/孤兒的 5 個交易模組（drl_lstm_trading.py、drl_lstm_v2_trading.py、
+  drl_fqi_trading.py、kalman_trading.py、pure_dtw_trading.py）自
+  strategies/trading/ 移至 archive/trading/，本檔對應條目的 trading_module
+  已同步改為 archive.trading.*，復活時無需搬回檔案即可直接執行
+  （run_trading.py 以 importlib 依字串載入，archive/ 為 namespace package）。
+  strategies/trading/ 現只保留現役的 zscore_trading.py 與 drl_threshold_trading.py。
+
 【從未進入策略清單的孤兒模組 — 2026-07-04 盤點記錄】
-  以下兩個 `strategies/trading/` 檔案不對應任何 `strategies_raw_all` 或本檔
+  以下兩個檔案（現位於 `archive/trading/`）不對應任何 `strategies_raw_all` 或本檔
   `strategies_raw_archived` 條目（現役與封存皆無），亦即從未被 `run_trading.py`
   正式跑過一次完整回測，`results/result.db` 中不存在對應的 METHOD/TRADE_METHOD
   組合。盤點結論：兩者皆為架構演進過程中的中繼草稿，在被賦予正式策略身分
@@ -244,7 +252,7 @@ strategies_raw_archived = [
     {
         "name":             "SSD Rolling DRL",
         "formation_module": "strategies.formation.ssd_rolling",
-        "trading_module":   "strategies.trading.drl_lstm_trading",
+        "trading_module":   "archive.trading.drl_lstm_trading",
         "sub_dir":          "SSD_Rolling_DRL",
         "db_method":        "SSD (Rolling-DRL)",
         "trade_method":     "DRL",
@@ -257,7 +265,7 @@ strategies_raw_archived = [
     {
         "name":             "HDBSCAN UMAP DRL",
         "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.drl_lstm_trading",
+        "trading_module":   "archive.trading.drl_lstm_trading",
         "sub_dir":          "HDBSCAN_UMAP_DRL",
         "db_method":        "HDBSCAN (UMAP-DRL)",
         "trade_method":     "DRL",
@@ -266,7 +274,7 @@ strategies_raw_archived = [
     {
         "name":             "HDBSCAN MultiScale DRL",
         "formation_module": "strategies.formation.HDBSCAN_MultiScale",
-        "trading_module":   "strategies.trading.drl_lstm_trading",
+        "trading_module":   "archive.trading.drl_lstm_trading",
         "sub_dir":          "HDBSCAN_MultiScale_DRL",
         "db_method":        "HDBSCAN (MultiScale-DRL)",
         "trade_method":     "DRL",
@@ -276,7 +284,7 @@ strategies_raw_archived = [
     {
         "name":             "SSD Rolling Kalman",
         "formation_module": "strategies.formation.ssd_rolling",
-        "trading_module":   "strategies.trading.kalman_trading",
+        "trading_module":   "archive.trading.kalman_trading",
         "sub_dir":          "SSD_Rolling_Kalman",
         "db_method":        "SSD (Rolling-Kalman)",
         "trade_method":     "Kalman",
@@ -285,7 +293,7 @@ strategies_raw_archived = [
     {
         "name":             "HDBSCAN UMAP Kalman",
         "formation_module": "strategies.formation.HDBSCAN_UMAP",
-        "trading_module":   "strategies.trading.kalman_trading",
+        "trading_module":   "archive.trading.kalman_trading",
         "sub_dir":          "HDBSCAN_UMAP_Kalman",
         "db_method":        "HDBSCAN (UMAP-Kalman)",
         "trade_method":     "Kalman",
@@ -301,7 +309,7 @@ strategies_raw_archived = [
         "name":             "HDBSCAN PCA-Loadings DRL FQI",
         "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
         "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "trading_module":   "archive.trading.drl_fqi_trading",
         "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI",
         "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI)",
         "trade_method":     "DRL",
@@ -316,7 +324,7 @@ strategies_raw_archived = [
         "name":             "SSD Rolling DRL FQI",
         "formation_module": "strategies.formation.ssd_rolling",
         "formation_strategy_id_base": "SSD Rolling",
-        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "trading_module":   "archive.trading.drl_fqi_trading",
         "sub_dir":          "SSD_Rolling_DRL_FQI",
         "db_method":        "SSD (Rolling-DRL-FQI)",
         "trade_method":     "DRL",
@@ -331,7 +339,7 @@ strategies_raw_archived = [
         "name":             "HDBSCAN PCA-Loadings DRL FQI XL",
         "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
         "formation_strategy_id_base": "HDBSCAN PCA-Loadings",
-        "trading_module":   "strategies.trading.drl_fqi_trading",
+        "trading_module":   "archive.trading.drl_fqi_trading",
         "sub_dir":          "HDBSCAN_PCA_Loadings_DRL_FQI_XL",
         "db_method":        "HDBSCAN (PCA-Loadings-DRL-FQI-XL)",
         "trade_method":     "DRL",

@@ -23,9 +23,7 @@ pairtrade_trainingproject/
 │   │   └── __init__.py
 │   └── trading/
 │       ├── zscore_trading.py      # Z-Score 狀態機（基礎類，三條 Spread 路徑；現役僅走路徑 B）
-│       ├── drl_threshold_trading.py # DRL 門檻選擇式 v4（#5、#6、#8、#10 使用）
-│       ├── drl_lstm_trading.py / drl_fqi_trading.py / kalman_trading.py  # 已封存（v1/v3/Kalman）
-│       └── pure_dtw_trading.py / drl_lstm_v2_trading.py  # 孤兒模組：從未賦予策略身分，無回測數據
+│       └── drl_threshold_trading.py # DRL 門檻選擇式 v4（#5、#6、#8、#10 使用）
 ├── fetch/
 │   ├── SP500_Tiingo.py            # Tiingo API 歷史數據下載
 │   ├── sp500_yf_now.py            # yFinance 當日數據更新
@@ -43,6 +41,12 @@ pairtrade_trainingproject/
 │   └── trading.ipynb              # 交易期模組完整邏輯說明 + DRL-THR 架構 + 績效總比較
 ├── archive/
 │   ├── config_archived_strategies.py  # 已封存策略 config（含孤兒模組盤點記錄）
+│   ├── trading/                   # 非現役交易模組（2026-07-05 自 strategies/trading/ 移入）
+│   │   ├── drl_lstm_trading.py    # DRL v1 online DQN（已封存，架構缺陷已診斷）
+│   │   ├── drl_lstm_v2_trading.py # DRL v2 修復版（孤兒：v1→v3 演進中繼，無回測數據）
+│   │   ├── drl_fqi_trading.py     # DRL v3 FQI（已封存，逐日定位動作空間已證偽）
+│   │   ├── kalman_trading.py      # Kalman 動態 hedge（已封存，與論文命題無關）
+│   │   └── pure_dtw_trading.py    # 交叉回穿波帶構想（孤兒，無回測數據）
 │   ├── 114/ 11505/ 11506/         # 歷史 notebook 存檔
 │   ├── docs/                      # 歷次學術 HTML 簡報
 │   └── generate_formation_trading_notebooks.py  # 舊版 notebook 產生腳本（已由手動維護取代）
@@ -119,6 +123,12 @@ CONV×2、DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Lo
 **孤兒模組（2 個，從未進入策略清單）**：`pure_dtw_trading.py`（早期交叉回穿波帶構想）、
 `drl_lstm_v2_trading.py`（DRL v1→v3 演進鏈中繼修復版）——程式碼保留供架構脈絡參考，
 `result.db` 無對應回測數據，盤點記錄見 `archive/config_archived_strategies.py` docstring末段。
+
+**非現役交易模組已歸位 `archive/trading/`（2026-07-05）**：上述孤兒模組×2 加上已封存的
+`drl_lstm_trading.py`（v1）、`drl_fqi_trading.py`（v3）、`kalman_trading.py` 共 5 檔自
+`strategies/trading/` 移入；封存 config 的 `trading_module` 已同步指向 `archive.trading.*`，
+復活時不需搬回檔案。`strategies/trading/` 現只含現役的 `zscore_trading.py` 與
+`drl_threshold_trading.py`。
 
 ---
 
