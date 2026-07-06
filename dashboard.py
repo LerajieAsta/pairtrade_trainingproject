@@ -564,23 +564,28 @@ def render_deep_dive(target_row):
 
     with col_p1:
         st.markdown("##### 1. Trading Periods")
+        # 單選語意用 selectbox（可鍵入搜尋年份），label 附期間損益
+        _period_labels = {
+            f"{r['Trading Period']}   (${r['Period Return ($)']:+,.0f})": r['Trading Period']
+            for _, r in disp_periods.iterrows()
+        }
+        _sel_label = st.selectbox(
+            "Select a trading period", list(_period_labels.keys()),
+            index=None, placeholder="Choose period…", key="dd_period_sel"
+        )
         styled_periods = disp_periods.style.format({'Period Return ($)': '${:,.2f}'}).map(
             lambda x: ('color: #4ade80; font-weight:bold;' if pd.notna(x) and x > 0
                        else ('color: #f87171; font-weight:bold;' if pd.notna(x) and x < 0 else '')),
             subset=['Period Return ($)']
         )
-        period_event = st.dataframe(
-            styled_periods, width='stretch', height=400, hide_index=True,
-            selection_mode="single-row", on_select="rerun"
-        )
+        st.dataframe(styled_periods, width='stretch', height=352, hide_index=True)
 
     with col_p2:
-        sel_p_row = period_event.selection.rows
-        if not sel_p_row:
+        if not _sel_label:
             st.info("Select a trading period on the left to view pairs.")
             return
 
-        sel_period_str = disp_periods.iloc[sel_p_row[0]]['Trading Period']
+        sel_period_str = _period_labels[_sel_label]
         st.markdown(f"##### 2. Pairs in [{sel_period_str}]")
 
         period_df = raw_target_df[raw_target_df['Trading_Period'] == sel_period_str].copy()
@@ -616,24 +621,33 @@ def render_deep_dive(target_row):
         pair_stats.rename(columns={'Ticker_A': 'Stock A', 'Ticker_B': 'Stock B'}, inplace=True)
         pair_stats = pair_stats.sort_values('Return ($)', ascending=False).reset_index(drop=True)
 
-        styled_pairs = pair_stats.style.format({
-            'Return ($)': '${:,.2f}', 'Win Rate': '{:.1%}', 'Avg Hold (days)': '{:.1f}'
-        }).map(
-            lambda x: ('color: #4ade80; font-weight:bold;' if pd.notna(x) and x > 0
-                       else ('color: #f87171; font-weight:bold;' if pd.notna(x) and x < 0 else '')),
-            subset=['Return ($)']
-        )
-        pair_event = st.dataframe(
-            styled_pairs, width='stretch', height=400, hide_index=True,
-            selection_mode="single-row", on_select="rerun"
-        )
-        sel_pair_row = pair_event.selection.rows
+        # 單選圓圈（radio）選配對，label 附損益與勝率；統計表保留為參考
+        _pair_labels = [
+            f"{r['Stock A']} / {r['Stock B']}   (${r['Return ($)']:+,.0f} · WR {r['Win Rate']:.0%})"
+            for _, r in pair_stats.iterrows()
+        ]
+        _rcol1, _rcol2 = st.columns([1, 1.2])
+        with _rcol1:
+            _sel_pair_label = st.radio(
+                "Select pair", _pair_labels, index=None,
+                key=f"dd_pair_radio_{sel_period_str}"
+            )
+        with _rcol2:
+            styled_pairs = pair_stats.style.format({
+                'Return ($)': '${:,.2f}', 'Win Rate': '{:.1%}', 'Avg Hold (days)': '{:.1f}'
+            }).map(
+                lambda x: ('color: #4ade80; font-weight:bold;' if pd.notna(x) and x > 0
+                           else ('color: #f87171; font-weight:bold;' if pd.notna(x) and x < 0 else '')),
+                subset=['Return ($)']
+            )
+            st.dataframe(styled_pairs, width='stretch', height=400, hide_index=True)
 
-    if not sel_pair_row:
+    if not _sel_pair_label:
         return
 
-    t_a = pair_stats.iloc[sel_pair_row[0]]['Stock A']
-    t_b = pair_stats.iloc[sel_pair_row[0]]['Stock B']
+    _pair_idx = _pair_labels.index(_sel_pair_label)
+    t_a = pair_stats.iloc[_pair_idx]['Stock A']
+    t_b = pair_stats.iloc[_pair_idx]['Stock B']
 
     st.markdown("---")
     st.markdown(f"##### 3. Trade Visualizer: {t_a} vs {t_b}  (Period: {sel_period_str})")
@@ -641,7 +655,8 @@ def render_deep_dive(target_row):
     # 視覺化選項
     viz_col1, viz_col2 = st.columns(2)
     with viz_col1:
-        normalize_prices = st.checkbox("Normalize prices (start = 1.0)", value=False,
+        # 預設開啟：雙 Y 軸自動縮放會製造假象的同步/發散，正規化後才可比
+        normalize_prices = st.checkbox("Normalize prices (start = 1.0)", value=True,
                                        key=f"norm_{t_a}_{t_b}")
     with viz_col2:
         show_zscore = st.checkbox("Show Spread / Z-Score subplot", value=True,
@@ -711,14 +726,22 @@ def render_deep_dive(target_row):
 
         marker_y = y_a  # 進出場標記跟隨 Price_A 軸
 
-        # Z-Score 子圖
+        # Z-Score 子圖：直接使用交易紀錄中的策略真實 Z 值（形成期凍結參數、
+        # 標準化 log 空間）——切勿用交易期原始價格重算，否則進出場標記
+        # 會出現在與 z=±2 門檻對不上的位置
         if show_zscore and n_rows == 2:
-            hr_val = float(pair_full['Hedge_Ratio'].iloc[0]) if 'Hedge_Ratio' in pair_full.columns else 1.0
-            spread = p_a - hr_val * p_b
-            s_mean, s_std = spread.mean(), spread.std()
-            z_vals = (spread - s_mean) / s_std if s_std > 0 else spread * 0
+            if 'ZScore' in pair_full.columns and pair_full['ZScore'].notna().any():
+                z_vals = pair_full['ZScore'].values.astype(float)
+                z_name = "Z-Score (strategy)"
+            else:
+                # 舊資料無 ZScore 欄位時的近似 fallback
+                hr_val = float(pair_full['Hedge_Ratio'].iloc[0]) if 'Hedge_Ratio' in pair_full.columns else 1.0
+                spread = p_a - hr_val * p_b
+                s_std = spread.std()
+                z_vals = (spread - spread.mean()) / s_std if s_std > 0 else spread * 0
+                z_name = "Z-Score (approx.)"
 
-            fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=z_vals, name="Z-Score",
+            fig_p.add_trace(go.Scatter(x=pair_full['Date'], y=z_vals, name=z_name,
                                        line=dict(color='rgba(192,132,252,0.9)', width=1.5)),
                             row=2, col=1)
             for level, color, dash in [(2, 'rgba(248,113,113,0.6)', 'dash'),
@@ -809,6 +832,8 @@ def render_deep_dive(target_row):
                                                line=dict(width=2, color='#fbd38d'))),
                         **marker_kwargs)
 
+    # 跳過週末（消除非交易日造成的水平/斜線段）
+    fig_p.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
     fig_p.update_layout(
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -1139,6 +1164,8 @@ def main():
         ('PORT SL %',   'Port SL %'),
         ('MAX SEC %',   'Max Sec %'),
         ('DYN Z',       'Dyn Z'),
+        ('ENTRY Z',     'Entry Z'),      # T2 網格維度（進場門檻）
+        ('DYN Z NUM',   'Dyn Stop Z'),   # T2 網格維度（發散停損）
     ]
     active_filters = [(col, label) for col, label in FILTER_DEFS
                       if col in master_df.columns and master_df[col].nunique() > 1]
@@ -1160,7 +1187,8 @@ def main():
         row_filters = active_filters[row_start: row_start + COLS_PER_ROW]
         cols_ui = st.columns(len(row_filters))
         for ui_col, (col, label) in zip(cols_ui, row_filters):
-            opts = ["All"] + sorted(master_df[col].dropna().unique(), key=natural_sort_key)
+            opts = ["All"] + sorted(master_df[col].dropna().unique(),
+                                    key=lambda v: natural_sort_key(str(v)))
             sel_vals[col] = ui_col.selectbox(label, opts, key=f"filter_{col}")
 
     # 快捷數值篩選
@@ -1267,7 +1295,7 @@ def main():
     # ══════════════════════════════════════════════
     st.markdown("### Complete Performance Table")
     st.markdown(
-        "Select rows to plot equity curves (max 5). "
+        "**Click a column header to sort.** Select rows to plot equity curves (max 5). "
         "**First selected row** shows trade detail below.",
         unsafe_allow_html=True
     )
@@ -1276,49 +1304,41 @@ def main():
         st.info("No data matches current filters.")
         return
 
-    _sort_options = {
-        "Ann. Return":   ("Ann_Ret_Raw",  False),
-        "Final Equity":  ("Final_Equity", False),
-        "Sharpe":        ("Sharpe_Raw",   False),
-        "Calmar":        ("Calmar_Raw",   False),
-        "Max Drawdown":  ("MDD_Raw",      True),   # ascending = least negative first
-        "Win Rate":      ("Win_Rate",     False),
-        "Profit Factor": ("Profit_Factor",False),
-        "Entries":       ("Entries",      False),
-    }
-    _sort_key = st.selectbox(
-        "Sort table by", list(_sort_options.keys()), index=0, key="perf_sort_col"
-    )
-    _col, _asc = _sort_options[_sort_key]
-
+    # 預設依年化報酬排序；使用者可直接點表頭改排序（欄位皆為數值型別）
     display_df = (filtered_df.copy()
-                  .sort_values(_col, ascending=_asc)
+                  .sort_values('Ann_Ret_Raw', ascending=False)
                   .reset_index(drop=True))
 
     # 排名欄
     display_df.insert(0, '#', range(1, len(display_df) + 1))
 
-    # 指標欄
-    display_df['FINAL EQUITY ($)']  = display_df['Final_Equity']
-    display_df['CUM. RETURN (%)']   = display_df['Cum_Ret_Raw']
-    display_df['ANN. RETURN (%)']   = display_df['Ann_Ret_Raw']
-    display_df['RCC (%)']           = display_df['RCC_Raw']
-    display_df['REC (%)']           = display_df['REC_Raw']
+    # 指標欄（保持 float dtype → 表頭點擊排序為數值排序；百分比欄 ×100）
+    display_df['FINAL EQUITY ($)']  = display_df['Final_Equity'].astype(float)
+    display_df['CUM. RETURN (%)']   = display_df['Cum_Ret_Raw'] * 100
+    display_df['ANN. RETURN (%)']   = display_df['Ann_Ret_Raw'] * 100
+    display_df['RCC (%)']           = display_df['RCC_Raw'] * 100
+    display_df['REC (%)']           = display_df['REC_Raw'] * 100
     sharpe_src = 'Sharpe_Active_Raw' if sharpe_active_mode else 'Sharpe_Raw'
     display_df['SHARPE']            = display_df.get(sharpe_src, display_df.get('Sharpe_Raw', 0))
-    display_df['MAX DRAWDOWN (%)']  = display_df['MDD_Raw']
+    display_df['MAX DRAWDOWN (%)']  = display_df['MDD_Raw'] * 100
     display_df['CALMAR']            = display_df.get('Calmar_Raw', 0.0)
     display_df['PROFIT FACTOR']     = display_df.get('PF_Raw', 0.0)
-    display_df['WIN RATE (%)']      = display_df.get('Win_Rate_Raw', 0.0)
+    display_df['WIN RATE (%)']      = display_df.get('Win_Rate_Raw', 0.0) * 100
     _tt = display_df.get('Total_Trades', pd.Series(0, index=display_df.index))
     display_df['TOTAL TRADES']      = _tt.fillna(0).astype(int)
     display_df['ENTRIES']           = display_df['Entries']
     display_df['EXITS']             = display_df['Exits']
-    display_df['STOP LOSSES']       = display_df['Stop_Losses'].apply(
-        lambda x: f"{int(x):,}" if pd.notna(x) and x >= 0 else "N/A")
+    display_df['STOP LOSSES']       = pd.to_numeric(display_df['Stop_Losses'], errors='coerce').where(
+        lambda s: s >= 0)   # -1（無資料）顯示為空白
     display_df['FORCED CLOSES']     = display_df['Forced_Closes']
     display_df['GROSS PROFIT ($)']  = display_df['Gross_Profit']
     display_df['GROSS LOSS ($)']    = display_df['Gross_Loss']
+
+    # 文獻口徑欄（GGR fully-invested / rf 計息超額；舊資料列可能為 NULL）
+    _nan_f = pd.Series(np.nan, index=display_df.index)
+    display_df['UTILIZATION (%)']       = pd.to_numeric(display_df.get('Avg_Utilization', _nan_f), errors='coerce') * 100
+    display_df['ANN. RET EMPLOYED (%)'] = pd.to_numeric(display_df.get('Ann_Ret_Employed', _nan_f), errors='coerce') * 100
+    display_df['EXCESS RET RF (%)']     = pd.to_numeric(display_df.get('Excess_Ret_RF', _nan_f), errors='coerce') * 100
 
     _nan_s = pd.Series(np.nan, index=display_df.index)
     display_df['T-STAT']    = display_df.get('T_Stat',    _nan_s)
@@ -1339,59 +1359,27 @@ def main():
     if show_detailed_metrics:
         metrics_cols = [
             'FINAL EQUITY ($)', 'CUM. RETURN (%)', 'ANN. RETURN (%)',
-            'RCC (%)', 'REC (%)', 'SHARPE', 'MAX DRAWDOWN (%)',
+            'RCC (%)', 'REC (%)',
+            'UTILIZATION (%)', 'ANN. RET EMPLOYED (%)', 'EXCESS RET RF (%)',
+            'SHARPE', 'MAX DRAWDOWN (%)',
             'CALMAR', 'PROFIT FACTOR', 'WIN RATE (%)', 'TOTAL TRADES',
             'T-STAT', 'T-PVAL', 'NW T-STAT', 'NW T-PVAL',
             'ENTRIES', 'EXITS', 'STOP LOSSES', 'FORCED CLOSES',
             'GROSS PROFIT ($)', 'GROSS LOSS ($)'
         ]
     else:
+        # 首屏精簡集合：t-test 統計移入 Detailed Metrics
         metrics_cols = [
             'FINAL EQUITY ($)', 'ANN. RETURN (%)', 'SHARPE', 'MAX DRAWDOWN (%)',
             'CALMAR', 'PROFIT FACTOR', 'WIN RATE (%)', 'TOTAL TRADES',
-            'T-STAT', 'T-PVAL', 'NW T-STAT', 'NW T-PVAL'
+            'EXCESS RET RF (%)'
         ]
 
     cols = config_cols + metrics_cols
 
-    # ── 格式化 ──
-    def fmt_pval(v):
-        try:
-            return 'N/A' if np.isnan(float(v)) else f'{float(v):.4f}'
-        except Exception:
-            return 'N/A'
-
-    def fmt_tstat(v):
-        try:
-            return 'N/A' if np.isnan(float(v)) else f'{float(v):.3f}'
-        except Exception:
-            return 'N/A'
-
-    all_formats = {
-        'FINAL EQUITY ($)': '${:,.2f}',
-        'CUM. RETURN (%)':  '{:.2%}',
-        'ANN. RETURN (%)':  '{:.2%}',
-        'RCC (%)':          '{:.2%}',
-        'REC (%)':          '{:.2%}',
-        'SHARPE':           '{:.2f}',
-        'MAX DRAWDOWN (%)': '{:.2%}',
-        'CALMAR':           '{:.2f}',
-        'PROFIT FACTOR':    '{:.2f}',
-        'WIN RATE (%)':     '{:.1%}',
-        'TOTAL TRADES':     '{:,.0f}',
-        'T-STAT':    fmt_tstat,
-        'T-PVAL':    fmt_pval,
-        'NW T-STAT': fmt_tstat,
-        'NW T-PVAL': fmt_pval,
-        'ENTRIES':          '{:,.0f}',
-        'EXITS':            '{:,.0f}',
-        'FORCED CLOSES':    '{:,.0f}',
-        'GROSS PROFIT ($)': '${:,.2f}',
-        'GROSS LOSS ($)':   '${:,.2f}',
-    }
-    active_formats = {k: v for k, v in all_formats.items() if k in cols}
-
-    df_styled = display_df[cols].style.format(active_formats)
+    # 數值格式全部交給 column_config（NumberColumn printf），Styler 只負責著色，
+    # 底層保持 float dtype → 表頭點擊排序為正確的數值排序
+    df_styled = display_df[cols].style
 
     def color_pos_neg(val):
         try:
@@ -1414,9 +1402,9 @@ def main():
 
     def color_winrate(val):
         try:
-            v = float(val)
-            if v >= 0.5: return 'color: #4ade80; font-weight: bold;'
-            if v > 0:    return 'color: #f87171; font-weight: bold;'
+            v = float(val)   # 已為 ×100 百分比值
+            if v >= 50: return 'color: #4ade80; font-weight: bold;'
+            if v > 0:   return 'color: #f87171; font-weight: bold;'
         except Exception:
             pass
         return ''
@@ -1433,6 +1421,7 @@ def main():
     if 'FINAL EQUITY ($)' in cols:
         df_styled = df_styled.map(color_equity, subset=['FINAL EQUITY ($)'])
     for c in ['CUM. RETURN (%)', 'ANN. RETURN (%)', 'RCC (%)', 'REC (%)',
+              'UTILIZATION (%)', 'ANN. RET EMPLOYED (%)', 'EXCESS RET RF (%)',
               'SHARPE', 'MAX DRAWDOWN (%)', 'CALMAR', 'PROFIT FACTOR',
               'GROSS PROFIT ($)', 'GROSS LOSS ($)', 'T-STAT', 'NW T-STAT']:
         if c in cols:
@@ -1456,27 +1445,33 @@ def main():
         'PORT SL %':        st.column_config.TextColumn("Port SL", width="small"),
         'MAX SEC %':        st.column_config.TextColumn("Max Sec", width="small"),
         'DYN Z':            st.column_config.TextColumn("Dyn Z", width="small"),
-        'FINAL EQUITY ($)': st.column_config.TextColumn("Final Equity", width="small"),
-        'CUM. RETURN (%)':  st.column_config.TextColumn("Cum. Ret", width="small"),
-        'ANN. RETURN (%)':  st.column_config.TextColumn("Ann. Ret", width="small"),
-        'RCC (%)':          st.column_config.TextColumn("RCC", width="small"),
-        'REC (%)':          st.column_config.TextColumn("REC", width="small"),
-        'SHARPE':           st.column_config.TextColumn("Sharpe", width="small"),
-        'MAX DRAWDOWN (%)': st.column_config.TextColumn("Max DD", width="small"),
-        'CALMAR':           st.column_config.TextColumn("Calmar", width="small"),
-        'PROFIT FACTOR':    st.column_config.TextColumn("Profit Factor", width="small"),
-        'WIN RATE (%)':     st.column_config.TextColumn("Win Rate", width="small"),
-        'TOTAL TRADES':     st.column_config.TextColumn("Trades", width="small"),
-        'T-STAT':           st.column_config.TextColumn("T-Stat", width="small"),
-        'T-PVAL':           st.column_config.TextColumn("p-val", width="small"),
-        'NW T-STAT':        st.column_config.TextColumn("NW T-Stat", width="small"),
-        'NW T-PVAL':        st.column_config.TextColumn("NW p-val", width="small"),
-        'ENTRIES':          st.column_config.TextColumn("Entries", width="small"),
-        'EXITS':            st.column_config.TextColumn("Exits", width="small"),
-        'STOP LOSSES':      st.column_config.TextColumn("Stop Loss #", width="small"),
-        'FORCED CLOSES':    st.column_config.TextColumn("Forced Close", width="small"),
-        'GROSS PROFIT ($)': st.column_config.TextColumn("Gross Profit", width="small"),
-        'GROSS LOSS ($)':   st.column_config.TextColumn("Gross Loss", width="small"),
+        'FINAL EQUITY ($)': st.column_config.NumberColumn("Final Equity", width="small", format="$%.2f"),
+        'CUM. RETURN (%)':  st.column_config.NumberColumn("Cum. Ret", width="small", format="%.2f%%"),
+        'ANN. RETURN (%)':  st.column_config.NumberColumn("Ann. Ret", width="small", format="%.2f%%"),
+        'RCC (%)':          st.column_config.NumberColumn("RCC", width="small", format="%.2f%%"),
+        'REC (%)':          st.column_config.NumberColumn("REC", width="small", format="%.2f%%"),
+        'UTILIZATION (%)':       st.column_config.NumberColumn("Utilization", width="small", format="%.1f%%",
+                                                               help="平均資金利用率（持倉配對/最大槽位）"),
+        'ANN. RET EMPLOYED (%)': st.column_config.NumberColumn("Ann.Ret (Employed)", width="small", format="%.2f%%",
+                                                               help="動用資本年化（GGR fully-invested 口徑）"),
+        'EXCESS RET RF (%)':     st.column_config.NumberColumn("Excess vs RF", width="small", format="%.2f%%",
+                                                               help="閒置現金計 rf 利息後的超額年化"),
+        'SHARPE':           st.column_config.NumberColumn("Sharpe", width="small", format="%.2f"),
+        'MAX DRAWDOWN (%)': st.column_config.NumberColumn("Max DD", width="small", format="%.2f%%"),
+        'CALMAR':           st.column_config.NumberColumn("Calmar", width="small", format="%.2f"),
+        'PROFIT FACTOR':    st.column_config.NumberColumn("Profit Factor", width="small", format="%.2f"),
+        'WIN RATE (%)':     st.column_config.NumberColumn("Win Rate", width="small", format="%.1f%%"),
+        'TOTAL TRADES':     st.column_config.NumberColumn("Trades", width="small", format="%d"),
+        'T-STAT':           st.column_config.NumberColumn("T-Stat", width="small", format="%.3f"),
+        'T-PVAL':           st.column_config.NumberColumn("p-val", width="small", format="%.4f"),
+        'NW T-STAT':        st.column_config.NumberColumn("NW T-Stat", width="small", format="%.3f"),
+        'NW T-PVAL':        st.column_config.NumberColumn("NW p-val", width="small", format="%.4f"),
+        'ENTRIES':          st.column_config.NumberColumn("Entries", width="small", format="%d"),
+        'EXITS':            st.column_config.NumberColumn("Exits", width="small", format="%d"),
+        'STOP LOSSES':      st.column_config.NumberColumn("Stop Loss #", width="small", format="%d"),
+        'FORCED CLOSES':    st.column_config.NumberColumn("Forced Close", width="small", format="%d"),
+        'GROSS PROFIT ($)': st.column_config.NumberColumn("Gross Profit", width="small", format="$%.2f"),
+        'GROSS LOSS ($)':   st.column_config.NumberColumn("Gross Loss", width="small", format="$%.2f"),
     }
     active_config = {k: v for k, v in column_config.items() if k in cols}
 
@@ -1519,35 +1514,32 @@ def main():
 
         y_label = "Return (%)" if equity_pct_mode else "Account Equity ($)"
 
+        # Drawdown 一律以紅色系呈現（水下深度視覺）；多策略以紅橙色階區分
+        dd_colors = ['#ef4444', '#f97316', '#f43f5e', '#fb923c', '#dc2626']
+        single_sel = len(plot_rows) == 1
+
         for i, row_idx in enumerate(plot_rows):
-            path = display_df.iloc[row_idx]['_path']
-            label = display_df.iloc[row_idx]['METHOD']
-            rank  = display_df.iloc[row_idx]['#']
-            desc  = f"#{rank} {label}"
+            row_sel = display_df.iloc[row_idx]
+            path = row_sel['_path']
+            rank = row_sel['#']
+            # 圖例用完整配置描述（同 METHOD 不同配置可區分）
+            desc = f"#{rank} {make_desc(row_sel)}"
             raw_df = load_data(path)
             if raw_df.empty or 'Daily_Delta' not in raw_df.columns:
                 continue
 
             port = raw_df.groupby('Date')['Daily_Delta'].sum().reset_index()
             port = port.sort_values('Date').reset_index(drop=True)
-            port['Equity'] = INITIAL_CAPITAL + port['Daily_Delta'].cumsum()
 
-            # 年份範圍篩選：重設基準至 INITIAL_CAPITAL，方便同期比較
+            # 年份範圍篩選：re-base 至 INITIAL_CAPITAL（僅累計窗內損益）
             if yr_filter_active:
                 port = port[
                     (port['Date'].dt.year >= yr_start) &
                     (port['Date'].dt.year <= yr_end)
                 ].copy().reset_index(drop=True)
-                if not port.empty:
-                    port['Equity'] = INITIAL_CAPITAL + (
-                        port['Daily_Delta'].cumsum()
-                        - port['Daily_Delta'].cumsum().iloc[0]
-                        + port['Equity'].iloc[0]
-                        - INITIAL_CAPITAL
-                    )
-
             if port.empty:
                 continue
+            port['Equity'] = INITIAL_CAPITAL + port['Daily_Delta'].cumsum()
 
             if equity_pct_mode:
                 y_vals = (port['Equity'] - INITIAL_CAPITAL) / INITIAL_CAPITAL
@@ -1564,7 +1556,9 @@ def main():
                 dd = (port['Equity'] - roll_max) / roll_max
                 fig_eq.add_trace(go.Scatter(
                     x=port['Date'], y=dd, mode='lines', name=f"{desc} DD",
-                    line=dict(width=1.5, color=colors[i % len(colors)], dash='dot'),
+                    line=dict(width=1.5, color=dd_colors[i % len(dd_colors)]),
+                    fill='tozeroy' if single_sel else None,
+                    fillcolor='rgba(239,68,68,0.22)' if single_sel else None,
                     showlegend=False
                 ), row=2, col=1)
 
@@ -1585,6 +1579,8 @@ def main():
         fig_eq.update_yaxes(title_text=y_label, row=1)
         if show_drawdown:
             fig_eq.update_yaxes(title_text="Drawdown", tickformat=".1%", row=2)
+        # 跳過週末（消除非交易日造成的水平/斜線段）
+        fig_eq.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
         fig_eq.update_layout(
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
