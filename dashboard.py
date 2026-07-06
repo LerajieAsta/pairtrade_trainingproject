@@ -611,6 +611,30 @@ def make_desc(row):
             f"{zwin_part}{psl_part}{dsz_part}")
 
 
+def _plotly_box_range(state):
+    """自 st.plotly_chart 的 session_state 事件取出框選的 x 日期範圍。"""
+    try:
+        sel = None
+        if state is not None:
+            sel = state.get("selection") if hasattr(state, "get") else getattr(state, "selection", None)
+        if not sel:
+            return None
+        box = sel.get("box") if hasattr(sel, "get") else getattr(sel, "box", None)
+        if box:
+            b0 = box[0]
+            xr = b0.get("x") if hasattr(b0, "get") else getattr(b0, "x", None)
+            if xr is not None and len(xr) == 2:
+                return (pd.to_datetime(min(xr)), pd.to_datetime(max(xr)))
+        pts = sel.get("points") if hasattr(sel, "get") else getattr(sel, "points", None)
+        if pts:
+            xs = pd.to_datetime([p.get("x") for p in pts if p.get("x") is not None])
+            if len(xs) > 1:
+                return (xs.min(), xs.max())
+    except Exception:
+        return None
+    return None
+
+
 @st.fragment
 def render_deep_dive(target_row, date_range=None):
     st.markdown("---")
@@ -1601,6 +1625,11 @@ def main():
         plot_rows = selected_rows[:5]
         colors = ['#4ade80', '#60a5fa', '#fbd38d', '#f87171', '#c084fc']
 
+        # 上一次框選的日期範圍（rerun 時自 session_state 取得）→ 圖表放大 + Deep Dive 限定
+        box_range = _plotly_box_range(st.session_state.get("eq_chart_sel"))
+        _zoom_y = []      # 收集框選視窗內的 equity y 值極值
+        _zoom_dd_min = 0.0
+
         n_rows_eq = 2 if show_drawdown else 1
         row_h = [0.65, 0.35] if show_drawdown else [1.0]
         fig_eq = make_subplots(
@@ -1660,6 +1689,15 @@ def main():
                     showlegend=False
                 ), row=2, col=1)
 
+            # 框選視窗內的 y 極值（供放大後的 y 軸自動貼合）
+            if box_range is not None:
+                _m = (port['Date'] >= box_range[0]) & (port['Date'] <= box_range[1])
+                if _m.any():
+                    _yw = y_vals[_m]
+                    _zoom_y += [float(np.nanmin(_yw)), float(np.nanmax(_yw))]
+                    if show_drawdown:
+                        _zoom_dd_min = min(_zoom_dd_min, float(dd[_m].min()))
+
         # 基準線
         if equity_pct_mode:
             fig_eq.add_hline(y=0, line=dict(color='rgba(128,128,128,0.5)', dash='dash', width=1),
@@ -1679,34 +1717,33 @@ def main():
             fig_eq.update_yaxes(title_text="Drawdown", tickformat=".1%", row=2)
         # 跳過週末（消除非交易日造成的水平/斜線段）
         fig_eq.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+
+        # 框選區間 → 圖表放大到該區間（x 軸鎖定、y 軸貼合視窗內極值）
+        if box_range is not None:
+            fig_eq.update_xaxes(range=[box_range[0], box_range[1]])
+            if _zoom_y:
+                _pad = (max(_zoom_y) - min(_zoom_y)) * 0.05 or (abs(max(_zoom_y)) * 0.02 + 1e-9)
+                fig_eq.update_yaxes(range=[min(_zoom_y) - _pad, max(_zoom_y) + _pad], row=1)
+            if show_drawdown:
+                fig_eq.update_yaxes(range=[_zoom_dd_min * 1.1 - 1e-4, 0.002], row=2)
+
         fig_eq.update_layout(
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=0, r=0, t=40, b=0),
             height=480 if show_drawdown else 320
         )
-        st.caption("🔍 使用圖表工具列的 **Box Select** 框選日期區間，下方 Deep Dive 將只分析該區間（雙擊圖表清除框選）。")
-        eq_event = st.plotly_chart(fig_eq, width='stretch', key="eq_chart_sel",
-                                   on_select="rerun", selection_mode=("box",))
+        if box_range is not None:
+            st.caption(f"🔍 已放大至框選區間 **{box_range[0]:%Y-%m-%d} ~ {box_range[1]:%Y-%m-%d}**，"
+                       f"下方 Deep Dive 同步限定此區間 —— **雙擊圖表** 還原全景。")
+        else:
+            st.caption("🔍 使用圖表工具列的 **Box Select** 框選日期區間：走勢圖將放大至該區間，"
+                       "下方 Deep Dive 亦只分析該區間（雙擊圖表還原）。")
+        st.plotly_chart(fig_eq, width='stretch', key="eq_chart_sel",
+                        on_select="rerun", selection_mode=("box",))
 
-        # 框選區間 → Deep Dive 日期範圍（未框選時退回年份篩選範圍）
-        dd_range = None
-        try:
-            _sel = getattr(eq_event, "selection", None)
-            _box = (_sel.get("box") if hasattr(_sel, "get") else getattr(_sel, "box", None)) if _sel else None
-            if _box:
-                _b0 = _box[0]
-                _xr = _b0.get("x") if hasattr(_b0, "get") else getattr(_b0, "x", None)
-                if _xr is not None and len(_xr) == 2:
-                    dd_range = (pd.to_datetime(min(_xr)), pd.to_datetime(max(_xr)))
-            if dd_range is None:
-                _pts = (_sel.get("points") if hasattr(_sel, "get") else getattr(_sel, "points", None)) if _sel else None
-                if _pts:
-                    _xs = pd.to_datetime([p.get("x") for p in _pts if p.get("x") is not None])
-                    if len(_xs) > 1:
-                        dd_range = (_xs.min(), _xs.max())
-        except Exception:
-            dd_range = None
+        # Deep Dive 日期範圍：框選優先，未框選時退回年份篩選範圍
+        dd_range = box_range
         if dd_range is None and yr_filter_active:
             dd_range = (pd.Timestamp(f"{yr_start}-01-01"), pd.Timestamp(f"{yr_end}-12-31"))
 
