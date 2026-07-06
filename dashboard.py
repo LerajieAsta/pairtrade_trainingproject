@@ -564,28 +564,23 @@ def render_deep_dive(target_row):
 
     with col_p1:
         st.markdown("##### 1. Trading Periods")
-        # 單選語意用 selectbox（可鍵入搜尋年份），label 附期間損益
-        _period_labels = {
-            f"{r['Trading Period']}   (${r['Period Return ($)']:+,.0f})": r['Trading Period']
-            for _, r in disp_periods.iterrows()
-        }
-        _sel_label = st.selectbox(
-            "Select a trading period", list(_period_labels.keys()),
-            index=None, placeholder="Choose period…", key="dd_period_sel"
-        )
         styled_periods = disp_periods.style.format({'Period Return ($)': '${:,.2f}'}).map(
             lambda x: ('color: #4ade80; font-weight:bold;' if pd.notna(x) and x > 0
                        else ('color: #f87171; font-weight:bold;' if pd.notna(x) and x < 0 else '')),
             subset=['Period Return ($)']
         )
-        st.dataframe(styled_periods, width='stretch', height=352, hide_index=True)
+        period_event = st.dataframe(
+            styled_periods, width='stretch', height=400, hide_index=True,
+            selection_mode="single-row", on_select="rerun"
+        )
 
     with col_p2:
-        if not _sel_label:
+        sel_p_row = period_event.selection.rows
+        if not sel_p_row:
             st.info("Select a trading period on the left to view pairs.")
             return
 
-        sel_period_str = _period_labels[_sel_label]
+        sel_period_str = disp_periods.iloc[sel_p_row[0]]['Trading Period']
         st.markdown(f"##### 2. Pairs in [{sel_period_str}]")
 
         period_df = raw_target_df[raw_target_df['Trading_Period'] == sel_period_str].copy()

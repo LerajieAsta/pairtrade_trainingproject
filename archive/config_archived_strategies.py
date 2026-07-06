@@ -135,15 +135,57 @@ from strategies.config import (
 )
 
 strategies_raw_archived = [
-    # ── 舊 #1：SSD Basic（被 SSD Rolling 取代的簡化基準） ─────────────────────
+    # ── SSD Basic：2026-07-06 已自本清單拉回 strategies/config.py 現役
+    #    （一切策略的基礎原型，Gatev 2006 累積回報指數 + 固定 β=1） ─────────
+    # ── HDBSCAN Cluster 系列精簡（2026-07-06）：僅保留 PCA5 Z-Score 版於現役
+    #    作為分組消融對照組，以下三條目封存（歷史結果在 results/result.db）──
     {
-        "name":             "SSD Basic",
-        "formation_module": "strategies.formation.ssd_basic",
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
         "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_Basic",
-        "db_method":        "SSD (Basic)",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA)",
         "trade_method":     "Z-Score",
-        "params":  {**base_params},
+        "params": {
+            **base_params,
+            "method":               "ssd_dtw_pca",
+            "pca_n_components":     15,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":  2,
+            "umap_random_state":    42,
+            "adf_pvalue_threshold": 0.01,
+            "ignore_ols_alpha":     True,
+        },
+    },
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA DRL THR",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "formation_strategy_id_base": "HDBSCAN Cluster SSD-DTW-PCA",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_DRL_THR",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "formation_strategy_id_base": "HDBSCAN Cluster SSD-DTW-PCA PCA5",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5_DRL_THR",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-PCA5-DRL-THR)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
     },
     # ── 舊 #3/#4：DTW Paper (DTW)/(SSD-DTW-PCA) ──────────────────────────────
     # 2026-07-05 以 formation_only 旗標回歸 strategies/config.py 現役清單

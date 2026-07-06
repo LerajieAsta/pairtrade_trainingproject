@@ -1,0 +1,29 @@
+/*-- scss:defaults --*/
+// 大字型（投影授課可讀性）
+$presentation-font-size-root: 34px;
+$presentation-h1-font-size: 1.6em;
+$presentation-h2-font-size: 1.25em;
+$presentation-h3-font-size: 1.05em;
+$font-family-sans-serif: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+$code-block-font-size: 0.62em;
+
+/*-- scss:rules --*/
+.reveal table {
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+.reveal .smaller table { font-size: 0.75em; }
+.reveal .slide-number { font-size: 0.5em; }
+
+// 圖片：置中 + 可縮放提示游標（Alt+點擊觸發 reveal zoom）
+.reveal img {
+  display: block;
+  margin: 0.3em auto;
+  max-height: 68vh;
+  cursor: zoom-in;
+}
+
+// KaTeX 公式稍放大
+.reveal .katex { font-size: 1.06em; }
+
+.reveal .callout { font-size: 0.75em; }

@@ -36,25 +36,27 @@ pairtrade_trainingproject/
 │   └── audit_report.csv           # 交易期資料品質審計報告
 ├── formation_data/
 │   └── formation_pairs_sp500_Tiingo.db  # 形成期主合併資料庫（LFS 追蹤）
-├── notebooks/
-│   ├── formation.ipynb            # 現役 10 策略形成期完整邏輯說明 + 論文引述 + 封存摘要
-│   └── trading.ipynb              # 交易期模組完整邏輯說明 + DRL-THR 架構 + 績效總比較
-├── archive/
+├── notebooks/                     # 策略筆記本（一策略一本，Quarto revealjs 投影片；見 notebooks/README.md）
+│   ├── formation/                 # 形成期策略 ×6：ssd_rolling ~ agglomerative_fundamentals（以策略方法命名）
+│   ├── trading/                   # 交易期策略 ×2：zscore_trading、drl_threshold_trading
+│   ├── comparison.ipynb           # 現役 10 策略績效總比較（讀 results/result.db 動態產生）
+│   ├── _quarto.yml / slides.scss  # revealjs 投影片設定（大字型、Alt+點擊縮放、KaTeX）
+├── docs/                          # GitHub Pages 輸出
+│   ├── index.html                 # 入口頁（連結全部投影片）
+│   └── slides/                    # quarto render 產出的 9 份投影片
+├── archive/                       # 歷史存檔（分類索引見 archive/README.md）
 │   ├── config_archived_strategies.py  # 已封存策略 config（含孤兒模組盤點記錄）
-│   ├── trading/                   # 非現役交易模組（2026-07-05 自 strategies/trading/ 移入）
-│   │   ├── drl_lstm_trading.py    # DRL v1 online DQN（已封存，架構缺陷已診斷）
-│   │   ├── drl_lstm_v2_trading.py # DRL v2 修復版（孤兒：v1→v3 演進中繼，無回測數據）
-│   │   ├── drl_fqi_trading.py     # DRL v3 FQI（已封存，逐日定位動作空間已證偽）
-│   │   ├── kalman_trading.py      # Kalman 動態 hedge（已封存，與論文命題無關）
-│   │   └── pure_dtw_trading.py    # 交叉回穿波帶構想（孤兒，無回測數據）
-│   ├── 114/ 11505/ 11506/         # 歷史 notebook 存檔
-│   ├── docs/                      # 歷次學術 HTML 簡報
-│   └── generate_formation_trading_notebooks.py  # 舊版 notebook 產生腳本（已由手動維護取代）
+│   ├── trading/                   # 非現役交易模組（drl_lstm×2、drl_fqi、kalman、pure_dtw）
+│   ├── notebooks/                 # 舊版筆記本（114/11505/11506/11507 依時期）
+│   ├── formation/                 # 已封存形成期模組（11506 CrossSector 系列等）
+│   ├── scripts/                   # 一次性工具腳本
+│   ├── docs/                      # 歷次學術 HTML 簡報（含舊版 formation/trading.html）
+│   └── h200/                      # H200 GPU 伺服器相關（2026-07-06 起不再使用）
 ├── dashboard.py                   # Streamlit 績效比對儀表板
 ├── run_formation.py               # 形成期主程式
 ├── run_trading.py                 # 交易期主程式
 ├── run.bat                        # 一鍵啟動 Dashboard
-├── setup.bat / setup.sh           # 環境初始化腳本
+├── setup.bat                      # 環境初始化腳本（Windows；setup.sh 已封存至 archive/h200/）
 ├── requirements.txt               # Python 套件清單
 └── pyproject.toml                 # 套件配置（Editable Install）
 ```
@@ -105,12 +107,12 @@ STRATEGIES_SLICE="4:6" python run_trading.py   # 只跑 #5 SSD Rolling DRL THR�
 | # | 策略名稱 | 形成期 | 交易期 | 角色 |
 | :---: | :--- | :--- | :--- | :--- |
 | 1 | SSD Rolling | `ssd_rolling.py` | `zscore_trading.py` | SSD 家族基準 |
-| 2 | DTW Paper Fixed (DTW) | 借用 DTW Paper 原版配對 | `zscore_trading.py`（路徑 B） | 誠實 DTW 基準 |
-| 3 | SSD-DTW-PCA Paper Fixed | 借用配對 | `zscore_trading.py`（路徑 B） | 最佳誠實基準：Top3 Sharpe 0.56 |
+| 2 | DTW Paper Fixed (DTW) | 借用 DTW Paper 原版配對 | `zscore_trading.py`（路徑 B） | DTW 基準 |
+| 3 | SSD-DTW-PCA Paper Fixed | 借用配對 | `zscore_trading.py`（路徑 B） | 全組最佳 Sharpe 基準：Top3 0.56 |
 | 4 | HDBSCAN Cluster SSD-DTW-PCA | `HDBSCAN_Cluster_SSD_DTW.py` | `zscore_trading.py` | 分組消融（vs #3，15 維 PCA） |
 | 5 | SSD Rolling DRL THR | 借用 #1 配對 | `drl_threshold_trading.py` | DRL 疊加對照組 |
 | 6 | HDBSCAN Cluster SSD-DTW-PCA DRL THR | 借用 #4 配對 | `drl_threshold_trading.py` | DRL 疊加實驗組 |
-| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | `zscore_trading.py` | 維度詛咒修復版（vs #4） |
+| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | `zscore_trading.py` | 5 維 PCA 聚類穩定性修復版（vs #4） |
 | 8 | HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR | 借用 #7 配對 | `drl_threshold_trading.py` | 全組 DRL 疊加最高 Sharpe 0.46 |
 | 9 | Agglomerative Fundamentals | `agglomerative_fundamentals.py` | `zscore_trading.py` | 分組消融第三支：價格 PCA⊕基本面 |
 | 10 | Agglomerative Fundamentals DRL THR | 借用 #9 配對 | `drl_threshold_trading.py` | 全組最佳年化報酬 2.89% |
@@ -173,7 +175,7 @@ HDBSCAN_PCA_Loadings._build_feature_matrix()  ──┬──→ HDBSCAN_Cluster
 ```
 
 只替換「配對候選怎麼分組」這一環節，其餘（群內共整合篩選、距離排序、spread 定義、交易端）完全相同——
-確保每個新策略都是乾淨的單變因消融實驗。詳細公式與診斷數據見 `notebooks/formation.ipynb`。
+確保每個新策略都是乾淨的單變因消融實驗。詳細公式與診斷數據見 `notebooks/formation/`（一策略一本）。
 
 ---
 
@@ -209,7 +211,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 6. **VOL ADJ**：波動率自適應（`use_vol_adjust`，動態放大 σ）
 
 兩個交易模組（`zscore_trading.py`、`drl_threshold_trading.py`）共用完全相同的部位配置公式與六大風控設計原則，
-確保「Z-Score 基準 vs DRL 疊加」比較時唯一變因是交易決策邏輯。詳見 `notebooks/trading.ipynb`。
+確保「Z-Score 基準 vs DRL 疊加」比較時唯一變因是交易決策邏輯。詳見 `notebooks/trading/drl_threshold_trading.ipynb`。
 
 ---
 
@@ -248,7 +250,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
    `formation_strategy_id_base` 指向該策略名稱
 5. 依序執行 `run_formation.py` → `run_trading.py`
 6. 用 `results/result.db` 的 `strategy_summaries` 與現有基準（SSD Rolling / SSD-DTW-PCA Paper Fixed）
-   做誠實對照；驗證無效則移入 `archive/config_archived_strategies.py` 並記錄診斷結論（不刪除歷史數據）
+   做同條件對照；驗證無效則移入 `archive/config_archived_strategies.py` 並記錄診斷結論（不刪除歷史數據）
 
 ---
 
@@ -273,5 +275,6 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
   （~130 bytes），遇到 `file is not a database` 或 run_trading「No periods found」即為此因。
   重建方式：`fetch/fundamentals_yfinance.py`（基本面）＋ `run_formation.py`（形成期配對，
   formation-only 條目會一併產生 DTW 原版配對）。額度恢復前 **不要 commit/push .db 檔案**。
-- `results/` 整個目錄被忽略：回測結果只存在本機，`notebooks/trading.ipynb` 的績效比較表為手動同步的
-  數據快照，重大回測更新後應一併更新該章節
+- `results/` 整個目錄被忽略：回測結果只存在本機。績效比較改由 `notebooks/comparison.ipynb`
+  動態讀取 result.db 產生——重大回測更新後重新執行該筆記本並 `quarto render`，
+  `docs/slides/comparison.html` 即同步最新數據

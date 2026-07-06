@@ -1,36 +1,33 @@
 project:
   type: default
-  output-dir: ../docs
+  output-dir: ../docs/slides
   render:
-    - formation.ipynb
-    - trading.ipynb
-    - formation_slides.qmd
-    - trading_slides.qmd
+    - formation/*.ipynb
+    - trading/*.ipynb
+    - comparison.ipynb
+
+lang: zh-TW
 
 format:
-  html:
-    theme: [darkly, custom.scss]
-    toc: true
-    toc-depth: 2
-    toc-location: left
-    toc-title: "目錄"
-    smooth-scroll: true
-    code-fold: show
-    code-summary: "查看程式碼"
-    code-copy: true
+  revealjs:
+    theme: [default, slides.scss]
+    width: 1400
+    height: 900
+    margin: 0.06
+    center: false
+    slide-number: c/t
+    hash: true
+    transition: fade
+    slide-level: 2
+    scrollable: true
+    html-math-method: katex
     code-line-numbers: false
     highlight-style: dracula
-    html-math-method: katex
-    grid:
-      body-width: 860px
-      sidebar-width: 270px
-    self-contained: true
-    anchor-sections: true
-    citations-hover: false
-    footnotes-hover: false
+    preview-links: true
     link-external-newwindow: true
+    embed-resources: true
 
 execute:
   enabled: false
-  echo: true
+  echo: false
   warning: false

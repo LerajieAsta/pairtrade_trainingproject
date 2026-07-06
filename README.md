@@ -9,12 +9,12 @@
 | # | 策略 | 形成期模組 | 交易期 | 角色 |
 | :---: | :--- | :--- | :--- | :--- |
 | 1 | SSD Rolling | `ssd_rolling.py` | Z-Score | SSD 家族基準 |
-| 2 | DTW Paper Fixed (DTW) | 借用配對 | Z-Score | 誠實 DTW 基準 |
-| 3 | SSD-DTW-PCA Paper Fixed | 借用配對 | Z-Score | 全組最佳誠實基準（Sharpe 0.56） |
+| 2 | DTW Paper Fixed (DTW) | 借用配對 | Z-Score | DTW 基準 |
+| 3 | SSD-DTW-PCA Paper Fixed | 借用配對 | Z-Score | 全組最佳 Sharpe 基準（0.56） |
 | 4 | HDBSCAN Cluster SSD-DTW-PCA | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | 分組消融：HDBSCAN vs GICS |
 | 5 | SSD Rolling DRL THR | 借用 #1 配對 | DRL | DRL 疊加對照組 |
 | 6 | HDBSCAN Cluster SSD-DTW-PCA DRL THR | 借用 #4 配對 | DRL | DRL 疊加實驗組 |
-| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | Z-Score | 維度詛咒修復版 |
+| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | Z-Score | 5 維 PCA 聚類穩定性修復版 |
 | 8 | HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR | 借用 #7 配對 | DRL | 全組 DRL 疊加最高 Sharpe（0.46） |
 | 9 | Agglomerative Fundamentals | `agglomerative_fundamentals.py` | Z-Score | 分組消融：價格 PCA ⊕ 公司基本面 |
 | 10 | Agglomerative Fundamentals DRL THR | 借用 #9 配對 | DRL | 全組最佳年化報酬（2.89%） |
@@ -23,7 +23,7 @@
 
 切換執行範圍：修改 `strategies/config.py` 中的 `strategies_raw`，或用環境變數免改檔覆寫（0-based Python 切片，如 `STRATEGIES_SLICE="4:6" python run_trading.py` 只跑 #5–#6）。
 
-**已封存策略（20 個 config 條目 + 2 個從未賦予策略身分的孤兒模組）**：完整清單、失敗根因診斷與復活方式見 `archive/config_archived_strategies.py` docstring；歷史回測結果保留於 `results/result.db`。策略邏輯與封存摘要見 [notebooks/formation.ipynb](notebooks/formation.ipynb) 第五節。
+**已封存策略（20 個 config 條目 + 2 個從未賦予策略身分的孤兒模組）**：完整清單、失敗根因診斷與復活方式見 `archive/config_archived_strategies.py` docstring；歷史回測結果保留於 `results/result.db`。封存分類索引見 [archive/README.md](archive/README.md)。
 
 ---
 
@@ -59,16 +59,19 @@ pairtrade_trainingproject/
 │   └── audit_report.csv           # 資料品質審計報告
 ├── formation_data/
 │   └── formation_pairs_sp500_Tiingo.db  # 形成期主合併資料庫（LFS 追蹤；可用 run_formation.py 完整重建）
-├── notebooks/
-│   ├── formation.ipynb            # 現役 10 策略形成期邏輯完整說明 + 論文引述
-│   └── trading.ipynb              # 交易期邏輯說明 + DRL-THR 架構 + 績效總比較
-├── archive/                       # 歷史存檔（已封存策略 config、非現役交易模組、舊版 notebook、docs 簡報）
-│   └── trading/                   # 已封存/孤兒交易模組（drl_lstm×2、drl_fqi、kalman、pure_dtw）
+├── notebooks/                     # 策略筆記本（一策略一本；Quarto revealjs 投影片，見 notebooks/README.md）
+│   ├── formation/                 # 形成期策略 ×6（SSD Rolling／DTW／SSD-DTW-PCA／HDBSCAN×2／Agglomerative）
+│   ├── trading/                   # 交易期策略 ×2（Z-Score 狀態機、DRL 門檻選擇式 v4）
+│   └── comparison.ipynb           # 現役 10 策略績效總比較（讀 results/result.db 動態產生）
+├── docs/                          # GitHub Pages：index.html 入口 + slides/（quarto render 產出投影片）
+├── archive/                       # 歷史存檔（分類索引見 archive/README.md）
+│   ├── notebooks/ formation/ trading/ scripts/ docs/ h200/
+│   └── config_archived_strategies.py  # 已封存策略 config 與完整診斷
 ├── dashboard.py                   # Streamlit 績效比對儀表板
 ├── run_formation.py               # 形成期主程式（多行程平行）
 ├── run_trading.py                 # 交易期主程式（多行程平行）
 ├── run.bat                        # 一鍵啟動 Dashboard
-├── setup.bat / setup.sh           # 環境初始化
+├── setup.bat                      # 環境初始化（Windows）
 └── requirements.txt               # Python 套件清單
 ```
 
@@ -136,13 +139,15 @@ run.bat
 
 > 2026-07-05 因 repo LFS 額度用罄，形成期配對與基本面快照已於本機完整重建：Z-Score 系列結果與前版一致（確定性計算復現）；DRL-THR 系列因重新訓練數值有波動（如最佳年化 3.03% → 2.89%），排名結構與定性結論不變。
 
-完整比較表與逐項解讀見 [notebooks/trading.ipynb](notebooks/trading.ipynb) 第五節「現役策略績效總比較」。
+完整比較表與逐項解讀見 [notebooks/comparison.ipynb](notebooks/comparison.ipynb)（投影片版 `docs/slides/comparison.html`，result.db 更新後重新執行＋render 即同步）。
 
 ---
 
 ## 策略說明文件
 
-- 形成期邏輯與論文引述：[notebooks/formation.ipynb](notebooks/formation.ipynb)
-- 交易期邏輯、DRL-THR 架構與績效總比較：[notebooks/trading.ipynb](notebooks/trading.ipynb)
+- 形成期策略（一策略一本：公式、參數、文獻標註）：[notebooks/formation/](notebooks/formation/)
+- 交易期策略（Z-Score 狀態機、DRL-THR v4）：[notebooks/trading/](notebooks/trading/)
+- 績效總比較：[notebooks/comparison.ipynb](notebooks/comparison.ipynb)
+- 投影片入口（quarto render 產出）：[docs/index.html](docs/index.html) → `docs/slides/`
 - 詳細開發指南：[PROJECT_GUIDE.md](PROJECT_GUIDE.md)
 - 已封存策略完整診斷：[archive/config_archived_strategies.py](archive/config_archived_strategies.py)
