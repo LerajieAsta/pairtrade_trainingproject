@@ -94,6 +94,82 @@ def load_master_dataframe_from_db(db_path="results/result.db"):
 
 
 @st.cache_data(show_spinner=False)
+def compute_range_metrics(path: str, y1: int, y2: int, top_n_str: str,
+                          db_path="results/result.db"):
+    """
+    指定年份區間內的策略績效指標（自 trade_logs 以索引查詢重算，
+    口徑與 db_utils.calculate_metrics_from_params 一致）。
+    回傳欄位覆寫 dict；區間內無資料時回傳 None。
+    """
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
+        d0, d1 = f"{y1}-01-01", f"{y2}-12-31 23:59:59"
+        daily = pd.read_sql_query(
+            "SELECT Date, SUM(Daily_Delta) AS delta, "
+            "SUM(CASE WHEN Position<>0 THEN 1 ELSE 0 END) AS n_open "
+            "FROM trade_logs WHERE strategy_id=? AND Date>=? AND Date<=? "
+            "GROUP BY Date ORDER BY Date",
+            conn, params=(path, d0, d1))
+        trades = pd.read_sql_query(
+            "SELECT Trade_PnL FROM trade_logs "
+            "WHERE strategy_id=? AND Date>=? AND Date<=? AND Trade_PnL<>0",
+            conn, params=(path, d0, d1))
+        conn.close()
+    except Exception:
+        return None
+    if daily.empty:
+        return None
+
+    cap = _portfolio_capital()
+    pnl = daily['delta'].astype(float)
+    equity = cap + pnl.cumsum()
+    final_pnl = float(pnl.sum())
+
+    # 月頻幾何年化（與 db_utils 同口徑）
+    m_eq = equity.set_axis(pd.to_datetime(daily['Date'])).resample('ME').last().dropna()
+    m_ret = m_eq.pct_change().fillna(0)
+    cum_ret = float(np.prod(1 + m_ret) - 1)
+    n_m = len(m_ret)
+    ann_ret = float((1 + cum_ret) ** (12 / n_m) - 1) if n_m > 0 else 0.0
+
+    prev_eq = equity.shift(1).fillna(cap)
+    d_ret = (pnl.values / prev_eq.values)
+    sharpe = float(np.sqrt(252) * d_ret.mean() / d_ret.std()) if d_ret.std() > 0 else 0.0
+    roll_max = equity.cummax()
+    mdd = float(((equity - roll_max) / roll_max).min())
+    calmar = float(ann_ret / abs(mdd)) if mdd != 0 else 0.0
+
+    tp = trades['Trade_PnL'].astype(float)
+    n_t = int(len(tp))
+    wr = float((tp > 0).mean()) if n_t else 0.0
+    gl = float(tp[tp <= 0].sum())
+    gp = float(tp[tp > 0].sum())
+    pf = float(gp / abs(gl)) if gl != 0 else 0.0
+
+    # 文獻口徑（利用率 / 動用資本年化 / rf 超額）
+    m = re.search(r"(\d+)", str(top_n_str or ""))
+    max_pairs = (int(m.group(1)) if m else 10) * 6      # CONCURRENT_PERIODS = 6
+    years = len(daily) / 252.0
+    util = float(daily['n_open'].mean() / max_pairs) if max_pairs > 0 else 0.0
+    ann_arith = final_pnl / cap / years if years > 0 else 0.0
+    avg_emp = float(daily['n_open'].mean()) * (cap / max_pairs) if max_pairs > 0 else 0.0
+    ann_emp = final_pnl / avg_emp / years if (avg_emp > 0 and years > 0) else 0.0
+
+    return {
+        'Final_Equity': cap + final_pnl,
+        'Cum_Ret_Raw': cum_ret, 'Ann_Ret_Raw': ann_ret,
+        'RCC_Raw': final_pnl / cap, 'REC_Raw': np.nan,
+        'Sharpe_Raw': sharpe, 'Sharpe_Active_Raw': np.nan,
+        'MDD_Raw': mdd, 'Calmar_Raw': calmar,
+        'PF_Raw': pf, 'Win_Rate_Raw': wr, 'Total_Trades': n_t,
+        'Gross_Profit': gp, 'Gross_Loss': gl,
+        'Avg_Utilization': util, 'Ann_Ret_Employed': ann_emp,
+        'Excess_Ret_RF': ann_arith - 0.02 * util,
+    }
+
+
+@st.cache_data(show_spinner=False)
 def load_data_from_db(strategy_path, db_path="results/result.db"):
     if not os.path.exists(db_path):
         return pd.DataFrame()
@@ -536,7 +612,7 @@ def make_desc(row):
 
 
 @st.fragment
-def render_deep_dive(target_row):
+def render_deep_dive(target_row, date_range=None):
     st.markdown("---")
     st.markdown(
         f"### Strategy Deep Dive: "
@@ -548,6 +624,18 @@ def render_deep_dive(target_row):
     if raw_target_df.empty or 'Period_Start' not in raw_target_df.columns:
         st.warning("Missing required columns ('Period_Start', 'Period_End') for periodic analysis.")
         return
+
+    # 日期範圍限定（來自走勢圖框選或年份篩選）：期間清單/配對統計/交易圖皆只看範圍內資料
+    if date_range is not None and 'Date' in raw_target_df.columns:
+        _d0, _d1 = date_range
+        raw_target_df = raw_target_df[
+            (raw_target_df['Date'] >= _d0) & (raw_target_df['Date'] <= _d1)
+        ].copy()
+        st.caption(f"📅 Deep Dive restricted to **{pd.Timestamp(_d0):%Y-%m-%d} ~ {pd.Timestamp(_d1):%Y-%m-%d}**"
+                   f"（來源：走勢圖框選 / 年份篩選）")
+        if raw_target_df.empty:
+            st.warning("No trading data within the selected date range.")
+            return
 
     raw_target_df['Trading_Period'] = (raw_target_df['Period_Start'].astype(str)
                                        + " ~ " + raw_target_df['Period_End'].astype(str))
@@ -616,33 +704,24 @@ def render_deep_dive(target_row):
         pair_stats.rename(columns={'Ticker_A': 'Stock A', 'Ticker_B': 'Stock B'}, inplace=True)
         pair_stats = pair_stats.sort_values('Return ($)', ascending=False).reset_index(drop=True)
 
-        # 單選圓圈（radio）選配對，label 附損益與勝率；統計表保留為參考
-        _pair_labels = [
-            f"{r['Stock A']} / {r['Stock B']}   (${r['Return ($)']:+,.0f} · WR {r['Win Rate']:.0%})"
-            for _, r in pair_stats.iterrows()
-        ]
-        _rcol1, _rcol2 = st.columns([1, 1.2])
-        with _rcol1:
-            _sel_pair_label = st.radio(
-                "Select pair", _pair_labels, index=None,
-                key=f"dd_pair_radio_{sel_period_str}"
-            )
-        with _rcol2:
-            styled_pairs = pair_stats.style.format({
-                'Return ($)': '${:,.2f}', 'Win Rate': '{:.1%}', 'Avg Hold (days)': '{:.1f}'
-            }).map(
-                lambda x: ('color: #4ade80; font-weight:bold;' if pd.notna(x) and x > 0
-                           else ('color: #f87171; font-weight:bold;' if pd.notna(x) and x < 0 else '')),
-                subset=['Return ($)']
-            )
-            st.dataframe(styled_pairs, width='stretch', height=400, hide_index=True)
+        styled_pairs = pair_stats.style.format({
+            'Return ($)': '${:,.2f}', 'Win Rate': '{:.1%}', 'Avg Hold (days)': '{:.1f}'
+        }).map(
+            lambda x: ('color: #4ade80; font-weight:bold;' if pd.notna(x) and x > 0
+                       else ('color: #f87171; font-weight:bold;' if pd.notna(x) and x < 0 else '')),
+            subset=['Return ($)']
+        )
+        pair_event = st.dataframe(
+            styled_pairs, width='stretch', height=400, hide_index=True,
+            selection_mode="single-row", on_select="rerun"
+        )
+        sel_pair_row = pair_event.selection.rows
 
-    if not _sel_pair_label:
+    if not sel_pair_row:
         return
 
-    _pair_idx = _pair_labels.index(_sel_pair_label)
-    t_a = pair_stats.iloc[_pair_idx]['Stock A']
-    t_b = pair_stats.iloc[_pair_idx]['Stock B']
+    t_a = pair_stats.iloc[sel_pair_row[0]]['Stock A']
+    t_b = pair_stats.iloc[sel_pair_row[0]]['Stock B']
 
     st.markdown("---")
     st.markdown(f"##### 3. Trade Visualizer: {t_a} vs {t_b}  (Period: {sel_period_str})")
@@ -1194,8 +1273,8 @@ def main():
     with qf2:
         qf_high_sharpe = st.checkbox("Sharpe > 1.0", value=False)
 
-    # 年份篩選（影響 Equity Curve 顯示，表格仍為全期績效）
-    st.markdown("**Year Range (affects Equity Curve display):**")
+    # 年份篩選：套用到全部績效指標（卡片、表格、走勢圖、Deep Dive）
+    st.markdown("**Year Range (applies to all metrics, equity curves & deep dive):**")
     yr_c1, yr_c2, yr_c3 = st.columns([1, 1, 3])
     with yr_c1:
         yr_start = st.number_input("Start Year", min_value=2001, max_value=2025,
@@ -1218,6 +1297,30 @@ def main():
         filtered_df = filtered_df[filtered_df['Ann_Ret_Raw'] > 0]
     if qf_high_sharpe and 'Sharpe_Raw' in filtered_df.columns:
         filtered_df = filtered_df[filtered_df['Sharpe_Raw'] > 1.0]
+
+    # ── 年份區間 → 全指標重算（trade_logs 索引查詢，逐策略快取） ──────────
+    if yr_filter_active and len(filtered_df) > 0:
+        filtered_df = filtered_df.copy()
+        _n = len(filtered_df)
+        _pb = st.progress(0.0, text=f"Recomputing metrics for {_n} strategies over {yr_start}–{yr_end}…")
+        for _i, (_idx, _row) in enumerate(filtered_df.iterrows()):
+            _rm = compute_range_metrics(_row['_path'], int(yr_start), int(yr_end),
+                                        str(_row.get('TOP N', '')))
+            if _rm is not None:
+                for _k, _v in _rm.items():
+                    if _k in filtered_df.columns or True:
+                        filtered_df.loc[_idx, _k] = _v
+            _pb.progress((_i + 1) / _n)
+        _pb.empty()
+        # t-test 為全期統計，區間模式下不適用
+        for _c in ['T_Stat', 'T_Pval', 'NW_T_Stat', 'NW_T_Pval']:
+            if _c in filtered_df.columns:
+                filtered_df[_c] = np.nan
+        st.caption(
+            f"📅 All metrics below are recomputed for **{yr_start}–{yr_end}** "
+            f"(t-tests are full-period statistics and are hidden in range mode; "
+            f"first computation per strategy is cached)."
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1582,10 +1685,33 @@ def main():
             margin=dict(l=0, r=0, t=40, b=0),
             height=480 if show_drawdown else 320
         )
-        st.plotly_chart(fig_eq, width='stretch')
+        st.caption("🔍 使用圖表工具列的 **Box Select** 框選日期區間，下方 Deep Dive 將只分析該區間（雙擊圖表清除框選）。")
+        eq_event = st.plotly_chart(fig_eq, width='stretch', key="eq_chart_sel",
+                                   on_select="rerun", selection_mode=("box",))
+
+        # 框選區間 → Deep Dive 日期範圍（未框選時退回年份篩選範圍）
+        dd_range = None
+        try:
+            _sel = getattr(eq_event, "selection", None)
+            _box = (_sel.get("box") if hasattr(_sel, "get") else getattr(_sel, "box", None)) if _sel else None
+            if _box:
+                _b0 = _box[0]
+                _xr = _b0.get("x") if hasattr(_b0, "get") else getattr(_b0, "x", None)
+                if _xr is not None and len(_xr) == 2:
+                    dd_range = (pd.to_datetime(min(_xr)), pd.to_datetime(max(_xr)))
+            if dd_range is None:
+                _pts = (_sel.get("points") if hasattr(_sel, "get") else getattr(_sel, "points", None)) if _sel else None
+                if _pts:
+                    _xs = pd.to_datetime([p.get("x") for p in _pts if p.get("x") is not None])
+                    if len(_xs) > 1:
+                        dd_range = (_xs.min(), _xs.max())
+        except Exception:
+            dd_range = None
+        if dd_range is None and yr_filter_active:
+            dd_range = (pd.Timestamp(f"{yr_start}-01-01"), pd.Timestamp(f"{yr_end}-12-31"))
 
         target_row = display_df.iloc[selected_rows[0]]
-        render_deep_dive(target_row)
+        render_deep_dive(target_row, date_range=dd_range)
 
 
 if __name__ == "__main__":
