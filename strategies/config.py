@@ -291,11 +291,11 @@ strategies_raw_all = [
     #     基本面資料為單一時點靜態快照（yfinance，見
     #     fetch/fundamentals_yfinance.py）——已知前視偏誤限制。
     {
-        "name":             "Agglomerative Fundamentals",
-        "formation_module": "strategies.formation.agglomerative_fundamentals",
+        "name":             "Agglomerative Fundamentals (yF)",
+        "formation_module": "strategies.formation.agglomerative_yF",
         "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "Agglomerative_Fundamentals",
-        "db_method":        "Agglomerative (Fundamentals)",
+        "sub_dir":          "Agglomerative_Fundamentals_yF",
+        "db_method":        "Agglomerative (Fundamentals-yF)",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -313,12 +313,49 @@ strategies_raw_all = [
     # 8. Agglomerative Fundamentals DRL THR —— DRL-THR 疊加在 Agglomerative
     #    Fundamentals 配對底上（借用 #7 的形成期配對，不需重跑形成期）。
     {
-        "name":             "Agglomerative Fundamentals DRL THR",
-        "formation_module": "strategies.formation.agglomerative_fundamentals",
-        "formation_strategy_id_base": "Agglomerative Fundamentals",
+        "name":             "Agglomerative Fundamentals DRL THR (yF)",
+        "formation_module": "strategies.formation.agglomerative_yF",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (yF)",
         "trading_module":   "strategies.trading.drl_threshold_trading",
-        "sub_dir":          "Agglomerative_Fundamentals_DRL_THR",
-        "db_method":        "Agglomerative (Fundamentals-DRL-THR)",
+        "sub_dir":          "Agglomerative_Fundamentals_DRL_THR_yF",
+        "db_method":        "Agglomerative (Fundamentals-DRL-THR-yF)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    # 9. Agglomerative Fundamentals FMP —— 升級為 FMP 長週期 Point-in-Time 數據，無前視偏誤
+    {
+        "name":             "Agglomerative Fundamentals (FMP)",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP",
+        "db_method":        "Agglomerative (Fundamentals-FMP)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "data/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+        },
+    },
+    # 10. Agglomerative Fundamentals DRL THR FMP —— DRL-THR 疊加在 FMP 版本上
+    {
+        "name":             "Agglomerative Fundamentals DRL THR (FMP)",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_DRL_THR_FMP",
+        "db_method":        "Agglomerative (Fundamentals-DRL-THR-FMP)",
         "trade_method":     "DRL",
         "params": {
             **base_params,

@@ -1015,41 +1015,50 @@ def render_pair_consistency():
         st.warning("SQLite DB not found. Run backtests to generate data.")
         return
 
-    dataset_map = {}
+    strategy_desc_map = {}
+    try:
+        import sqlite3
+        conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
+        cursor = conn.cursor()
+        
+        # Query the required columns from strategy_summaries to build accurate descriptions
+        query = """
+        SELECT _path, DATASET, METHOD, TRADE_METHOD, "TOP N", "STOP LOSS %", "MAX SEC %", "ENTRY Z", "DYN Z NUM"
+        FROM strategy_summaries;
+        """
+        cursor.execute(query)
+        for r in cursor.fetchall():
+            path = r[0]
+            dataset = r[1] or "Unknown"
+            method = r[2] or "Unknown"
+            trade_method = r[3] or ""
+            top_n = r[4] or ""
+            sl_pct = r[5] or ""
+            msr_pct = r[6] or ""
+            entry_z = r[7] if r[7] is not None else ""
+            dyn_z = r[8] if r[8] is not None else ""
+            
+            parts = [dataset, method]
+            if trade_method: parts.append(trade_method)
+            if top_n: parts.append(top_n)
+            if sl_pct: parts.append(f"SL {sl_pct}")
+            if msr_pct: parts.append(f"MSR {msr_pct}")
+            if entry_z: parts.append(f"EntryZ {entry_z}")
+            if dyn_z: parts.append(f"DynZ {dyn_z}")
+            
+            strategy_desc_map[path] = " · ".join(parts) + f" ({path.split('/')[-1]})"
+    except Exception as e:
+        st.error(f"Error loading strategy_summaries: {e}")
+        pass
 
     def format_strategy_id(path):
-        try:
-            dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val = \
-                extract_features_from_path(path)
-            if path in dataset_map and dataset_map[path] not in ["Unknown", ""]:
-                dataset = dataset_map[path]
-            parts = [dataset]
-            if reentry not in ['NoReEntry', 'Unknown', '']:
-                parts.append(reentry)
-            if voladj not in ['NoVolAdj', 'N/A', '']:
-                parts.append(voladj)
-            parts += [method, top_n, f"SL {sl_pct}", f"ZWin {zwin}"]
-            if psl_pct not in ['0%', '0.0%', '']:
-                parts.append(f"PSL {psl_pct}")
-            if msr_pct not in ['0%', '0.0%', '']:
-                parts.append(f"MSR {msr_pct}")
-            if dsz_val not in ['0', '0.0', '']:
-                parts.append(f"DSZ {dsz_val}")
-            return " · ".join(parts) + f" ({path.split('/')[-1]})"
-        except Exception:
-            return path
+        return strategy_desc_map.get(path, path)
 
     try:
         import sqlite3
         conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=30.0)
         cursor = conn.cursor()
-        try:
-            cursor.execute("SELECT _path, DATASET FROM strategy_summaries;")
-            for r in cursor.fetchall():
-                dataset_map[r[0]] = r[1]
-        except Exception:
-            pass
-
+        
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='strategy_pairs';")
         if not cursor.fetchone():
             st.info("strategy_pairs table not found. Run backfill script first.")
@@ -1067,8 +1076,8 @@ def render_pair_consistency():
 
         st.markdown("---")
         st.markdown("#### Strategy Pair Details")
-        cursor.execute("SELECT DISTINCT strategy_id FROM strategy_pairs;")
-        all_strat_ids = sorted([row[0] for row in cursor.fetchall()])
+        
+        all_strat_ids = sorted(list(strategy_desc_map.keys()))
 
         selected_strat = st.selectbox("Select Strategy", all_strat_ids,
                                       format_func=format_strategy_id,
@@ -1252,6 +1261,9 @@ def main():
     # ══════════════════════════════════════════════
     # FILTERS
     # ══════════════════════════════════════════════
+    st.markdown("### Filters")
+
+    # 移除被廢棄的 ENTRY Z 與 DYN Z NUM
     FILTER_DEFS = [
         ('DATASET',     'Dataset'),
         ('RE-ENTRY',    'Re-Entry'),
@@ -1262,17 +1274,13 @@ def main():
         ('PORT SL %',   'Port SL %'),
         ('MAX SEC %',   'Max Sec %'),
         ('DYN Z',       'Dyn Z'),
-        ('ENTRY Z',     'Entry Z'),      # T2 網格維度（進場門檻）
-        ('DYN Z NUM',   'Dyn Stop Z'),   # T2 網格維度（發散停損）
     ]
     active_filters = [(col, label) for col, label in FILTER_DEFS
                       if col in master_df.columns and master_df[col].nunique() > 1]
 
-    st.markdown("### Filters")
-
-    # METHOD 用 multiselect（可同時選多個策略類型）
-    method_col_present = 'METHOD' in master_df.columns and master_df['METHOD'].nunique() > 1
     sel_methods = []
+    
+    method_col_present = 'METHOD' in master_df.columns and master_df['METHOD'].nunique() > 1
     if method_col_present:
         method_opts = sorted(master_df['METHOD'].dropna().unique(), key=natural_sort_key)
         sel_methods = st.multiselect("Method (multi-select)", method_opts,
@@ -1288,7 +1296,6 @@ def main():
             opts = ["All"] + sorted(master_df[col].dropna().unique(),
                                     key=lambda v: natural_sort_key(str(v)))
             sel_vals[col] = ui_col.selectbox(label, opts, key=f"filter_{col}")
-
     # 快捷數值篩選
     st.markdown("**Quick Filters:**")
     qf1, qf2, qf3 = st.columns([1, 1, 3])
@@ -1444,9 +1451,9 @@ def main():
     display_df['SHARPE']            = display_df.get(sharpe_src, display_df.get('Sharpe_Raw', 0))
     display_df['MAX DRAWDOWN (%)']  = display_df['MDD_Raw'] * 100
     display_df['CALMAR']            = display_df.get('Calmar_Raw', 0.0)
-    display_df['PROFIT FACTOR']     = display_df.get('PF_Raw', 0.0)
-    display_df['WIN RATE (%)']      = display_df.get('Win_Rate_Raw', 0.0) * 100
-    _tt = display_df.get('Total_Trades', pd.Series(0, index=display_df.index))
+    display_df['PROFIT FACTOR']     = display_df.get('Profit_Factor', display_df.get('PF_Raw', 0.0))
+    display_df['WIN RATE (%)']      = display_df.get('Win_Rate', display_df.get('Win_Rate_Raw', 0.0)) * 100
+    _tt = display_df.get('Entries', pd.Series(0, index=display_df.index))
     display_df['TOTAL TRADES']      = _tt.fillna(0).astype(int)
     display_df['ENTRIES']           = display_df['Entries']
     display_df['EXITS']             = display_df['Exits']
@@ -1490,11 +1497,11 @@ def main():
             'GROSS PROFIT ($)', 'GROSS LOSS ($)'
         ]
     else:
-        # 首屏精簡集合：t-test 統計移入 Detailed Metrics
+        # 首屏精簡集合：t-test 統計移入 Detailed Metrics -> 教授要求預設顯示 T檢定
         metrics_cols = [
             'FINAL EQUITY ($)', 'ANN. RETURN (%)', 'SHARPE', 'MAX DRAWDOWN (%)',
             'CALMAR', 'PROFIT FACTOR', 'WIN RATE (%)', 'TOTAL TRADES',
-            'EXCESS RET RF (%)'
+            'T-STAT', 'T-PVAL', 'NW T-STAT', 'NW T-PVAL', 'EXCESS RET RF (%)'
         ]
 
     cols = config_cols + metrics_cols
@@ -1555,45 +1562,45 @@ def main():
             df_styled = df_styled.map(color_pval, subset=[pc])
 
     column_config = {
-        '#':                st.column_config.NumberColumn("#", width="small"),
-        'STRATEGY CONFIG':  st.column_config.TextColumn("Strategy Config", width="large"),
-        'DATASET':          st.column_config.TextColumn("Dataset", width="small"),
-        'RE-ENTRY':         st.column_config.TextColumn("Re-Entry", width="small"),
-        'VOL ADJ':          st.column_config.TextColumn("Vol Adj", width="small"),
-        'METHOD':           st.column_config.TextColumn("Method", width="medium"),
-        'TOP N':            st.column_config.TextColumn("Top N", width="small"),
-        'STOP LOSS %':      st.column_config.TextColumn("Stop Loss", width="small"),
-        'Z-WINDOW':         st.column_config.TextColumn("Z-Win", width="small"),
-        'PORT SL %':        st.column_config.TextColumn("Port SL", width="small"),
-        'MAX SEC %':        st.column_config.TextColumn("Max Sec", width="small"),
-        'DYN Z':            st.column_config.TextColumn("Dyn Z", width="small"),
-        'FINAL EQUITY ($)': st.column_config.NumberColumn("Final Equity", width="small", format="$%.2f"),
-        'CUM. RETURN (%)':  st.column_config.NumberColumn("Cum. Ret", width="small", format="%.2f%%"),
-        'ANN. RETURN (%)':  st.column_config.NumberColumn("Ann. Ret", width="small", format="%.2f%%"),
-        'RCC (%)':          st.column_config.NumberColumn("RCC", width="small", format="%.2f%%"),
-        'REC (%)':          st.column_config.NumberColumn("REC", width="small", format="%.2f%%"),
+        '#':                st.column_config.NumberColumn("#", width="small", help="排名或序號"),
+        'STRATEGY CONFIG':  st.column_config.TextColumn("Strategy Config", width="large", help="策略完整參數組合與路徑名稱"),
+        'DATASET':          st.column_config.TextColumn("Dataset", width="small", help="使用的股票資料集"),
+        'RE-ENTRY':         st.column_config.TextColumn("Re-Entry", width="small", help="是否允許平倉後再次進場"),
+        'VOL ADJ':          st.column_config.TextColumn("Vol Adj", width="small", help="波動度調整設定"),
+        'METHOD':           st.column_config.TextColumn("Method", width="medium", help="形成期（選股與分群）的方法"),
+        'TOP N':            st.column_config.TextColumn("Top N", width="small", help="選取的股票對數量"),
+        'STOP LOSS %':      st.column_config.TextColumn("Stop Loss", width="small", help="個別配對停損百分比"),
+        'Z-WINDOW':         st.column_config.TextColumn("Z-Win", width="small", help="計算 Z-Score 的滾動天數"),
+        'PORT SL %':        st.column_config.TextColumn("Port SL", width="small", help="投資組合整體停損百分比"),
+        'MAX SEC %':        st.column_config.TextColumn("Max Sec", width="small", help="單一產業最大曝險限制"),
+        'DYN Z':            st.column_config.TextColumn("Dyn Z", width="small", help="動態 Z-Score 參數設定"),
+        'FINAL EQUITY ($)': st.column_config.NumberColumn("Final Equity", width="small", format="$%.2f", help="期末總權益餘額"),
+        'CUM. RETURN (%)':  st.column_config.NumberColumn("Cum. Ret", width="small", format="%.2f%%", help="累積報酬率"),
+        'ANN. RETURN (%)':  st.column_config.NumberColumn("Ann. Ret", width="small", format="%.2f%%", help="年化報酬率"),
+        'RCC (%)':          st.column_config.NumberColumn("RCC", width="small", format="%.2f%%", help="已實現資本貢獻 (Realized Capital Contribution)"),
+        'REC (%)':          st.column_config.NumberColumn("REC", width="small", format="%.2f%%", help="已實現權益貢獻 (Realized Equity Contribution)"),
         'UTILIZATION (%)':       st.column_config.NumberColumn("Utilization", width="small", format="%.1f%%",
-                                                               help="平均資金利用率（持倉配對/最大槽位）"),
+                                                               help="平均資金利用率（持倉配對數 / 最大槽位）"),
         'ANN. RET EMPLOYED (%)': st.column_config.NumberColumn("Ann.Ret (Employed)", width="small", format="%.2f%%",
-                                                               help="動用資本年化（GGR fully-invested 口徑）"),
+                                                               help="動用資本的年化報酬（GGR fully-invested 口徑）"),
         'EXCESS RET RF (%)':     st.column_config.NumberColumn("Excess vs RF", width="small", format="%.2f%%",
-                                                               help="閒置現金計 rf 利息後的超額年化"),
-        'SHARPE':           st.column_config.NumberColumn("Sharpe", width="small", format="%.2f"),
-        'MAX DRAWDOWN (%)': st.column_config.NumberColumn("Max DD", width="small", format="%.2f%%"),
-        'CALMAR':           st.column_config.NumberColumn("Calmar", width="small", format="%.2f"),
-        'PROFIT FACTOR':    st.column_config.NumberColumn("Profit Factor", width="small", format="%.2f"),
-        'WIN RATE (%)':     st.column_config.NumberColumn("Win Rate", width="small", format="%.1f%%"),
-        'TOTAL TRADES':     st.column_config.NumberColumn("Trades", width="small", format="%d"),
-        'T-STAT':           st.column_config.NumberColumn("T-Stat", width="small", format="%.3f"),
-        'T-PVAL':           st.column_config.NumberColumn("p-val", width="small", format="%.4f"),
-        'NW T-STAT':        st.column_config.NumberColumn("NW T-Stat", width="small", format="%.3f"),
-        'NW T-PVAL':        st.column_config.NumberColumn("NW p-val", width="small", format="%.4f"),
-        'ENTRIES':          st.column_config.NumberColumn("Entries", width="small", format="%d"),
-        'EXITS':            st.column_config.NumberColumn("Exits", width="small", format="%d"),
-        'STOP LOSSES':      st.column_config.NumberColumn("Stop Loss #", width="small", format="%d"),
-        'FORCED CLOSES':    st.column_config.NumberColumn("Forced Close", width="small", format="%d"),
-        'GROSS PROFIT ($)': st.column_config.NumberColumn("Gross Profit", width="small", format="$%.2f"),
-        'GROSS LOSS ($)':   st.column_config.NumberColumn("Gross Loss", width="small", format="$%.2f"),
+                                                               help="閒置現金計 rf 利息後的超額年化報酬"),
+        'SHARPE':           st.column_config.NumberColumn("Sharpe", width="small", format="%.2f", help="夏普指標（報酬 / 標準差）"),
+        'MAX DRAWDOWN (%)': st.column_config.NumberColumn("Max DD", width="small", format="%.2f%%", help="最大回撤（最高點至最低點跌幅）"),
+        'CALMAR':           st.column_config.NumberColumn("Calmar", width="small", format="%.2f", help="卡瑪指標（年化報酬 / 最大回撤）"),
+        'PROFIT FACTOR':    st.column_config.NumberColumn("Profit Factor", width="small", format="%.2f", help="獲利因子（總獲利金額 / 總虧損金額絕對值）"),
+        'WIN RATE (%)':     st.column_config.NumberColumn("Win Rate", width="small", format="%.1f%%", help="交易勝率（獲利次數 / 總交易次數）"),
+        'TOTAL TRADES':     st.column_config.NumberColumn("Trades", width="small", format="%d", help="總交易次數"),
+        'T-STAT':           st.column_config.NumberColumn("T-Stat", width="small", format="%.3f", help="T 檢定統計量（檢定報酬是否顯著大於0）"),
+        'T-PVAL':           st.column_config.NumberColumn("p-val", width="small", format="%.4f", help="T 檢定 p 值"),
+        'NW T-STAT':        st.column_config.NumberColumn("NW T-Stat", width="small", format="%.3f", help="Newey-West T 檢定統計量（修正自相關與異質變異）"),
+        'NW T-PVAL':        st.column_config.NumberColumn("NW p-val", width="small", format="%.4f", help="Newey-West T 檢定 p 值"),
+        'ENTRIES':          st.column_config.NumberColumn("Entries", width="small", format="%d", help="總進場次數"),
+        'EXITS':            st.column_config.NumberColumn("Exits", width="small", format="%d", help="正常平倉次數"),
+        'STOP LOSSES':      st.column_config.NumberColumn("Stop Loss #", width="small", format="%d", help="觸發停損次數"),
+        'FORCED CLOSES':    st.column_config.NumberColumn("Forced Close", width="small", format="%d", help="回測結束時的強制平倉次數"),
+        'GROSS PROFIT ($)': st.column_config.NumberColumn("Gross Profit", width="small", format="$%.2f", help="總獲利金額"),
+        'GROSS LOSS ($)':   st.column_config.NumberColumn("Gross Loss", width="small", format="$%.2f", help="總虧損金額"),
     }
     active_config = {k: v for k, v in column_config.items() if k in cols}
 
