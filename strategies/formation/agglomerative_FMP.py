@@ -64,6 +64,16 @@ _CANONICAL_SECTORS = [
 
 _UNKNOWN_SECTOR_IDX = len(_CANONICAL_SECTORS)  # one-hot 最後一欄
 
+
+def _canonicalize_sector(raw: str) -> str:
+    """將原始產業字串正規化為 _CANONICAL_SECTORS 之一，無法對應者歸為 Unknown。
+    （與 agglomerative_yF 同一實作；FMP/yF 拆分重構時遺漏，補回。）"""
+    if not raw:
+        return "Unknown"
+    mapped = _SECTOR_CANONICAL_MAP.get(raw, raw)
+    return mapped if mapped in _CANONICAL_SECTORS else "Unknown"
+
+
 # 基本面資料快取
 _fundamentals_cache: pd.DataFrame = None
 

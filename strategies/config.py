@@ -92,8 +92,13 @@ base_params = {
     "formation_window":             FORMATION_WINDOW,
     "trading_window":               FORWARD_DAYS,
     "rolling_step":                 rolling_step,
-    "fee_rate":                     0.001,
-    "slippage_rate":                0.001,
+    # 單邊交易成本 0.29%（= 29 bps），依 Do & Faff (2012) 對美股 pairs trading
+    # 單邊成本約 30 bps（佣金 + 市場衝擊）之估計。friction = fee_rate + slippage_rate
+    # 於每次進場、出場各按部位名目額扣一次（故每配對一完整往返 ≈ 0.58% 名目額）。
+    # Do, B. H., & Faff, R. (2012). Are pairs trading profits robust to trading
+    #   costs? Journal of Financial Research, 35(2), 261–287.
+    "fee_rate":                     0.0029,
+    "slippage_rate":                0.0,
     "initial_capital":              INITIAL_CAPITAL,
     "allow_reentry":                False,
     "zscore_clip":                  10.0,
@@ -180,7 +185,7 @@ strategies_raw_all = [
         "trade_method":     "Z-Score",
         "params":  {**base_params},
     },
-    # 1. SSD Rolling（SSD 家族代表基準；亦為 #5 DRL 對照的形成來源）
+    # 1. SSD Rolling（SSD 家族代表基準；亦為 DRL / 距離對照的形成來源）
     {
         "name":             "SSD Rolling",
         "formation_module": "strategies.formation.ssd_rolling",
@@ -188,6 +193,23 @@ strategies_raw_all = [
         "sub_dir":          "SSD_Rolling",
         "db_method":        "SSD (Rolling)",
         "trade_method":     "Z-Score",
+        "params":  {
+            **base_params,
+        },
+    },
+    # 1b. SSD Rolling Distance（距離基準交易，Gatev et al. 2006 GGR 距離法）
+    #     借用 SSD Rolling 的形成期配對，唯一變因 = 交易端 spread 空間：
+    #       回歸基準（#1 zscore_trading）：spread = OLS 共整合殘差
+    #       距離基準（本策略 distance_trading）：spread = 正規化價格距離（等權、hedge=1）
+    #     構成「回歸 vs 距離」的乾淨單變因對照（指導教授指定）。
+    {
+        "name":             "SSD Rolling Distance",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "formation_strategy_id_base": "SSD Rolling",
+        "trading_module":   "strategies.trading.distance_trading",
+        "sub_dir":          "SSD_Rolling_Distance",
+        "db_method":        "SSD (Rolling-Distance)",
+        "trade_method":     "Distance",
         "params":  {
             **base_params,
         },
@@ -458,9 +480,9 @@ def draw_dashboard(
     sys.stdout.write(f"\033[{total_lines}A")
 
     try:
-        term_width = min(os.get_terminal_size().columns, 130)
+        term_width = min(os.get_terminal_size().columns, 200)
     except OSError:
-        term_width = 130
+        term_width = 200
 
     def line(s: str) -> None:
         visible = re.sub(r"\033\[[^m]*m", "", s)
@@ -588,7 +610,7 @@ def draw_dashboard(
         else:
             status_str = f"\033[37m{status}\033[0m"
 
-        bar_width = 5
+        bar_width = 20
         completed = int(bar_width * pct / 100)
         bar       = "\033[94m" + "█" * completed + "\033[90m" + "░" * (bar_width - completed) + "\033[0m"
 
@@ -601,11 +623,12 @@ def draw_dashboard(
         else:
             eta_str = "---"
 
-        display_name = name
+        # 策略名稱欄放寬至 45 字元，讓完整策略名可見（含 MSR/Top_n 後綴）
+        display_name = name if len(name) <= 45 else name[:44] + "…"
 
         status_pad = _pad_visible(status_str, 10)
-        name_pad   = _pad_visible(display_name[:30], 30)
-        bar_pad    = _pad_visible(bar, 5)
+        name_pad   = _pad_visible(display_name, 45)
+        bar_pad    = _pad_visible(bar, bar_width)
         msg_pad    = _pad_visible(msg[:35], 35)
 
         line(
