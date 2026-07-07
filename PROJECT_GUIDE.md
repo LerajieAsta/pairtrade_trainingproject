@@ -80,7 +80,7 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 - 讀取 `dataset/sp500_Tiingo.db`（或 config 指定資料庫，見 `DB_PROFILES`）
 - 多行程平行執行每個策略的每個滾動期形成期計算（`ProcessPoolExecutor`，`spawn` context 避免 CUDA fork 污染）
 - 結果寫入 `formation_data/formation_pairs_{db_basename}.db`
-- 智慧續傳：以 formation DB 為唯一真相來源（DB 中有該策略配對才視為完成；舊版 JSON 標記檔 fallback 已移除，避免「有標記無資料」誤跳過），已完成的策略/期數自動跳過
+- 逐滾動期續傳：formation DB 的 `formation_progress` 表記錄每個「已嘗試」窗口（含空配對窗口）；策略完整性 = progress 期數 == 預期窗口數。中斷後重跑只補算缺漏窗口，不整策略重來。（舊 JSON 標記檔 fallback 已移除）
 - `merge_databases()`：合併前先刪除同 `strategy_id` 的既有列再 `INSERT OR REPLACE`——避免非決定性模組（如已封存的 `ml_pair_quality.py`）重跑選出不同配對時，新舊兩批配對同時留在資料庫（同一期配對數超過 `top_n`）
 - `FORCE_RERUN = False`（config.py）：正常模式，不強制重跑
 
@@ -91,6 +91,7 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 - 輸出：`results/tiingo/` 下的 Trade Log CSV + `dataset/audit_report.csv` + `results/result.db` 的 `strategy_summaries`/`trade_logs`/`strategy_pairs`
 - 網格搜尋：Top N / Stop Loss / MSR 等參數組合
 - 所有交易全部失敗時拋出 `RuntimeError`（fail-loud），不會靜默回傳空結果
+- 逐滾動期續傳（Z-Score 策略）：每期算完即以 pickle 落地至 `results/<dataset>/.ckpt/<策略>/<期>.pkl`；中斷重跑僅補算缺漏期，並自 checkpoint 重建 PortfolioManager 權益。summary/CSV 於全部期完成後定稿並清除 checkpoint。DRL 策略因 walk-forward 訓練狀態暫不套用（維持整策略重跑）。config 級跳過仍以 result.db 有 summary 列為準
 
 ---
 

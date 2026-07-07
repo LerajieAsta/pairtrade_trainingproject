@@ -543,5 +543,14 @@ def init_formation_db(db_path="data/formation_pairs.db"):
     );
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_formation_strat ON formation_pairs (strategy_id);")
+    # 逐滾動期續傳進度表：記錄「已嘗試」的形成窗口（含產出空配對者），
+    # 用以正確判定策略是否完整跑完（避免空窗口造成 formation_pairs 計數 < 預期）。
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS formation_progress (
+        "strategy_id" TEXT,
+        "Period_Start" TEXT,
+        PRIMARY KEY ("strategy_id", "Period_Start")
+    );
+    """)
     conn.commit()
     return conn

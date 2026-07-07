@@ -178,6 +178,43 @@ def worker_task(
                               max_pairs=params.get("top_n", 10) * CONCURRENT_PERIODS)
         all_trade_logs = []
 
+        # ── 逐滾動期續傳（Z-Score 策略；DRL 因 walk-forward 訓練狀態暫不套用） ──
+        # 每期算完即以 pickle 落地至 checkpoint 目錄；中斷後重跑僅補算缺漏期，
+        # 並自已存 logs 重建 PortfolioManager 權益（= 初始 + 累計已實現 PnL）。
+        # summary/CSV 仍於全部期完成後定稿（需完整權益曲線）。
+        import pickle
+        use_ckpt = strategy_config.get("trade_method") != "DRL"
+        ckpt_dir = os.path.join(output_root, ".ckpt", safe_name)
+        done_periods = set()
+        if use_ckpt:
+            if FORCE_RERUN and os.path.isdir(ckpt_dir):
+                import shutil
+                shutil.rmtree(ckpt_dir, ignore_errors=True)
+            os.makedirs(ckpt_dir, exist_ok=True)
+            if not FORCE_RERUN:
+                _recovered_pnl = 0.0
+                for _fn in sorted(os.listdir(ckpt_dir)):
+                    if not _fn.endswith(".pkl"):
+                        continue
+                    try:
+                        with open(os.path.join(ckpt_dir, _fn), "rb") as _f:
+                            _pdf = pickle.load(_f)
+                    except Exception:
+                        os.remove(os.path.join(ckpt_dir, _fn))  # 損毀（可能中斷寫入）→ 丟棄重算
+                        continue
+                    if _pdf is None or _pdf.empty:
+                        done_periods.add(_fn[:-4])
+                        continue
+                    all_trade_logs.append(_pdf)
+                    done_periods.add(_fn[:-4])
+                    # 該期各配對最終已實現 PnL 之和 → 加回權益
+                    _last = _pdf.groupby(['Ticker_A', 'Ticker_B'])['Realized_PnL'].last()
+                    _recovered_pnl += float(_last.sum())
+                pm.current_equity = INITIAL_CAPITAL + _recovered_pnl
+                if done_periods:
+                    print(f"  [Resume] 已載入 {len(done_periods)} 期 checkpoint，"
+                          f"重建權益 ${pm.current_equity:,.2f}，續算剩餘期數")
+
         # Cache signature once — valid for all periods and pairs of the same Trading class
         _sig = inspect.signature(TradingClass.__init__)
         _has_var_keyword = any(
@@ -191,8 +228,14 @@ def worker_task(
             trade_start = p_row["Trade_Start"]
             trade_end = p_row["Trade_End"]
 
+            # 逐期續傳：已完成期直接跳過（logs 與權益已於上方 checkpoint 載入階段還原）
+            if use_ckpt and str(period_start) in done_periods:
+                print(f"Period {i+1}/{total_periods}: {period_start} -> 已完成，跳過（checkpoint）")
+                continue
+
             # 列印期數，觸發 ProgressAwareStdout 解析
             print(f"Period {i+1}/{total_periods}: {period_start} to {trade_end}")
+            period_logs = []   # 本期各配對交易紀錄（供逐期 checkpoint 落地）
 
             # 讀取該週期在形成期篩選出的配對 (使用 formation_strategy_id)
             df_pairs = pd.read_sql_query("""
@@ -319,6 +362,7 @@ def worker_task(
                                 df_log.loc[last_idx, 'Status'] = 'FORCED_CLOSE_DELISTED'
 
                             all_trade_logs.append(df_log)
+                            period_logs.append(df_log)
                             final_realized_pnl = df_log['Realized_PnL'].iloc[-1]
                             pm.process_closed_trade(pair, final_realized_pnl)
 
@@ -328,6 +372,18 @@ def worker_task(
 
             # 清理 PortfolioManager 中的 active_pairs 以防累積
             pm.active_pairs.clear()
+
+            # 逐期 checkpoint 落地（原子寫入：先寫 .tmp 再 rename）。空期也留標記檔。
+            if use_ckpt:
+                _cf = os.path.join(ckpt_dir, f"{period_start}.pkl")
+                try:
+                    _payload = (pd.concat(period_logs, ignore_index=True)
+                                if period_logs else None)
+                    with open(_cf + ".tmp", "wb") as _f:
+                        pickle.dump(_payload, _f, protocol=pickle.HIGHEST_PROTOCOL)
+                    os.replace(_cf + ".tmp", _cf)
+                except Exception as _e:
+                    print(f"  [Warning] checkpoint 寫入失敗（{period_start}）: {_e}")
 
         conn.close()  # type: ignore
 
@@ -360,6 +416,11 @@ def worker_task(
                 overwrite=True,
                 trade_method=strategy_config.get("trade_method", "Z-Score")
             )
+
+        # 全部期已完成並定稿 summary/CSV → 清除 checkpoint 目錄
+        if use_ckpt and os.path.isdir(ckpt_dir):
+            import shutil
+            shutil.rmtree(ckpt_dir, ignore_errors=True)
 
         elapsed = time.time() - start_time
         progress_dict[name] = {

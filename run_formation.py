@@ -50,31 +50,34 @@ from strategies.config import (
 # 斷點續傳 (Smart Resume) 工具函數
 # ════════════════════════════════════════════════════════════════════════════
 
-def check_formation_completed(config: dict, db_path: str, log_dir: str, formation_db_path: str) -> bool:
+def check_formation_completed(config: dict, db_path: str, log_dir: str, formation_db_path: str,
+                              expected_periods: int = 0) -> bool:
     """
-    智慧判定策略形成期是否已完整跑完（斷點續傳）。
-    formation DB 為唯一真相來源：DB 中有該策略的配對資料才視為完成。
-    （舊版的標記檔 fallback 已移除——標記檔可能在資料庫遺失/換機時殘留，
-      造成「已有標記但無資料」的誤跳過，導致 run_trading 找不到配對。）
+    智慧判定策略形成期是否已完整跑完（逐滾動期續傳）。
+    formation DB 為唯一真相來源：以 formation_progress 表記錄的「已嘗試窗口數」
+    對比 expected_periods —— 只有全部窗口都跑過才算完成。
+    部分完成 → 回傳 False，worker 會啟動並用內建的 completed_periods 逐期跳過，
+    只補算缺漏的窗口。
+    （不用 formation_pairs 計數，因為早期空窗口不產生配對列，會低估完成度。）
     """
     if FORCE_RERUN:
         return False
 
-    if not os.path.exists(formation_db_path):
+    if not os.path.exists(formation_db_path) or expected_periods <= 0:
         return False
     try:
         with get_db_connection(formation_db_path) as conn:  # type: ignore
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='formation_pairs';"
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='formation_progress';"
             )
             if cursor.fetchone()[0] == 0:
                 return False
             cursor.execute(
-                "SELECT count(*) FROM formation_pairs WHERE strategy_id = ?;",
+                "SELECT count(*) FROM formation_progress WHERE strategy_id = ?;",
                 (config["name"],),
             )
-            return cursor.fetchone()[0] > 0
+            return cursor.fetchone()[0] >= expected_periods
     except Exception:
         return False
 
@@ -164,6 +167,7 @@ def worker_task(
         conn = init_formation_db(temp_db_path)
         cursor = conn.cursor()  # type: ignore
         cursor.execute("DELETE FROM formation_pairs")
+        cursor.execute("DELETE FROM formation_progress")
         conn.commit()  # type: ignore
 
         # 2. 載入形成期模組
@@ -180,10 +184,10 @@ def worker_task(
         if main_db and os.path.exists(main_db) and not FORCE_RERUN:
             try:
                 main_conn = get_db_connection(main_db)
-                df_exists = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name='formation_pairs'", main_conn)  # type: ignore
+                df_exists = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table' AND name='formation_progress'", main_conn)  # type: ignore
                 if not df_exists.empty:
                     df_completed = pd.read_sql_query(  # type: ignore
-                        "SELECT DISTINCT Period_Start FROM formation_pairs WHERE strategy_id = ?",
+                        "SELECT DISTINCT Period_Start FROM formation_progress WHERE strategy_id = ?",
                         main_conn, params=(name,)  # type: ignore
                     )
                     completed_periods = set(df_completed["Period_Start"].tolist())
@@ -251,7 +255,15 @@ def worker_task(
             formation_instance = FormationClass(**valid_kwargs)
             pairs_df = formation_instance.run()
 
+            # 逐期續傳：無論產出是否為空，都先記錄「此窗口已嘗試」（含空配對窗口），
+            # 以便完整性判定不被早期空窗口低估。
+            cursor.execute(
+                "INSERT OR REPLACE INTO formation_progress (strategy_id, Period_Start) VALUES (?, ?)",
+                (name, form_start_dt),
+            )
+
             if pairs_df.empty:
+                conn.commit()  # type: ignore
                 continue
 
             records = []
@@ -356,26 +368,33 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
             temp_cursor = temp_conn.cursor()  # type: ignore
             temp_cursor.execute("SELECT strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params FROM formation_pairs")
             rows = temp_cursor.fetchall()
+            try:
+                temp_cursor.execute("SELECT strategy_id, Period_Start FROM formation_progress")
+                prog_rows = temp_cursor.fetchall()
+            except Exception:
+                prog_rows = list({(r[0], r[1]) for r in rows})   # 相容無 progress 表的舊暫存
             temp_conn.close()  # type: ignore
 
-            # 先清掉主資料庫裡這個 strategy_id 的舊資料，再插入這次產生的資料。
-            # INSERT OR REPLACE 只在 (strategy_id, Period_Start, Ticker_A, Ticker_B)
-            # 完全相同時才會取代舊列；對距離排序法（SSD/DTW）等決定性模組，重跑
-            # 永遠選出同一組配對，這個假設成立。但對會隨程式碼/標籤變動而改選不同
-            # 配對的模組（例如 ml_pair_quality 這種會迭代訓練的模型），新舊兩批
-            # 配對的主鍵不會完全相同，舊資料不會被取代，兩批會一起留在資料庫裡，
-            # 造成同一期配對數超過 top_n。這裡改成先刪除該 strategy_id 的全部舊
-            # 資料，再整批插入這次的結果，確保重跑後的資料庫忠實反映最新一次的
-            # 選股結果。
-            strategy_ids = {r[0] for r in rows}
-            for sid in strategy_ids:
-                cursor.execute("DELETE FROM formation_pairs WHERE strategy_id = ?", (sid,))
+            # 逐（strategy_id, Period_Start）窗口刪除再插入：只覆寫本次實際計算過的
+            # 窗口，保留先前續傳已合併的窗口（避免 delete-all 抹掉已完成期）。
+            # 對會改選配對的模組（ml_pair_quality），同一窗口舊列先刪後插不殘留 stale。
+            # 以 progress 為權威窗口清單（含空配對窗口）。
+            merged_windows = set(prog_rows) | {(r[0], r[1]) for r in rows}
+            for sid, pstart in merged_windows:
+                cursor.execute(
+                    "DELETE FROM formation_pairs WHERE strategy_id = ? AND Period_Start = ?",
+                    (sid, pstart),
+                )
 
             cursor.executemany("""
-                INSERT OR REPLACE INTO formation_pairs 
+                INSERT OR REPLACE INTO formation_pairs
                 (strategy_id, Period_Start, Trade_Start, Trade_End, Ticker_A, Ticker_B, Sector_A, Sector_B, Pair_Rank, Formation_Params)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, rows)
+            cursor.executemany(
+                "INSERT OR REPLACE INTO formation_progress (strategy_id, Period_Start) VALUES (?, ?)",
+                prog_rows,
+            )
             conn.commit()  # type: ignore
         except Exception as e:
             print(f"⚠️ [DB Merge] 整合暫存資料庫 {temp_db} 失敗: {e}", flush=True)
@@ -513,6 +532,12 @@ def run_all_formations():
     strategies_to_run = []
     strategies_config = []
 
+    # 預期滾動窗口總數（與 worker_task 內同一公式），供逐期續傳完整性判定
+    _roll = list(range(local_first_trade_idx, total_days - FORWARD_DAYS + 1, rolling_step))
+    if _roll and _roll[-1] != total_days - FORWARD_DAYS:
+        _roll.append(total_days - FORWARD_DAYS)
+    expected_periods = len(_roll)
+
     for raw in expanded_strategies_raw:
         safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in raw["name"])
         config = {
@@ -527,7 +552,7 @@ def run_all_formations():
         }
         strategies_config.append(config)
 
-        if check_formation_completed(config, DB_PATH, log_dir, formation_db_path):
+        if check_formation_completed(config, DB_PATH, log_dir, formation_db_path, expected_periods):
             progress_dict[config["name"]] = {
                 "status":   "SUCCESS",
                 "progress": "完成",
