@@ -69,3 +69,4 @@ formation_data/formation_pairs_sp500_Tiingo_*.db
 
 # Distribution / packaging
 *.egg-info/
+formation_data/formation_pairs_sp500_Tiingo.db.lfs-pointer.bak
