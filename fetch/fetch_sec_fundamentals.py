@@ -4,10 +4,15 @@ SEC EDGAR PIT 基本面抓取（免費、官方、無需 API key）
 
 背景：FMP /api/v3 已停用、且低階方案歷史深度受限，無法建 2000–2025 PIT 基本面。
 本模組改以 SEC EDGAR XBRL companyfacts（免費、官方、以申報日 filed 做 PIT 對齊）
-取得每股盈餘與流通股數，配合專案既有的 Tiingo 股價，計算：
-    market_cap = 流通股數 × 收盤價
-    pe_ratio   = 收盤價 / TTM EPS
+取得每股盈餘與流通股數，配合 Tiingo API 的「原始（未調整）收盤價」計算：
+    market_cap = 原始收盤價 × 流通股數        （兩者皆當期未調整 → 直接相乘，無需拆股因子）
+    pe_ratio   = 原始收盤價 / TTM EPS
     industry   = Tiingo Constituents 的 GICS_Sector
+
+為何用 Tiingo 原始價而非本地 DB 或 yfinance：
+  - 本地 sp500_Tiingo.db 的 Close 已「拆股調整」，與 SEC 當期股數基準不一致；
+  - yfinance 對已下市股（如 TIE）常抓不到；
+  - Tiingo API 的 close 欄為原始價、且涵蓋已下市股，配 SEC 當期股數可直接算市值/PE。
 
 輸出 parquet 的 schema 與 fetch_fmp_fundamentals.py 完全相同（index=[date,ticker]，
 欄位 close/market_cap/pe_ratio/industry），故 agglomerative_FMP.py 不需改動即可沿用。
@@ -16,9 +21,11 @@ SEC EDGAR PIT 基本面抓取（免費、官方、無需 API key）
 或可將 Agglomerative Fundamentals 回測起點設在 2009）。已下市個股若不在 SEC 現行
 ticker→CIK 對照中則缺該檔（同樣插補）。
 
-用法：
-    python fetch/fetch_sec_fundamentals.py
-（無需 API key；SEC 要求帶 User-Agent，請改成你的聯絡 email。）
+用法（SEC 免金鑰，僅需 User-Agent；Tiingo 原始股價需金鑰）：
+    PowerShell:
+      $env:SEC_USER_AGENT="你的名字 email@校.edu.tw"
+      $env:TIINGO_API_KEY="你的 Tiingo 金鑰"
+      python fetch/fetch_sec_fundamentals.py
 """
 
 import os
@@ -37,6 +44,8 @@ SEC_RATE_DELAY = 0.15   # ~6–7 req/s，SEC 上限 10 req/s
 TIINGO_DB = "dataset/price/sp500_Tiingo.db"
 CACHE_DIR = "dataset/fundamental/sec_cache"
 OUTPUT_PATH = "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet"
+# Tiingo API 金鑰（原始股價用）：改由環境變數提供，勿硬編碼。
+TIINGO_API_KEY = os.environ.get("TIINGO_API_KEY", "").strip()
 
 # 診斷用欄位對應（XBRL 概念名）
 EPS_CONCEPTS = ["EarningsPerShareDiluted", "EarningsPerShareBasic"]
@@ -165,49 +174,46 @@ def _pit_shares(facts: dict) -> pd.DataFrame:
             .drop_duplicates(subset="filed", keep="last").reset_index(drop=True))
 
 
-def _yf_price_splits(symbol: str, start: str, end: str):
+def _tiingo_raw_monthly_close(symbol: str, start: str, end: str) -> pd.Series:
     """
-    自 yfinance 取月底「拆股調整（未調股利）」收盤價與拆股事件（一次 history 呼叫）。
-    Tiingo DB 的價格為「完整調整」（含股利），會扭曲估值比率，故改用 yfinance。
-    回傳 (monthly_close: Series[date->close], splits: Series[date->ratio])。
-    快取於 CACHE_DIR。
+    自 Tiingo API 取「原始（未調整）」日收盤價，月底重取樣。含已下市股（如 TIE）。
+    回傳 Series[date(月底) -> raw_close]；快取於 CACHE_DIR。
     """
-    import yfinance as yf
     os.makedirs(CACHE_DIR, exist_ok=True)
-    cache = os.path.join(CACHE_DIR, f"{symbol}_yf.pkl")
+    cache = os.path.join(CACHE_DIR, f"{symbol}_tiingo_raw.pkl")
     if os.path.exists(cache):
         try:
-            obj = pd.read_pickle(cache)
-            return obj["close"], obj["splits"]
+            return pd.read_pickle(cache)
         except Exception:
             pass
-    try:
-        # 抓到「今日」為止（end=None）：累積拆股因子需要 on_date 之後（含回測期之後）
-        # 的所有拆股，故不能只抓回測窗口，否則像 2015 的日期會漏算 2020 的拆股。
-        h = yf.Ticker(symbol).history(start=start, auto_adjust=False,
-                                      actions=True, raise_errors=False)
-    except Exception:
-        h = pd.DataFrame()
-    if h is None or h.empty or "Close" not in h.columns:
-        empty = (pd.Series(dtype=float), pd.Series(dtype=float))
-        pd.to_pickle({"close": empty[0], "splits": empty[1]}, cache)
-        return empty
-    h.index = pd.DatetimeIndex(h.index).tz_localize(None)
-    monthly = h["Close"].resample("ME").last().dropna()
-    sp = h["Stock Splits"] if "Stock Splits" in h.columns else pd.Series(dtype=float)
-    sp = sp[sp > 0]
-    pd.to_pickle({"close": monthly, "splits": sp}, cache)
+    if not TIINGO_API_KEY:
+        raise RuntimeError("未設定環境變數 TIINGO_API_KEY（Tiingo 原始股價需要）。")
+    url = f"https://api.tiingo.com/tiingo/daily/{symbol}/prices"
+    params = {"startDate": start, "endDate": end, "format": "json"}
+    headers = {"Content-Type": "application/json", "Authorization": f"Token {TIINGO_API_KEY}"}
+    rows = []
+    for attempt in range(4):
+        try:
+            r = requests.get(url, params=params, headers=headers, timeout=30)
+            if r.status_code == 200:
+                rows = r.json()
+                break
+            if r.status_code == 404:
+                break                       # 該 ticker Tiingo 無資料
+            time.sleep(1.0 * (attempt + 1))
+        except requests.exceptions.RequestException:
+            time.sleep(1.0 * (attempt + 1))
+    if not rows:
+        s = pd.Series(dtype=float)
+        pd.to_pickle(s, cache)
+        return s
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
+    df = df.sort_values("date").set_index("date")
+    monthly = df["close"].resample("ME").last().dropna()   # close = 原始未調整價
+    pd.to_pickle(monthly, cache)
     time.sleep(0.05)
-    return monthly, sp
-
-
-def _cum_split_factor(splits: pd.Series, on_date: pd.Timestamp) -> float:
-    """d 之後（含未來）所有拆股比率的乘積 —— 把當期股數/EPS 對齊拆股調整價基準。"""
-    if splits is None or len(splits) == 0:
-        return 1.0
-    fut = splits[splits.index > on_date]
-    f = float(fut.prod()) if len(fut) else 1.0
-    return f if f > 0 else 1.0
+    return monthly
 
 
 def _asof_value(pit_df: pd.DataFrame, on_date: pd.Timestamp, filed_col="filed", val_col=None):
@@ -243,15 +249,17 @@ def build_dataset(start="2000-01-01", end="2025-12-31"):
                 shares_pit = _pit_shares(facts)
                 if not eps_pit.empty or not shares_pit.empty:
                     n_ok += 1
-        px, splits = _yf_price_splits(sym, start, end)   # 拆股調整價 + 拆股事件
+        try:
+            px = _tiingo_raw_monthly_close(sym, start, end)   # 原始（未調整）月底價
+        except RuntimeError as e:
+            raise SystemExit(str(e))
         for d in month_ends:
             close = float(px.get(d, np.nan)) if len(px) else np.nan
             shares = _asof_value(shares_pit, d, val_col="shares") if not shares_pit.empty else np.nan
             ttm_eps = _asof_value(eps_pit, d, val_col="ttm_eps") if not eps_pit.empty else np.nan
-            cum = _cum_split_factor(splits, d)
-            # 拆股不變量：以拆股調整價 × 累積拆股因子，對齊 SEC 當期（未調整）股數/EPS
-            mcap = close * shares * cum if (np.isfinite(close) and np.isfinite(shares)) else np.nan
-            pe = close * cum / ttm_eps if (np.isfinite(close) and np.isfinite(ttm_eps) and ttm_eps > 0) else np.nan
+            # 原始價 × 當期股數 → 市值；原始價 / TTM EPS → PE（皆當期未調整，直接相乘）
+            mcap = close * shares if (np.isfinite(close) and np.isfinite(shares)) else np.nan
+            pe = close / ttm_eps if (np.isfinite(close) and np.isfinite(ttm_eps) and ttm_eps > 0) else np.nan
             all_rows.append((d, sym, close, mcap, pe, industry_map.get(sym, "Unknown")))
         if (i + 1) % 25 == 0:
             print(f"  進度 {i+1}/{len(symbols)} | 有基本面 {n_ok} 檔")
