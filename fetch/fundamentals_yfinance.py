@@ -6,7 +6,7 @@ Firm-fundamentals snapshot fetcher (market cap, trailing P/E) via yfinance
 因此本腳本抓取「今日」市值與本益比，供 Agglomerative Fundamentals 形成期
 模組在所有歷史形成窗口中重複使用（已知前視偏誤限制，見該模組 docstring）。
 
-寫入獨立的 dataset/fundamentals_sp500.db（不動用共用的 sp500_Tiingo.db），
+寫入獨立的 dataset/fundamental/fundamentals_sp500.db（不動用共用的 dataset/price/sp500_Tiingo.db），
 避免與價格資料庫的讀寫並發或 LFS diff 產生干擾。
 
 用法：
@@ -25,11 +25,11 @@ import yfinance as yf
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(_SCRIPT_DIR)
 
-SOURCE_DB_PATH = os.path.join(_PROJECT_DIR, "dataset", "sp500_Tiingo.db")
+SOURCE_DB_PATH = os.path.join(_PROJECT_DIR, "dataset", "price", "sp500_Tiingo.db")
 SOURCE_TABLE = "Constituents"
 SOURCE_TICKER_COL = "Symbol"
 
-OUTPUT_DB_PATH = os.path.join(_PROJECT_DIR, "dataset", "fundamentals_sp500.db")
+OUTPUT_DB_PATH = os.path.join(_PROJECT_DIR, "dataset", "fundamental", "fundamentals_sp500.db")
 
 MAX_RETRIES = 3
 BACKOFF_BASE_SECONDS = 2.0

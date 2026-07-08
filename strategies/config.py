@@ -48,23 +48,23 @@ CPU_LIMIT_PCT = 0.95
 DRL_MAX_WORKERS = 10  # 本機 CPU-only（無 CUDA），torch.set_num_threads(1)，10 並行安全
 DB_PROFILES = {
     "sp500_Current": {
-        "db_path":     "./dataset/sp500_Current.db",
+        "db_path":     "./dataset/price/sp500_Current.db",
         "output_root": "./results/current",
         "label":       "S&P 500 現行成分股 (Current)",
     },
     "sp500_yF": {
-        "db_path":     "./dataset/sp500_yF.db",
+        "db_path":     "./dataset/price/sp500_yF.db",
         "output_root": "./results/yFinance",
         "label":       "S&P 500 完整歷史成分股 (yFinance)",
     },
     "sp500_Tiingo": {
-        "db_path":     "./dataset/sp500_Tiingo.db",
+        "db_path":     "./dataset/price/sp500_Tiingo.db",
         "output_root": "./results/tiingo",
         "label":       "S&P 500 完整歷史成分股 (Tiingo)",
     },
 }
 
-DB_PATH = "./dataset/sp500_Tiingo.db"
+DB_PATH = "./dataset/price/sp500_Tiingo.db"
 TABLE_NAME = "Daily_Prices"
 INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
@@ -322,7 +322,7 @@ strategies_raw_all = [
         "params": {
             **base_params,
             "pca_n_components":            5,
-            "fundamentals_db_path":        "./dataset/fundamentals_sp500.db",
+            "fundamentals_db_path":        "./dataset/fundamental/fundamentals_sp500.db",
             "price_feature_weight":        1.0,
             "fundamentals_feature_weight": 1.0,
             "sector_onehot_weight":        1.0,
@@ -360,7 +360,7 @@ strategies_raw_all = [
         "params": {
             **base_params,
             "pca_n_components":            5,
-            "fundamentals_parquet_path":   "data/sp500_pit_2000_2025_monthly.parquet",
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
             "price_feature_weight":        1.0,
             "fundamentals_feature_weight": 1.0,
             "sector_onehot_weight":        1.0,

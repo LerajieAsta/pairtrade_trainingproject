@@ -138,7 +138,7 @@ class Formation:
         min_tickers_for_pairing: int = 2,
         # ── 特徵組 ──────────────────────────────────────────────
         pca_n_components: int = 5,
-        fundamentals_db_path: str = "./dataset/fundamentals_sp500.db",
+        fundamentals_db_path: str = "./dataset/fundamental/fundamentals_sp500.db",
         fundamentals_table: str = "Fundamentals",
         price_feature_weight: float = 1.0,
         fundamentals_feature_weight: float = 1.0,

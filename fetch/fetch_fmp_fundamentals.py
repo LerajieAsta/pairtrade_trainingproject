@@ -13,7 +13,7 @@ class FMPPITDataPipeline:
     專為 S&P 500 成分股（2000–2025）長週期回測設計，具備動態成分股重建與無前視偏誤特徵計算。
     """
 
-    def __init__(self, api_key: str, cache_dir: str = "data/fmp_cache", tiingo_db_path: str = "dataset/sp500_Tiingo.db"):
+    def __init__(self, api_key: str, cache_dir: str = "dataset/fundamental/fmp_cache", tiingo_db_path: str = "dataset/price/sp500_Tiingo.db"):
         self.api_key = api_key
         self.base_url = "https://financialmodelingprep.com/api/v3"
         self.cache_dir = cache_dir
@@ -247,7 +247,7 @@ def process_sp500_pipeline(
     start_date: str = "2000-01-01",
     end_date: str = "2025-12-31",
     rebalance_freq: str = "ME",  # 'ME' 代表月底重平衡, 可改為 'QE' 季底或 'D' 每日
-    output_path: str = "data/sp500_pit_2000_2025_monthly.parquet"
+    output_path: str = "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet"
 ) -> pd.DataFrame:
     """
     S&P 500 長週期 Point-in-Time 數據處理主函數
@@ -334,7 +334,7 @@ if __name__ == "__main__":
         start_date=START,
         end_date=END,
         rebalance_freq="ME",
-        output_path="data/sp500_pit_2000_2025_monthly.parquet"
+        output_path="dataset/fundamental/sp500_pit_2000_2025_monthly.parquet"
     )
     
     print("\nS&P 500 PIT 數據處理與生存者偏差校正完成。")

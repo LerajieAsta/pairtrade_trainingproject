@@ -99,7 +99,7 @@ def robust_get(url, headers, max_retries=3, retry_delay=5):
 def get_sp500_tickers():
     """獲取標普 500 成分股清單"""
     print("正在嘗試從 yF 資料庫載入完整歷史成分股清單...")
-    yf_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dataset", "sp500_yF.db")
+    yf_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dataset", "price", "sp500_yF.db")
     if os.path.exists(yf_db_path):
         try:
             import sqlite3
@@ -578,9 +578,9 @@ if __name__ == "__main__":
         script_dir = os.getcwd()
 
     project_dir = os.path.dirname(script_dir)
-    data_dir = os.path.join(project_dir, "dataset")  
+    data_dir = os.path.join(project_dir, "dataset", "price")
     os.makedirs(data_dir, exist_ok=True)
-    db_file = os.path.join(data_dir, "sp500_Tiingo.db")  
+    db_file = os.path.join(data_dir, "sp500_Tiingo.db")
     abs_db_path = os.path.abspath(db_file)
 
     print(f"\n{'='*55}")

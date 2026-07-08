@@ -183,12 +183,12 @@ if __name__ == "__main__":
     # 2. 取得專案根目錄 (即 fetch 的上一層，例如: .../MyProject)
     project_dir = os.path.dirname(script_dir)
     
-    # 3. 指定目標資料夾為專案根目錄下的 dataset 資料夾 (例如: .../MyProject/dataset)
-    data_dir = os.path.join(project_dir, "dataset")
-    
+    # 3. 指定目標資料夾為專案根目錄下的 dataset/price 資料夾（價格類資料庫）
+    data_dir = os.path.join(project_dir, "dataset", "price")
+
     # 4. 如果資料夾不存在，自動建立它
     os.makedirs(data_dir, exist_ok=True)
-    
+
     # 5. 將資料庫檔案路徑指到該資料夾內
     db_file = os.path.join(data_dir, "SP500_Current.db")
 

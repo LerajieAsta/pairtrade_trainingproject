@@ -132,7 +132,7 @@ class Formation:
         min_tickers_for_pairing: int = 2,
         # ── 特徵組 ──────────────────────────────────────────────
         pca_n_components: int = 5,
-        fundamentals_parquet_path: str = "data/sp500_pit_2000_2025_monthly.parquet",
+        fundamentals_parquet_path: str = "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
         price_feature_weight: float = 1.0,
         fundamentals_feature_weight: float = 1.0,
         sector_onehot_weight: float = 1.0,

@@ -38,7 +38,12 @@ Project/
 # Databases
 *.db
 !dataset/*.db
+!dataset/price/*.db
+!dataset/fundamental/*.db
 !formation_data/*.db
+# 基本面本地資料產物（先前位於已忽略的 data/，維持不進版控）
+dataset/fundamental/fmp_cache/
+dataset/fundamental/*.parquet
 # SQLite WAL/SHM temp files should never be committed
 *.db-shm
 *.db-wal

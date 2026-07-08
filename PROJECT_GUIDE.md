@@ -28,11 +28,15 @@ pairtrade_trainingproject/
 │   ├── SP500_Tiingo.py            # Tiingo API 歷史數據下載
 │   ├── sp500_yf_now.py            # yFinance 當日數據更新
 │   └── fundamentals_yfinance.py   # 公司基本面快照下載（市值、本益比，供 Agglomerative Fundamentals 使用）
-├── dataset/                       # 資料庫（大檔案透過 Git LFS 追蹤）
-│   ├── sp500_Tiingo.db            # 主要資料庫，`DB_PATH` 預設指向此
-│   ├── sp500_yF.db                # yFinance 備用資料庫
-│   ├── sp500_Current.db           # 現行成分股查詢
-│   ├── fundamentals_sp500.db      # 公司基本面快照（單一時點靜態資料，見下方限制說明）
+├── dataset/                       # 資料庫（大檔案透過 Git LFS 追蹤），分 price／fundamental 兩類
+│   ├── price/                     # 價格類資料庫
+│   │   ├── sp500_Tiingo.db        # 主要資料庫，`DB_PATH` 預設指向此
+│   │   ├── sp500_yF.db            # yFinance 備用資料庫
+│   │   └── sp500_Current.db       # 現行成分股查詢
+│   ├── fundamental/               # 基本面類（DB 進 LFS；parquet／fmp_cache 本地不進版控）
+│   │   ├── fundamentals_sp500.db  # 公司基本面快照（單一時點靜態資料，見下方限制說明）
+│   │   ├── sp500_pit_2000_2025_monthly.parquet  # FMP Point-in-Time 基本面（本地產物）
+│   │   └── fmp_cache/             # FMP API 快取（本地產物）
 │   └── audit_report.csv           # 交易期資料品質審計報告
 ├── formation_data/
 │   └── formation_pairs_sp500_Tiingo.db  # 形成期主合併資料庫（LFS 追蹤）
@@ -77,7 +81,7 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 
 ### run_formation.py 細節
 
-- 讀取 `dataset/sp500_Tiingo.db`（或 config 指定資料庫，見 `DB_PROFILES`）
+- 讀取 `dataset/price/sp500_Tiingo.db`（或 config 指定資料庫，見 `DB_PROFILES`）
 - 多行程平行執行每個策略的每個滾動期形成期計算（`ProcessPoolExecutor`，`spawn` context 避免 CUDA fork 污染）
 - 結果寫入 `formation_data/formation_pairs_{db_basename}.db`
 - 逐滾動期續傳：formation DB 的 `formation_progress` 表記錄每個「已嘗試」窗口（含空配對窗口）；策略完整性 = progress 期數 == 預期窗口數。中斷後重跑只補算缺漏窗口，不整策略重來。（舊 JSON 標記檔 fallback 已移除）
@@ -222,10 +226,11 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 
 | 檔案 | 用途 |
 | :--- | :--- |
-| `sp500_Tiingo.db` | 主要資料庫，`DB_PATH` 預設指向此 |
-| `sp500_yF.db` | yFinance 備用（config `DB_PROFILES` 可切換） |
-| `sp500_Current.db` | 現行成分股查詢 |
-| `fundamentals_sp500.db` | 公司基本面快照（市值、本益比），供 `agglomerative_fundamentals.py` 使用；⚠️ 單一時點靜態資料，非歷史逐日序列。2026-07-05 以 `fetch/fundamentals_yfinance.py` 重抓（843 檔：633 有效、210 已下市） |
+| `price/sp500_Tiingo.db` | 主要資料庫，`DB_PATH` 預設指向此 |
+| `price/sp500_yF.db` | yFinance 備用（config `DB_PROFILES` 可切換） |
+| `price/sp500_Current.db` | 現行成分股查詢 |
+| `fundamental/fundamentals_sp500.db` | 公司基本面快照（市值、本益比），供 `agglomerative_fundamentals.py` 使用；⚠️ 單一時點靜態資料，非歷史逐日序列。2026-07-05 以 `fetch/fundamentals_yfinance.py` 重抓（843 檔：633 有效、210 已下市） |
+| `fundamental/sp500_pit_2000_2025_monthly.parquet`、`fundamental/fmp_cache/` | FMP Point-in-Time 基本面與 API 快取（本地產物，不進版控） |
 
 資料表：`Daily_Prices`（Date, Symbol, Open, High, Low, Close, Volume）、`Constituents`（Symbol, GICS_Sector）
 

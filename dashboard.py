@@ -944,9 +944,8 @@ def render_deep_dive(target_row, date_range=None):
 @st.cache_data(show_spinner=False)
 def get_sector_mapping():
     mapping = {}
-    for db_file in ["data/sp500Full.db", "data/sp500_Current.db",
-                    "dataset/sp500_Tiingo.db", "dataset/sp500_yF.db",
-                    "data/sp500.db", "dataset/SP500_Current.db"]:
+    for db_file in ["dataset/price/sp500_Tiingo.db", "dataset/price/sp500_yF.db",
+                    "dataset/price/sp500_Current.db"]:
         if os.path.exists(db_file):
             try:
                 import sqlite3
