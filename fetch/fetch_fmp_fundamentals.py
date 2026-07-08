@@ -15,7 +15,9 @@ class FMPPITDataPipeline:
 
     def __init__(self, api_key: str, cache_dir: str = "dataset/fundamental/fmp_cache", tiingo_db_path: str = "dataset/price/sp500_Tiingo.db"):
         self.api_key = api_key
-        self.base_url = "https://financialmodelingprep.com/api/v3"
+        # FMP 於 2024-08 停用 /api/v3 legacy 端點（回 403 Legacy Endpoint），
+        # 全面遷移至 /stable，改以 ?symbol= query 參數呼叫。
+        self.base_url = "https://financialmodelingprep.com/stable"
         self.cache_dir = cache_dir
         self.tiingo_db_path = tiingo_db_path
         if not os.path.exists(cache_dir):
@@ -42,11 +44,15 @@ class FMPPITDataPipeline:
                     delay *= 2
                     continue
                 else:
-                    return []
+                    # 不再靜默回傳 []：把 HTTP 錯誤明確拋出，避免像 403 Legacy /
+                    # 402 Restricted 這類權限問題被吞掉、產生全 NaN 的資料集而不自知。
+                    raise RuntimeError(
+                        f"FMP API {response.status_code} @ {endpoint}: {response.text[:200]}"
+                    )
             except requests.exceptions.RequestException:
                 time.sleep(delay)
                 delay *= 2
-        return []
+        raise RuntimeError(f"FMP API 重試 {retries} 次仍失敗 @ {endpoint}")
 
     def fetch_sp500_current_constituents(self) -> List[Dict]:
         """
@@ -110,18 +116,22 @@ class FMPPITDataPipeline:
             if not df[mask].empty:
                 return df[mask].reset_index(drop=True)
 
-        endpoint = f"historical-price-full/{ticker}"
-        params = {"from": start_date, "to": end_date}
-        data = self._get_request(endpoint, params)
-        
-        if not data or "historical" not in data:
+        # /stable：historical-price-eod/full?symbol=，回傳為扁平 list（非 {"historical": [...]}）
+        try:
+            data = self._get_request("historical-price-eod/full",
+                                     {"symbol": ticker, "from": start_date, "to": end_date})
+        except RuntimeError as e:
+            print(f"  [Warning] 股價抓取失敗 {ticker}: {e}")
             return pd.DataFrame()
-        
-        df = pd.DataFrame(data["historical"])
+
+        rows = data.get("historical") if isinstance(data, dict) else data
+        if not rows:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(rows)
         df["date"] = pd.to_datetime(df["date"])
         df = df.sort_values("date").reset_index(drop=True)
-        
-        # 寫入快取以利重複利用
+
         df.to_csv(cache_file, index=False)
         return df[["date", "close"]]
 
@@ -134,17 +144,21 @@ class FMPPITDataPipeline:
             df = pd.read_csv(cache_file, parse_dates=["date"])
             return df
 
-        endpoint = f"historical-market-capitalization/{ticker}"
-        params = {"limit": limit}
-        data = self._get_request(endpoint, params)
-        
+        # /stable：symbol 改為 query 參數
+        try:
+            data = self._get_request("historical-market-capitalization",
+                                     {"symbol": ticker, "limit": limit})
+        except RuntimeError as e:
+            print(f"  [Warning] 市值抓取失敗 {ticker}: {e}")
+            return pd.DataFrame()
+
         if not data:
             return pd.DataFrame()
-        
+
         df = pd.DataFrame(data)
         df["date"] = pd.to_datetime(df["date"])
         df = df.sort_values("date").reset_index(drop=True)
-        
+
         df[["date", "marketCap"]].to_csv(cache_file, index=False)
         return df[["date", "marketCap"]]
 
@@ -156,23 +170,30 @@ class FMPPITDataPipeline:
         if os.path.exists(cache_file):
             return pd.read_csv(cache_file, parse_dates=["fiscal_date", "filling_date"])
 
-        endpoint = f"income-statement/{ticker}"
-        params = {"period": "quarter", "limit": 120}  # 覆蓋 25 年需要約 100-120 季
-        data = self._get_request(endpoint, params)
-        
+        # /stable：symbol 改為 query 參數；欄位改為 stable 命名（epsDiluted / filingDate），
+        # 並相容 v3 舊命名（epsdiluted / fillingDate）以防混用。
+        try:
+            data = self._get_request("income-statement",
+                                     {"symbol": ticker, "period": "quarter", "limit": 120})
+        except RuntimeError as e:
+            print(f"  [Warning] 財報抓取失敗 {ticker}: {e}")
+            return pd.DataFrame()
+
         if not data:
             return pd.DataFrame()
-        
+
         df = pd.DataFrame(data)
-        required_cols = ["date", "fillingDate", "epsdiluted"]
-        for col in required_cols:
+        eps_col = "epsDiluted" if "epsDiluted" in df.columns else "epsdiluted"
+        fil_col = "filingDate" if "filingDate" in df.columns else "fillingDate"
+        for col in ("date", fil_col, eps_col):
             if col not in df.columns:
                 df[col] = np.nan
-                
+
         df["fiscal_date"] = pd.to_datetime(df["date"])
-        df["filling_date"] = pd.to_datetime(df["fillingDate"])
+        df["filling_date"] = pd.to_datetime(df[fil_col])
         df["filling_date"] = df["filling_date"].fillna(df["fiscal_date"] + pd.Timedelta(days=45))
-        
+        df["epsdiluted"] = pd.to_numeric(df[eps_col], errors="coerce")
+
         result_df = df[["fiscal_date", "filling_date", "epsdiluted"]].sort_values("filling_date").reset_index(drop=True)
         result_df.to_csv(cache_file, index=False)
         return result_df
@@ -322,8 +343,24 @@ def process_sp500_pipeline(
 
 
 if __name__ == "__main__":
-    FMP_API_KEY = "NYs5FDrjT91BGzgN35aH12ddsbzgoUEz"
-    
+    # API key 改由環境變數提供（勿再硬編碼於原始碼）：
+    #   Windows PowerShell:  $env:FMP_API_KEY="你的key"; python fetch/fetch_fmp_fundamentals.py
+    #   Linux/macOS:         FMP_API_KEY=你的key python fetch/fetch_fmp_fundamentals.py
+    FMP_API_KEY = os.environ.get("FMP_API_KEY", "").strip()
+    if not FMP_API_KEY:
+        raise SystemExit("請先設定環境變數 FMP_API_KEY（FMP /stable API 金鑰）。")
+
+    # 前置檢查：先以單一 ticker 測試付費端點，權限不足時立即明確中止，
+    # 避免整批抓完才發現 market_cap/pe 全 NaN。
+    _pf = FMPPITDataPipeline(FMP_API_KEY)
+    try:
+        _probe = _pf.fetch_historical_market_cap("AAPL", limit=2)
+        if _probe.empty:
+            raise SystemExit("前置檢查：historical-market-capitalization 無資料，請確認金鑰方案。")
+        print(f"✅ 前置檢查通過：AAPL 市值端點可用（樣本 {len(_probe)} 筆）。")
+    except Exception as e:
+        raise SystemExit(f"前置檢查失敗：{e}")
+
     # 回測時間範圍：2000-01-01 至 2025-12-31
     START = "2000-01-01"
     END = "2025-12-31"
