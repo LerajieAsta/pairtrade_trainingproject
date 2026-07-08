@@ -520,7 +520,7 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
         return False
 
 
-def init_formation_db(db_path="data/formation_pairs.db"):
+def init_formation_db(db_path="formation_data/formation_pairs.db"):
     """
     初始化 Formation 期間選出的配對資料庫。
     """
