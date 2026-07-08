@@ -39,7 +39,7 @@ from strategies.preprocess_equity import DataProcessor
 from strategies.portfolio_manager import PortfolioManager
 from strategies.db_utils import get_db_connection
 from strategies.config import (
-    INITIAL_CAPITAL, CONCURRENT_PERIODS,
+    INITIAL_CAPITAL, CONCURRENT_PERIODS, WRITE_TRADE_CSV,
     FORCE_RERUN, CPU_LIMIT_PCT, DRL_MAX_WORKERS, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
     TICKER_COL, SECTOR_COL, BACKTEST_START, BACKTEST_END,
     FORMATION_WINDOW, FORWARD_DAYS, rolling_step,
@@ -69,33 +69,27 @@ def _build_filename(params: dict) -> str:
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def check_trading_completed(strategy_config: dict, output_root: str, results_db_path: str = "", dataset_name: str = "") -> bool:
+    """
+    完成判定「純以 result.db 為準」：strategy_summaries 有該 config 的列即視為完成。
+    不再要求 CSV 存在 → CSV 成為可選產物（見 WRITE_TRADE_CSV），可安全清除以省空間。
+    """
     if FORCE_RERUN:
         return False
 
-    sub_dir  = strategy_config["sub_dir"]
-    params   = strategy_config["params"]
-    filename = _build_filename(params)
-    csv_path = os.path.join(output_root, sub_dir, filename)
-
-    if not os.path.exists(csv_path):
+    if not (results_db_path and dataset_name) or not os.path.exists(results_db_path):
         return False
 
-    # result.db 為完成與否的唯一真相來源：DB 檔不存在（重建情境）或該列未登記
-    # 一律視為未完成，CSV 僅為必要非充分條件（防 stale CSV / 重建時誤跳過）
-    if results_db_path and dataset_name:
-        if not os.path.exists(results_db_path):
-            return False
-        try:
-            path_key = f"{dataset_name.lower()}/{sub_dir}/{filename}"
-            with sqlite3.connect(results_db_path, timeout=5.0) as _conn:
-                row = _conn.execute(
-                    "SELECT 1 FROM strategy_summaries WHERE _path = ?", (path_key,)
-                ).fetchone()
-                return row is not None
-        except Exception:
-            return False
-
-    return True
+    sub_dir  = strategy_config["sub_dir"]
+    filename = _build_filename(strategy_config["params"])
+    try:
+        path_key = f"{dataset_name.lower()}/{sub_dir}/{filename}"
+        with sqlite3.connect(results_db_path, timeout=5.0) as _conn:
+            row = _conn.execute(
+                "SELECT 1 FROM strategy_summaries WHERE _path = ?", (path_key,)
+            ).fetchone()
+            return row is not None
+    except Exception:
+        return False
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -392,14 +386,15 @@ def worker_task(
             df_all = pd.concat(all_trade_logs, ignore_index=True)
             df_all = df_all.sort_values("Date").reset_index(drop=True)
 
-            # 依據命名規範建立 CSV
+            # 依據命名規範建立檔名（path_key 恆需，供 result.db 主鍵）
             filename = _build_filename(params)
-            
-            # 建立子目錄並輸出 CSV
-            strat_output_dir = os.path.join(output_root, sub_dir)
-            os.makedirs(strat_output_dir, exist_ok=True)
-            csv_path = os.path.join(strat_output_dir, filename)
-            df_all.to_csv(csv_path, index=False)
+
+            # 人類可讀 Trade Log CSV 為可選產物（WRITE_TRADE_CSV）；
+            # 續傳與儀表板皆以 result.db 為準，關閉可省 ~14GB。
+            if WRITE_TRADE_CSV:
+                strat_output_dir = os.path.join(output_root, sub_dir)
+                os.makedirs(strat_output_dir, exist_ok=True)
+                df_all.to_csv(os.path.join(strat_output_dir, filename), index=False)
 
             # 寫入 SQLite 資料庫 (result.db)
             dataset_subdir = dataset_name.lower()

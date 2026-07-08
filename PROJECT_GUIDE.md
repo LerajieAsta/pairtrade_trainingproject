@@ -95,7 +95,24 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 - 輸出：`results/tiingo/` 下的 Trade Log CSV + `dataset/audit_report.csv` + `results/result.db` 的 `strategy_summaries`/`trade_logs`/`strategy_pairs`
 - 網格搜尋：Top N / Stop Loss / MSR 等參數組合
 - 所有交易全部失敗時拋出 `RuntimeError`（fail-loud），不會靜默回傳空結果
-- 逐滾動期續傳（Z-Score 策略）：每期算完即以 pickle 落地至 `results/<dataset>/.ckpt/<策略>/<期>.pkl`；中斷重跑僅補算缺漏期，並自 checkpoint 重建 PortfolioManager 權益。summary/CSV 於全部期完成後定稿並清除 checkpoint。DRL 策略因 walk-forward 訓練狀態暫不套用（維持整策略重跑）。config 級跳過仍以 result.db 有 summary 列為準
+- 逐滾動期續傳（Z-Score 策略）：每期算完即以 pickle 落地至 `results/<dataset>/.ckpt/<策略>/<期>.pkl`；中斷重跑僅補算缺漏期，並自 checkpoint 重建 PortfolioManager 權益。summary 於全部期完成後定稿並清除 checkpoint。DRL 策略因 walk-forward 訓練狀態暫不套用（維持整策略重跑）
+- **完成判定純以 result.db 為準**（`check_trading_completed` 查 `strategy_summaries` 有無該 config 列，不再要求 CSV 存在）
+- **Trade Log CSV 為可選產物**：`config.WRITE_TRADE_CSV`（預設 True）。設 False 可省 ~14GB，不影響回測／續傳／儀表板（皆讀 result.db）
+
+### results/ 目錄結構與重跑
+
+```
+results/
+├── result.db            單一真相來源（儀表板 + 續傳；per-config 覆寫）
+├── <dataset>/           Trade Log CSV（可選，WRITE_TRADE_CSV）+ pipeline logs
+├── archive/             snapshot_run.py 歸檔的舊 result.db 與 summary CSV
+└── analysis/            額外分析產物（如 drl_variance）
+```
+
+重跑三種模式：
+1. **選擇性重跑**（改一個策略）：`STRATEGIES_SLICE="i:j" python run_trading.py` —— result.db 逐 config 覆寫，其餘不動。
+2. **全量重跑前先歸檔舊版**：`python snapshot_run.py <tag>` 把 result.db 搬到 `archive/` 並匯出 summary CSV，再 `FORCE_RERUN=True` 重建。可新舊並存比較、回滾。
+3. **輕量對照**：`python snapshot_run.py <tag> --summary-only` 只匯出 summary CSV 不動 DB。
 
 ---
 

@@ -44,6 +44,9 @@ if hasattr(sys.stdout, "reconfigure"):
 
 # ── 共用常數 ─────────────────────────────────────────────────────────────
 FORCE_RERUN = False
+# 交易期是否另存人類可讀的 Trade Log CSV。續傳與儀表板均以 result.db 為準，
+# 故 CSV 為可選產物；設 False 可省下 ~14GB（大型網格）且不影響回測/續傳/儀表板。
+WRITE_TRADE_CSV = True
 CPU_LIMIT_PCT = 0.95
 DRL_MAX_WORKERS = 10  # 本機 CPU-only（無 CUDA），torch.set_num_threads(1)，10 並行安全
 DB_PROFILES = {
