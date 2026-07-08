@@ -149,6 +149,56 @@
       color: #adb5bd;
       text-align: center;
     }
+    /* 研究架構 */
+    .arch {
+      background: #fff;
+      border: 1px solid #dee2e6;
+      border-radius: 10px;
+      padding: 1.4rem 1.5rem;
+    }
+    .arch-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+    .arch-stage {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid #eef0f2;
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+    .arch-stage .num {
+      flex-shrink: 0;
+      width: 1.5rem; height: 1.5rem;
+      border-radius: 50%;
+      background: #0d6efd;
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .arch-stage .body { flex: 1; }
+    .arch-stage .title {
+      font-size: 0.9rem; font-weight: 600; color: #0d1117; margin-bottom: 0.15rem;
+    }
+    .arch-stage .desc { font-size: 0.8rem; color: #6c757d; line-height: 1.5; }
+    .arch-arrow { text-align: center; color: #ced4da; font-size: 0.85rem; line-height: 0.4; }
+    .arch-props {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;
+    }
+    .arch-prop {
+      border: 1px solid #dee2e6; border-radius: 8px; padding: 0.8rem 1rem;
+    }
+    .arch-prop .tag {
+      display: inline-block; font-size: 0.68rem; font-weight: 600;
+      padding: 0.12rem 0.5rem; border-radius: 999px;
+      background: #e7f1ff; color: #0d6efd; margin-bottom: 0.4rem;
+    }
+    .arch-prop p { font-size: 0.8rem; color: #495057; line-height: 1.5; }
+    @media (max-width: 560px) { .arch-props { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -157,6 +207,61 @@
       <h1>S&amp;P 500 Pairs Trading</h1>
       <p>配對交易量化回測平台 — 策略邏輯技術文件</p>
       <span class="badge">現役 8 個交易策略 + 2 個 formation-only 條目</span>
+    </div>
+
+    <p class="section-label">🏛️ 研究架構</p>
+    <div class="arch">
+      <div class="arch-flow">
+        <div class="arch-stage">
+          <div class="num">1</div>
+          <div class="body">
+            <div class="title">資料層 — S&amp;P 500 歷史成分股</div>
+            <div class="desc">Tiingo 日頻價量（2000–2025）＋動態成分股名冊，避免存活者偏差；FMP／yFinance 公司基本面（市值、本益比、GICS 產業）。</div>
+          </div>
+        </div>
+        <div class="arch-arrow">▼</div>
+        <div class="arch-stage">
+          <div class="num">2</div>
+          <div class="body">
+            <div class="title">形成期（252 日）— 配對搜尋 · 三階段</div>
+            <div class="desc"><b>分組</b>：距離／共整合／HDBSCAN·Agglomerative 聚類（價格 PCA 因子載荷 ⊕ 基本面 ⊕ 產業）；<b>篩選</b>：共整合 ADF、OU 半衰期、Hurst、零穿越；<b>排序</b>：SSD／DTW／PCA 融合或品質分數，選 Top N 配對。</div>
+          </div>
+        </div>
+        <div class="arch-arrow">▼</div>
+        <div class="arch-stage">
+          <div class="num">3</div>
+          <div class="body">
+            <div class="title">組合層 — 資金配置</div>
+            <div class="desc">PortfolioManager 以 <code>current_equity ÷ max_pairs</code> 等額配置；<code>max_pairs = Top N × 重疊期數</code>，確保任意時點總部署 ≤ 權益。</div>
+          </div>
+        </div>
+        <div class="arch-arrow">▼</div>
+        <div class="arch-stage">
+          <div class="num">4</div>
+          <div class="body">
+            <div class="title">交易期（126 日）— 訊號執行 · 三種基準</div>
+            <div class="desc"><b>回歸基準</b>（Z-Score）：OLS 共整合殘差；<b>距離基準</b>（GGR 2006）：正規化價格距離、等權；<b>DRL 門檻選擇式</b>（Kim &amp; Kim 2019）：每配對每期由監督式網路自選 (entry_z, exit_z)。進出場狀態機 + 六大風控。交易成本 0.29%／單邊（Do &amp; Faff 2012）。</div>
+          </div>
+        </div>
+        <div class="arch-arrow">▼</div>
+        <div class="arch-stage">
+          <div class="num">5</div>
+          <div class="body">
+            <div class="title">評估層 — 績效與統計檢定</div>
+            <div class="desc">年化報酬／Sharpe／Sortino／Calmar／MDD／獲利因子＋文獻口徑（資金利用率、動用資本年化、rf 計息超額）；逐月配對報酬 t 檢定與 Newey-West 修正 t 值（H₀：與基準策略無差異）。</div>
+          </div>
+        </div>
+      </div>
+      <div class="arch-props">
+        <div class="arch-prop">
+          <span class="tag">命題 1 · 形成法</span>
+          <p>以資料驅動的聚類（HDBSCAN／Agglomerative）搜尋配對，相對於靜態 GICS 產業分組與距離／共整合法，能否提升配對品質與績效。</p>
+        </div>
+        <div class="arch-prop">
+          <span class="tag">命題 2 · 交易法</span>
+          <p>以強化／監督式學習自適應選擇交易門檻（DRL 門檻選擇式），相對於固定門檻的 Z-Score 回歸基準，能否提升風險調整後報酬。</p>
+        </div>
+      </div>
     </div>
 
     <p class="section-label">🔍 形成期策略投影片（一策略一份，Alt+點擊可縮放圖表）</p>
