@@ -66,6 +66,16 @@ class Formation(_UMAPFormation):
 
         # 日報酬矩陣 (T-1 × N)，逐股標準化 → PCA 等同於對相關矩陣做特徵分解
         R  = np.diff(np.column_stack(cols), axis=0)
+
+        # 研究框架 #1：分群前先移除市場（+產業）因子，讓 PCA 建在特殊性報酬上
+        # （避免被市場 β 齊漲齊跌主導、且更耐 regime）。
+        if getattr(self, "factor_residual", False):
+            from strategies.formation._utils import _residualize_returns
+            sec = [self.sector_mapping.get(t.upper(), self.sector_mapping.get(t, "Unknown"))
+                   for t in valid_tickers]
+            R = _residualize_returns(R, sector_labels=sec)
+            print("  [Formation] 因子殘差化：已移除市場+產業共動（分群建於特殊性報酬）")
+
         mu = R.mean(axis=0)
         sd = R.std(axis=0, ddof=1)
         sd[sd < 1e-12] = 1e-12

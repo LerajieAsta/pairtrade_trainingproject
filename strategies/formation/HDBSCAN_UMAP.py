@@ -285,7 +285,9 @@ class Formation:
         use_mom1_filter:         bool  = True,
         market_returns: Optional[pd.Series] = None,
         feature_mode:            str   = "stats10",
+        factor_residual:         bool  = False,   # 研究框架 #1：分群前先移除市場+產業因子
     ):
+        self.factor_residual = factor_residual
         self.price_df   = price_df.copy()
         self.form_start = form_start
         self.form_end   = form_end

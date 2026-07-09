@@ -306,6 +306,28 @@ strategies_raw_all = [
             "ignore_ols_alpha":     True,
         },
     },
+    # 6b. 同上 + 因子殘差化（研究框架 #1 消融）：聚類前移除市場+產業因子，
+    #     PCA 建於特殊性報酬，理論上降低偽相關、提升 regime 穩健性。
+    #     與 #6 唯一差異 = factor_residual=True → 直接對照殘差化的增量貢獻。
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5_Resid",
+        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-PCA5-Resid)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "method":               "ssd_dtw_pca",
+            "pca_n_components":     5,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":  2,
+            "umap_random_state":    42,
+            "adf_pvalue_threshold": 0.01,
+            "ignore_ols_alpha":     True,
+            "factor_residual":      True,
+        },
+    },
     # 7. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings
     #     ⊕ GICS one-hot ⊕ log(市值) ⊕ 盈餘殖利率(1/PE)」混合特徵空間做
     #     Agglomerative（average-linkage、依合併距離分位數校準

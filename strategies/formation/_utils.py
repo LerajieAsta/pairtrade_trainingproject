@@ -68,3 +68,64 @@ def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
         return float(result[0]), float(result[1])
     except Exception:
         return 0.0, 1.0
+
+
+def _residualize_returns(R: np.ndarray, sector_labels=None) -> np.ndarray:
+    """
+    因子殘差化（研究框架次步 #1）：移除共同因子後保留特殊性報酬。
+    分群/相關若建在原始報酬上，會被市場 β 齊漲齊跌主導，且相關結構隨 regime 變動；
+    改建在殘差上 → 捕捉「特殊性共動」（才會均值回歸）、更耐 regime。
+
+    步驟：
+      1) 市場因子 f_mkt[t] = 橫斷面平均報酬；逐股對 [1, f_mkt] OLS → 取殘差（移除市場 β）。
+      2) 若給 sector_labels：產業因子 g_s[t] = 同產業市場殘差的橫斷面平均；
+         逐股對 [1, g_{sector}] OLS → 取殘差（移除產業共動）。
+
+    參數:
+        R (T×N): 日報酬矩陣。sector_labels: 長度 N 的產業標籤（None 則只移除市場）。
+    回傳: 殘差報酬矩陣（T×N）。
+    """
+    R = np.asarray(R, dtype=np.float64)
+    T, N = R.shape
+    if T < 10 or N < 2:
+        return R
+
+    def _resid_on(factor_1d: np.ndarray, y_2d: np.ndarray) -> np.ndarray:
+        # 對每一欄 y 逐股回歸 [1, factor] 取殘差（factor 相同 → 一次解出所有 β）；
+        # 回傳每欄均值為 0 的殘差（後續 PCA/相關正好需要去均值輸入）。
+        f = factor_1d - factor_1d.mean()
+        var_f = float(f @ f) + 1e-12
+        yc = y_2d - y_2d.mean(axis=0)
+        beta = (yc.T @ f) / var_f              # (N,)
+        return yc - np.outer(f, beta)
+
+    f_mkt = R.mean(axis=1)
+    e1 = _resid_on(f_mkt, R)
+
+    if sector_labels is None:
+        return e1
+
+    labels = np.asarray(sector_labels)
+    e2 = e1.copy()
+    for s in np.unique(labels):
+        idx = np.where(labels == s)[0]
+        if len(idx) < 2:
+            continue
+        g_s = e1[:, idx].mean(axis=1)               # 該產業的殘差因子
+        e2[:, idx] = _resid_on(g_s, e1[:, idx])
+    return e2
+
+
+def _bh_fdr_threshold(pvalues, alpha: float = 0.05) -> float:
+    """
+    Benjamini–Hochberg FDR 臨界 p 值（研究框架次步 #2）。
+    N=500 → ~125k 候選配對，固定 p<0.05 會產生數千個偽共整合（＝出樣本強制平倉）。
+    回傳可通過的最大 p 門檻：最大的 p_(k) 使得 p_(k) ≤ (k/m)·alpha；無則回 0（全數拒絕）。
+    """
+    p = np.sort(np.asarray([x for x in pvalues if np.isfinite(x)], dtype=np.float64))
+    m = len(p)
+    if m == 0:
+        return 0.0
+    crit = (np.arange(1, m + 1) / m) * alpha
+    passed = np.where(p <= crit)[0]
+    return float(p[passed.max()]) if len(passed) else 0.0

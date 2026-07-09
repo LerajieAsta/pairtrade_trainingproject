@@ -50,6 +50,7 @@ class Formation:
         hdbscan_min_samples:      int   = 2,
         hdbscan_metric:           str   = "euclidean",
         umap_random_state:        int   = 42,
+        factor_residual:          bool  = False,   # 研究框架 #1：聚類前移除市場+產業因子
         # ── 排序組（與 DTW_Cointegration_Paper 一致） ────────────
         method:                   str   = "ssd_dtw_pca",
         adf_pvalue_threshold:     float = 0.01,
@@ -76,6 +77,8 @@ class Formation:
             hdbscan_min_samples      = hdbscan_min_samples,
             hdbscan_metric           = hdbscan_metric,
             umap_random_state        = umap_random_state,
+            sector_mapping           = sector_mapping,   # 因子殘差化需產業標籤
+            factor_residual          = factor_residual,
         )
 
         self.method               = method
