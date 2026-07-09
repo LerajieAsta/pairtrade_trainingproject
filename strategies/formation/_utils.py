@@ -109,11 +109,13 @@ def _residualize_returns(R: np.ndarray, sector_labels=None) -> np.ndarray:
     e2 = e1.copy()
     for s in np.unique(labels):
         idx = np.where(labels == s)[0]
-        if len(idx) < 2:
+        # 需 ≥3 檔才對產業因子去均值：2 檔時 g_s=(e_i+e_j)/2，回歸後兩殘差完全共線，
+        # 造成後續 PCA 的 SVD 退化不收斂。
+        if len(idx) < 3:
             continue
         g_s = e1[:, idx].mean(axis=1)               # 該產業的殘差因子
         e2[:, idx] = _resid_on(g_s, e1[:, idx])
-    return e2
+    return np.nan_to_num(e2, nan=0.0, posinf=0.0, neginf=0.0)
 
 
 def _cost_viable(spread_std: float, roundtrip_cost: float = 0.0058,

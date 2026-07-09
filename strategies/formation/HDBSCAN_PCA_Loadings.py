@@ -80,10 +80,16 @@ class Formation(_UMAPFormation):
         sd = R.std(axis=0, ddof=1)
         sd[sd < 1e-12] = 1e-12
         Rs = (R - mu) / sd
+        Rs = np.nan_to_num(Rs, nan=0.0, posinf=0.0, neginf=0.0)   # 防退化欄位造成 SVD 不收斂
 
         n_factors = max(1, min(self.pca_n_components, Rs.shape[0] - 1, Rs.shape[1] - 1))
         pca = PCA(n_components=n_factors, random_state=self.umap_random_state)
-        pca.fit(Rs)
+        try:
+            pca.fit(Rs)
+        except np.linalg.LinAlgError:
+            # 殘差化可能使部分欄位共線 → SVD 不收斂；加微擾動破除退化後重試
+            rng = np.random.default_rng(self.umap_random_state)
+            pca.fit(Rs + rng.normal(0.0, 1e-6, Rs.shape))
 
         # loadings (N × k)：每檔股票在各風險因子上的暴露，
         # 以 sqrt(特徵值) 加權使歐氏距離反映因子重要性
