@@ -29,7 +29,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
 
-from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._utils import _compute_hurst, _ols, _adf_stat, _cost_viable
 
 try:
     import umap
@@ -288,10 +288,16 @@ class Formation:
         factor_residual:         bool  = False,   # 研究框架 #1：分群前先移除市場+產業因子
         use_fdr:                 bool  = False,   # 研究框架 #2：共整合 p 值 BH-FDR 校正
         fdr_alpha:               float = 0.05,
+        use_cost_filter:         bool  = False,   # 研究框架 #3：成本可行性預過濾
+        roundtrip_cost:          float = 0.0058,  # 往返成本（0.29%×2，Do & Faff 2012）
+        cost_margin:             float = 1.0,
     ):
         self.factor_residual = factor_residual
         self.use_fdr    = use_fdr
         self.fdr_alpha  = fdr_alpha
+        self.use_cost_filter = use_cost_filter
+        self.roundtrip_cost  = roundtrip_cost
+        self.cost_margin     = cost_margin
         self.price_df   = price_df.copy()
         self.form_start = form_start
         self.form_end   = form_end
@@ -546,6 +552,14 @@ class Formation:
                     if zc < self.min_zero_crossings:
                         rejected_count += 1
                         continue
+
+                    # 步驟 5b（研究框架 #3）：成本可行性——spread 振幅須足以覆蓋往返成本
+                    if self.use_cost_filter:
+                        _sstd = float(np.std(best_resid, ddof=1)) if len(best_resid) > 1 else 0.0
+                        if not _cost_viable(_sstd, self.roundtrip_cost,
+                                            entry_z=2.0, margin=self.cost_margin):
+                            rejected_count += 1
+                            continue
 
                     # 步驟 6：Beta 差異
                     if abs(beta_a - beta_b) > self.max_beta_diff:

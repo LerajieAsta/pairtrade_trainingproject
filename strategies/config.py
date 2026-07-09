@@ -346,6 +346,9 @@ strategies_raw_all = [
             "factor_residual":   True,    # #1
             "use_fdr":           True,    # #2
             "fdr_alpha":         0.05,
+            "use_cost_filter":   True,    # #3
+            "roundtrip_cost":    0.0058,  # 0.29%×2（Do & Faff 2012）
+            "cost_margin":       1.0,
         },
     },
     # 7. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings

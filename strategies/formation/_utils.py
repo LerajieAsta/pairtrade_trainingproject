@@ -116,6 +116,20 @@ def _residualize_returns(R: np.ndarray, sector_labels=None) -> np.ndarray:
     return e2
 
 
+def _cost_viable(spread_std: float, roundtrip_cost: float = 0.0058,
+                 entry_z: float = 2.0, margin: float = 1.0) -> bool:
+    """
+    成本可行性過濾（研究框架次步 #3）。
+    一次往返（entry_z·σ 進場 → 回到 0 出場）的預期擷取 ≈ entry_z × spread_std（分數移動）；
+    必須顯著大於往返成本（單邊 0.29% × 2 = 0.58%），否則訊號被費用吃光。
+    要求：entry_z × spread_std ≥ margin × roundtrip_cost。
+      spread_std：spread（log-price 殘差）標準差，近似分數移動幅度。
+    """
+    if not np.isfinite(spread_std) or spread_std <= 0:
+        return False
+    return (entry_z * spread_std) >= (margin * roundtrip_cost)
+
+
 def _bh_fdr_threshold(pvalues, alpha: float = 0.05) -> float:
     """
     Benjamini–Hochberg FDR 臨界 p 值（研究框架次步 #2）。
