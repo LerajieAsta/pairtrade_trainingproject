@@ -87,8 +87,11 @@ class Formation(_UMAPFormation):
         try:
             pca.fit(Rs)
         except np.linalg.LinAlgError:
-            # 殘差化可能使部分欄位共線 → SVD 不收斂；加微擾動破除退化後重試
+            # 殘差化可能使部分欄位共線 → 預設 gesdd SVD 不收斂；
+            # 加微擾動破除退化 + 改用 randomized solver（對退化矩陣幾乎不會不收斂）。
             rng = np.random.default_rng(self.umap_random_state)
+            pca = PCA(n_components=n_factors, svd_solver="randomized",
+                      random_state=self.umap_random_state)
             pca.fit(Rs + rng.normal(0.0, 1e-6, Rs.shape))
 
         # loadings (N × k)：每檔股票在各風險因子上的暴露，
