@@ -286,8 +286,12 @@ class Formation:
         market_returns: Optional[pd.Series] = None,
         feature_mode:            str   = "stats10",
         factor_residual:         bool  = False,   # 研究框架 #1：分群前先移除市場+產業因子
+        use_fdr:                 bool  = False,   # 研究框架 #2：共整合 p 值 BH-FDR 校正
+        fdr_alpha:               float = 0.05,
     ):
         self.factor_residual = factor_residual
+        self.use_fdr    = use_fdr
+        self.fdr_alpha  = fdr_alpha
         self.price_df   = price_df.copy()
         self.form_start = form_start
         self.form_end   = form_end
@@ -464,6 +468,9 @@ class Formation:
         print(f"  [Formation] 有效群落：{len(valid_groups)} 組")
 
         eg_records, passed_count, rejected_count = [], 0, 0
+        n_adf_tested = 0                       # 研究框架 #2：BH-FDR 的檢定總數 m
+        # FDR 模式下用寬鬆 ADF 門檻放行候選，最後再以 BH 臨界值統一過濾
+        _adf_gate = max(self.adf_pvalue_threshold, 0.10) if self.use_fdr else self.adf_pvalue_threshold
 
         for cluster_lbl, group_tickers in sorted(valid_groups.items()):
             if len(group_tickers) > 100:
@@ -506,7 +513,8 @@ class Formation:
                     al_ba, be_ba, re_ba = _ols(log_b, log_a)
                     stat_ba, pval_ba    = _adf_stat(re_ba, self.adf_max_lags)
 
-                    if min(pval_ab, pval_ba) >= self.adf_pvalue_threshold:
+                    n_adf_tested += 1                       # FDR 的 m：每個做過 ADF 的配對
+                    if min(pval_ab, pval_ba) >= _adf_gate:
                         rejected_count += 1
                         continue
 
@@ -611,6 +619,20 @@ class Formation:
 
         if not eg_records:
             return pd.DataFrame()
+
+        # 研究框架 #2：BH-FDR 校正共整合偽陽性（m = 全部做過 ADF 的配對數）
+        if self.use_fdr and eg_records:
+            from strategies.formation._utils import _bh_fdr_threshold
+            pvals = [r["ADF_PValue"] for r in eg_records]
+            # 以真實檢定總數 m 為分母；候選皆為最小的 p，故在此子集上計算即等價
+            bh_thr = _bh_fdr_threshold(pvals + [1.0] * max(0, n_adf_tested - len(pvals)),
+                                       self.fdr_alpha)
+            before = len(eg_records)
+            eg_records = [r for r in eg_records if r["ADF_PValue"] <= bh_thr]
+            print(f"  [Formation] BH-FDR（m={n_adf_tested}, α={self.fdr_alpha}）："
+                  f"門檻 p≤{bh_thr:.2e} | {before} → {len(eg_records)} 對")
+            if not eg_records:
+                return pd.DataFrame()
 
         # Mom1 篩選（Han et al. 2021）
         if self.use_mom1_filter and len(eg_records) > 1:

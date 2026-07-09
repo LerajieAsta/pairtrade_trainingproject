@@ -328,6 +328,26 @@ strategies_raw_all = [
             "factor_residual":      True,
         },
     },
+    # 6c. HDBSCAN PCA-Loadings + 因子殘差化 + BH-FDR（研究框架 #1+#2 合併示範）
+    #     用 HDBSCAN_UMAP 的群內共整合+品質分數篩選路徑（非 SSD-DTW 排序），
+    #     故因子殘差特徵與 FDR 校正皆能直接影響最終選對 → 檢驗兩者的淨貢獻。
+    {
+        "name":             "HDBSCAN PCA-Loadings ResidFDR",
+        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_PCA_Loadings_ResidFDR",
+        "db_method":        "HDBSCAN (PCA-Loadings-ResidFDR)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
+            "reduce_method":     "none",
+            "pca_n_components":  5,
+            "feature_mode":      "pca_loadings",
+            "factor_residual":   True,    # #1
+            "use_fdr":           True,    # #2
+            "fdr_alpha":         0.05,
+        },
+    },
     # 7. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings
     #     ⊕ GICS one-hot ⊕ log(市值) ⊕ 盈餘殖利率(1/PE)」混合特徵空間做
     #     Agglomerative（average-linkage、依合併距離分位數校準
