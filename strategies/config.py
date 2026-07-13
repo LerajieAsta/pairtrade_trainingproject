@@ -5,6 +5,7 @@ import re
 import copy
 import threading
 import json
+import unicodedata
 import numpy as np
 import pandas as pd
 
@@ -696,8 +697,16 @@ elif _sens_param:
 _DASHBOARD_FIXED_LINES = 8
 _ANSI_RE = re.compile(r"\033\[[^m]*m")
 
+def _char_width(ch: str) -> int:
+    """終端顯示欄寬：CJK/全形/寬版 emoji = 2；組合字元 = 0；其餘 = 1。
+    （東亞 Ambiguous 視為 1，符合 VS Code / Windows Terminal 非 CJK 語系預設。）"""
+    if unicodedata.combining(ch):
+        return 0
+    return 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+
 def _visible_len(s: str) -> int:
-    return len(_ANSI_RE.sub("", s))
+    """去除 ANSI 後的「顯示欄寬」（非字元數）——CJK/emoji 佔 2 欄。"""
+    return sum(_char_width(c) for c in _ANSI_RE.sub("", s))
 
 def _pad_visible(s: str, width: int, align: str = "left") -> str:
     v_len = _visible_len(s)
@@ -729,9 +738,10 @@ def draw_dashboard(
         term_width = 200
 
     def line(s: str) -> None:
-        # 依「實際可見寬度」截斷至 term_width-1（保留 ANSI 碼、不填滿最後一欄）。
-        # 舊版以「全字串 ANSI 字元數」估算截點，會多留可見字元使行達/超過滿版寬度，
-        # 觸發終端右邊界 auto-wrap → 每行後多一空行。改為逐字掃描可見寬度即根治。
+        # 依「終端顯示欄寬」截斷至 term_width-1（保留 ANSI 碼、不填滿最後一欄）。
+        # 關鍵：CJK/emoji 佔 2 欄，若以字元數計算，補齊後的欄位顯示寬度會超出預期，
+        # 使整行顯示寬度 > 終端欄寬 → 觸發右邊界 auto-wrap → 每行後多一空行。
+        # 逐字元累加「顯示欄寬」即根治。
         limit = max(1, term_width - 1)
         out, vis, i = [], 0, 0
         while i < len(s):
@@ -741,10 +751,11 @@ def draw_dashboard(
                     out.append(m.group(0))
                     i = m.end()
                     continue
-            if vis >= limit:
+            w = _char_width(s[i])
+            if vis + w > limit:
                 break
             out.append(s[i])
-            vis += 1
+            vis += w
             i += 1
         print("".join(out) + "\033[0m\033[K")
 
