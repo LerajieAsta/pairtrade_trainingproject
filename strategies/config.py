@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import re
+import copy
 import threading
 import json
 import numpy as np
@@ -547,6 +548,105 @@ if _env_slice:
         print(f"[config] STRATEGIES_SLICE={_env_slice} → 執行 {[s['name'] for s in strategies_raw]}")
     except (ValueError, IndexError):
         print(f"⚠️ [config] STRATEGIES_SLICE='{_env_slice}' 無法解析，使用預設範圍")
+
+
+# ── 敏感性分析（OFAT，口試委員要求）─────────────────────────────────────────
+# 對各策略使用參數做 One-Factor-At-A-Time 敏感性分析：每次只變動一個參數、
+# 其餘固定基準值，量測 Sharpe/強平率/PF/break-even/DSR 隨參數的變化曲線，
+# 展示每個參數的邊際敏感度與穩健區間（全網格組合爆炸，OFAT 為學位論文標準做法）。
+#
+# formation 參數（adf_pvalue_threshold、pca_n_components）每個值都要重跑 formation，
+# 故每值 = 一個獨立策略條目（自有 name/sub_dir/db_method → formation 配對 DB 以
+# name 為 strategy_id 鍵，天然不與基準碰撞）。交易參數（entry_z、top_n、stop_loss）
+# 已由 run_trading 的 _list 網格涵蓋，不需在此建 formation 變體。
+#
+# 用法（PowerShell）：
+#   $env:SENSITIVITY_PARAM="adf_pvalue_threshold"; python run_formation.py; python run_trading.py
+#   可選 $env:SENSITIVITY_BASE="Agglomerative Fundamentals (FMP)"（預設跑三支論文主力）
+#   可選 $env:SENSITIVITY_VALUES="0.01,0.05,0.1"（覆寫預設值清單）
+#   評估：python -m analysis.sensitivity_report
+
+# Tier 1 formation 參數的預設掃描範圍（基準值以粗體標於註解）
+SENSITIVITY_TIER1_FORMATION = {
+    "adf_pvalue_threshold": [0.01, 0.05, 0.10],   # 基準 0.01(HDBSCAN)/0.05(Agg)
+    "pca_n_components":     [3, 5, 10, 15],        # 基準 5
+}
+# 論文主力策略（口試敏感性分析聚焦對象）
+SENSITIVITY_BASES = [
+    "Agglomerative Fundamentals (FMP)",
+    "Agglomerative Fundamentals (yF)",
+    "HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid",
+]
+_SENSITIVITY_INT_PARAMS = {"pca_n_components"}
+
+
+def _sens_slug(v) -> str:
+    return str(v).replace(".", "p").replace("-", "m")
+
+
+def make_sensitivity_variants(base_name: str, param: str, values: list) -> list:
+    """把基準策略沿單一參數的值清單複製成獨立策略條目（OFAT）。"""
+    base = next((s for s in strategies_raw_all if s["name"] == base_name), None)
+    if base is None:
+        print(f"⚠️ [sensitivity] 找不到基準策略 '{base_name}'")
+        return []
+    variants = []
+    for v in values:
+        var = copy.deepcopy(base)
+        var["params"] = {**base["params"], param: v}
+        tag = f"SENS-{param}-{_sens_slug(v)}"
+        var["name"]      = f"{base_name} [{param}={v}]"
+        var["sub_dir"]   = f"{base.get('sub_dir', base_name)}__{tag}"
+        var["db_method"] = f"{base['db_method']} [{param}={v}]"
+        var.pop("formation_strategy_id_base", None)   # 自行產生 formation 配對
+        variants.append(var)
+    return variants
+
+
+# 交易端 _list 網格參數 → SENSITIVITY_PARAM 命中時改設對應 _list（沿用既有
+# formation 配對、只重跑交易，成本低）。top_n/stop_loss 已預設掃描，此處補 entry_z。
+_SENSITIVITY_TRADING_LIST = {
+    "entry_z":   ("entry_z_list",   [1.5, 2.0, 2.5, 3.0]),
+    "top_n":     ("top_n_list",     [1, 3, 5, 10, 20]),
+    "stop_loss": ("stop_loss_list", [0.0, 0.05, 0.10, 0.15]),
+}
+
+_sens_param = os.environ.get("SENSITIVITY_PARAM", "").strip()
+if _sens_param:
+    _venv = os.environ.get("SENSITIVITY_VALUES", "").strip()
+    _base_env = os.environ.get("SENSITIVITY_BASE", "").strip()
+    _bases = [_base_env] if _base_env else SENSITIVITY_BASES
+
+    if _sens_param in _SENSITIVITY_TRADING_LIST:
+        # 交易端參數：對每個基準策略設對應 _list，run_trading 網格自動展開（不建 formation 變體）
+        _list_key, _default = _SENSITIVITY_TRADING_LIST[_sens_param]
+        _cast = int if _sens_param == "top_n" else float
+        _vals = [_cast(x) for x in _venv.split(",")] if _venv else _default
+        _sel = []
+        for _b in _bases:
+            _base = next((s for s in strategies_raw_all if s["name"] == _b), None)
+            if _base is None:
+                print(f"⚠️ [sensitivity] 找不到基準策略 '{_b}'"); continue
+            _v = copy.deepcopy(_base)
+            _v["params"][_list_key] = _vals
+            _sel.append(_v)
+        strategies_raw = _sel
+        print(f"[config] 敏感性分析（交易端）：{_sens_param} ∈ {_vals} × {len(_sel)} 策略"
+              f"（沿用既有 formation，只重跑交易）")
+    else:
+        # formation 參數：每值一個獨立變體（需重跑 formation）
+        _cast = int if _sens_param in _SENSITIVITY_INT_PARAMS else float
+        _vals = [_cast(x) for x in _venv.split(",") if x.strip()] if _venv \
+                else SENSITIVITY_TIER1_FORMATION.get(_sens_param, [])
+        if not _vals:
+            print(f"⚠️ [sensitivity] 參數 '{_sens_param}' 無值清單（提供 SENSITIVITY_VALUES 或用已知參數）")
+        else:
+            _variants = []
+            for _b in _bases:
+                _variants += make_sensitivity_variants(_b, _sens_param, _vals)
+            strategies_raw_all = strategies_raw_all + _variants   # 附加尾端（不影響既有索引）
+            strategies_raw = _variants                            # 敏感性模式：只跑變體
+            print(f"[config] 敏感性分析（formation）：{_sens_param} ∈ {_vals} × {len(_bases)} 策略 → {len(_variants)} 變體")
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
