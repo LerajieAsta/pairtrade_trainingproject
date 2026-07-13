@@ -7,27 +7,37 @@
 ```text
 pairtrade_trainingproject/
 ├── strategies/
-│   ├── config.py                  # 策略清單（10 交易策略 + 2 formation-only）、網格參數、全域回測設定
+│   ├── config.py                  # 策略清單（15 交易 + 2 formation-only）、網格參數、全域設定、敏感性 OFAT 產生器
 │   ├── db_utils.py                # SQLite 合併、讀寫工具
 │   ├── portfolio_manager.py       # 組合層級資金管理（MSR 產業上限）
 │   ├── preprocess_equity.py       # 權益曲線前處理
 │   ├── formation/
-│   │   ├── _utils.py              # 共用統計工具（_ols、_adf_stat、_compute_hurst）
-│   │   ├── ssd_rolling.py         # SSD Rolling：Z-Score 標準化 log-price 空間（#1；被 #9 複用排序）
-│   │   ├── DTW_Cointegration_Paper.py  # DTW + ADF 雙重篩選 + Sakoe-Chiba DTW + PCA 融合（#2/#3 借用；#4/#7 複用）
-│   │   ├── HDBSCAN_PCA_Loadings.py # 報酬 PCA 因子載荷特徵萃取（被 #4/#7/#9 組合複用）
-│   │   ├── HDBSCAN_Cluster_SSD_DTW.py # 組合：HDBSCAN 聚類 + DTW 排序（#4/#7）
-│   │   ├── agglomerative_fundamentals.py # 組合：Agglomerative 聚類（價格 PCA⊕基本面）+ SSD 排序（#9）
+│   │   ├── _utils.py              # 共用統計工具（_ols、_adf_stat、_compute_hurst、_residualize_returns〔#1〕、_bh_fdr_threshold〔#2〕、_cost_viable〔#3〕）
+│   │   ├── ssd_basic.py           # SSD Basic：最基礎原型（#0）
+│   │   ├── ssd_rolling.py         # SSD Rolling：Z-Score 標準化 log-price 空間（#1；被 #2/#5 複用）
+│   │   ├── DTW_Cointegration_Paper.py  # DTW + ADF 雙重篩選 + Sakoe-Chiba DTW + PCA 融合（#3/#4 借用；#6/#7/#9 複用排序）
+│   │   ├── HDBSCAN_PCA_Loadings.py # 報酬 PCA 因子載荷特徵萃取（被 #6/#7 複用；#8 直接使用，含殘差化+FDR+成本過濾）
+│   │   ├── HDBSCAN_Cluster_SSD_DTW.py # 組合：HDBSCAN 聚類 + DTW 排序（#6/#7；#7 加 factor_residual）
+│   │   ├── MST_PartialCorr_Cointegration.py # 偏相關網路圖候選 + 共整合 + SSD-DTW 排序（#9，研究框架 #4）
+│   │   ├── agglomerative_yF.py    # Agglomerative（價格 PCA⊕基本面靜態快照）+ SSD 排序（#10/#11）
+│   │   ├── agglomerative_FMP.py   # 同上，改用 FMP Point-in-Time parquet（#12/#13）
+│   │   ├── agglomerative_sec_pit.py # 子類 FMP，加 Beta 風險先驗（#14，研究框架 #5）
 │   │   ├── ml_pair_quality.py     # 監督式學習排序 walk-forward 反事實回歸（已封存，程式碼保留）
-│   │   ├── ssd_basic.py / HDBSCAN_UMAP.py / HDBSCAN_MultiScale.py / ensemble.py  # 已封存
+│   │   ├── HDBSCAN_UMAP.py / HDBSCAN_MultiScale.py / ensemble.py  # 已封存（HDBSCAN_UMAP 為 #6/#7 父類，仍使用）
 │   │   └── __init__.py
 │   └── trading/
 │       ├── zscore_trading.py      # Z-Score 狀態機（基礎類，三條 Spread 路徑；現役僅走路徑 B）
-│       └── drl_threshold_trading.py # DRL 門檻選擇式 v4（#5、#6、#8、#10 使用）
+│       ├── distance_trading.py    # 距離基準交易（GGR 2006，#2）
+│       └── drl_threshold_trading.py # DRL 門檻選擇式 v4（#5、#11、#13 使用）
+├── analysis/                      # 評估層（讀 result.db，不重跑）
+│   ├── regime_cost_dsr_eval.py    # 研究框架 #6：regime 分層 Sharpe + break-even 成本表 + Deflated Sharpe
+│   └── sensitivity_report.py      # OFAT 參數敏感性報表（formation 變體曲線 + 交易端 top_n）
 ├── fetch/
 │   ├── SP500_Tiingo.py            # Tiingo API 歷史數據下載
 │   ├── sp500_yf_now.py            # yFinance 當日數據更新
-│   └── fundamentals_yfinance.py   # 公司基本面快照下載（市值、本益比，供 Agglomerative Fundamentals 使用）
+│   ├── fundamentals_yfinance.py   # 公司基本面靜態快照（市值、本益比，供 agglomerative_yF）
+│   ├── fetch_fmp_fundamentals.py  # FMP Point-in-Time 基本面 → parquet（供 agglomerative_FMP）
+│   └── fetch_sec_fundamentals.py  # SEC EDGAR XBRL PIT 基本面 + Tiingo 原始股價 → parquet（供 agglomerative_sec_pit）
 ├── dataset/                       # 資料庫（大檔案透過 Git LFS 追蹤），分 price／fundamental 兩類
 │   ├── price/                     # 價格類資料庫
 │   │   ├── sp500_Tiingo.db        # 主要資料庫，`DB_PATH` 預設指向此
@@ -41,13 +51,13 @@ pairtrade_trainingproject/
 ├── formation_data/
 │   └── formation_pairs_sp500_Tiingo.db  # 形成期主合併資料庫（LFS 追蹤）
 ├── notebooks/                     # 策略筆記本（一策略一本，Quarto revealjs 投影片；見 notebooks/README.md）
-│   ├── formation/                 # 形成期策略 ×6：ssd_rolling ~ agglomerative_fundamentals（以策略方法命名）
-│   ├── trading/                   # 交易期策略 ×2：zscore_trading、drl_threshold_trading
-│   ├── comparison.ipynb           # 現役 10 策略績效總比較（讀 results/result.db 動態產生）
+│   ├── formation/                 # 形成期策略 ×8：ssd_basic/rolling、dtw、ssd-dtw-pca、hdbscan×3、agglomerative
+│   ├── trading/                   # 交易期策略 ×3：zscore_trading、distance_trading、drl_threshold_trading
+│   ├── comparison.ipynb           # 現役策略績效總比較（讀 config.strategies_raw_all + result.db 動態產生）
 │   ├── _quarto.yml / slides.scss  # revealjs 投影片設定（大字型、Alt+點擊縮放、KaTeX）
 ├── docs/                          # GitHub Pages 輸出
 │   ├── index.html                 # 入口頁（連結全部投影片）
-│   └── slides/                    # quarto render 產出的 9 份投影片
+│   └── slides/                    # quarto render 產出的投影片（comparison + formation×8 + trading×3）
 ├── archive/                       # 歷史存檔（分類索引見 archive/README.md）
 │   ├── config_archived_strategies.py  # 已封存策略 config（含孤兒模組盤點記錄）
 │   ├── trading/                   # 非現役交易模組（drl_lstm×2、drl_fqi、kalman、pure_dtw）
@@ -118,38 +128,52 @@ results/
 
 ## 3. 策略清單（`config.py`）
 
-`strategies_raw_all` 為現役策略池（10 個交易策略 + 尾端 2 個 formation-only 條目），
+`strategies_raw_all` 為現役策略池（15 個交易策略 + 尾端 2 個 formation-only 條目，0-based 索引），
 `strategies_raw = strategies_raw_all[:]` 決定實際執行範圍
 （或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片；0-based Python 切片語意）：
 
 ```bash
-STRATEGIES_SLICE="4:6" python run_trading.py   # 只跑 #5 SSD Rolling DRL THR、#6 HDBSCAN Cluster ... DRL THR
+STRATEGIES_SLICE="6:9" python run_trading.py   # 只跑 #6 HDBSCAN PCA5、#7 PCA5 Resid、#8 ResidFDR
 ```
 
 | # | 策略名稱 | 形成期 | 交易期 | 角色 |
 | :---: | :--- | :--- | :--- | :--- |
+| 0 | SSD Basic | `ssd_basic.py` | `zscore_trading.py` | 最基礎原型 |
 | 1 | SSD Rolling | `ssd_rolling.py` | `zscore_trading.py` | SSD 家族基準 |
-| 2 | DTW Paper Fixed (DTW) | 借用 DTW Paper 原版配對 | `zscore_trading.py`（路徑 B） | DTW 基準 |
-| 3 | SSD-DTW-PCA Paper Fixed | 借用配對 | `zscore_trading.py`（路徑 B） | 全組最佳 Sharpe 基準：Top3 0.56 |
-| 4 | HDBSCAN Cluster SSD-DTW-PCA | `HDBSCAN_Cluster_SSD_DTW.py` | `zscore_trading.py` | 分組消融（vs #3，15 維 PCA） |
+| 2 | SSD Rolling Distance | 借用 #1 配對 | `distance_trading.py` | 回歸 vs 距離交易對照（GGR 2006） |
+| 3 | DTW Paper Fixed (DTW) | 借用 DTW Paper 配對 | `zscore_trading.py`（路徑 B） | DTW 基準 |
+| 4 | SSD-DTW-PCA Paper Fixed | 借用配對 | `zscore_trading.py`（路徑 B） | 距離排序基準 |
 | 5 | SSD Rolling DRL THR | 借用 #1 配對 | `drl_threshold_trading.py` | DRL 疊加對照組 |
-| 6 | HDBSCAN Cluster SSD-DTW-PCA DRL THR | 借用 #4 配對 | `drl_threshold_trading.py` | DRL 疊加實驗組 |
-| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維 PCA） | `zscore_trading.py` | 5 維 PCA 聚類穩定性修復版（vs #4） |
-| 8 | HDBSCAN Cluster SSD-DTW-PCA PCA5 DRL THR | 借用 #7 配對 | `drl_threshold_trading.py` | 全組 DRL 疊加最高 Sharpe 0.46 |
-| 9 | Agglomerative Fundamentals | `agglomerative_fundamentals.py` | `zscore_trading.py` | 分組消融第三支：價格 PCA⊕基本面 |
-| 10 | Agglomerative Fundamentals DRL THR | 借用 #9 配對 | `drl_threshold_trading.py` | 全組最佳年化報酬 2.89% |
-| — | DTW Paper (DTW) / (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only（跳過回測） | 產生 #2/#3 借用的原版配對 |
+| 6 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維） | `zscore_trading.py` | 分組消融：HDBSCAN vs GICS |
+| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid | `HDBSCAN_Cluster_SSD_DTW.py`（+殘差） | `zscore_trading.py` | **研究框架 #1**：因子殘差化（vs #6） |
+| 8 | HDBSCAN PCA-Loadings ResidFDR | `HDBSCAN_PCA_Loadings.py` | `zscore_trading.py` | **研究框架 #1+#2+#3**：殘差＋BH-FDR＋成本過濾 |
+| 9 | MST PartialCorr Cointegration | `MST_PartialCorr_Cointegration.py` | `zscore_trading.py` | **研究框架 #4**：偏相關圖候選生成器 |
+| 10 | Agglomerative Fundamentals (yF) | `agglomerative_yF.py` | `zscore_trading.py` | 分組消融：價格 PCA⊕基本面（yF 靜態快照） |
+| 11 | Agglomerative Fundamentals DRL THR (yF) | 借用 #10 配對 | `drl_threshold_trading.py` | DRL 疊加（yF） |
+| 12 | Agglomerative Fundamentals (FMP) | `agglomerative_FMP.py` | `zscore_trading.py` | 基本面 Point-in-Time（無前視偏誤） |
+| 13 | Agglomerative Fundamentals DRL THR (FMP) | 借用 #12 配對 | `drl_threshold_trading.py` | DRL 疊加（FMP） |
+| 14 | Agglomerative SEC-PIT Beta | `agglomerative_sec_pit.py` | `zscore_trading.py` | **研究框架 #5**：SEC PIT⊕Beta 風險先驗（vs #12） |
+| 15/16 | DTW Paper (DTW) / (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only（跳過回測） | 產生 #3/#4 借用的原版配對 |
 
-**formation-only 條目（2026-07-05）**：repo LFS 額度用罄致 formation DB 無法下載後，DTW Paper 原版
-兩條目以 `formation_only: True` 旗標回歸現役清單尾端——`run_formation.py` 計算其配對（供 #2/#3
-借用），`run_trading.py` 跳過（原版交易端為座標 artifact，維持封存）。全部形成期配對因此可在任何
-機器上以 `run_formation.py` 完整本地重算。
+**formation-only 條目**：DTW Paper 原版兩條目以 `formation_only: True` 旗標僅產生配對供 #3/#4
+借用，`run_trading.py` 跳過（原版交易端為座標 artifact，維持封存）。全部形成期配對因此可在任何
+機器上以 `run_formation.py` 完整本地重算，不依賴 repo LFS。
 
-**已封存策略（20 個 config 條目）**：`archive/config_archived_strategies.py`
-（SSD Basic、HDBSCAN 舊特徵系×4、Ensemble×2、DRL v1×3、Kalman×2、
-CONV×2、DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Loadings 系×2、ML Pair Quality×1），
+**研究框架 #1–#6（畢業論文次步，見第 4 節與 `analysis/`）**：#1 因子殘差化、#2 BH-FDR 多重檢定校正、
+#3 成本可行性過濾（策略 #7/#8/#9/#14）、#4 MST 圖候選（#9）、#5 Beta 風險先驗（#14）、
+#6 穩健性評估層（`analysis/regime_cost_dsr_eval.py`）。
+
+**參數敏感性分析（OFAT，口試委員要求）**：`config.py` 內建 env 驅動變體產生器——
+`SENSITIVITY_ALL=1` 一次產生 Tier-1 全部變體（`adf_pvalue_threshold`、`pca_n_components`、
+`beta_feature_weight`、`entry_z`），或 `SENSITIVITY_PARAM=<param>` 單參數。formation 參數每值 =
+一個獨立變體（自有 db_method，重跑 formation）；交易端參數改設 `_list` 沿用既有 formation。
+評估：`python -m analysis.sensitivity_report`。
+
+**已封存策略**：`archive/config_archived_strategies.py`
+（HDBSCAN 舊特徵系×4、Ensemble×2、DRL v1×3、Kalman×2、CONV×2、
+DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Loadings DRL×2、ML Pair Quality×1 等），
 封存理由與完整診斷數據見該檔 docstring，歷史回測結果保留於 `results/result.db`。
-⚠️ HDBSCAN PCA-Loadings 的形成期配對仍被復活備用借用，formation DB 資料列不可刪。
+⚠️ HDBSCAN PCA-Loadings 的形成期配對仍被借用，formation DB 資料列不可刪。
 
 **孤兒模組（2 個，從未進入策略清單）**：`pure_dtw_trading.py`（早期交叉回穿波帶構想）、
 `drl_lstm_v2_trading.py`（DRL v1→v3 演進鏈中繼修復版）——程式碼保留供架構脈絡參考，
@@ -158,8 +182,8 @@ CONV×2、DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Lo
 **非現役交易模組已歸位 `archive/trading/`（2026-07-05）**：上述孤兒模組×2 加上已封存的
 `drl_lstm_trading.py`（v1）、`drl_fqi_trading.py`（v3）、`kalman_trading.py` 共 5 檔自
 `strategies/trading/` 移入；封存 config 的 `trading_module` 已同步指向 `archive.trading.*`，
-復活時不需搬回檔案。`strategies/trading/` 現只含現役的 `zscore_trading.py` 與
-`drl_threshold_trading.py`。
+復活時不需搬回檔案。`strategies/trading/` 現含現役的 `zscore_trading.py`、`distance_trading.py`
+與 `drl_threshold_trading.py`。
 
 ---
 
@@ -170,33 +194,41 @@ CONV×2、DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Lo
 | 策略 | 分組依據 | 排序邏輯 | 關鍵 Formation_Params |
 | :--- | :--- | :--- | :--- |
 | SSD Rolling (#1) | 真實 GICS 產業 | min-SSD + 三道統計過濾 | `Log_Mean/Std_A/B`, `Spread_Mean/Std` |
-| DTW Paper Fixed (#2/#3) | 真實 GICS 產業 | DTW / SSD-DTW-PCA 距離 | `OLS_Alpha`（交易端因 `ignore_ols_alpha=True` 而忽略）, `Log_Mean/Std_A/B` |
-| HDBSCAN Cluster SSD-DTW-PCA (#4/#7) | HDBSCAN 聚類（報酬 PCA 因子載荷，15 維/5 維） | 沿用 DTW 模組的 SSD-DTW-PCA 排序 | 同上 + `Sector_A/B`（真實 GICS 回填） |
-| Agglomerative Fundamentals (#9) | Agglomerative 聚類（價格 PCA⊕市值⊕PE⊕GICS one-hot） | 沿用 SSD Rolling 的 min-SSD 排序 | `Log_Mean/Std_A/B` + `Cluster_ID`、`MarketCap`、`TrailingPE` |
+| DTW Paper Fixed (#3/#4) | 真實 GICS 產業 | DTW / SSD-DTW-PCA 距離 | `OLS_Alpha`（交易端因 `ignore_ols_alpha=True` 而忽略）, `Log_Mean/Std_A/B` |
+| HDBSCAN Cluster SSD-DTW-PCA (#6/#7) | HDBSCAN 聚類（報酬 PCA 因子載荷，5 維；#7 建於因子殘差） | 沿用 DTW 模組的 SSD-DTW-PCA 排序 | 同上 + `Sector_A/B`（真實 GICS 回填） |
+| HDBSCAN PCA-Loadings ResidFDR (#8) | HDBSCAN（殘差 PCA loadings 直接分群） | 群內共整合 + BH-FDR + 成本過濾 + 品質分數 | 同上 |
+| MST PartialCorr Cointegration (#9) | 偏相關網路圖（MST+kNN 候選邊） | 共整合篩選 + SSD-DTW-PCA 排序 | 同上 |
+| Agglomerative Fundamentals (#10/#12/#14) | Agglomerative 聚類（價格 PCA⊕市值⊕PE⊕GICS；#14 再加 Beta） | 沿用 SSD Rolling 的 min-SSD 排序 | `Log_Mean/Std_A/B` + `Cluster_ID`、`MarketCap`、`TrailingPE` |
 
-### 過濾門檻（全現役策略共用）
+### 過濾門檻（HDBSCAN 系列共用，`_HDBSCAN_UMAP_FILTERS`）
 
 | 指標 | 門檻 |
 | :--- | :--- |
-| OU 半衰期 | 1 ≤ halflife ≤ `trading_window`/3 天 |
-| Hurst 指數 | < 0.50（均值回歸） |
+| OU 半衰期 | 1 ≤ halflife ≤ `FORWARD_DAYS`/2 = 63 天 |
+| Hurst 指數 | < 0.55（均值回歸；已由 0.50 放寬） |
+| 零穿越次數 | ≥ 3（已由 5 放寬） |
 | ADF p-value | ≤ 0.05（SSD Rolling/Agglomerative）或 ≤ 0.01（DTW/HDBSCAN 系列） |
+| BH-FDR / 成本過濾 | #8/#9 額外套用：多重檢定校正（α=0.05）＋ spread 振幅須覆蓋 0.58% 往返成本 |
 
 ### 「組合優於重寫」架構模式
 
-#4/#7（HDBSCAN Cluster SSD-DTW-PCA）與 #9（Agglomerative Fundamentals）都不是從零打造的獨立形成邏輯，
-而是把既有模組像積木一樣組裝：
+#6/#7（HDBSCAN Cluster SSD-DTW-PCA）與 #10/#12/#14（Agglomerative Fundamentals 系）都不是從零打造的
+獨立形成邏輯，而是把既有模組像積木一樣組裝：
 
 ```
-HDBSCAN_PCA_Loadings._build_feature_matrix()  ──┬──→ HDBSCAN_Cluster_SSD_DTW.py（#4/#7）
-  （報酬 PCA 因子載荷特徵萃取）                    │       + DTW_Cointegration_Paper 排序
+HDBSCAN_PCA_Loadings._build_feature_matrix()  ──┬──→ HDBSCAN_Cluster_SSD_DTW.py（#6/#7）
+  （報酬 PCA 因子載荷特徵萃取；#7 建於殘差）        │       + DTW_Cointegration_Paper 排序
                                                  │
-                                                 └──→ agglomerative_fundamentals.py（#9）
-                                                         + 基本面特徵 + Agglomerative 分群
-                                                         + ssd_rolling 排序
+                                                 ├──→ agglomerative_yF/FMP.py（#10/#12）
+                                                 │       + 基本面特徵 + Agglomerative 分群 + ssd_rolling 排序
+                                                 │       └── agglomerative_sec_pit.py（#14）子類再加 Beta 風險先驗
+                                                 │
+                                                 └──→ MST_PartialCorr_Cointegration.py（#9）
+                                                         偏相關圖候選 + 共整合 + SSD-DTW 排序
 ```
 
-只替換「配對候選怎麼分組」這一環節，其餘（群內共整合篩選、距離排序、spread 定義、交易端）完全相同——
+**命題 1 三方候選生成對照**（同 SSD-DTW 排序、同篩選、同交易端，唯一變因 = 候選生成方式）：
+GICS 產業（#4）→ HDBSCAN 聚類（#6/#7）→ 偏相關圖（#9）。只替換「配對候選怎麼分組」這一環節，
 確保每個新策略都是乾淨的單變因消融實驗。詳細公式與診斷數據見 `notebooks/formation/`（一策略一本）。
 
 ---
@@ -246,7 +278,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 | `price/sp500_Tiingo.db` | 主要資料庫，`DB_PATH` 預設指向此 |
 | `price/sp500_yF.db` | yFinance 備用（config `DB_PROFILES` 可切換） |
 | `price/sp500_Current.db` | 現行成分股查詢 |
-| `fundamental/fundamentals_sp500.db` | 公司基本面快照（市值、本益比），供 `agglomerative_fundamentals.py` 使用；⚠️ 單一時點靜態資料，非歷史逐日序列。2026-07-05 以 `fetch/fundamentals_yfinance.py` 重抓（843 檔：633 有效、210 已下市） |
+| `fundamental/fundamentals_sp500.db` | 公司基本面快照（市值、本益比），供 `agglomerative_yF.py` 使用；⚠️ 單一時點靜態資料，非歷史逐日序列。以 `fetch/fundamentals_yfinance.py` 重抓（843 檔：633 有效、210 已下市）。逐點 PIT 版見 `fundamental/sp500_pit_2000_2025_monthly.parquet`（FMP／SEC，供 `agglomerative_FMP.py`／`agglomerative_sec_pit.py`） |
 | `fundamental/sp500_pit_2000_2025_monthly.parquet`、`fundamental/fmp_cache/` | FMP Point-in-Time 基本面與 API 快取（本地產物，不進版控） |
 
 資料表：`Daily_Prices`（Date, Symbol, Open, High, Low, Close, Volume）、`Constituents`（Symbol, GICS_Sector）
