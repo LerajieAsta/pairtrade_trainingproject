@@ -566,10 +566,14 @@ if _env_slice:
 #   可選 $env:SENSITIVITY_VALUES="0.01,0.05,0.1"（覆寫預設值清單）
 #   評估：python -m analysis.sensitivity_report
 
-# Tier 1 formation 參數的預設掃描範圍（基準值以粗體標於註解）
+# formation 參數的預設掃描範圍（基準值標於註解）
 SENSITIVITY_TIER1_FORMATION = {
     "adf_pvalue_threshold": [0.01, 0.05, 0.10],   # 基準 0.01(HDBSCAN)/0.05(Agg)
     "pca_n_components":     [3, 5, 10, 15],        # 基準 5
+    # beta_feature_weight（#5 Agg SEC-PIT+β 專屬）：1.0 已知有害（中位 Sharpe
+    # −0.500 vs FMP −0.227）；掃低權重驗證是否存在中性/有益區間。0.0 = β 區塊
+    # 歸零 ≈ 無 β 控制組（只剩價格 PCA+PIT 市值/PE+產業）。
+    "beta_feature_weight":  [0.0, 0.25, 0.5, 1.0],
 }
 # 論文主力策略（口試敏感性分析聚焦對象）
 SENSITIVITY_BASES = [
@@ -577,6 +581,11 @@ SENSITIVITY_BASES = [
     "Agglomerative Fundamentals (yF)",
     "HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid",
 ]
+# 特定參數僅對特定策略有意義（beta_feature_weight 只有 SEC-PIT+β 有 β 區塊；
+# 若套到無此參數的策略，會被 run_formation 的 inspect.signature 過濾成無效重複）。
+SENSITIVITY_PARAM_BASES = {
+    "beta_feature_weight": ["Agglomerative SEC-PIT Beta"],
+}
 _SENSITIVITY_INT_PARAMS = {"pca_n_components"}
 
 
@@ -615,7 +624,12 @@ _sens_param = os.environ.get("SENSITIVITY_PARAM", "").strip()
 if _sens_param:
     _venv = os.environ.get("SENSITIVITY_VALUES", "").strip()
     _base_env = os.environ.get("SENSITIVITY_BASE", "").strip()
-    _bases = [_base_env] if _base_env else SENSITIVITY_BASES
+    if _base_env:
+        _bases = [_base_env]
+    elif _sens_param in SENSITIVITY_PARAM_BASES:      # 參數專屬策略（如 beta → SEC-PIT+β）
+        _bases = SENSITIVITY_PARAM_BASES[_sens_param]
+    else:
+        _bases = SENSITIVITY_BASES
 
     if _sens_param in _SENSITIVITY_TRADING_LIST:
         # 交易端參數：對每個基準策略設對應 _list，run_trading 網格自動展開（不建 formation 變體）
