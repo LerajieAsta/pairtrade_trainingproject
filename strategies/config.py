@@ -694,9 +694,10 @@ elif _sens_param:
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
 _DASHBOARD_FIXED_LINES = 8
+_ANSI_RE = re.compile(r"\033\[[^m]*m")
 
 def _visible_len(s: str) -> int:
-    return len(re.sub(r"\033\[[^m]*m", "", s))
+    return len(_ANSI_RE.sub("", s))
 
 def _pad_visible(s: str, width: int, align: str = "left") -> str:
     v_len = _visible_len(s)
@@ -728,10 +729,24 @@ def draw_dashboard(
         term_width = 200
 
     def line(s: str) -> None:
-        visible = re.sub(r"\033\[[^m]*m", "", s)
-        if len(visible) > term_width:
-            s = s[:term_width + (len(s) - len(visible))] + "\033[0m"
-        print(f"{s}\033[K")
+        # 依「實際可見寬度」截斷至 term_width-1（保留 ANSI 碼、不填滿最後一欄）。
+        # 舊版以「全字串 ANSI 字元數」估算截點，會多留可見字元使行達/超過滿版寬度，
+        # 觸發終端右邊界 auto-wrap → 每行後多一空行。改為逐字掃描可見寬度即根治。
+        limit = max(1, term_width - 1)
+        out, vis, i = [], 0, 0
+        while i < len(s):
+            if s[i] == "\033":
+                m = _ANSI_RE.match(s, i)
+                if m:
+                    out.append(m.group(0))
+                    i = m.end()
+                    continue
+            if vis >= limit:
+                break
+            out.append(s[i])
+            vis += 1
+            i += 1
+        print("".join(out) + "\033[0m\033[K")
 
     stage_eng = "Formation" if stage_title == "形成" else "Trading"
 
