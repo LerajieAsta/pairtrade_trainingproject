@@ -620,8 +620,37 @@ _SENSITIVITY_TRADING_LIST = {
     "stop_loss": ("stop_loss_list", [0.0, 0.05, 0.10, 0.15]),
 }
 
+def _build_all_sensitivity():
+    """全掃：所有 formation 敏感性變體（adf×pca×beta）＋ 三主力 entry_z 交易掃描。
+    回傳 (formation_變體清單, entry_z_基準清單)。單次 run_formation+run_trading 覆蓋 Tier-1。"""
+    form_variants = []
+    for _p, _vals in SENSITIVITY_TIER1_FORMATION.items():
+        for _b in SENSITIVITY_PARAM_BASES.get(_p, SENSITIVITY_BASES):
+            form_variants += make_sensitivity_variants(_b, _p, _vals)
+    ez_bases = []
+    _ez_key, _ez_vals = _SENSITIVITY_TRADING_LIST["entry_z"]
+    for _b in SENSITIVITY_BASES:
+        _base = next((s for s in strategies_raw_all if s["name"] == _b), None)
+        if _base is not None:
+            _v = copy.deepcopy(_base)
+            _v["params"][_ez_key] = _ez_vals      # 沿用既有 formation，交易端展開 entry_z
+            ez_bases.append(_v)
+    return form_variants, ez_bases
+
+
+_sens_all = os.environ.get("SENSITIVITY_ALL", "").strip().lower() not in ("", "0", "false", "no")
 _sens_param = os.environ.get("SENSITIVITY_PARAM", "").strip()
-if _sens_param:
+
+if _sens_all:
+    # 一次跑完所有敏感性分析：run_formation 產生全部 formation 變體的配對，
+    # run_trading 回測全部變體 + 三主力 entry_z 網格。搭配 FORCE_RERUN=True 即「全部重測」。
+    _form_variants, _ez_bases = _build_all_sensitivity()
+    strategies_raw_all = strategies_raw_all + _form_variants   # 附加尾端（不動既有索引）
+    strategies_raw = _form_variants + _ez_bases
+    print(f"[config] 敏感性【全掃】模式：{len(_form_variants)} 個 formation 變體"
+          f"（adf×pca×beta）+ {len(_ez_bases)} 支主力 entry_z 掃描 = {len(strategies_raw)} 條。"
+          f"單次 run_formation + run_trading 涵蓋 Tier-1 全部。")
+elif _sens_param:
     _venv = os.environ.get("SENSITIVITY_VALUES", "").strip()
     _base_env = os.environ.get("SENSITIVITY_BASE", "").strip()
     if _base_env:
