@@ -1007,35 +1007,35 @@ def print_summary_report(results, strategies_config, total_elapsed, show_equity=
     print("=" * 80, flush=True)
     print(f" 總耗時: {total_elapsed:.2f} 秒（約 {total_elapsed / 60:.2f} 分鐘）", flush=True)
     
+    # 以 _pad_visible（顯示欄寬）補齊，讓 CJK 標題/儲存格與資料欄對齊（native :<N 以字元數
+    # 計算，中文佔 2 欄會錯位）。
     if show_equity:
         print(
-            f"\n{'策略名稱':<45} | {'狀態':<10} | {'跳過':<4} | {'最終權益':<10} | {'耗時(秒)':<10} | 錯誤訊息",
+            "\n" + " | ".join([_pad_visible("策略名稱", 45), _pad_visible("狀態", 10),
+                               _pad_visible("跳過", 4), _pad_visible("最終權益", 10),
+                               _pad_visible("耗時(秒)", 10), "錯誤訊息"]),
             flush=True,
         )
         print("-" * 110, flush=True)
     else:
         print(
-            f"\n{'策略名稱':<45} | {'狀態':<10} | {'跳過':<4} | {'耗時(秒)':<10} | 錯誤訊息",
+            "\n" + " | ".join([_pad_visible("策略名稱", 45), _pad_visible("狀態", 10),
+                               _pad_visible("跳過", 4), _pad_visible("耗時(秒)", 10), "錯誤訊息"]),
             flush=True,
         )
         print("-" * 90, flush=True)
-        
+
     name_order = {c["name"]: i for i, c in enumerate(strategies_config)}
     results_sorted = sorted(results, key=lambda r: name_order.get(r["name"], 999))
-    
+
     for res in results_sorted:
         err = res.get("error") or "無"
         skipped = "是" if res.get("skipped") else "否"
+        cells = [_pad_visible(str(res["name"]), 45), _pad_visible(str(res["status"]), 10),
+                 _pad_visible(skipped, 4)]
         if show_equity:
             final_eq = res.get("final_equity", 0.0)
-            final_eq_str = f"${final_eq:.2f}"
-            print(
-                f"{res['name']:<45} | {res['status']:<10} | {skipped:<4} | {final_eq_str:<10} | {res['elapsed']:<10.2f} | {err}",
-                flush=True,
-            )
-        else:
-            print(
-                f"{res['name']:<45} | {res['status']:<10} | {skipped:<4} | {res['elapsed']:<10.2f} | {err}",
-                flush=True,
-            )
+            cells.append(_pad_visible(f"${final_eq:.2f}", 10))
+        cells += [_pad_visible(f"{res['elapsed']:.2f}", 10), err]
+        print(" | ".join(cells), flush=True)
     print("=" * 80, flush=True)
