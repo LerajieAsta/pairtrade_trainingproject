@@ -461,6 +461,31 @@ strategies_raw_all = [
             "thr_min_train_samples": 200,
         },
     },
+    # 11. Agglomerative SEC-PIT + Beta 風險先驗（研究框架 #5）——與 #9 FMP 版
+    #     唯一差異 = 特徵多一個「Beta（系統性風險，形成期滾動估計、全覆蓋、PIT）」
+    #     區塊。隔離「加入基本面風險先驗」對分群→配對品質的淨貢獻。市值/PE 沿用
+    #     PIT parquet（覆蓋稀疏，多數插補），Beta 才是真正有訊號的全覆蓋風險特徵。
+    {
+        "name":             "Agglomerative SEC-PIT Beta",
+        "formation_module": "strategies.formation.agglomerative_sec_pit",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_SEC_PIT_Beta",
+        "db_method":        "Agglomerative (SEC-PIT-Beta)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "beta_feature_weight":         1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+        },
+    },
     # ── DTW Paper 原版（formation-only：僅產生形成期配對供 #2/#3 借用） ──────
     # 2026-07-05：repo LFS 額度用罄，formation_pairs DB 無法下載，原版配對
     # 需本地重算。原版「交易端」為座標 artifact 已封存（見 archive/
