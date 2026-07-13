@@ -4,17 +4,22 @@
 
 ```
 notebooks/
-├── formation/                              # 形成期策略（每策略一本，共 7 本）
+├── formation/                              # 形成期策略（每形成法一本，共 10 本）
 │   ├── ssd_basic.ipynb                     # SSD Basic（基礎原型）
 │   ├── ssd_rolling.ipynb                   # SSD Rolling
 │   ├── dtw_paper_fixed.ipynb               # DTW Paper Fixed
 │   ├── ssd_dtw_pca_paper_fixed.ipynb       # SSD-DTW-PCA Paper Fixed
-│   ├── hdbscan_cluster_pca5.ipynb          # HDBSCAN Cluster SSD-DTW-PCA PCA5（分組消融對照組）
-│   └── agglomerative_fundamentals.ipynb    # Agglomerative Fundamentals
+│   ├── hdbscan_cluster_pca5.ipynb          # HDBSCAN Cluster PCA5（分組消融對照組）
+│   ├── hdbscan_cluster_pca5_resid.ipynb    # HDBSCAN Cluster PCA5 Resid（研究框架 #1 因子殘差化）
+│   ├── hdbscan_pca_loadings_residfdr.ipynb # HDBSCAN PCA-Loadings ResidFDR（#1+#2+#3：殘差 + BH-FDR + 成本過濾）
+│   ├── mst_partialcorr_cointegration.ipynb # MST PartialCorr（研究框架 #4：偏相關網路圖候選生成器）
+│   ├── agglomerative_fundamentals.ipynb    # Agglomerative Fundamentals（yF 快照 / FMP 逐點）
+│   └── agglomerative_sec_pit.ipynb         # Agglomerative SEC-PIT Beta（研究框架 #5：Beta 風險先驗）
 ├── trading/                                # 交易期策略（每交易模組一本）
-│   ├── zscore_trading.ipynb                # Z-Score 狀態機（Z-Score 系 6 策略）
+│   ├── zscore_trading.ipynb                # Z-Score 狀態機（回歸基準）
+│   ├── distance_trading.ipynb              # 距離基準交易（GGR 2006，回歸 vs 距離對照）
 │   └── drl_threshold_trading.ipynb         # DRL 門檻選擇式 v4（DRL THR 系 4 策略）
-├── comparison.ipynb                        # 現役 8 策略績效總比較（讀 results/result.db）
+├── comparison.ipynb                        # 現役策略績效總比較（讀 results/result.db）
 ├── _quarto.yml                             # revealjs 投影片設定（大字型、zoom、KaTeX）
 └── slides.scss                             # 主題（34px root、中文字型、表格縮放）
 ```
