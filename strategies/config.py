@@ -351,6 +351,32 @@ strategies_raw_all = [
             "cost_margin":       1.0,
         },
     },
+    # 6d. MST / 偏相關圖 候選生成器（研究框架 #4）——命題 1 的第三種候選生成方式。
+    #     同排序（SSD-DTW-PCA）、同交易端（路徑 B，ignore_ols_alpha），唯一差異 =
+    #     候選生成：偏相關網路圖（MST+kNN）取代 HDBSCAN 聚類 / GICS 產業分組。
+    #     偏相關（Ledoit-Wolf 收縮精確矩陣）在控制其餘全體後只留 A–B 直接共動，
+    #     去除市場/龍頭中介的間接相關 → 更貼近共整合的經濟來源。factor_residual=True
+    #     與勝出的 PCA5 Resid 對齊，公平比較「圖候選 vs 聚類候選」。
+    {
+        "name":             "MST PartialCorr Cointegration",
+        "formation_module": "strategies.formation.MST_PartialCorr_Cointegration",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "MST_PartialCorr_Cointegration",
+        "db_method":        "MST (PartialCorr-SSD-DTW-PCA)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "graph_method":         "mst+knn",
+            "knn_k":                5,
+            "partial_corr":         True,
+            "factor_residual":      True,   # #1：與 PCA5 Resid 對齊
+            "method":               "ssd_dtw_pca",
+            "dtw_window":           15,
+            "adf_pvalue_threshold": 0.01,
+            "umap_random_state":    42,
+            "ignore_ols_alpha":     True,   # 路徑 B：與形成期標準化空間一致
+        },
+    },
     # 7. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings
     #     ⊕ GICS one-hot ⊕ log(市值) ⊕ 盈餘殖利率(1/PE)」混合特徵空間做
     #     Agglomerative（average-linkage、依合併距離分位數校準
