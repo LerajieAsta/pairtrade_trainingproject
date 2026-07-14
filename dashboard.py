@@ -49,7 +49,7 @@ st.markdown("""
 # CONSTANTS & CONFIG
 # ==========================================
 RESULTS_DIR = "results"
-from strategies.config import INITIAL_CAPITAL, FORWARD_DAYS, rolling_step, CONCURRENT_PERIODS
+from strategies.config import INITIAL_CAPITAL, FORWARD_DAYS, rolling_step, CONCURRENT_PERIODS, RF_ANNUAL
 
 # 最大並行部署資本（用於 daily return 正規化）= INITIAL_CAPITAL（run_trading 已修正）
 _CONCURRENT_PERIODS = CONCURRENT_PERIODS
@@ -165,7 +165,7 @@ def compute_range_metrics(path: str, y1: int, y2: int, top_n_str: str,
         'PF_Raw': pf, 'Win_Rate_Raw': wr, 'Total_Trades': n_t,
         'Gross_Profit': gp, 'Gross_Loss': gl,
         'Avg_Utilization': util, 'Ann_Ret_Employed': ann_emp,
-        'Excess_Ret_RF': ann_arith - 0.02 * util,
+        'Excess_Ret_RF': ann_arith - RF_ANNUAL * util,
     }
 
 
