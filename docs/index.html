@@ -206,7 +206,7 @@
     <div class="header">
       <h1>S&amp;P 500 Pairs Trading</h1>
       <p>配對交易量化回測平台 — 策略邏輯技術文件</p>
-      <span class="badge">現役 8 個交易策略 + 2 個 formation-only 條目</span>
+      <span class="badge">現役 15 個交易策略 + 2 個 formation-only 條目</span>
     </div>
 
     <p class="section-label">🏛️ 研究架構</p>
@@ -291,16 +291,41 @@
         <h2>HDBSCAN Cluster SSD-DTW-PCA PCA5</h2>
         <p>5 維報酬 PCA 因子載荷聚類 ⊕ SSD-DTW-PCA 排序（分組消融對照組）</p>
       </a>
+      <a class="card" href="slides/formation/hdbscan_cluster_pca5_resid.html">
+        <div class="card-icon">🧮</div>
+        <h2>HDBSCAN Cluster PCA5 Resid</h2>
+        <p>因子殘差化（去市場＋產業）→ PCA5 因子載荷聚類 + SSD-DTW-PCA 排序</p>
+      </a>
+      <a class="card" href="slides/formation/hdbscan_pca_loadings_residfdr.html">
+        <div class="card-icon">🔬</div>
+        <h2>HDBSCAN PCA-Loadings ResidFDR</h2>
+        <p>殘差化因子載荷聚類 + BH-FDR 多重檢定校正 + 成本可行性過濾</p>
+      </a>
+      <a class="card" href="slides/formation/mst_partialcorr_cointegration.html">
+        <div class="card-icon">🕸️</div>
+        <h2>MST PartialCorr Cointegration</h2>
+        <p>偏相關網路圖（Ledoit-Wolf 精確矩陣）MST+kNN 候選生成 + SSD-DTW-PCA 排序</p>
+      </a>
       <a class="card" href="slides/formation/agglomerative_fundamentals.html">
         <div class="card-icon">🧬</div>
         <h2>Agglomerative Fundamentals</h2>
-        <p>價格 PCA ⊕ 基本面 ⊕ GICS one-hot 混合特徵分群（最佳 ML 配對）</p>
+        <p>價格 PCA ⊕ 基本面 ⊕ GICS one-hot 混合特徵分群（yF 快照 / FMP 逐點兩資料源）</p>
+      </a>
+      <a class="card" href="slides/formation/agglomerative_sec_pit.html">
+        <div class="card-icon">📊</div>
+        <h2>Agglomerative SEC-PIT Beta</h2>
+        <p>SEC/FMP Point-in-Time 基本面 ⊕ Beta 系統性風險先驗，隔離風險先驗淨貢獻</p>
       </a>
     </div>
 
     <p class="section-label">📈 交易期策略投影片</p>
     <div class="cards">
-      <a class="card" href="slides/trading/zscore_trading.html">
+            <a class="card" href="slides/trading/distance_trading.html">
+        <div class="card-icon">📐</div>
+        <h2>距離基準交易（Distance）</h2>
+        <p>GGR 正規化價格距離 spread（回歸 vs 距離的單變因對照）</p>
+      </a>
+<a class="card" href="slides/trading/zscore_trading.html">
         <div class="card-icon">🧠</div>
         <h2>Z-Score 狀態機</h2>
         <p>Spread 重建路徑 B、進出場狀態機、六大風控（#1–#4、#7、#9）</p>
@@ -329,16 +354,21 @@
     </div>
 
     <div class="strategies">
-      <h3>現役策略（strategies/config.py）</h3>
-      <div class="strategy-item"><span class="dot"></span><span>#1 SSD Basic — 累積回報指數 SSD + 固定 β=1（基礎原型）</span></div>
+      <h3>現役策略（strategies/config.py，13 交易 + 2 formation-only）</h3>
+      <div class="strategy-item"><span class="dot"></span><span>#1 SSD Basic — 累積回報指數 SSD + 固定 β=1（Gatev 2006 基礎原型）</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#2 SSD Rolling — Z-Score log-price SSD + OLS β</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#3 DTW Paper Fixed (DTW) — 共整合篩選 + Sakoe-Chiba DTW 排序</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#4 SSD-DTW-PCA Paper Fixed — SSD⊕DTW PCA 融合排序</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#5 SSD Rolling DRL THR — #2 配對 + DRL 門檻選擇式 v4</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#6 HDBSCAN Cluster SSD-DTW-PCA PCA5 — 5 維因子載荷聚類分組（分組消融對照組）</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#7 Agglomerative Fundamentals — 價格 PCA ⊕ 公司基本面分群</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#8 Agglomerative Fundamentals DRL THR — #7 配對 + DRL v4</span></div>
-      <div class="strategy-item muted"><span class="dot formation-only"></span><span>DTW Paper (DTW)／(SSD-DTW-PCA) — formation-only：只產生 #3/#4 借用的配對，不參與回測</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#3 SSD Rolling Distance — 距離基準交易（回歸 vs 距離對照）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#4 DTW Paper Fixed (DTW) — 共整合篩選 + Sakoe-Chiba DTW 排序</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#5 SSD-DTW-PCA Paper Fixed — SSD⊕DTW PCA 融合排序</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#6 SSD Rolling DRL THR — #2 配對 + DRL 門檻選擇式 v4</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#7 HDBSCAN Cluster PCA5 — 5 維因子載荷聚類（分組消融對照組）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#8 HDBSCAN Cluster PCA5 Resid — 因子殘差化後聚類</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#9 HDBSCAN PCA-Loadings ResidFDR — 殘差化 + BH-FDR + 成本過濾</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#10 Agglomerative Fundamentals (yF) — 基本面快照分群</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#11 Agglomerative Fundamentals DRL THR (yF) — #10 配對 + DRL v4</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#12 Agglomerative Fundamentals (FMP) — 基本面逐點(PIT)分群</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#13 Agglomerative Fundamentals DRL THR (FMP) — #12 配對 + DRL v4</span></div>
+      <div class="strategy-item muted"><span class="dot formation-only"></span><span>DTW Paper (DTW)／(SSD-DTW-PCA) — formation-only：只產生 #4/#5 借用的配對，不參與回測</span></div>
     </div>
 
     <div class="footer">

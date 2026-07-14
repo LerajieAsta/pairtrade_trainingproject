@@ -443,7 +443,7 @@
 
   <meta name="author" content="李伯修">
   <meta name="dcterms.date" content="2026-07-13">
-  <title>Agglomerative Fundamentals</title>
+  <title>HDBSCAN PCA-Loadings ResidFDR</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1042,8 +1042,8 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Agglomerative Fundamentals</h1>
-  <p class="subtitle">形成期策略：價格因子 ⊕ 公司基本面 ⊕ 產業之混合特徵 Agglomerative 分群（yF / FMP 兩種資料源）</p>
+  <h1 class="title">HDBSCAN PCA-Loadings ResidFDR</h1>
+  <p class="subtitle">形成期策略：殘差化因子載荷聚類 + 多重檢定校正(BH-FDR) + 成本可行性過濾</p>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1056,7 +1056,7 @@ margin-right: 0; }
   <p class="date">2026-07-13</p>
 </section>
 <section>
-<section id="策略概述" class="title-slide slide level1 center">
+<section id="策略概述" class="title-slide slide level1 center scrollable">
 <h1>策略概述</h1>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
@@ -1071,120 +1071,153 @@ margin-right: 0; }
 </div>
 </div>
 </div>
-<p><strong>Agglomerative Fundamentals</strong> 以「價格行為 ⊕ 公司基本面 ⊕ 產業」混合特徵做階層聚類建立配對搜尋空間。本策略有<strong>兩個資料源變體</strong>，方法論完全相同、僅基本面資料來源不同：</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">變體</th>
-<th style="text-align: left;">形成模組</th>
-<th style="text-align: left;">基本面資料</th>
-<th style="text-align: left;">前視偏誤</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;"><strong>yF</strong></td>
-<td style="text-align: left;"><code>agglomerative_yF.py</code></td>
-<td style="text-align: left;">yfinance <strong>單一時點快照</strong>（SQLite）</td>
-<td style="text-align: left;">有（每個歷史窗都用「今日」數值）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><strong>FMP</strong></td>
-<td style="text-align: left;"><code>agglomerative_FMP.py</code></td>
-<td style="text-align: left;">FMP <strong>Point-in-Time 逐點</strong>（Parquet）</td>
-<td style="text-align: left;">已修正（每窗取 ≤ 形成期末的最近一筆）</td>
-</tr>
-</tbody>
-</table>
-<p>兩者各再衍生一個 DRL THR 交易變體（借用同一組形成期配對）。共用組合模式：借用 <code>HDBSCAN_PCA_Loadings</code> 的價格因子載荷 + 基本面 + 產業 one-hot → Agglomerative 分群 → <code>ssd_rolling</code> 排序。</p>
+<p><strong>HDBSCAN PCA-Loadings ResidFDR</strong> 在殘差化因子載荷聚類的基礎上，對群內共整合篩選加入兩道統計嚴謹性強化：</p>
+<ol type="1">
+<li>報酬<strong>因子殘差化</strong>（移除市場＋產業因子）→ 5 維 PCA 因子載荷 → HDBSCAN 聚類</li>
+<li>群內多道品質過濾（相關初篩、ADF、半衰期、Hurst、Beta 差、波動比、ADV）+ 品質評分排序</li>
+<li><strong>BH-FDR 多重檢定校正</strong>：對全部候選配對的共整合 p 值做 Benjamini–Hochberg 校正，控制偽發現率</li>
+<li><strong>成本可行性過濾</strong>：剔除 spread 振幅不足以覆蓋往返交易成本（0.58%）的配對</li>
+<li>依品質評分取前 <code>top_n</code></li>
+</ol>
+<p>實作模組：<code>strategies/formation/HDBSCAN_PCA_Loadings.py</code>（<code>feature_mode=&quot;pca_loadings&quot;, factor_residual=True, use_fdr=True, use_cost_filter=True</code>），共整合篩選繼承自 <code>HDBSCAN_UMAP.py</code> 的多濾網品質評分流程。</p>
 </section>
-<section id="為何用-agglomerative-階層聚類" class="slide level2">
-<h2>為何用 Agglomerative 階層聚類</h2>
-<ul>
-<li><strong>每個點都分配群組</strong>（無「雜訊」概念）；不適合成群者以「過小群併入 Unknown」事後排除，排除比例由資料決定</li>
-<li><strong>不預設群數</strong>：以每期合併距離的分位數校準 <code>distance_threshold</code>，群數隨當期分布自然決定</li>
-<li><strong>average linkage</strong>：對混合特徵（連續 + one-hot）的距離尺度差異較不敏感，降低單一巨型群傾向</li>
-</ul>
-</section>
-<section id="yf-與-fmp-的關鍵差異前視偏誤" class="slide level2">
-<h2>yF 與 FMP 的關鍵差異：前視偏誤</h2>
-<p>兩變體唯一的實質差異在基本面資料的<strong>時間對齊</strong>：</p>
-<ul>
-<li><strong>yF</strong>：市值/本益比為 yfinance 抓取當下的<strong>單一快照</strong>，所有 2000–2025 歷史窗口共用同一組「現在的」數值—— 對早期窗口存在前視偏誤（用未來資訊分群），是免費資料源下已知且刻意接受的限制</li>
-<li><strong>FMP</strong>：從 Point-in-Time Parquet 中，對每個形成窗<strong>取日期 ≤ 形成期末的最近一筆</strong>基本面記錄， 並優先採用該時點的 PIT 產業分類——每個窗口只用當時可得的資訊，<strong>修正了 yF 的前視偏誤</strong></li>
-</ul>
-<p>FMP 變體是為了在保留基本面分群方法的前提下，消除 yF 的前視限制而建立的對照。</p>
+<section id="動機控制大規模配對搜尋的偽陽性與費用侵蝕" class="slide level2">
+<h2>動機：控制大規模配對搜尋的偽陽性與費用侵蝕</h2>
+<p>S&amp;P 500 全市場約 <span class="math inline">N(N-1)/2 \approx</span> 12.5 萬個候選配對。若對每對用固定 <span class="math inline">p &lt; 0.05</span> 檢定共整合， 純機率下就會產生<strong>數千個偽共整合</strong>——這些配對出樣本不回歸，變成強制平倉的虧損來源。</p>
+<p>同時，即使配對真的共整合，若其 spread 振幅太小，往返交易成本（0.58%）會把訊號吃光。 本策略以兩道統計/經濟過濾（多重檢定校正、成本可行性）針對性地解決這兩個問題。</p>
 </section></section>
 <section>
 <section id="參考文獻與引用對應" class="title-slide slide level1 center">
 <h1>參考文獻與引用對應</h1>
 
 </section>
-<section id="文獻-1hong-hwang-2021" class="slide level2">
-<h2>文獻 1：Hong &amp; Hwang (2021)</h2>
+<section id="文獻-1avellaneda-lee-2010" class="slide level2">
+<h2>文獻 1：Avellaneda &amp; Lee (2010)</h2>
 <blockquote>
-<p>Hong, S., &amp; Hwang, S. (2021). In search of pairs using firm fundamentals: Is pairs trading profitable? <em>The European Journal of Finance</em>, <strong>29</strong>(5).</p>
+<p>Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7), 761–782.</p>
 </blockquote>
-<p><strong>參考部分</strong>：以企業基本面特徵（而非純價格）識別配對；基本面相近的公司共享估值與現金流驅動因子，價格均衡有基本面基礎。</p>
-<p><strong>為何參考</strong>：混合特徵中基本面區塊（log 市值、盈餘殖利率 <span class="math inline">1/PE</span>）的直接依據。</p>
-<p>📄 <code>ref/2021-In Search of Pairs using Firm Fundamentals.pdf</code></p>
+<p><strong>參考部分</strong>：報酬因子分解（因子暴露 + 特殊性報酬），統計套利建於殘差報酬。</p>
+<p><strong>為何參考</strong>：階段 1 的因子殘差化與 5 維因子載荷聚類座標之依據（同 Resid 版）。</p>
+<p>📄 <code>ref/2010-Statistical arbitrage in the U.S. equities market.pdf</code></p>
 </section>
-<section id="文獻-2ward-1963avellaneda-lee-2010" class="slide level2">
-<h2>文獻 2：Ward (1963)／Avellaneda &amp; Lee (2010)</h2>
+<section id="文獻-2benjamini-hochberg-1995" class="slide level2">
+<h2>文獻 2：Benjamini &amp; Hochberg (1995)</h2>
 <blockquote>
-<p>Ward, J. H. (1963). Hierarchical grouping to optimize an objective function. <em>JASA</em>, <strong>58</strong>(301), 236–244. Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7), 761–782.</p>
+<p>Benjamini, Y., &amp; Hochberg, Y. (1995). Controlling the false discovery rate: A practical and powerful approach to multiple testing. <em>Journal of the Royal Statistical Society: Series B</em>, <strong>57</strong>(1), 289–300.</p>
 </blockquote>
-<p><strong>參考部分與理由</strong>：</p>
+<p><strong>參考部分</strong>：</p>
 <ul>
-<li>Ward：階層聚集聚類框架與 dendrogram 可事後切割的特性——階段 3 兩段式 <code>distance_threshold</code> 校準之依據（⚠️ <code>ref/</code> 缺 PDF，需補充）</li>
-<li>Avellaneda &amp; Lee：報酬 PCA 因子載荷——價格行為區塊的計算方式（📄 <code>ref/2010-Statistical arbitrage in the U.S. equities market.pdf</code>）</li>
+<li><strong>偽發現率（FDR）</strong>控制框架：在 <span class="math inline">m</span> 個同時檢定中，控制「被拒絕的虛無假設中實為真」的期望比例</li>
+<li>BH 程序：將 p 值升序排列，取最大的 <span class="math inline">p_{(k)}</span> 使 <span class="math inline">p_{(k)} \le \frac{k}{m}\alpha</span>，作為拒絕門檻</li>
 </ul>
+<p><strong>為何參考</strong>：</p>
+<ul>
+<li>階段 3 對約 12.5 萬對候選的共整合 p 值直接套用 BH 程序（<code>_bh_fdr_threshold</code>）： 以寬鬆 ADF 門檻（<span class="math inline">p&lt;0.10</span>）放行候選，最後統一以 BH 臨界值過濾—— 比固定 <span class="math inline">p&lt;0.01</span> 更能同時兼顧「不漏真配對」與「壓制偽共整合」</li>
+</ul>
+<p>⚠️ <strong><code>ref/</code> 資料夾內無此文獻 PDF，需補充。</strong></p>
 </section>
-<section id="文獻-3gatev-goetzmann-rouwenhorst-2006engle-granger-1987krauss-et-al.-2016" class="slide level2">
-<h2>文獻 3：Gatev, Goetzmann &amp; Rouwenhorst (2006)／Engle &amp; Granger (1987)／Krauss et al. (2016)</h2>
-<p><strong>參考部分與理由</strong>：群內 min-SSD 排序（Gatev，📄 <code>ref/2006-...</code>）＋ ADF 共整合（Engle &amp; Granger，⚠️ 缺 PDF）＋ 半衰期/Hurst 過濾（Krauss，📄 <code>ref/2016-...</code>），經 <code>ssd_rolling.py</code> 複用。</p>
+<section id="文獻-3do-faff-2012" class="slide level2">
+<h2>文獻 3：Do &amp; Faff (2012)</h2>
+<blockquote>
+<p>Do, B., &amp; Faff, R. (2012). Are pairs trading profits robust to trading costs? <em>Journal of Financial Research</em>, <strong>35</strong>(2), 261–287.</p>
+</blockquote>
+<p><strong>參考部分</strong>：配對交易獲利對往返交易成本高度敏感，低振幅配對在計入成本後多為淨虧損。</p>
+<p><strong>為何參考</strong>：</p>
+<ul>
+<li>階段 4 成本可行性過濾的依據：要求單次往返的預期擷取 <span class="math inline">entry_z \times \sigma_{spread}</span> 須 <span class="math inline">\ge</span> 往返成本（<span class="math inline">2 \times 0.29\% = 0.58\%</span>），在形成期就剔除註定被費用吃光的配對</li>
+</ul>
+<p>📄 <code>ref/2012 - ARE PAIRS TRADING PROFITS ROBUST TO TRADING COSTS.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">
 <h1>各階段行為</h1>
 
 </section>
-<section id="階段-1混合特徵矩陣建構" class="slide level2">
-<h2>階段 1：混合特徵矩陣建構</h2>
-<p>三區塊特徵：</p>
-<ul>
-<li><strong>價格行為（5 維）</strong>：借用 <code>HDBSCAN_PCA_Loadings._build_feature_matrix()</code> 的報酬 PCA 因子載荷（不用其聚類）</li>
-<li><strong>公司基本面（2 維）</strong>：<span class="math inline">[\log(1+\text{MarketCap}),\ 1/PE]</span>；缺值以正規化產業中位數插補後 winsorize（1%–99%）</li>
-<li><strong>產業歸屬（12 維）</strong>：11 個正規化 GICS 產業 + Unknown 的 one-hot（產業別名先正規化，如 Healthcare→Health Care）</li>
-</ul>
-<p><strong>資料源差異</strong>：yF 從 SQLite 快照取 MarketCap/TrailingPE；FMP 從 PIT Parquet 取形成期末當時的 market_cap/pe_ratio 與 PIT 產業。</p>
+<section id="階段-1因子殘差化-pca5-因子載荷-hdbscan-聚類" class="slide level2">
+<h2>階段 1：因子殘差化 + PCA5 因子載荷 + HDBSCAN 聚類</h2>
+<p>報酬先做因子殘差化（移除市場因子 → 產業因子，見 Resid 版階段 1 公式）， 以殘差報酬的 5 維 PCA 因子載荷做 HDBSCAN 聚類（<code>min_cluster_size=5</code>、<code>reduce_method=&quot;none&quot;</code>），噪音點排除。</p>
 </section>
-<section id="階段-2區塊分別標準化與加權拼接" class="slide level2">
-<h2>階段 2：區塊分別標準化與加權拼接</h2>
-<p><span class="math display">X = [\, w_{price}\cdot\text{Scale}(\text{loadings}) \ \|\ w_{fund}\cdot\text{Scale}(f) \ \|\ w_{sector}\cdot\text{OneHot} \,], \quad w_{price}=w_{fund}=w_{sector}=1.0</span></p>
-<p>三區塊<strong>各自</strong> <code>StandardScaler</code> 後加權拼接——避免 joint 標準化讓 12 欄 one-hot 稀釋 2 欄基本面的距離貢獻。</p>
+<section id="階段-2群內多濾網品質篩選" class="slide level2">
+<h2>階段 2：群內多濾網品質篩選</h2>
+<p>群內每對股票依序通過（任一未過即淘汰）：</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 38%">
+<col style="width: 30%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">步驟</th>
+<th style="text-align: left;">過濾</th>
+<th style="text-align: left;">門檻</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">1</td>
+<td style="text-align: left;">相關係數初篩</td>
+<td style="text-align: left;"><span class="math inline">\text{corr}(\ln P_A, \ln P_B) \ge 0.50</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">2</td>
+<td style="text-align: left;">ADF 共整合（雙向取較小 p）</td>
+<td style="text-align: left;">FDR 模式下用寬鬆閘 <span class="math inline">p &lt; 0.10</span> 放行（見階段 3）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">OU 半衰期</td>
+<td style="text-align: left;"><span class="math inline">1 \le HL \le 63</span> 日</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">4</td>
+<td style="text-align: left;">Hurst</td>
+<td style="text-align: left;"><span class="math inline">H &lt; 0.55</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">5</td>
+<td style="text-align: left;"><strong>成本可行性</strong></td>
+<td style="text-align: left;"><span class="math inline">entry_z \times \sigma_{spread} \ge 0.58\%</span>（見階段 4）</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">6</td>
+<td style="text-align: left;">Beta 差異</td>
+<td style="text-align: left;"><span class="math inline">|\beta_A - \beta_B| \le 0.8</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">7</td>
+<td style="text-align: left;">波動率比</td>
+<td style="text-align: left;"><span class="math inline">\max/\min \le 3.0</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">8</td>
+<td style="text-align: left;">ADV 流動性比</td>
+<td style="text-align: left;"><span class="math inline">\ge 0.1</span></td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">9</td>
+<td style="text-align: left;">品質評分</td>
+<td style="text-align: left;">綜合配對特徵計算 <code>quality_score</code>（排序用）</td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="階段-3agglomerative-分群與-distance_threshold-校準依據ward-1963" class="slide level2 scrollable">
-<h2>階段 3：Agglomerative 分群與 distance_threshold 校準（依據：Ward 1963）</h2>
-<ol type="1">
-<li><strong>Probe</strong>：<code>n_clusters=1</code> 跑完整合併路徑（<code>compute_distances=True</code>），取全部 <span class="math inline">N-1</span> 個合併距離</li>
-<li><strong>校準</strong>：<span class="math inline">\text{threshold} = \text{percentile}_{75}(\{d_{merge}\})</span></li>
-<li><strong>分群</strong>：<code>AgglomerativeClustering(distance_threshold=threshold, linkage=&quot;average&quot;)</code>；過小群（&lt; <code>min_cluster_size</code>=5）併入 <code>&quot;Unknown&quot;</code></li>
-</ol>
+<section id="階段-3bh-fdr-多重檢定校正依據benjamini-hochberg-1995" class="slide level2">
+<h2>階段 3：BH-FDR 多重檢定校正（依據：Benjamini &amp; Hochberg 1995）</h2>
+<p>ADF 階段先用<strong>寬鬆閘</strong> <span class="math inline">p &lt; 0.10</span> 放行候選（避免過早剔除真配對）， 記錄做過 ADF 檢定的配對總數 <span class="math inline">m</span>。全部候選收集完後，統一套用 BH 程序：</p>
+<p><span class="math display">p_{crit} = \max\left\{ p_{(k)} : p_{(k)} \le \frac{k}{m}\,\alpha \right\}, \qquad \alpha = 0.05</span></p>
+<p>只保留 <span class="math inline">\text{ADF\_PValue} \le p_{crit}</span> 的配對。<span class="math inline">m</span> 以全部做過 ADF 的配對數計入 （未進 records 的以 <span class="math inline">p=1</span> 補齊），確保多重檢定的分母正確。</p>
 </section>
-<section id="階段-4群內-min-ssd-排序與過濾依據gatev-2006" class="slide level2">
-<h2>階段 4：群內 min-SSD 排序與過濾（依據：Gatev 2006）</h2>
-<p>分群標籤當 <code>sector_mapping</code> 餵給 <code>ssd_rolling.Formation</code>：群內 Z-Score 標準化 log-price → SSD 初篩 → 協方差 OLS 對沖比例 → 三道過濾（ADF <span class="math inline">p&lt;0.05</span>、半衰期 <span class="math inline">[1,42]</span> 日、Hurst <span class="math inline">&lt;0.5</span>）→ 依 SSD 升序取前 <code>top_n</code>。</p>
+<section id="階段-4成本可行性過濾依據do-faff-2012" class="slide level2">
+<h2>階段 4：成本可行性過濾（依據：Do &amp; Faff 2012）</h2>
+<p>一次往返（<span class="math inline">entry_z\cdot\sigma</span> 進場 → 回到 0 出場）的預期分數擷取 <span class="math inline">\approx entry_z \times \sigma_{spread}</span>， 須顯著大於往返成本：</p>
+<p><span class="math display">entry_z \times \sigma_{spread} \ \ge\ \text{margin} \times \text{roundtrip\_cost}, \qquad
+entry_z = 2.0,\ \text{roundtrip\_cost} = 0.0058,\ \text{margin} = 1.0</span></p>
+<p><span class="math inline">\sigma_{spread}</span> 為 log-price 共整合殘差的標準差（近似分數移動幅度）。不滿足者於形成期即剔除。</p>
 </section>
-<section id="階段-56輸出與交易期銜接" class="slide level2">
-<h2>階段 5–6：輸出與交易期銜接</h2>
-<p>輸出標準欄位 + <code>Sector_A/B</code>（真實 GICS）、<code>Cluster_ID_A/B</code>、<code>MarketCap_A/B</code>、<code>TrailingPE_A/B</code>。 排序流程不輸出 <code>OLS_Alpha</code>，交易期於標準化空間重建 spread（路徑 B）。 形成期統計量整個交易期凍結（無前視——但 yF 變體另有基本面快照的前視限制，見「關鍵差異」一節）。 本策略配對另供 DRL 門檻選擇式交易端使用（見 <code>trading/drl_threshold_trading.ipynb</code>）。</p>
+<section id="階段-5排序與交易期銜接" class="slide level2">
+<h2>階段 5：排序與交易期銜接</h2>
+<p>通過全部過濾與 BH-FDR 校正的配對依 <code>quality_score</code> 取前 <code>top_n</code>。 輸出 <code>OLS_Alpha</code>（本策略共整合殘差於 log-price 空間），交易期依 config 的 <code>ignore_ols_alpha</code> 設定決定 spread 重建座標。形成期統計量整個交易期凍結（無前視）。</p>
 </section></section>
 <section id="參數總表" class="title-slide slide level1 center">
 <h1>參數總表</h1>
@@ -1213,39 +1246,39 @@ margin-right: 0; }
 <td style="text-align: left;">每期配對數</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><code>pca_n_components</code></td>
-<td style="text-align: center;">5</td>
-<td style="text-align: left;">價格區塊因子數</td>
+<td style="text-align: left;"><code>factor_residual</code></td>
+<td style="text-align: center;"><strong>True</strong></td>
+<td style="text-align: left;">移除市場＋產業因子</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">三區塊權重</td>
-<td style="text-align: center;">各 1.0</td>
-<td style="text-align: left;">price / fundamentals / sector</td>
+<td style="text-align: left;"><code>feature_mode</code></td>
+<td style="text-align: center;"><code>pca_loadings</code></td>
+<td style="text-align: left;">5 維殘差因子載荷</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><code>agg_linkage</code> / <code>agg_threshold_percentile</code></td>
-<td style="text-align: center;">average / 75.0</td>
-<td style="text-align: left;">分群與門檻校準</td>
+<td style="text-align: left;"><code>use_fdr</code> / <code>fdr_alpha</code></td>
+<td style="text-align: center;"><strong>True</strong> / 0.05</td>
+<td style="text-align: left;">BH-FDR 多重檢定校正</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><code>min_cluster_size</code></td>
-<td style="text-align: center;">5</td>
-<td style="text-align: left;">過小群併入 Unknown</td>
+<td style="text-align: left;"><code>use_cost_filter</code> / <code>roundtrip_cost</code> / <code>cost_margin</code></td>
+<td style="text-align: center;"><strong>True</strong> / 0.0058 / 1.0</td>
+<td style="text-align: left;">成本可行性</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><code>adf_pvalue_threshold</code></td>
-<td style="text-align: center;">0.05</td>
-<td style="text-align: left;">群內共整合</td>
+<td style="text-align: center;">0.01（FDR 模式閘放寬至 0.10）</td>
+<td style="text-align: left;">共整合</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">yF 資料源</td>
-<td style="text-align: center;"><code>dataset/fundamental/fundamentals_sp500.db</code></td>
-<td style="text-align: left;">yfinance 快照</td>
+<td style="text-align: left;"><code>min_corr</code> / <code>halflife_max</code> / <code>hurst_threshold</code></td>
+<td style="text-align: center;">0.50 / 63 / 0.55</td>
+<td style="text-align: left;">品質過濾</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">FMP 資料源</td>
-<td style="text-align: center;"><code>dataset/fundamental/sp500_pit_2000_2025_monthly.parquet</code></td>
-<td style="text-align: left;">PIT 逐點</td>
+<td style="text-align: left;"><code>max_beta_diff</code> / <code>max_vol_ratio</code> / <code>min_adv_ratio</code></td>
+<td style="text-align: center;">0.8 / 3.0 / 0.1</td>
+<td style="text-align: left;">品質過濾</td>
 </tr>
 </tbody>
 </table>

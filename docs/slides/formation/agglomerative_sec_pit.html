@@ -443,7 +443,7 @@
 
   <meta name="author" content="李伯修">
   <meta name="dcterms.date" content="2026-07-13">
-  <title>Agglomerative Fundamentals</title>
+  <title>Agglomerative SEC-PIT Beta</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1042,8 +1042,8 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Agglomerative Fundamentals</h1>
-  <p class="subtitle">形成期策略：價格因子 ⊕ 公司基本面 ⊕ 產業之混合特徵 Agglomerative 分群（yF / FMP 兩種資料源）</p>
+  <h1 class="title">Agglomerative SEC-PIT Beta</h1>
+  <p class="subtitle">形成期策略：價格 PCA ⊕ SEC PIT 基本面 ⊕ Beta 風險先驗 → Agglomerative 分群 + SSD 排序</p>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1056,7 +1056,7 @@ margin-right: 0; }
   <p class="date">2026-07-13</p>
 </section>
 <section>
-<section id="策略概述" class="title-slide slide level1 center">
+<section id="策略概述" class="title-slide slide level1 center scrollable">
 <h1>策略概述</h1>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
@@ -1071,55 +1071,34 @@ margin-right: 0; }
 </div>
 </div>
 </div>
-<p><strong>Agglomerative Fundamentals</strong> 以「價格行為 ⊕ 公司基本面 ⊕ 產業」混合特徵做階層聚類建立配對搜尋空間。本策略有<strong>兩個資料源變體</strong>，方法論完全相同、僅基本面資料來源不同：</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">變體</th>
-<th style="text-align: left;">形成模組</th>
-<th style="text-align: left;">基本面資料</th>
-<th style="text-align: left;">前視偏誤</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;"><strong>yF</strong></td>
-<td style="text-align: left;"><code>agglomerative_yF.py</code></td>
-<td style="text-align: left;">yfinance <strong>單一時點快照</strong>（SQLite）</td>
-<td style="text-align: left;">有（每個歷史窗都用「今日」數值）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><strong>FMP</strong></td>
-<td style="text-align: left;"><code>agglomerative_FMP.py</code></td>
-<td style="text-align: left;">FMP <strong>Point-in-Time 逐點</strong>（Parquet）</td>
-<td style="text-align: left;">已修正（每窗取 ≤ 形成期末的最近一筆）</td>
-</tr>
-</tbody>
-</table>
-<p>兩者各再衍生一個 DRL THR 交易變體（借用同一組形成期配對）。共用組合模式：借用 <code>HDBSCAN_PCA_Loadings</code> 的價格因子載荷 + 基本面 + 產業 one-hot → Agglomerative 分群 → <code>ssd_rolling</code> 排序。</p>
+<p><strong>Agglomerative SEC-PIT Beta</strong> 在 Agglomerative（價格 PCA ⊕ 公司基本面）分群距離中，加入 <strong>Beta 系統性風險先驗</strong>——與 FMP 版（<code>#12</code>）<strong>唯一差異是多一個 Beta 特徵區塊</strong>，藉此隔離「基本面風險先驗」對分群→配對品質的<strong>淨貢獻</strong>（研究框架 #5）：</p>
+<ol type="1">
+<li>借用 <code>HDBSCAN_PCA_Loadings</code> 萃取<strong>價格 PCA 因子載荷</strong></li>
+<li>SEC／FMP <strong>Point-in-Time</strong> parquet 以 asof 對齊 <code>form_end</code> 取市值／PE（無前視）</li>
+<li><strong>Beta</strong> = 形成窗報酬對橫斷面市場因子回歸斜率（全覆蓋、天生 PIT）</li>
+<li>各特徵區塊分別標準化＋加權組合 → <strong>Agglomerative</strong>（average linkage）分群</li>
+<li>群內 <strong>SSD Rolling</strong> 排序，取前 <code>top_n</code></li>
+<li>交易期 Z-Score 路徑 B</li>
+</ol>
+<p>實作模組：<code>strategies/formation/agglomerative_sec_pit.py</code>（子類 <code>agglomerative_FMP</code>，新增 <code>beta_feature_weight</code>）。</p>
 </section>
-<section id="為何用-agglomerative-階層聚類" class="slide level2">
-<h2>為何用 Agglomerative 階層聚類</h2>
-<ul>
-<li><strong>每個點都分配群組</strong>（無「雜訊」概念）；不適合成群者以「過小群併入 Unknown」事後排除，排除比例由資料決定</li>
-<li><strong>不預設群數</strong>：以每期合併距離的分位數校準 <code>distance_threshold</code>，群數隨當期分布自然決定</li>
-<li><strong>average linkage</strong>：對混合特徵（連續 + one-hot）的距離尺度差異較不敏感，降低單一巨型群傾向</li>
-</ul>
-</section>
-<section id="yf-與-fmp-的關鍵差異前視偏誤" class="slide level2">
-<h2>yF 與 FMP 的關鍵差異：前視偏誤</h2>
-<p>兩變體唯一的實質差異在基本面資料的<strong>時間對齊</strong>：</p>
-<ul>
-<li><strong>yF</strong>：市值/本益比為 yfinance 抓取當下的<strong>單一快照</strong>，所有 2000–2025 歷史窗口共用同一組「現在的」數值—— 對早期窗口存在前視偏誤（用未來資訊分群），是免費資料源下已知且刻意接受的限制</li>
-<li><strong>FMP</strong>：從 Point-in-Time Parquet 中，對每個形成窗<strong>取日期 ≤ 形成期末的最近一筆</strong>基本面記錄， 並優先採用該時點的 PIT 產業分類——每個窗口只用當時可得的資訊，<strong>修正了 yF 的前視偏誤</strong></li>
-</ul>
-<p>FMP 變體是為了在保留基本面分群方法的前提下，消除 yF 的前視限制而建立的對照。</p>
+<section id="為何只加-beta不加槓桿獲利率" class="slide level2">
+<h2>為何只加 Beta，不加槓桿／獲利率</h2>
+<p><strong>Beta（系統性風險）相近</strong>的兩檔股票，其 spread 更<strong>市場中性</strong>、更易均值回歸，是理論上最貼合市場中性配對的基本面風險特徵；且 Beta 由形成窗價格回歸即得——<strong>全覆蓋、天生 point-in-time、無前視</strong>。</p>
+<p>相對地，SEC EDGAR XBRL 的基本面覆蓋率在本資料集極低：市值／PE 全期僅約 10%、2009 年前近乎 0（XBRL 制度 2009 才普及）。若再從 XBRL 拉槓桿（D/E）、獲利率（ROE／margin），同樣 0%（2009 前）＋稀疏（之後約 15%）→ <strong>90%+ 需群組中位數插補 = 引入雜訊而非訊號</strong>。故只加 Beta，市值／PE 沿用 PIT 有資料處、缺漏以產業中位數插補。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>重要</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>實測結論</strong>：等權（<code>beta_feature_weight=1.0</code>）加入 Beta <strong>反而全面變差</strong>——高變異的 Beta 主導了分群距離，把 β 相近但行為／產業不同的股票硬拉在一起，群質下降。與 #2/#3/#4 同一母題：<strong>好的基礎表徵已捕捉結構，額外堆疊特徵常是稀釋而非增益</strong>。<code>beta_feature_weight</code> 已納入敏感性掃描（<span class="math inline">\{0,0.25,0.5,1.0\}</span>，<span class="math inline">0=</span> 無 β 控制組 <span class="math inline">\approx</span> FMP）。詳見 <code>notebooks/comparison.ipynb</code>。</p>
+</div>
+</div>
+</div>
 </section></section>
 <section>
 <section id="參考文獻與引用對應" class="title-slide slide level1 center">
@@ -1129,62 +1108,69 @@ margin-right: 0; }
 <section id="文獻-1hong-hwang-2021" class="slide level2">
 <h2>文獻 1：Hong &amp; Hwang (2021)</h2>
 <blockquote>
-<p>Hong, S., &amp; Hwang, S. (2021). In search of pairs using firm fundamentals: Is pairs trading profitable? <em>The European Journal of Finance</em>, <strong>29</strong>(5).</p>
+<p>Hong, S., &amp; Hwang, S. (2021). In search of pairs using firm fundamentals: Is pairs trading profitable? <em>The European Journal of Finance</em>.</p>
 </blockquote>
-<p><strong>參考部分</strong>：以企業基本面特徵（而非純價格）識別配對；基本面相近的公司共享估值與現金流驅動因子，價格均衡有基本面基礎。</p>
-<p><strong>為何參考</strong>：混合特徵中基本面區塊（log 市值、盈餘殖利率 <span class="math inline">1/PE</span>）的直接依據。</p>
-<p>📄 <code>ref/2021-In Search of Pairs using Firm Fundamentals.pdf</code></p>
+<p>以公司基本面（規模、估值等）尋找配對——本策略「以基本面特徵輔助分群」的直接依據。</p>
 </section>
-<section id="文獻-2ward-1963avellaneda-lee-2010" class="slide level2">
-<h2>文獻 2：Ward (1963)／Avellaneda &amp; Lee (2010)</h2>
+<section id="文獻-2sharpe-1964" class="slide level2">
+<h2>文獻 2：Sharpe (1964)</h2>
 <blockquote>
-<p>Ward, J. H. (1963). Hierarchical grouping to optimize an objective function. <em>JASA</em>, <strong>58</strong>(301), 236–244. Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7), 761–782.</p>
+<p>Sharpe, W. F. (1964). Capital asset prices: A theory of market equilibrium under conditions of risk. <em>The Journal of Finance</em>, <strong>19</strong>(3), 425–442.</p>
 </blockquote>
-<p><strong>參考部分與理由</strong>：</p>
-<ul>
-<li>Ward：階層聚集聚類框架與 dendrogram 可事後切割的特性——階段 3 兩段式 <code>distance_threshold</code> 校準之依據（⚠️ <code>ref/</code> 缺 PDF，需補充）</li>
-<li>Avellaneda &amp; Lee：報酬 PCA 因子載荷——價格行為區塊的計算方式（📄 <code>ref/2010-Statistical arbitrage in the U.S. equities market.pdf</code>）</li>
-</ul>
+<p>市場模型 <span class="math inline">r_i=\alpha_i+\beta_i r_m+\varepsilon_i</span> 的 <span class="math inline">\beta_i</span> 度量<strong>系統性風險</strong>——本策略「階段 3」以 Beta 相近作為市場中性配對的風險先驗。</p>
 </section>
-<section id="文獻-3gatev-goetzmann-rouwenhorst-2006engle-granger-1987krauss-et-al.-2016" class="slide level2">
-<h2>文獻 3：Gatev, Goetzmann &amp; Rouwenhorst (2006)／Engle &amp; Granger (1987)／Krauss et al. (2016)</h2>
-<p><strong>參考部分與理由</strong>：群內 min-SSD 排序（Gatev，📄 <code>ref/2006-...</code>）＋ ADF 共整合（Engle &amp; Granger，⚠️ 缺 PDF）＋ 半衰期/Hurst 過濾（Krauss，📄 <code>ref/2016-...</code>），經 <code>ssd_rolling.py</code> 複用。</p>
+<section id="文獻-3ward-1963avellaneda-lee-2010" class="slide level2">
+<h2>文獻 3：Ward (1963)／Avellaneda &amp; Lee (2010)</h2>
+<blockquote>
+<p>Ward, J. H. (1963). Hierarchical grouping to optimize an objective function. <em>JASA</em>, <strong>58</strong>(301), 236–244.</p>
+</blockquote>
+<blockquote>
+<p>Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7), 761–782.</p>
+</blockquote>
+<p>前者為 Agglomerative 階層分群（「階段 4」）依據；後者為報酬 PCA 因子載荷（「階段 1」）依據。</p>
+</section>
+<section id="文獻-4engle-granger-1987krauss-do-huck-2016" class="slide level2">
+<h2>文獻 4：Engle &amp; Granger (1987)／Krauss, Do &amp; Huck (2016)</h2>
+<blockquote>
+<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction. <em>Econometrica</em>, <strong>55</strong>(2), 251–276.</p>
+</blockquote>
+<blockquote>
+<p>Krauss, C., Do, X. A., &amp; Huck, N. (2016). The profitability of pairs trading strategies: Distance, cointegration and copula methods. <em>Quantitative Finance</em>, <strong>17</strong>(3), 469–488.</p>
+</blockquote>
+<p>「階段 5」群內 min-SSD 排序 + ADF／半衰期／Hurst 過濾（沿用 <code>ssd_rolling.py</code>）依據。</p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">
 <h1>各階段行為</h1>
 
 </section>
-<section id="階段-1混合特徵矩陣建構" class="slide level2">
-<h2>階段 1：混合特徵矩陣建構</h2>
-<p>三區塊特徵：</p>
-<ul>
-<li><strong>價格行為（5 維）</strong>：借用 <code>HDBSCAN_PCA_Loadings._build_feature_matrix()</code> 的報酬 PCA 因子載荷（不用其聚類）</li>
-<li><strong>公司基本面（2 維）</strong>：<span class="math inline">[\log(1+\text{MarketCap}),\ 1/PE]</span>；缺值以正規化產業中位數插補後 winsorize（1%–99%）</li>
-<li><strong>產業歸屬（12 維）</strong>：11 個正規化 GICS 產業 + Unknown 的 one-hot（產業別名先正規化，如 Healthcare→Health Care）</li>
-</ul>
-<p><strong>資料源差異</strong>：yF 從 SQLite 快照取 MarketCap/TrailingPE；FMP 從 PIT Parquet 取形成期末當時的 market_cap/pe_ratio 與 PIT 產業。</p>
+<section id="階段-1價格-pca-因子載荷依據avellaneda-lee-2010" class="slide level2">
+<h2>階段 1：價格 PCA 因子載荷（依據：Avellaneda &amp; Lee 2010）</h2>
+<p>借用 <code>HDBSCAN_PCA_Loadings._build_feature_matrix()</code>：對形成窗標準化日報酬做 PCA，取前 <code>pca_n_components</code>（=5）主成分的因子載荷（以 <span class="math inline">\sqrt{\text{特徵值}}</span> 加權）作為<strong>價格行為</strong>座標。</p>
 </section>
-<section id="階段-2區塊分別標準化與加權拼接" class="slide level2">
-<h2>階段 2：區塊分別標準化與加權拼接</h2>
-<p><span class="math display">X = [\, w_{price}\cdot\text{Scale}(\text{loadings}) \ \|\ w_{fund}\cdot\text{Scale}(f) \ \|\ w_{sector}\cdot\text{OneHot} \,], \quad w_{price}=w_{fund}=w_{sector}=1.0</span></p>
-<p>三區塊<strong>各自</strong> <code>StandardScaler</code> 後加權拼接——避免 joint 標準化讓 12 欄 one-hot 稀釋 2 欄基本面的距離貢獻。</p>
+<section id="階段-2secfmp-pit-基本面-asof-對齊" class="slide level2">
+<h2>階段 2：SEC／FMP PIT 基本面 asof 對齊</h2>
+<p>讀 <code>sp500_pit_2000_2025_monthly.parquet</code>（MultiIndex <code>date, ticker</code>），取 <span class="math inline">\le</span> <code>form_end</code> 的最近月份快照，逐股取 <span class="math inline">\ln(1+\text{市值})</span> 與盈餘殖利率 <span class="math inline">1/\text{PE}</span>。<strong>Point-in-Time 對齊確保無前視</strong>；缺漏以正規化產業中位數插補（<code>_impute_by_group</code>）+ winsorize。</p>
 </section>
-<section id="階段-3agglomerative-分群與-distance_threshold-校準依據ward-1963" class="slide level2 scrollable">
-<h2>階段 3：Agglomerative 分群與 distance_threshold 校準（依據：Ward 1963）</h2>
-<ol type="1">
-<li><strong>Probe</strong>：<code>n_clusters=1</code> 跑完整合併路徑（<code>compute_distances=True</code>），取全部 <span class="math inline">N-1</span> 個合併距離</li>
-<li><strong>校準</strong>：<span class="math inline">\text{threshold} = \text{percentile}_{75}(\{d_{merge}\})</span></li>
-<li><strong>分群</strong>：<code>AgglomerativeClustering(distance_threshold=threshold, linkage=&quot;average&quot;)</code>；過小群（&lt; <code>min_cluster_size</code>=5）併入 <code>&quot;Unknown&quot;</code></li>
-</ol>
+<section id="階段-3beta-風險先驗依據sharpe-1964" class="slide level2">
+<h2>階段 3：Beta 風險先驗（依據：Sharpe 1964）</h2>
+<p>對每檔股票，以形成窗日報酬對<strong>橫斷面平均報酬（市場因子）</strong>做單因子回歸取斜率：</p>
+<p><span class="math display">\beta_i=\frac{\operatorname{Cov}(r_i,\,r_{mkt})}{\operatorname{Var}(r_{mkt})},\qquad r_{mkt,t}=\frac{1}{N}\sum_j r_{j,t}</span></p>
+<p><strong>全覆蓋、天生 PIT、無前視</strong>（僅用形成窗資料）。由 <code>_rolling_betas()</code> 計算，獨立標準化後以 <code>beta_feature_weight</code> 加權，成為特徵矩陣中獨立一欄。</p>
 </section>
-<section id="階段-4群內-min-ssd-排序與過濾依據gatev-2006" class="slide level2">
-<h2>階段 4：群內 min-SSD 排序與過濾（依據：Gatev 2006）</h2>
-<p>分群標籤當 <code>sector_mapping</code> 餵給 <code>ssd_rolling.Formation</code>：群內 Z-Score 標準化 log-price → SSD 初篩 → 協方差 OLS 對沖比例 → 三道過濾（ADF <span class="math inline">p&lt;0.05</span>、半衰期 <span class="math inline">[1,42]</span> 日、Hurst <span class="math inline">&lt;0.5</span>）→ 依 SSD 升序取前 <code>top_n</code>。</p>
+<section id="階段-4特徵區塊加權組合-agglomerative-分群依據ward-1963" class="slide level2">
+<h2>階段 4：特徵區塊加權組合 + Agglomerative 分群（依據：Ward 1963）</h2>
+<p>各區塊<strong>分別</strong>標準化再依權重組合（避免單一 joint scaler 讓 one-hot 稀釋距離）：</p>
+<p><span class="math display">X=[\,w_p\,\text{PCA}\;\|\;w_f\,(\ln\text{Cap},\,1/\text{PE})\;\|\;w_\beta\,\beta\;\|\;w_s\,\text{GICS one-hot}\,]</span></p>
+<p>AgglomerativeClustering（average linkage、依合併距離分位數 <code>agg_threshold_percentile</code>=75 校準 <code>distance_threshold</code>）分群；過小群（&lt; <code>min_cluster_size</code>=5）併入 “Unknown” 排除。</p>
 </section>
-<section id="階段-56輸出與交易期銜接" class="slide level2">
-<h2>階段 5–6：輸出與交易期銜接</h2>
-<p>輸出標準欄位 + <code>Sector_A/B</code>（真實 GICS）、<code>Cluster_ID_A/B</code>、<code>MarketCap_A/B</code>、<code>TrailingPE_A/B</code>。 排序流程不輸出 <code>OLS_Alpha</code>，交易期於標準化空間重建 spread（路徑 B）。 形成期統計量整個交易期凍結（無前視——但 yF 變體另有基本面快照的前視限制，見「關鍵差異」一節）。 本策略配對另供 DRL 門檻選擇式交易端使用（見 <code>trading/drl_threshold_trading.ipynb</code>）。</p>
+<section id="階段-5群內-ssd-rolling-排序依據ggr-2006krauss-et-al.-2016" class="slide level2">
+<h2>階段 5：群內 SSD Rolling 排序（依據：GGR 2006／Krauss et al. 2016）</h2>
+<p>將分群標籤當作 <code>sector_mapping</code> 餵給 <code>ssd_rolling.Formation</code>，完整複用其 min-SSD 排序 + Engle-Granger ADF + 半衰期 + Hurst 篩選流程，取前 <code>top_n</code>。回填真實 GICS 產業、群集 ID、市值、PE 供報表分析。</p>
+</section>
+<section id="階段-6交易期參數使用" class="slide level2">
+<h2>階段 6：交易期參數使用</h2>
+<p>交易期於標準化空間重建 spread（Z-Score 路徑 B），輸出 <code>Ticker_A/B, Rank, Hedge_Ratio, Spread_Mean/Std, Log_Mean/Std_A/B</code> 供 <code>zscore_trading.py</code> 使用；DRL 疊加版（若有）借用同配對改走 <code>drl_threshold_trading.py</code>。</p>
 </section></section>
 <section id="參數總表" class="title-slide slide level1 center">
 <h1>參數總表</h1>
@@ -1215,37 +1201,37 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;"><code>pca_n_components</code></td>
 <td style="text-align: center;">5</td>
-<td style="text-align: left;">價格區塊因子數</td>
+<td style="text-align: left;">價格報酬 PCA 因子數</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">三區塊權重</td>
-<td style="text-align: center;">各 1.0</td>
-<td style="text-align: left;">price / fundamentals / sector</td>
+<td style="text-align: left;"><code>beta_feature_weight</code></td>
+<td style="text-align: center;"><strong>1.0</strong>（敏感性掃 <span class="math inline">\{0,0.25,0.5,1.0\}</span>）</td>
+<td style="text-align: left;">Beta 風險先驗權重</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><code>agg_linkage</code> / <code>agg_threshold_percentile</code></td>
-<td style="text-align: center;">average / 75.0</td>
-<td style="text-align: left;">分群與門檻校準</td>
+<td style="text-align: left;"><code>price/fundamentals/sector_onehot_weight</code></td>
+<td style="text-align: center;">1.0 / 1.0 / 1.0</td>
+<td style="text-align: left;">各特徵區塊權重</td>
 </tr>
 <tr class="even">
+<td style="text-align: left;"><code>agg_linkage</code> / <code>agg_threshold_percentile</code></td>
+<td style="text-align: center;">average / 75</td>
+<td style="text-align: left;">Agglomerative 分群</td>
+</tr>
+<tr class="odd">
 <td style="text-align: left;"><code>min_cluster_size</code></td>
 <td style="text-align: center;">5</td>
 <td style="text-align: left;">過小群併入 Unknown</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;"><code>adf_pvalue_threshold</code></td>
 <td style="text-align: center;">0.05</td>
-<td style="text-align: left;">群內共整合</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">yF 資料源</td>
-<td style="text-align: center;"><code>dataset/fundamental/fundamentals_sp500.db</code></td>
-<td style="text-align: left;">yfinance 快照</td>
+<td style="text-align: left;">群內 ADF 顯著水準</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">FMP 資料源</td>
-<td style="text-align: center;"><code>dataset/fundamental/sp500_pit_2000_2025_monthly.parquet</code></td>
-<td style="text-align: left;">PIT 逐點</td>
+<td style="text-align: left;">基本面來源</td>
+<td style="text-align: center;">SEC/FMP PIT parquet</td>
+<td style="text-align: left;">asof 對齊 <code>form_end</code>，無前視</td>
 </tr>
 </tbody>
 </table>
