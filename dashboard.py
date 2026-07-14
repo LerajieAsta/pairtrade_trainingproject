@@ -1375,9 +1375,9 @@ def main():
     empty_series = pd.Series({
         'RCC_Raw': 0, 'REC_Raw': 0, 'Cum_Ret_Raw': 0, 'Ann_Ret_Raw': 0,
         'Sharpe_Raw': 0, 'Sharpe_Active_Raw': 0, 'MDD_Raw': 0,
-        'Calmar_Raw': 0, 'PF_Raw': 0,
+        'Calmar_Raw': 0, 'PF_Raw': 0, 'Profit_Factor': 0,
         'Entries': 0, 'Exits': 0, 'Stop_Losses': 0, 'Forced_Closes': 0,
-        'Gross_Profit': 0.0, 'Gross_Loss': 0.0, 'Win_Rate_Raw': 0.0, 'Total_Trades': 0,
+        'Gross_Profit': 0.0, 'Gross_Loss': 0.0, 'Win_Rate_Raw': 0.0, 'Win_Rate': 0.0, 'Total_Trades': 0,
         'DATASET': '-', 'RE-ENTRY': '-', 'VOL ADJ': '-', 'METHOD': '-',
         'TOP N': '-', 'STOP LOSS %': '-', 'Z-WINDOW': '-',
         'PORT SL %': '-', 'MAX SEC %': '-', 'DYN Z': '-',
@@ -1390,14 +1390,19 @@ def main():
             return d.loc[d[col].idxmax()]
         return empty_series
 
+    # result.db 儲存欄位為 Profit_Factor / Win_Rate；儀表板即時重算欄位為 PF_Raw /
+    # Win_Rate_Raw。兩者擇一存在，故動態選欄，避免「最佳」卡片抓不到欄位而顯示 0。
+    pf_col = 'Profit_Factor' if 'Profit_Factor' in filtered_df.columns else 'PF_Raw'
+    wr_col = 'Win_Rate' if 'Win_Rate' in filtered_df.columns else 'Win_Rate_Raw'
+
     if len(filtered_df) > 0:
         best_ann  = safe_best('Ann_Ret_Raw')
         best_shp  = safe_best('Sharpe_Raw')
         # MDD 是負數；idxmax 取「最接近 0」= 最小回撤 = 最佳
         best_mdd  = safe_best('MDD_Raw')
         best_cal  = safe_best('Calmar_Raw')
-        best_pf   = safe_best('PF_Raw')
-        best_wr   = safe_best('Win_Rate_Raw')
+        best_pf   = safe_best(pf_col)
+        best_wr   = safe_best(wr_col)
     else:
         best_ann = best_shp = best_mdd = best_cal = best_pf = best_wr = empty_series
 
@@ -1414,9 +1419,9 @@ def main():
     c4.metric(f"BEST CALMAR{filter_note}",
               f"{best_cal['Calmar_Raw']:.2f}", best_cal['METHOD'])
     c5.metric(f"BEST PROFIT FACTOR{filter_note}",
-              f"{best_pf['PF_Raw']:.2f}", best_pf['METHOD'])
+              f"{float(best_pf.get(pf_col, 0) or 0):.2f}", best_pf['METHOD'])
     c6.metric(f"BEST WIN RATE{filter_note}",
-              f"{best_wr['Win_Rate_Raw']:.1%}", best_wr['METHOD'])
+              f"{float(best_wr.get(wr_col, 0) or 0):.1%}", best_wr['METHOD'])
 
     # ══════════════════════════════════════════════
     # PERFORMANCE TABLE
