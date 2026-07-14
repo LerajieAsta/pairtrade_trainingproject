@@ -443,7 +443,7 @@
 
   <meta name="author" content="李伯修">
   <meta name="dcterms.date" content="2026-07-06">
-  <title>DRL 門檻選擇式 v4</title>
+  <title>門檻選擇式學習交易引擎</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1042,8 +1042,8 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">DRL 門檻選擇式 v4</h1>
-  <p class="subtitle">交易期策略：門檻選單決策 + 反事實標籤 walk-forward 監督回歸</p>
+  <h1 class="title">門檻選擇式學習交易引擎</h1>
+  <p class="subtitle">交易期策略：讓模型為每組配對挑選最適進出場門檻（反事實標籤 + 滾動前向監督學習）</p>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1055,321 +1055,57 @@ margin-right: 0; }
 
   <p class="date">2026-07-06</p>
 </section>
-<section id="策略概述" class="title-slide slide level1 center scrollable">
-<h1>策略概述</h1>
-<p><strong>DRL 門檻選擇式 v4</strong> 是交易期（<span class="math inline">T = 126</span> 交易日）的學習型交易引擎： 神經網路依形成期特徵，<strong>為每組配對每期選擇一個交易門檻組合</strong>（或選擇不交易）， 選定後交由標準 Z-Score 狀態機執行整個交易期。</p>
-<ol type="1">
-<li><strong>動作選單（9 個）</strong>：SKIP（不交易）+ 8 組 <span class="math inline">(entry_z, exit_z)</span> 門檻組合</li>
-<li><strong>決策網路</strong>：MLP 以 12 維形成期特徵預測 9 個動作的期望報酬，取 argmax</li>
-<li><strong>反事實標籤</strong>：每期對全部 9 個動作逐一模擬實際報酬，作為訓練標籤（全資訊監督回歸）</li>
-<li><strong>Walk-forward 訓練</strong>：每期決策只用「交易期已於本期開始前結束」的歷史樣本（無前視）</li>
-<li>訓練樣本不足時自動退回基準動作 <span class="math inline">(2.0, 0.0)</span></li>
-</ol>
-<p>使用本引擎的策略：SSD Rolling DRL THR、Agglomerative Fundamentals DRL THR （各自借用對應 Z-Score 策略的形成期配對）。</p>
-</section>
+<section class="slide level2">
 
+<p>—title: “門檻選擇式學習交易引擎”subtitle: “交易期策略：讓模型為每組配對挑選最適進出場門檻（反事實標籤 + 滾動前向監督學習）”author: “李伯修”date: “2026-07-06”lang: zh-TW—</p>
+</section>
+<section>
+<section id="策略概述-.callout-tip投影片操作alt-點擊-可縮放任何圖片表格o-鍵總覽f-全螢幕-一句話說明一般的-z-score-配對交易進出場門檻是固定的例如價差偏離-2-個標準差時進場回到-0-時出場本策略改為讓一個會從歷史經驗學習的模型依據每一組配對在觀察期形成期展現的性質回歸快不快波動大不大訊號多不多為每一組配對量身挑選最適合它的進出場門檻甚至判斷這組配對這一期不值得做直接空手跳過-比喻固定門檻像是所有配對都穿同一個尺寸的衣服本策略則依每組配對的體型量身選門檻挑選的依據是從歷史上同類配對改用不同門檻分別會賺或賠多少累積出來的經驗與純-z-score-的唯一差別是門檻怎麼定價差spread計算下單規則停損費用全部相同因此兩者比較時唯一的變因就是門檻是固定-vs-由模型學習挑選這讓實驗成為乾淨的單變因對照-運作流程每組配對每一期各做一次1.-量身特徵從形成期算出-12-個描述這組配對性質的數字見階段-22.-模型挑門檻一個小型神經網路讀入這-12-個數字預測-9-個候選門檻各自的期望報酬挑預期報酬最高的那一個3.-只用過去不用未來模型只拿結果在本期開始前就已經完全確定的歷史配對來學習杜絕用到未來資訊前視偏誤4.-從所有選項學習對每一組歷史配對把-9-個門檻逐一實際模擬一遍算出各自的真實報酬當作教材因為每個選項的結果事後都能精確算出這其實是單純的看完整例子學規律問題監督式學習不需要一般-ai-常見的試誤探索5.-保底機制當可用的歷史例子還不夠少於-200-筆時自動退回固定門檻-2.0-0.0此時行為與純-z-score-完全相同所以本策略的表現至少不會比-z-score-差太多有結構上的保證動作選單9-選-1不交易skip-8-種門檻組合進場門檻-in1.5-2.0-2.5-3.0-出場門檻-in0.0-0.5使用本引擎的策略ssd-rolling門檻學習版agglomerative-fundamentals門檻學習版各自借用對應-z-score-策略的形成期配對" class="title-slide slide level1 center">
+<h1>策略概述::: {.callout-tip}投影片操作：<strong>Alt + 點擊</strong> 可縮放任何圖片/表格；<code>O</code> 鍵總覽、<code>F</code> 全螢幕。:::## 一句話說明一般的 Z-Score 配對交易，進出場門檻是<strong>固定</strong>的（例如價差偏離 2 個標準差時進場、回到 0 時出場）。本策略改為讓一個<strong>會從歷史經驗學習的模型</strong>，依據每一組配對在觀察期（形成期）展現的性質（回歸快不快、波動大不大、訊號多不多……），<strong>為每一組配對量身挑選最適合它的進出場門檻</strong>，甚至判斷「這組配對這一期不值得做，直接空手跳過」。&gt; <strong>比喻</strong>：固定門檻像是所有配對都穿同一個尺寸的衣服；本策略則依每組配對的「體型」量身選門檻。挑選的依據，是從歷史上「同類配對改用不同門檻分別會賺或賠多少」累積出來的經驗。<strong>與純 Z-Score 的唯一差別是「門檻怎麼定」</strong>——價差（spread）計算、下單規則、停損、費用全部相同。因此兩者比較時，唯一的變因就是「門檻是<strong>固定</strong> vs 由模型<strong>學習挑選</strong>」，這讓實驗成為乾淨的單變因對照。## 運作流程（每組配對、每一期各做一次）1. <strong>量身特徵</strong>：從形成期算出 12 個描述這組配對性質的數字（見階段 2）。2. <strong>模型挑門檻</strong>：一個小型神經網路讀入這 12 個數字，預測 9 個候選門檻各自的期望報酬，挑「預期報酬最高」的那一個。3. <strong>只用過去、不用未來</strong>：模型只拿「結果在本期開始前就已經完全確定」的歷史配對來學習，杜絕用到未來資訊（前視偏誤）。4. <strong>從所有選項學習</strong>：對每一組歷史配對，把 9 個門檻<strong>逐一實際模擬一遍</strong>、算出各自的真實報酬當作教材。因為每個選項的結果事後都能精確算出，這其實是單純的「看完整例子學規律」問題（監督式學習），不需要一般 AI 常見的試誤探索。5. <strong>保底機制</strong>：當可用的歷史例子還不夠（少於 200 筆）時，自動退回固定門檻 <span class="math inline">(2.0, 0.0)</span>，此時行為與純 Z-Score 完全相同——所以本策略的表現「至少不會比 Z-Score 差太多」有結構上的保證。<strong>動作選單（9 選 1）</strong>：不交易（SKIP）＋ 8 種門檻組合＝進場門檻 <span class="math inline">\in\{1.5, 2.0, 2.5, 3.0\}</span> × 出場門檻 <span class="math inline">\in\{0.0, 0.5\}</span>。使用本引擎的策略：SSD Rolling（門檻學習版）、Agglomerative Fundamentals（門檻學習版），各自借用對應 Z-Score 策略的形成期配對。</h1>
+
+</section>
+<section id="術語對照給非-ai-領域讀者本文件為求精確會用到少數機器學習術語以下先以白話對照正文出現時不再逐一解釋-術語-白話說明-神經網路-mlp多層感知器-一個可調參數的數學函數輸入一組數字輸出一組數字透過看大量例子自動調整參數學會輸入輸出的對應關係本文的網路輸入-12-個特徵-輸出-9-個門檻的預測報酬-監督式學習-回歸-給模型一批題目特徵標準答案真實報酬讓它學會由題目預測答案本策略即屬此類-argmax取最大者-使某個數值最大的那個選項例在-9-個門檻的預測報酬中取-argmax就是挑預測報酬最高的門檻-滾動前向walk-forward-站在每一期的當下只用該時點之前就已完全結束結果已知的資料來訓練與決策絕不使用之後才發生的資訊量化金融杜絕前視偏誤的標準做法-反事實counterfactual-即使實際只執行了一個門檻仍對沒選的其他門檻在同一段價格上模擬一遍算出它們各自會有的報酬-全資訊-vs-部分回饋bandit-若每個選項的結果事後都能算出全資訊-直接看完整答案卷學習若只能看到自己選的那個結果部分回饋-才需要試誤探索本策略屬全資訊故用監督學習而非強化學習的試誤機制-特徵標準化-截尾clip-把單位與量級各異的輸入縮放到共同尺度並截掉極端離群值讓每個輸入的重要性起點一致訓練更穩定見階段-2-epoch-batch-epoch把訓練資料完整看過一遍batch每次更新參數所抽取的一小批樣本-adam-學習率-mse-adam一種自動調整步長的參數更新法學習率每步調整的幅度mse均方誤差預測值與真實值差距的平方之平均本策略以最小化-mse-為訓練目標-relu-一種非線性轉換把負值歸零正值保留讓網路能表達較複雜的關係" class="slide level2">
+<h2>術語對照（給非 AI 領域讀者）本文件為求精確會用到少數機器學習術語，以下先以白話對照，正文出現時不再逐一解釋：| 術語 | 白話說明 || :— | :— || 神經網路 / MLP（多層感知器） | 一個可調參數的數學函數，輸入一組數字、輸出一組數字；透過看大量例子自動調整參數，學會「輸入→輸出」的對應關係。本文的網路：輸入 12 個特徵 → 輸出 9 個門檻的預測報酬。 || 監督式學習 / 回歸 | 給模型一批「題目（特徵）＋標準答案（真實報酬）」，讓它學會由題目預測答案。本策略即屬此類。 || <span class="math inline">\arg\max</span>（取最大者） | 「使某個數值最大的那個選項」。例：在 9 個門檻的預測報酬中取 <span class="math inline">\arg\max</span>，就是挑預測報酬最高的門檻。 || 滾動前向（walk-forward） | 站在每一期的當下，只用「該時點之前就已完全結束、結果已知」的資料來訓練與決策，絕不使用之後才發生的資訊。量化金融杜絕前視偏誤的標準做法。 || 反事實（counterfactual） | 即使實際只執行了一個門檻，仍對「沒選的其他門檻」在同一段價格上模擬一遍、算出它們各自會有的報酬。 || 全資訊 vs 部分回饋（bandit） | 若每個選項的結果事後都能算出（全資訊）→ 直接看完整答案卷學習；若只能看到自己選的那個結果（部分回饋）→ 才需要試誤探索。本策略屬全資訊，故用監督學習而非強化學習的試誤機制。 || 特徵標準化 / 截尾（clip） | 把單位與量級各異的輸入縮放到共同尺度、並截掉極端離群值，讓每個輸入的重要性起點一致、訓練更穩定（見階段 2）。 || epoch / batch | epoch＝把訓練資料完整看過一遍；batch＝每次更新參數所抽取的一小批樣本。 || Adam / 學習率 / MSE | Adam＝一種自動調整步長的參數更新法；學習率＝每步調整的幅度；MSE（均方誤差）＝「預測值與真實值差距的平方之平均」，本策略以最小化 MSE 為訓練目標。 || ReLU | 一種非線性轉換：把負值歸零、正值保留，讓網路能表達較複雜的關係。 |</h2>
+</section></section>
 <section>
 <section id="參考文獻與引用對應" class="title-slide slide level1 center">
 <h1>參考文獻與引用對應</h1>
 
 </section>
-<section id="文獻-1kim-kim-2019" class="slide level2">
-<h2>文獻 1：Kim &amp; Kim (2019)</h2>
-<blockquote>
-<p>Kim, T., &amp; Kim, H. Y. (2019). Optimizing the pairs-trading strategy using deep reinforcement learning with trading and stop-loss boundaries. <em>Complexity</em>, 2019, Article 3582516.</p>
-</blockquote>
-<p><strong>參考部分</strong>：</p>
-<ul>
-<li>核心框架：讓學習器<strong>輸出交易邊界（進場／出場門檻）而非逐日持倉動作</strong>—— agent 的動作空間是門檻組合的離散集合，實際交易由既定規則依門檻執行</li>
-<li>以配對的歷史特徵作為狀態輸入，門檻選擇以期為單位（而非以日為單位）</li>
-</ul>
-<p><strong>為何參考</strong>：</p>
-<ul>
-<li>本引擎的動作空間設計（8 組 <span class="math inline">(entry_z, exit_z)</span> + SKIP）直接採用此文獻的門檻選擇式框架： 把決策粒度從「每日」壓縮到「每配對每期一次」， 大幅降低動作空間維度，避免模型對日級價格噪音做擇時</li>
-<li>SKIP 動作是對其框架的自然延伸：允許學習器拒絕不值得交易的配對</li>
-</ul>
+<section id="文獻-1kim-kim-2019-kim-t.-kim-h.-y.-2019.-optimizing-the-pairs-trading-strategy-using-deep-reinforcement-learning-with-trading-and-stop-loss-boundaries.-complexity-2019-article-3582516.參考部分--核心框架讓學習器輸出交易邊界進場出場門檻而非逐日持倉動作-agent-的動作空間是門檻組合的離散集合實際交易由既定規則依門檻執行--以配對的歷史特徵作為狀態輸入門檻選擇以期為單位而非以日為單位為何參考--本引擎的動作空間設計8-組-entry_z-exit_z-skip直接採用此文獻的門檻選擇式框架-把決策粒度從每日壓縮到每配對每期一次-大幅降低動作空間維度避免模型對日級價格噪音做擇時--skip-動作是對其框架的自然延伸允許學習器拒絕不值得交易的配對" class="slide level2">
+<h2>文獻 1：Kim &amp; Kim (2019)&gt; Kim, T., &amp; Kim, H. Y. (2019). Optimizing the pairs-trading strategy using deep reinforcement learning with trading and stop-loss boundaries. <em>Complexity</em>, 2019, Article 3582516.<strong>參考部分</strong>：- 核心框架：讓學習器<strong>輸出交易邊界（進場／出場門檻）而非逐日持倉動作</strong>—— agent 的動作空間是門檻組合的離散集合，實際交易由既定規則依門檻執行- 以配對的歷史特徵作為狀態輸入，門檻選擇以期為單位（而非以日為單位）<strong>為何參考</strong>：- 本引擎的動作空間設計（8 組 <span class="math inline">(entry_z, exit_z)</span> + SKIP）直接採用此文獻的門檻選擇式框架： 把決策粒度從「每日」壓縮到「每配對每期一次」， 大幅降低動作空間維度，避免模型對日級價格噪音做擇時- SKIP 動作是對其框架的自然延伸：允許學習器拒絕不值得交易的配對</h2>
 </section>
-<section id="文獻-2sutton-barto-2018" class="slide level2">
-<h2>文獻 2：Sutton &amp; Barto (2018)</h2>
-<blockquote>
-<p>Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em> (2nd ed.). MIT Press.</p>
-</blockquote>
-<p><strong>參考部分</strong>：</p>
-<ul>
-<li>序貫決策問題的 MDP 形式化 <span class="math inline">(S, A, P, R, \gamma)</span>，以及<strong>探索－利用權衡</strong>的成立條件： 只有在「未執行的動作觀察不到報酬」（部分回饋）時才需要探索</li>
-</ul>
-<p><strong>為何參考</strong>：</p>
-<ul>
-<li>用於界定本問題的性質：歷史配對期上<strong>全部 9 個動作的報酬都能精確反事實回算</strong> （對交易期價格逐一模擬 9 組門檻），屬於<strong>全資訊回饋</strong>—— 依此理論框架，問題退化為監督回歸，無需探索機制、無需價值迭代， 這是本引擎採用「反事實標籤 + MSE 回歸」而非 Q-learning 的理論依據</li>
-</ul>
+<section id="文獻-2sutton-barto-2018-sutton-r.-s.-barto-a.-g.-2018.-reinforcement-learning-an-introduction-2nd-ed..-mit-press.參考部分--序貫決策問題的-mdp-形式化-s-a-p-r-gamma以及探索利用權衡的成立條件-只有在未執行的動作觀察不到報酬部分回饋時才需要探索為何參考--用於界定本問題的性質歷史配對期上全部-9-個動作的報酬都能精確反事實回算-對交易期價格逐一模擬-9-組門檻屬於全資訊回饋-依此理論框架問題退化為監督回歸無需探索機制無需價值迭代-這是本引擎採用反事實標籤-mse-回歸而非-q-learning-的理論依據-白話強化學習需要試誤探索是因為通常只能看到自己選的那個動作的結果但本問題裡每組歷史配對的-9-個門檻報酬事後都能精確算出全資訊等於拿到完整答案卷因此退化成單純的看例子學規律監督回歸不需要探索也不需要價值迭代" class="slide level2">
+<h2>文獻 2：Sutton &amp; Barto (2018)&gt; Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement Learning: An Introduction</em> (2nd ed.). MIT Press.<strong>參考部分</strong>：- 序貫決策問題的 MDP 形式化 <span class="math inline">(S, A, P, R, \gamma)</span>，以及<strong>探索－利用權衡</strong>的成立條件： 只有在「未執行的動作觀察不到報酬」（部分回饋）時才需要探索<strong>為何參考</strong>：- 用於界定本問題的性質：歷史配對期上<strong>全部 9 個動作的報酬都能精確反事實回算</strong> （對交易期價格逐一模擬 9 組門檻），屬於<strong>全資訊回饋</strong>—— 依此理論框架，問題退化為監督回歸，無需探索機制、無需價值迭代， 這是本引擎採用「反事實標籤 + MSE 回歸」而非 Q-learning 的理論依據&gt; <strong>白話</strong>：強化學習需要「試誤探索」是因為通常只能看到自己選的那個動作的結果。但本問題裡，每組歷史配對的 9 個門檻報酬事後都能精確算出（全資訊），等於拿到完整答案卷，因此退化成單純的「看例子學規律」（監督回歸），不需要探索、也不需要價值迭代。</h2>
 </section>
-<section id="文獻-3統計套利機器學習方法綜述-2025" class="slide level2">
-<h2>文獻 3：統計套利機器學習方法綜述 (2025)</h2>
-<blockquote>
-<p>A survey of statistical arbitrage pair trading with machine learning, deep learning, and reinforcement learning methods (2025).</p>
-</blockquote>
-<p><strong>參考部分</strong>：</p>
-<ul>
-<li>RL 應用於配對交易的動作空間設計分類：逐日持倉決策 vs 門檻／邊界決策兩大路線， 及其在樣本效率與過度交易風險上的取捨</li>
-</ul>
-<p><strong>為何參考</strong>：</p>
-<ul>
-<li>提供門檻選擇式路線在文獻中的定位；本引擎的設計取捨（決策粒度、費用敏感性）與其歸納一致</li>
-</ul>
+<section id="文獻-3統計套利機器學習方法綜述-2025-a-survey-of-statistical-arbitrage-pair-trading-with-machine-learning-deep-learning-and-reinforcement-learning-methods-2025.參考部分--rl-應用於配對交易的動作空間設計分類逐日持倉決策-vs-門檻邊界決策兩大路線-及其在樣本效率與過度交易風險上的取捨為何參考--提供門檻選擇式路線在文獻中的定位本引擎的設計取捨決策粒度費用敏感性與其歸納一致" class="slide level2">
+<h2>文獻 3：統計套利機器學習方法綜述 (2025)&gt; A survey of statistical arbitrage pair trading with machine learning, deep learning, and reinforcement learning methods (2025).<strong>參考部分</strong>：- RL 應用於配對交易的動作空間設計分類：逐日持倉決策 vs 門檻／邊界決策兩大路線， 及其在樣本效率與過度交易風險上的取捨<strong>為何參考</strong>：- 提供門檻選擇式路線在文獻中的定位；本引擎的設計取捨（決策粒度、費用敏感性）與其歸納一致</h2>
 </section></section>
 <section>
-<section id="各階段行為" class="title-slide slide level1 center">
-<h1>各階段行為</h1>
-<p>引擎對每個交易期的每組配對依序執行：特徵萃取 → 訓練 → 決策 → 反事實標籤生成 → 正式模擬。</p>
+<section id="各階段行為引擎對每個交易期的每組配對依序執行特徵萃取-訓練-決策-反事實標籤生成-正式模擬" class="title-slide slide level1 center">
+<h1>各階段行為引擎對每個交易期的每組配對依序執行：特徵萃取 → 訓練 → 決策 → 反事實標籤生成 → 正式模擬。</h1>
+
 </section>
-<section id="階段-1spread-與-z-score與-z-score-狀態機同口徑" class="slide level2">
-<h2>階段 1：Spread 與 Z-Score（與 Z-Score 狀態機同口徑）</h2>
-<p>價格先做同樣的異常清理（單日 |漲跌幅| &gt; 50% 以前值遞補）， Z-Score 以形成期凍結參數計算（路徑 B，標準化空間）：</p>
-<p><span class="math display">Z_t = \text{clip}\left(\frac{P&#39;_{A,t} - \beta P&#39;_{B,t} - \mu_\epsilon^{form}}{\max(\sigma_\epsilon^{form}, 10^{-8})},\ -10,\ 10\right), \qquad
-P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
-<p>spread 定義與 Z-Score 基準完全相同——確保門檻選擇是唯一的差異來源。</p>
+<section id="階段-1spread-與-z-score與-z-score-狀態機同口徑價格先做同樣的異常清理單日-漲跌幅-50-以前值遞補z-score-以形成期凍結參數計算路徑-b標準化空間z_t-textclipleftfracp_at---beta-p_bt---mu_epsilonformmaxsigma_epsilonform-10-8--10-10right-qquadp_it-fracln-p_it---mu_iformsigma_iformspread-定義與-z-score-基準完全相同確保門檻選擇是唯一的差異來源" class="slide level2">
+<h2>階段 1：Spread 與 Z-Score（與 Z-Score 狀態機同口徑）價格先做同樣的異常清理（單日 |漲跌幅| &gt; 50% 以前值遞補），Z-Score 以形成期凍結參數計算（路徑 B，標準化空間）：<span class="math display">Z_t = \text{clip}\left(\frac{P&#39;_{A,t} - \beta P&#39;_{B,t} - \mu_\epsilon^{form}}{\max(\sigma_\epsilon^{form}, 10^{-8})},\ -10,\ 10\right), \qquadP&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span>spread 定義與 Z-Score 基準完全相同——確保門檻選擇是唯一的差異來源。</h2>
 </section>
-<section id="階段-212-維形成期特徵萃取" class="slide level2">
-<h2>階段 2：12 維形成期特徵萃取</h2>
-<p>對<strong>形成期</strong>（非交易期）的 Z 序列與對數價格計算特徵，全部截尾至約 <span class="math inline">[-3, 3]</span>：</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 29%">
-<col style="width: 23%">
-<col style="width: 23%">
-<col style="width: 23%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: center;">#</th>
-<th style="text-align: left;">特徵</th>
-<th style="text-align: left;">計算</th>
-<th style="text-align: left;">捕捉的資訊</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: center;">1</td>
-<td style="text-align: left;">期末 <span class="math inline">Z</span></td>
-<td style="text-align: left;"><span class="math inline">\text{clip}(z_{-1}/3)</span></td>
-<td style="text-align: left;">進場初始偏離方向</td>
-</tr>
-<tr class="even">
-<td style="text-align: center;">2</td>
-<td style="text-align: left;">期末 <span class="math inline">|Z|</span></td>
-<td style="text-align: left;"><span class="math inline">\text{clip}(|z_{-1}|/3)</span></td>
-<td style="text-align: left;">偏離幅度</td>
-</tr>
-<tr class="odd">
-<td style="text-align: center;">3</td>
-<td style="text-align: left;">零穿越頻率</td>
-<td style="text-align: left;"><span class="math inline">\text{clip}(zc \times 10)</span></td>
-<td style="text-align: left;">回歸訊號密度</td>
-</tr>
-<tr class="even">
-<td style="text-align: center;">4</td>
-<td style="text-align: left;">半衰期</td>
-<td style="text-align: left;"><span class="math inline">\ln(HL)/3</span>（AR(1) 估計，截尾 <span class="math inline">[1, 252]</span>）</td>
-<td style="text-align: left;">回歸速度</td>
-</tr>
-<tr class="odd">
-<td style="text-align: center;">5</td>
-<td style="text-align: left;">近期波動 regime</td>
-<td style="text-align: left;">近 21 日 <span class="math inline">\sigma_z</span> ／全期 <span class="math inline">\sigma_z - 1</span></td>
-<td style="text-align: left;">波動狀態變化</td>
-</tr>
-<tr class="even">
-<td style="text-align: center;">6</td>
-<td style="text-align: left;">近期 <span class="math inline">Z</span> 趨勢</td>
-<td style="text-align: left;"><span class="math inline">(z_{-1} - \bar{z}_{21})/3</span></td>
-<td style="text-align: left;">短期方向</td>
-</tr>
-<tr class="odd">
-<td style="text-align: center;">7</td>
-<td style="text-align: left;">兩股相關係數</td>
-<td style="text-align: left;"><span class="math inline">\text{corr}(\ln P_A, \ln P_B)</span></td>
-<td style="text-align: left;">共動強度</td>
-</tr>
-<tr class="even">
-<td style="text-align: center;">8</td>
-<td style="text-align: left;">波動率比</td>
-<td style="text-align: left;"><span class="math inline">\sigma_A/\sigma_B - 1</span></td>
-<td style="text-align: left;">兩腳對稱性</td>
-</tr>
-<tr class="odd">
-<td style="text-align: center;">9</td>
-<td style="text-align: left;">對沖比例偏移</td>
-<td style="text-align: left;"><span class="math inline">\beta - 1</span></td>
-<td style="text-align: left;">曝險不對稱</td>
-</tr>
-<tr class="even">
-<td style="text-align: center;">10</td>
-<td style="text-align: left;">Spread 振幅</td>
-<td style="text-align: left;"><span class="math inline">\sigma_\epsilon \times 5</span></td>
-<td style="text-align: left;">費用可行性（振幅需覆蓋摩擦成本）</td>
-</tr>
-<tr class="odd">
-<td style="text-align: center;">11</td>
-<td style="text-align: left;"><span class="math inline">|Z|&gt;2</span> 佔比</td>
-<td style="text-align: left;"><span class="math inline">\text{mean}(|z| &gt; 2)</span></td>
-<td style="text-align: left;">訊號出現頻率</td>
-</tr>
-<tr class="even">
-<td style="text-align: center;">12</td>
-<td style="text-align: left;">最大 <span class="math inline">|Z|</span></td>
-<td style="text-align: left;"><span class="math inline">\max|z| / 5</span></td>
-<td style="text-align: left;">極端偏離歷史</td>
-</tr>
-</tbody>
-</table>
-<p>形成期資料不足 60 日時無法建構特徵 → 該配對直接使用基準動作。</p>
+<section id="階段-212-維形成期特徵萃取對形成期非交易期的-z-序列與對數價格計算-12-個特徵全部標準化並截尾至約--3-3-.callout-note為何要截尾至約--3-3這-12-個特徵原本的單位與量級差異很大例如相關係數落在-0sim1半衰期可能高達上百天z-值偶爾瞬間飆到-pm10若把這些量級懸殊的數字直接餵給神經網路模型會被少數大數值主導也容易被極端離群值干擾而學不穩定因此每個特徵都先縮放到共同尺度並把超出範圍的極端值截平clip--共同尺度讓每個輸入的重要性起點一致模型才不會單憑量級大小誤判特徵重要性--截尾把罕見的極端值壓回合理範圍避免單一離群樣本扭曲訓練選--3-3-是因為若特徵近似常態分布pm3-標準差已涵蓋約-99.7-的正常情形超出者合理視為離群值而截平這是機器學習標準的特徵前處理feature-scaling與金融上把不同指標標準化到可比較尺度的作法同理-特徵-計算-捕捉的資訊-1-期末-z-textclipz_-13-進場初始偏離方向-2-期末-z-textclipz_-13-偏離幅度-3-零穿越頻率-textclipzc-times-10-回歸訊號密度-4-半衰期-lnhl3ar1-估計截尾-1-252-回歸速度-5-近期波動-regime-近-21-日-sigma_z-全期-sigma_z---1-波動狀態變化-6-近期-z-趨勢-z_-1---barz_213-短期方向-7-兩股相關係數-textcorrln-p_a-ln-p_b-共動強度-8-波動率比-sigma_asigma_b---1-兩腳對稱性-9-對沖比例偏移-beta---1-曝險不對稱-10-spread-振幅-sigma_epsilon-times-5-費用可行性振幅需覆蓋摩擦成本-11-z2-佔比-textmeanz-2-訊號出現頻率-12-最大-z-maxz-5-極端偏離歷史-每個特徵除以-3-或-5再截平都是為了達到上述共同尺度-截離群的目的形成期資料不足-60-日時無法穩定建構特徵-該配對直接使用基準門檻" class="slide level2">
+<h2>階段 2：12 維形成期特徵萃取對<strong>形成期</strong>（非交易期）的 Z 序列與對數價格計算 12 個特徵，全部<strong>標準化並截尾至約 <span class="math inline">[-3, 3]</span></strong>。::: {.callout-note}<strong>為何要截尾至約 <span class="math inline">[-3, 3]</span></strong>：這 12 個特徵原本的單位與量級差異很大——例如相關係數落在 <span class="math inline">0\sim1</span>、半衰期可能高達上百天、Z 值偶爾瞬間飆到 <span class="math inline">\pm10</span>。若把這些量級懸殊的數字直接餵給神經網路，模型會被少數大數值主導、也容易被極端離群值干擾而學不穩定。因此每個特徵都先<strong>縮放到共同尺度、並把超出範圍的極端值截平</strong>（clip）：- <strong>共同尺度</strong>讓每個輸入的「重要性起點」一致，模型才不會單憑量級大小誤判特徵重要性；- <strong>截尾</strong>把罕見的極端值壓回合理範圍，避免單一離群樣本扭曲訓練。選 <span class="math inline">[-3, 3]</span> 是因為若特徵近似常態分布，<span class="math inline">\pm3</span> 標準差已涵蓋約 99.7% 的正常情形，超出者合理視為離群值而截平。這是機器學習標準的<strong>特徵前處理（feature scaling）</strong>，與金融上把不同指標標準化到可比較尺度的作法同理。:::| # | 特徵 | 計算 | 捕捉的資訊 || :—: | :— | :— | :— || 1 | 期末 <span class="math inline">Z</span> | <span class="math inline">\text{clip}(z_{-1}/3)</span> | 進場初始偏離方向 || 2 | 期末 <span class="math inline">|Z|</span> | <span class="math inline">\text{clip}(|z_{-1}|/3)</span> | 偏離幅度 || 3 | 零穿越頻率 | <span class="math inline">\text{clip}(zc \times 10)</span> | 回歸訊號密度 || 4 | 半衰期 | <span class="math inline">\ln(HL)/3</span>（AR(1) 估計，截尾 <span class="math inline">[1, 252]</span>） | 回歸速度 || 5 | 近期波動 regime | 近 21 日 <span class="math inline">\sigma_z</span> ／全期 <span class="math inline">\sigma_z - 1</span> | 波動狀態變化 || 6 | 近期 <span class="math inline">Z</span> 趨勢 | <span class="math inline">(z_{-1} - \bar{z}_{21})/3</span> | 短期方向 || 7 | 兩股相關係數 | <span class="math inline">\text{corr}(\ln P_A, \ln P_B)</span> | 共動強度 || 8 | 波動率比 | <span class="math inline">\sigma_A/\sigma_B - 1</span> | 兩腳對稱性 || 9 | 對沖比例偏移 | <span class="math inline">\beta - 1</span> | 曝險不對稱 || 10 | Spread 振幅 | <span class="math inline">\sigma_\epsilon \times 5</span> | 費用可行性（振幅需覆蓋摩擦成本） || 11 | <span class="math inline">|Z|&gt;2</span> 佔比 | <span class="math inline">\text{mean}(|z| &gt; 2)</span> | 訊號出現頻率 || 12 | 最大 <span class="math inline">|Z|</span> | <span class="math inline">\max|z| / 5</span> | 極端偏離歷史 |每個特徵除以 3 或 5、再截平，都是為了達到上述「共同尺度 + 截離群」的目的。形成期資料不足 60 日時無法穩定建構特徵 → 該配對直接使用基準門檻。</h2>
 </section>
-<section id="階段-3walk-forward-訓練無前視保證" class="slide level2">
-<h2>階段 3：Walk-Forward 訓練（無前視保證）</h2>
-<p><strong>樣本資格</strong>：緩衝區中每筆樣本記錄其交易期結束日 <span class="math inline">t_e</span>，本期（交易起始日 <span class="math inline">trade\_start_k</span>） 只用已完結的樣本訓練：</p>
-<p><span class="math display">\text{eligible} = \{(f, r, t_e) \in \text{buffer} : t_e &lt; trade\_start_k\}</span></p>
-<p><strong>訓練條件與程序</strong>：</p>
-<ul>
-<li>樣本數 <span class="math inline">\ge</span> <code>thr_min_train_samples</code>（= 200）且較上次訓練有新樣本時才重新訓練</li>
-<li><code>ThresholdNet</code>：<span class="math inline">\text{Linear}(12 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 9)</span></li>
-<li><code>Adam(lr = 10^{-3})</code>、<code>MSELoss</code>、40 epochs、batch <span class="math inline">\min(4096, n)</span></li>
-<li>權重初始化與 batch 洗牌<strong>不固定隨機種子</strong>：單次回測數值為隨機變數， 以 多輪重跑程序 多次重跑報告分布統計</li>
-</ul>
-<p><strong>狀態隔離</strong>：網路／緩衝區以 <code>variant_id</code>（策略名稱 + Top N + 停損 + MSR）為鍵隔離， 同一行程內依序執行的不同參數變體不共用任何訓練狀態。</p>
+<section id="階段-3滾動前向訓練無前視保證-滾動前向walk-forward的白話想像站在每一期的當下只能用那個時間點之前就已經完全結束報酬已成定局的配對當教材不能偷看之後才發生的事這是量化金融杜絕前視偏誤的標準驗證方式樣本資格訓練資料庫緩衝區中每筆樣本都記錄它的交易期結束日-t_e本期交易起始日-trade_start_k只用已經完結的樣本訓練text可用樣本-f-r-t_e-in-text緩衝區-t_e-trade_start_k神經網路結構與訓練術語見開頭對照表--結構輸入-12-個特徵-兩層各-64-個神經元中間接-relu-非線性-輸出-9-個數字對應-9-個門檻的預測報酬以式表示為-textlinear12-to-64-to-textrelu-to-textlinear64-to-64-to-textrelu-to-textlinear64-to-9--訓練用-adam-最佳化器自動調步長的梯度下降學習率-10-3以均方誤差mse預測報酬與實際報酬差距的平方為目標反覆看資料-40-遍epoch每遍隨機抽一批batch大小-min4096-n更新參數--觸發條件可用樣本數-ge-200-且較上次訓練有新樣本時才重新訓練否則沿用既有模型數值變異性網路權重初始化與抽批洗牌不固定隨機種子故單次回測的數值是隨機變數因此以多次獨立重跑評估其分布避免以單次結果下定論狀態隔離不同參數變體策略名稱-top-n-停損-產業上限各自擁有獨立的網路與訓練資料庫同一程式行程內依序執行時互不污染" class="slide level2">
+<h2>階段 3：滾動前向訓練（無前視保證）&gt; <strong>滾動前向（walk-forward）的白話</strong>：想像站在每一期的當下，只能用「那個時間點之前就已經完全結束、報酬已成定局」的配對當教材，不能偷看之後才發生的事。這是量化金融杜絕前視偏誤的標準驗證方式。<strong>樣本資格</strong>：訓練資料庫（緩衝區）中每筆樣本都記錄它的交易期結束日 <span class="math inline">t_e</span>；本期（交易起始日 <span class="math inline">trade\_start_k</span>）只用「已經完結」的樣本訓練：<span class="math display">\text{可用樣本} = \{(f, r, t_e) \in \text{緩衝區} : t_e &lt; trade\_start_k\}</span><strong>神經網路結構與訓練</strong>（術語見開頭對照表）：- 結構：輸入 12 個特徵 → 兩層各 64 個神經元（中間接 ReLU 非線性）→ 輸出 9 個數字（對應 9 個門檻的預測報酬）；以式表示為 <span class="math inline">\text{Linear}(12 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 9)</span>。- 訓練：用 Adam 最佳化器（自動調步長的梯度下降）、學習率 <span class="math inline">10^{-3}</span>，以均方誤差（MSE，預測報酬與實際報酬差距的平方）為目標，反覆看資料 40 遍（epoch），每遍隨機抽一批（batch，大小 <span class="math inline">\min(4096, n)</span>）更新參數。- 觸發條件：可用樣本數 <span class="math inline">\ge</span> 200 且較上次訓練有新樣本時，才重新訓練（否則沿用既有模型）。<strong>數值變異性</strong>：網路權重初始化與抽批洗牌<strong>不固定隨機種子</strong>，故單次回測的數值是隨機變數；因此以<strong>多次獨立重跑</strong>評估其分布，避免以單次結果下定論。<strong>狀態隔離</strong>：不同參數變體（策略名稱 + Top N + 停損 + 產業上限）各自擁有獨立的網路與訓練資料庫，同一程式行程內依序執行時互不污染。</h2>
 </section>
-<section id="階段-4決策" class="slide level2 scrollable">
-<h2>階段 4：決策</h2>
-<p><span class="math display">a^* = \begin{cases}
-\arg\max_a \ \text{net}(f)_a &amp; \text{if } n_{eligible} \ge 200 \text{ 且特徵可用} \\
-(2.0,\ 0.0) \ \text{（基準動作）} &amp; \text{otherwise}
-\end{cases}</span></p>
-<p>動作選單：</p>
-<p><span class="math display">\mathcal{A} = \{\text{SKIP}\} \cup \{(e, x) : e \in \{1.5, 2.0, 2.5, 3.0\},\ x \in \{0.0, 0.5\}\}, \qquad |\mathcal{A}| = 9</span></p>
-<p><strong>結構保證</strong>：</p>
-<ol type="1">
-<li>選單含基準 <span class="math inline">(2.0, 0.0)</span> → 本引擎的策略空間<strong>包含</strong> Z-Score 狀態機</li>
-<li>訓練不足時退回基準 → 樣本累積初期行為等同 Z-Score 狀態機</li>
-<li>SKIP 提供「拒絕交易」的選擇權——預期報酬為負的配對可整期空手</li>
-</ol>
+<section id="階段-4決策挑一個門檻當可用樣本足夠ge-200且特徵可算時選模型預測期望報酬最高的動作否則退回基準門檻a-begincasesargmax_a-text網路預測報酬f_a-text樣本充足且特徵可用-2.0-0.0-text基準門檻-text否則endcases其中-argmax-即取使預測報酬最大的那個門檻見開頭術語對照動作選單mathcala-textskip-cup-e-x-e-in-1.5-2.0-2.5-3.0-x-in-0.0-0.5-qquad-mathcala-9三個結構性保證1.-選單內含基準-2.0-0.0-本策略的可選空間涵蓋純-z-score-狀態機2.-樣本不足時退回基準-累積初期的行為等同純-z-score3.-skip-提供拒絕交易的選擇權-預期報酬為負的配對可整期空手不被迫進場" class="slide level2">
+<h2>階段 4：決策（挑一個門檻）當可用樣本足夠（<span class="math inline">\ge 200</span>）且特徵可算時，選「模型預測期望報酬最高」的動作；否則退回基準門檻：<span class="math display">a^* = \begin{cases}\arg\max_a \ \text{網路預測報酬}(f)_a &amp; \text{樣本充足且特徵可用} \\(2.0,\ 0.0) \ \text{（基準門檻）} &amp; \text{否則}\end{cases}</span>其中 <span class="math inline">\arg\max</span> 即「取使預測報酬最大的那個門檻」（見開頭術語對照）。動作選單：<span class="math display">\mathcal{A} = \{\text{SKIP}\} \cup \{(e, x) : e \in \{1.5, 2.0, 2.5, 3.0\},\ x \in \{0.0, 0.5\}\}, \qquad |\mathcal{A}| = 9</span><strong>三個結構性保證</strong>：1. 選單內含基準 <span class="math inline">(2.0, 0.0)</span> → 本策略的可選空間<strong>涵蓋</strong>純 Z-Score 狀態機；2. 樣本不足時退回基準 → 累積初期的行為等同純 Z-Score；3. SKIP 提供「拒絕交易」的選擇權 → 預期報酬為負的配對可整期空手，不被迫進場。</h2>
 </section>
-<section id="階段-5反事實標籤生成" class="slide level2">
-<h2>階段 5：反事實標籤生成</h2>
-<p>無論本期實際選了哪個動作，都對<strong>全部 8 個非 SKIP 動作</strong>在本期交易資料上逐一模擬 （<code>_fast_threshold_pnl</code>，與正式模擬同一套狀態機邏輯與費用會計）， 記錄各動作的期末報酬率（%）作為 9 維標籤向量（SKIP 恆為 0）：</p>
-<p><span class="math display">r_a = \frac{\text{PnL}_a}{C_{pair}} \times 100, \quad a \in \mathcal{A}</span></p>
-<p>樣本 <span class="math inline">(f, r, t_e)</span> 存入緩衝區，供<strong>之後</strong>的期別訓練使用（本期不用，見階段 3 資格規則）。</p>
-<p><strong>性質</strong>：因所有動作的報酬皆可觀察，這是<strong>全資訊監督回歸</strong>而非部分回饋的 bandit —— 無探索－利用問題（依據：Sutton &amp; Barto 2018 的回饋結構分類）。</p>
+<section id="階段-5反事實標籤生成產生學習教材-反事實counterfactual的白話即使本期實際只執行了一個門檻我們仍對沒選的其他門檻在同一段交易期價格上逐一模擬一遍算出它們各自會有的報酬無論本期實際選了哪個動作都對全部-8-個非-skip-門檻在本期交易資料上逐一模擬與正式交易同一套狀態機邏輯與費用會計記錄各門檻的期末報酬率作為-9-維標籤向量skip-恆為-0r_a-fractext損益_ac_text每配對-times-100-quad-a-in-mathcala樣本-f-r-t_e特徵9-門檻報酬結束日存入緩衝區供之後的期別訓練使用本期不用見階段-3-的資格規則以確保無前視為何這讓問題變簡單因為-9-個門檻的報酬事後全部可觀察全資訊模型等於拿到完整答案卷可直接以監督回歸學習什麼特徵下哪個門檻報酬最高不像一般強化學習只能看到自己選的那個結果部分回饋必須靠試誤探索這也是本策略採用監督回歸而非-q-learning-等試誤方法的根本原因" class="slide level2">
+<h2>階段 5：反事實標籤生成（產生學習教材）&gt; <strong>反事實（counterfactual）的白話</strong>：即使本期實際只執行了一個門檻，我們仍對「沒選的其他門檻」在同一段交易期價格上<strong>逐一模擬一遍</strong>，算出它們各自會有的報酬。無論本期實際選了哪個動作，都對<strong>全部 8 個非 SKIP 門檻</strong>在本期交易資料上逐一模擬（與正式交易同一套狀態機邏輯與費用會計），記錄各門檻的期末報酬率（%）作為 9 維標籤向量（SKIP 恆為 0）：<span class="math display">r_a = \frac{\text{損益}_a}{C_{\text{每配對}}} \times 100, \quad a \in \mathcal{A}</span>樣本 <span class="math inline">(f,\ r,\ t_e)</span>（特徵、9 門檻報酬、結束日）存入緩衝區，供<strong>之後</strong>的期別訓練使用（本期不用，見階段 3 的資格規則，以確保無前視）。<strong>為何這讓問題變簡單</strong>：因為 9 個門檻的報酬事後全部可觀察（全資訊），模型等於拿到「完整答案卷」，可直接以監督回歸學習「什麼特徵下、哪個門檻報酬最高」；不像一般強化學習只能看到自己選的那個結果（部分回饋），必須靠試誤探索。這也是本策略採用監督回歸、而非 Q-learning 等試誤方法的根本原因。</h2>
 </section>
-<section id="階段-6以選定門檻執行正式模擬" class="slide level2">
-<h2>階段 6：以選定門檻執行正式模擬</h2>
-<p>選定 <span class="math inline">(e, x)</span> 後，整個交易期執行標準 Z-Score 狀態機：</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">條件</th>
-<th style="text-align: left;">動作</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;"><span class="math inline">Z_t &gt; e</span>（空手時）</td>
-<td style="text-align: left;">空 A、多 B（風險中性配置 <span class="math inline">v_A = C/W</span>、<span class="math inline">v_B = |\beta|C/W</span>）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><span class="math inline">Z_t &lt; -e</span></td>
-<td style="text-align: left;">多 A、空 B</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">空頭且 <span class="math inline">Z_t \le x</span>／多頭且 <span class="math inline">Z_t \ge -x</span></td>
-<td style="text-align: left;">平倉（可再進場）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">期末仍持倉</td>
-<td style="text-align: left;"><code>PERIOD_END_EXIT</code> 強制結算</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">選擇 SKIP</td>
-<td style="text-align: left;">整期 <code>HOLD_CASH (SKIP)</code></td>
-</tr>
-</tbody>
-</table>
-<ul>
-<li>費用會計與 Z-Score 狀態機相同：進出場各扣 <span class="math inline">(\text{fee} + \text{slippage}) \times</span> 兩腳名目金額</li>
-<li>最後一日不開新倉（<span class="math inline">i &lt; T-1</span> 才允許進場）</li>
-<li>輸出交易日誌欄位與 Z-Score 狀態機完全一致（<code>ZScore</code>、<code>Position</code>、<code>Status</code>、<code>Daily_Delta</code> 等）</li>
-</ul>
+<section id="階段-6以選定門檻執行正式模擬選定-e-x-後整個交易期執行標準-z-score-狀態機-條件-動作-z_t-e空手時-空-a多-b風險中性配置-v_a-cwv_b-betacw-z_t--e-多-a空-b-空頭且-z_t-le-x多頭且-z_t-ge--x-平倉可再進場-期末仍持倉-period_end_exit-強制結算-選擇-skip-整期-hold_cash-skip---費用會計與-z-score-狀態機相同進出場各扣-textfee-textslippage-times-兩腳名目金額--最後一日不開新倉i-t-1-才允許進場--輸出交易日誌欄位與-z-score-狀態機完全一致zscorepositionstatusdaily_delta-等" class="slide level2">
+<h2>階段 6：以選定門檻執行正式模擬選定 <span class="math inline">(e, x)</span> 後，整個交易期執行標準 Z-Score 狀態機：| 條件 | 動作 || :— | :— || <span class="math inline">Z_t &gt; e</span>（空手時） | 空 A、多 B（風險中性配置 <span class="math inline">v_A = C/W</span>、<span class="math inline">v_B = |\beta|C/W</span>） || <span class="math inline">Z_t &lt; -e</span> | 多 A、空 B || 空頭且 <span class="math inline">Z_t \le x</span>／多頭且 <span class="math inline">Z_t \ge -x</span> | 平倉（可再進場） || 期末仍持倉 | <code>PERIOD_END_EXIT</code> 強制結算 || 選擇 SKIP | 整期 <code>HOLD_CASH (SKIP)</code> |- 費用會計與 Z-Score 狀態機相同：進出場各扣 <span class="math inline">(\text{fee} + \text{slippage}) \times</span> 兩腳名目金額- 最後一日不開新倉（<span class="math inline">i &lt; T-1</span> 才允許進場）- 輸出交易日誌欄位與 Z-Score 狀態機完全一致（<code>ZScore</code>、<code>Position</code>、<code>Status</code>、<code>Daily_Delta</code> 等）</h2>
 </section></section>
-<section id="參數總表" class="title-slide slide level1 center">
-<h1>參數總表</h1>
-<table class="caption-top">
-<colgroup>
-<col style="width: 30%">
-<col style="width: 38%">
-<col style="width: 30%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">參數</th>
-<th style="text-align: center;">值</th>
-<th style="text-align: left;">說明</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">動作選單</td>
-<td style="text-align: center;">SKIP + <span class="math inline">\{1.5,2.0,2.5,3.0\} \times \{0.0,0.5\}</span></td>
-<td style="text-align: left;">共 9 個動作</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">基準動作</td>
-<td style="text-align: center;"><span class="math inline">(2.0, 0.0)</span></td>
-<td style="text-align: left;">訓練不足時的預設</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;"><code>drl_hidden_size</code></td>
-<td style="text-align: center;">64</td>
-<td style="text-align: left;">MLP 隱藏層寬度（兩層）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><code>drl_lr</code></td>
-<td style="text-align: center;"><span class="math inline">10^{-3}</span></td>
-<td style="text-align: left;">Adam 學習率</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;"><code>thr_train_epochs</code></td>
-<td style="text-align: center;">40</td>
-<td style="text-align: left;">每次增量訓練 epoch 數</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><code>thr_min_train_samples</code></td>
-<td style="text-align: center;">200</td>
-<td style="text-align: left;">啟用網路決策的最低樣本數</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">特徵維度</td>
-<td style="text-align: center;">12</td>
-<td style="text-align: left;">形成期特徵（見階段 2）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">隨機種子</td>
-<td style="text-align: center;">不固定</td>
-<td style="text-align: left;">變異數以 多輪重跑程序 多次重跑評估</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;"><code>capital_per_pair</code></td>
-<td style="text-align: center;">10,000</td>
-<td style="text-align: left;">每配對獨立資金</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><code>fee_rate</code> + <code>slippage_rate</code></td>
-<td style="text-align: center;">0.0029 + 0</td>
-<td style="text-align: left;">與 Z-Score 狀態機相同（往返 0.58%）</td>
-</tr>
-</tbody>
-</table>
+<section id="參數總表-參數-值-說明-動作選單-skip-1.52.02.53.0-times-0.00.5-共-9-個動作-基準動作-2.0-0.0-訓練不足時的預設-drl_hidden_size-64-神經網路隱藏層寬度兩層各-64-神經元-drl_lr-10-3-adam-學習率-thr_train_epochs-40-每次增量訓練-epoch-數-thr_min_train_samples-200-啟用網路決策的最低樣本數-特徵維度-12-形成期特徵見階段-2-隨機種子-不固定-數值變異以多次獨立重跑評估其分布-capital_per_pair-10000-每配對獨立資金-fee_rate-slippage_rate-0.0029-0-與-z-score-狀態機相同往返-0.58" class="title-slide slide level1 center">
+<h1>參數總表| 參數 | 值 | 說明 || :— | :—: | :— || 動作選單 | SKIP + <span class="math inline">\{1.5,2.0,2.5,3.0\} \times \{0.0,0.5\}</span> | 共 9 個動作 || 基準動作 | <span class="math inline">(2.0, 0.0)</span> | 訓練不足時的預設 || <code>drl_hidden_size</code> | 64 | 神經網路隱藏層寬度（兩層，各 64 神經元） || <code>drl_lr</code> | <span class="math inline">10^{-3}</span> | Adam 學習率 || <code>thr_train_epochs</code> | 40 | 每次增量訓練 epoch 數 || <code>thr_min_train_samples</code> | 200 | 啟用網路決策的最低樣本數 || 特徵維度 | 12 | 形成期特徵（見階段 2） || 隨機種子 | 不固定 | 數值變異以多次獨立重跑評估其分布 || <code>capital_per_pair</code> | 10,000 | 每配對獨立資金 || <code>fee_rate</code> + <code>slippage_rate</code> | 0.0029 + 0 | 與 Z-Score 狀態機相同（往返 0.58%） |</h1>
 
 </section>
     </div>
