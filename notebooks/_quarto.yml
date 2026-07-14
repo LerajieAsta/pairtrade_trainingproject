@@ -5,6 +5,7 @@ project:
     - formation/*.ipynb
     - trading/*.ipynb
     - comparison.ipynb
+    - performance_guide.ipynb
 
 lang: zh-TW
 

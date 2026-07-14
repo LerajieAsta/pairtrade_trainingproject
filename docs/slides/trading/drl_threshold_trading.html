@@ -1065,7 +1065,7 @@ margin-right: 0; }
 <li><strong>Walk-forward 訓練</strong>：每期決策只用「交易期已於本期開始前結束」的歷史樣本（無前視）</li>
 <li>訓練樣本不足時自動退回基準動作 <span class="math inline">(2.0, 0.0)</span></li>
 </ol>
-<p>實作模組：<code>strategies/trading/drl_threshold_trading.py</code>（<code>ThresholdNet</code> + <code>Trading</code> 類）。 使用本引擎的策略：SSD Rolling DRL THR、Agglomerative Fundamentals DRL THR （各自借用對應 Z-Score 策略的形成期配對）。</p>
+<p>使用本引擎的策略：SSD Rolling DRL THR、Agglomerative Fundamentals DRL THR （各自借用對應 Z-Score 策略的形成期配對）。</p>
 </section>
 
 <section>
@@ -1088,7 +1088,6 @@ margin-right: 0; }
 <li>本引擎的動作空間設計（8 組 <span class="math inline">(entry_z, exit_z)</span> + SKIP）直接採用此文獻的門檻選擇式框架： 把決策粒度從「每日」壓縮到「每配對每期一次」， 大幅降低動作空間維度，避免模型對日級價格噪音做擇時</li>
 <li>SKIP 動作是對其框架的自然延伸：允許學習器拒絕不值得交易的配對</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2021-Optimizing the Pairs-Trading Strategy Using Deep Reinforcement Learning with Trading and Stop-Loss Boundaries.pdf</code></p>
 </section>
 <section id="文獻-2sutton-barto-2018" class="slide level2">
 <h2>文獻 2：Sutton &amp; Barto (2018)</h2>
@@ -1103,7 +1102,6 @@ margin-right: 0; }
 <ul>
 <li>用於界定本問題的性質：歷史配對期上<strong>全部 9 個動作的報酬都能精確反事實回算</strong> （對交易期價格逐一模擬 9 組門檻），屬於<strong>全資訊回饋</strong>—— 依此理論框架，問題退化為監督回歸，無需探索機制、無需價值迭代， 這是本引擎採用「反事實標籤 + MSE 回歸」而非 Q-learning 的理論依據</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-3統計套利機器學習方法綜述-2025" class="slide level2">
 <h2>文獻 3：統計套利機器學習方法綜述 (2025)</h2>
@@ -1118,7 +1116,6 @@ margin-right: 0; }
 <ul>
 <li>提供門檻選擇式路線在文獻中的定位；本引擎的設計取捨（決策粒度、費用敏感性）與其歸納一致</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2025-A survey of statistical arbitrage pair trading with machine learning, deep learning, and reinforcement learning methods.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">
@@ -1236,7 +1233,7 @@ P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
 <li>樣本數 <span class="math inline">\ge</span> <code>thr_min_train_samples</code>（= 200）且較上次訓練有新樣本時才重新訓練</li>
 <li><code>ThresholdNet</code>：<span class="math inline">\text{Linear}(12 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 9)</span></li>
 <li><code>Adam(lr = 10^{-3})</code>、<code>MSELoss</code>、40 epochs、batch <span class="math inline">\min(4096, n)</span></li>
-<li>權重初始化與 batch 洗牌<strong>不固定隨機種子</strong>：單次回測數值為隨機變數， 以 <code>run_drl_variance.py</code> 多次重跑報告分布統計</li>
+<li>權重初始化與 batch 洗牌<strong>不固定隨機種子</strong>：單次回測數值為隨機變數， 以 多輪重跑程序 多次重跑報告分布統計</li>
 </ul>
 <p><strong>狀態隔離</strong>：網路／緩衝區以 <code>variant_id</code>（策略名稱 + Top N + 停損 + MSR）為鍵隔離， 同一行程內依序執行的不同參數變體不共用任何訓練狀態。</p>
 </section>
@@ -1359,7 +1356,7 @@ P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
 <tr class="even">
 <td style="text-align: left;">隨機種子</td>
 <td style="text-align: center;">不固定</td>
-<td style="text-align: left;">變異數以 <code>run_drl_variance.py</code> 多次重跑評估</td>
+<td style="text-align: left;">變異數以 多輪重跑程序 多次重跑評估</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><code>capital_per_pair</code></td>

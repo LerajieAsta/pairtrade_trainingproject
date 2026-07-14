@@ -1080,7 +1080,6 @@ margin-right: 0; }
 <li>群內 <strong>SSD Rolling</strong> 排序，取前 <code>top_n</code></li>
 <li>交易期 Z-Score 路徑 B</li>
 </ol>
-<p>實作模組：<code>strategies/formation/agglomerative_sec_pit.py</code>（子類 <code>agglomerative_FMP</code>，新增 <code>beta_feature_weight</code>）。</p>
 </section>
 <section id="為何只加-beta不加槓桿獲利率" class="slide level2">
 <h2>為何只加 Beta，不加槓桿／獲利率</h2>
@@ -1095,7 +1094,7 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>實測結論</strong>：等權（<code>beta_feature_weight=1.0</code>）加入 Beta <strong>反而全面變差</strong>——高變異的 Beta 主導了分群距離，把 β 相近但行為／產業不同的股票硬拉在一起，群質下降。與 #2/#3/#4 同一母題：<strong>好的基礎表徵已捕捉結構，額外堆疊特徵常是稀釋而非增益</strong>。<code>beta_feature_weight</code> 已納入敏感性掃描（<span class="math inline">\{0,0.25,0.5,1.0\}</span>，<span class="math inline">0=</span> 無 β 控制組 <span class="math inline">\approx</span> FMP）。詳見 <code>notebooks/comparison.ipynb</code>。</p>
+<p><strong>實測結論</strong>：等權（<code>beta_feature_weight=1.0</code>）加入 Beta <strong>反而全面變差</strong>——高變異的 Beta 主導了分群距離，把 β 相近但行為／產業不同的股票硬拉在一起，群質下降。與 #2/#3/#4 同一母題：<strong>好的基礎表徵已捕捉結構，額外堆疊特徵常是稀釋而非增益</strong>。<code>beta_feature_weight</code> 已納入敏感性掃描（<span class="math inline">\{0,0.25,0.5,1.0\}</span>，<span class="math inline">0=</span> 無 β 控制組 <span class="math inline">\approx</span> FMP）。詳見績效比較報告。</p>
 </div>
 </div>
 </div>
@@ -1137,7 +1136,7 @@ margin-right: 0; }
 <blockquote>
 <p>Krauss, C., Do, X. A., &amp; Huck, N. (2016). The profitability of pairs trading strategies: Distance, cointegration and copula methods. <em>Quantitative Finance</em>, <strong>17</strong>(3), 469–488.</p>
 </blockquote>
-<p>「階段 5」群內 min-SSD 排序 + ADF／半衰期／Hurst 過濾（沿用 <code>ssd_rolling.py</code>）依據。</p>
+<p>「階段 5」群內 min-SSD 排序 + ADF／半衰期／Hurst 過濾（沿用 SSD Rolling 排序流程）依據。</p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">
@@ -1150,7 +1149,7 @@ margin-right: 0; }
 </section>
 <section id="階段-2secfmp-pit-基本面-asof-對齊" class="slide level2">
 <h2>階段 2：SEC／FMP PIT 基本面 asof 對齊</h2>
-<p>讀 <code>sp500_pit_2000_2025_monthly.parquet</code>（MultiIndex <code>date, ticker</code>），取 <span class="math inline">\le</span> <code>form_end</code> 的最近月份快照，逐股取 <span class="math inline">\ln(1+\text{市值})</span> 與盈餘殖利率 <span class="math inline">1/\text{PE}</span>。<strong>Point-in-Time 對齊確保無前視</strong>；缺漏以正規化產業中位數插補（<code>_impute_by_group</code>）+ winsorize。</p>
+<p>讀 Point-in-Time 基本面資料（MultiIndex <code>date, ticker</code>），取 <span class="math inline">\le</span> <code>form_end</code> 的最近月份快照，逐股取 <span class="math inline">\ln(1+\text{市值})</span> 與盈餘殖利率 <span class="math inline">1/\text{PE}</span>。<strong>Point-in-Time 對齊確保無前視</strong>；缺漏以正規化產業中位數插補（<code>_impute_by_group</code>）+ winsorize。</p>
 </section>
 <section id="階段-3beta-風險先驗依據sharpe-1964" class="slide level2">
 <h2>階段 3：Beta 風險先驗（依據：Sharpe 1964）</h2>
@@ -1170,7 +1169,7 @@ margin-right: 0; }
 </section>
 <section id="階段-6交易期參數使用" class="slide level2">
 <h2>階段 6：交易期參數使用</h2>
-<p>交易期於標準化空間重建 spread（Z-Score 路徑 B），輸出 <code>Ticker_A/B, Rank, Hedge_Ratio, Spread_Mean/Std, Log_Mean/Std_A/B</code> 供 <code>zscore_trading.py</code> 使用；DRL 疊加版（若有）借用同配對改走 <code>drl_threshold_trading.py</code>。</p>
+<p>交易期於標準化空間重建 spread（Z-Score 路徑 B），輸出 <code>Ticker_A/B, Rank, Hedge_Ratio, Spread_Mean/Std, Log_Mean/Std_A/B</code> 供 Z-Score 交易模組 使用；DRL 疊加版（若有）借用同配對改走 DRL 門檻選擇模組。</p>
 </section></section>
 <section id="參數總表" class="title-slide slide level1 center">
 <h1>參數總表</h1>

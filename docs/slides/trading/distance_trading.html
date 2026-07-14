@@ -1072,7 +1072,6 @@ margin-right: 0; }
 </div>
 </div>
 <p><strong>距離基準交易</strong>以 Gatev, Goetzmann &amp; Rouwenhorst (2006) 的<strong>正規化價格距離</strong>建構 spread，取代回歸基準（<code>zscore_trading</code>）的共整合殘差 spread。兩者<strong>共用同一套 Z-Score 狀態機</strong>（進出場、風控、費用會計完全相同），唯一差異在 spread 的建構空間——構成「回歸 vs 距離」的乾淨單變因對照（教授指定的消融實驗）。</p>
-<p>實作模組：<code>strategies/trading/distance_trading.py</code>（繼承 <code>zscore_trading.Trading</code>，只覆寫 spread 建構）。現役使用策略：SSD Rolling Distance（借用 SSD Rolling 的形成期配對）。</p>
 </section>
 <section id="回歸基準-vs-距離基準" class="slide level2">
 <h2>回歸基準 vs 距離基準</h2>
@@ -1128,7 +1127,6 @@ margin-right: 0; }
 <ul>
 <li>本模組即此距離法交易規則的實作：spread 為正規化價格差、對沖固定 <span class="math inline">\beta=1</span>、 <span class="math inline">|z|&gt;2</span> 開倉對應「2 倍歷史標準差」門檻</li>
 </ul>
-<p>📄 <code>ref/2006-Pairs Trading Performance of a Relative-Value Arbitrage Rule.pdf</code></p>
 </section>
 <section id="文獻-2do-faff-2012" class="slide level2">
 <h2>文獻 2：Do &amp; Faff (2012)</h2>
@@ -1137,7 +1135,6 @@ margin-right: 0; }
 </blockquote>
 <p><strong>參考部分</strong>：交易成本對配對交易獲利的侵蝕。</p>
 <p><strong>為何參考</strong>：每筆進出場扣往返成本（<code>fee_rate=0.0029</code>、<code>slippage=0</code>，往返 0.58%）之依據。</p>
-<p>📄 <code>ref/2012 - ARE PAIRS TRADING PROFITS ROBUST TO TRADING COSTS.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">

@@ -1065,7 +1065,7 @@ margin-right: 0; }
 <li>對沖比例固定 <span class="math inline">\beta = 1</span>（等金額對沖，無回歸估計）</li>
 <li>記錄形成期價差標準差 <span class="math inline">s_{i,j}</span>，作為交易期 2 倍標準差開倉門檻的基準</li>
 </ol>
-<p>實作模組：<code>strategies/formation/ssd_basic.py</code> （2026-07-06 重寫：移除先前版本自加的三道統計過濾與同產業限制，回歸論文原始規格）。</p>
+<p>（2026-07-06 重寫：移除先前版本自加的三道統計過濾與同產業限制，回歸論文原始規格）。</p>
 </section>
 
 <section>
@@ -1076,7 +1076,7 @@ margin-right: 0; }
 <section id="文獻-1gatev-goetzmann-rouwenhorst-2006" class="slide level2">
 <h2>文獻 1：Gatev, Goetzmann &amp; Rouwenhorst (2006)</h2>
 <blockquote>
-<p>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies</em>, <strong>19</strong>(3), 797–827.</p>
+<p>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies, 19</em>(3), 797–827.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1087,7 +1087,6 @@ margin-right: 0; }
 <ul>
 <li>本策略即此基準模型的復刻：正規化方式、距離定義、選取規則、<span class="math inline">\beta = 1</span> 等金額對沖 全部按原文重現，作為研究中一切延伸策略的原型與比較基底</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2006-Pairs Trading Performance of a Relative-Value Arbitrage Rule.pdf</code></p>
 </section>
 <section id="文獻-2zhu-2024" class="slide level2">
 <h2>文獻 2：Zhu (2024)</h2>
@@ -1106,7 +1105,6 @@ margin-right: 0; }
 <ul>
 <li>原論文（1962–2002 資料）的規格經此複製研究以近二十年資料重新驗證仍有效； 本實作的公式與流程<strong>逐條對齊其第 3.1 節</strong>（距離含 <span class="math inline">1/T</span> 縮放、<span class="math inline">s_{i,j}</span> 用 population 標準差）</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2024-Zhu_Pairs_Trading.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">

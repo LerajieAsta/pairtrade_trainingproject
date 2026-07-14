@@ -1066,7 +1066,7 @@ margin-right: 0; }
 <li>依 DTW 距離由小到大選出前 <code>top_n</code> 組配對</li>
 <li>交易期以 <code>ignore_ols_alpha=True</code> 統一在標準化空間重建 spread（座標修正，見階段 7）</li>
 </ol>
-<p>實作模組：<code>strategies/formation/DTW_Cointegration_Paper.py</code>（<code>method=&quot;dtw&quot;</code>）； config 條目 <code>DTW Paper Fixed (DTW)</code> 透過 <code>formation_strategy_id_base</code> 讀取 formation-only 條目 <code>DTW Paper (DTW)</code> 產生的配對。</p>
+<p>config 條目 <code>DTW Paper Fixed (DTW)</code> 透過 <code>formation_strategy_id_base</code> 讀取 formation-only 條目 <code>DTW Paper (DTW)</code> 產生的配對。</p>
 </section>
 
 <section>
@@ -1090,12 +1090,11 @@ margin-right: 0; }
 <li>本模組即為此論文方法的<strong>對齊實作</strong>（模組 docstring 明載「許鈞翔 (2025) 論文對齊版」），流程順序、篩選條件與排序方式皆按論文重現</li>
 <li>「先共整合、後距離」的順序讓昂貴的 DTW 計算只發生在已確認具均衡關係的配對上</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2025-最小距離法結合動態時間校正之配對交易研究(許鈞翔).pdf</code></p>
 </section>
 <section id="文獻-2sakoe-chiba-1978" class="slide level2">
 <h2>文獻 2：Sakoe &amp; Chiba (1978)</h2>
 <blockquote>
-<p>Sakoe, H., &amp; Chiba, S. (1978). Dynamic programming algorithm optimization for spoken word recognition. <em>IEEE Transactions on Acoustics, Speech, and Signal Processing</em>, <strong>26</strong>(1), 43–49.</p>
+<p>Sakoe, H., &amp; Chiba, S. (1978). Dynamic programming algorithm optimization for spoken word recognition. <em>IEEE Transactions on Acoustics, Speech, and Signal Processing, 26</em>(1), 43–49.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1106,12 +1105,11 @@ margin-right: 0; }
 <ul>
 <li>本策略的 DTW 實作（<code>_sakoe_chiba_dtw</code>）直接採用其帶約束形式：把時間扭曲限制在 <span class="math inline">W = 15</span> 天內，防止兩段相隔數月的走勢被不合理地對齊，同時把計算複雜度從 <span class="math inline">O(N^2)</span> 降至 <span class="math inline">O(N \cdot W)</span></li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-3engle-granger-1987" class="slide level2">
 <h2>文獻 3：Engle &amp; Granger (1987)</h2>
 <blockquote>
-<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica</em>, <strong>55</strong>(2), 251–276.</p>
+<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica, 55</em>(2), 251–276.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1121,7 +1119,6 @@ margin-right: 0; }
 <ul>
 <li>本策略階段 3 的「雙向 OLS + ADF」即此程序的實作；因 Engle-Granger 檢定結果<strong>依賴回歸方向</strong>（以 A 回歸 B 與以 B 回歸 A 的殘差不同），本策略對兩個方向各檢定一次、取 p 值較小者，確保不因方向選擇錯過共整合配對</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-4krauss-do-huck-2016" class="slide level2">
 <h2>文獻 4：Krauss, Do &amp; Huck (2016)</h2>
@@ -1136,7 +1133,6 @@ margin-right: 0; }
 <ul>
 <li>統計過濾第二道（半衰期 <span class="math inline">1</span>–<span class="math inline">42</span> 日）與第三道（<span class="math inline">H &lt; 0.5</span>）的設計依據，確保通過共整合檢定的配對，其回歸速度落在交易期內可實現的時間尺度</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2016-The profitability of pairs trading strategies distance, cointegration, and copula methols.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">

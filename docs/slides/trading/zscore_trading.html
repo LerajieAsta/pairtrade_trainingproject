@@ -1065,7 +1065,7 @@ margin-right: 0; }
 <li>比例停損與 Z 發散停損；停損後該配對<strong>本期凍結</strong></li>
 <li>期末未平倉部位強制結算</li>
 </ol>
-<p>實作模組：<code>strategies/trading/zscore_trading.py</code>（<code>Trading</code> 類）。 使用本引擎的形成期策略：SSD Basic、SSD Rolling、DTW Paper Fixed、SSD-DTW-PCA Paper Fixed、 HDBSCAN Cluster SSD-DTW-PCA PCA5、Agglomerative Fundamentals。</p>
+<p>使用本引擎的形成期策略：SSD Basic、SSD Rolling、DTW Paper Fixed、SSD-DTW-PCA Paper Fixed、 HDBSCAN Cluster SSD-DTW-PCA PCA5、Agglomerative Fundamentals。</p>
 </section>
 
 <section>
@@ -1073,8 +1073,22 @@ margin-right: 0; }
 <h1>參考文獻與引用對應</h1>
 
 </section>
-<section id="文獻-1gatev-goetzmann-rouwenhorst-2006-gatev-e.-goetzmann-w.-n.-rouwenhorst-k.-g.-2006.-pairs-trading-performance-of-a-relative-value-arbitrage-rule.-review-of-financial-studies-193-797827.參考部分--第-3-節交易規則價差偏離超過形成期-2-倍標準差時開倉做空高估腳做多低估腳-價差收斂交叉時平倉交易期結束時強制平倉--形成期統計量在交易期保持不變的靜態設計--等金額市場中性對沖建倉為何參考--本引擎的核心狀態機即此交易規則的實作entry_z-2.0-對應-2-倍標準差開倉-exit_z-0.0-對應收斂平倉period_end_exit-對應期末強制結算--zscore_window-0靜態模式對應其形成期統計量凍結設計-文獻檔案ref2006-pairs-trading-performance-of-a-relative-value-arbitrage-rule.pdf" class="slide level2">
-<h2>文獻 1：Gatev, Goetzmann &amp; Rouwenhorst (2006)&gt; Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies, 19</em>(3), 797–827.<strong>參考部分</strong>：- 第 3 節交易規則：價差偏離超過<strong>形成期 2 倍標準差</strong>時開倉（做空高估腳、做多低估腳）， 價差<strong>收斂交叉</strong>時平倉，交易期結束時強制平倉- 形成期統計量在交易期<strong>保持不變</strong>的靜態設計- 等金額（市場中性）對沖建倉<strong>為何參考</strong>：- 本引擎的核心狀態機即此交易規則的實作：<code>entry_z = 2.0</code> 對應 2 倍標準差開倉、 <code>exit_z = 0.0</code> 對應收斂平倉、<code>PERIOD_END_EXIT</code> 對應期末強制結算- <code>zscore_window = 0</code>（靜態模式）對應其形成期統計量凍結設計📄 文獻檔案：<code>ref/2006-Pairs Trading Performance of a Relative-Value Arbitrage Rule.pdf</code></h2>
+<section id="文獻-1gatev-goetzmann-rouwenhorst-2006" class="slide level2">
+<h2>文獻 1：Gatev, Goetzmann &amp; Rouwenhorst (2006)</h2>
+<blockquote>
+<p>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies, 19</em>(3), 797–827.</p>
+</blockquote>
+<p><strong>參考部分</strong>：</p>
+<ul>
+<li>第 3 節交易規則：價差偏離超過<strong>形成期 2 倍標準差</strong>時開倉（做空高估腳、做多低估腳）， 價差<strong>收斂交叉</strong>時平倉，交易期結束時強制平倉</li>
+<li>形成期統計量在交易期<strong>保持不變</strong>的靜態設計</li>
+<li>等金額（市場中性）對沖建倉</li>
+</ul>
+<p><strong>為何參考</strong>：</p>
+<ul>
+<li>本引擎的核心狀態機即此交易規則的實作：<code>entry_z = 2.0</code> 對應 2 倍標準差開倉、 <code>exit_z = 0.0</code> 對應收斂平倉、<code>PERIOD_END_EXIT</code> 對應期末強制結算</li>
+<li><code>zscore_window = 0</code>（靜態模式）對應其形成期統計量凍結設計</li>
+</ul>
 </section>
 <section id="文獻-2do-faff-2012" class="slide level2">
 <h2>文獻 2：Do &amp; Faff (2012)</h2>
@@ -1089,7 +1103,6 @@ margin-right: 0; }
 <ul>
 <li>本引擎<strong>每一筆進出場都扣除摩擦成本</strong>（<code>fee_rate = 0.0029</code> + <code>slippage_rate = 0</code>， 往返合計 0.58%（0.29%×2），以兩腳名目金額計算）的設計依據—— 避免回測結果高估未計成本的獲利</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2012 - ARE PAIRS TRADING PROFITS ROBUST TO TRADING COSTS.pdf</code></p>
 </section>
 <section id="文獻-3krauss-do-huck-2016" class="slide level2">
 <h2>文獻 3：Krauss, Do &amp; Huck (2016)</h2>
@@ -1105,7 +1118,6 @@ margin-right: 0; }
 <ul>
 <li>比例停損（<code>stop_loss_pct</code> 網格 [0, 5%, 15%]）與 Z 發散停損（<code>dynamic_stop_z</code>） 兩道風控的設計依據；網格搜尋讓停損強度成為可比較的實驗變因</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2016-The profitability of pairs trading strategies distance, cointegration, and copula methols.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">

@@ -1066,7 +1066,6 @@ margin-right: 0; }
 <li>通過 <strong>三道統計檢定</strong>（ADF 共整合、OU 半衰期、Hurst 指數）確認 spread 具備均值回歸性質</li>
 <li>依 SSD 由小到大選出前 <code>top_n</code> 組配對，輸出交易期所需的全部參數</li>
 </ol>
-<p>實作模組：<code>strategies/formation/ssd_rolling.py</code>（統計工具引用 <code>strategies/formation/_utils.py</code>）。</p>
 </section>
 
 <section>
@@ -1077,7 +1076,7 @@ margin-right: 0; }
 <section id="文獻-1gatev-goetzmann-rouwenhorst-2006" class="slide level2">
 <h2>文獻 1：Gatev, Goetzmann &amp; Rouwenhorst (2006)</h2>
 <blockquote>
-<p>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies</em>, <strong>19</strong>(3), 797–827.</p>
+<p>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies, 19</em>(3), 797–827.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1089,12 +1088,11 @@ margin-right: 0; }
 <li>這是配對交易距離法的<strong>開山文獻</strong>，SSD 排序是本策略的核心選取準則，直接沿用其「距離越小 → 歷史走勢越相近 → 越可能存在均衡關係」的邏輯</li>
 <li>本策略的形成期 252 日／交易期 126 日視窗設計即對應其 12 個月／6 個月架構</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2006-Pairs Trading Performance of a Relative-Value Arbitrage Rule.pdf</code></p>
 </section>
 <section id="文獻-2engle-granger-1987" class="slide level2">
 <h2>文獻 2：Engle &amp; Granger (1987)</h2>
 <blockquote>
-<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica</em>, <strong>55</strong>(2), 251–276.</p>
+<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica, 55</em>(2), 251–276.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1106,7 +1104,6 @@ margin-right: 0; }
 <li>SSD 距離只保證「歷史走勢相近」，不保證價差會回歸——必須以共整合檢定確認兩股間存在<strong>統計上的長期均衡關係</strong></li>
 <li>本策略統計過濾第一道的 ADF 檢定（對 OLS 殘差 spread 檢定單根）即為其兩步驟程序的直接實作</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-3krauss-do-huck-2016" class="slide level2">
 <h2>文獻 3：Krauss, Do &amp; Huck (2016)</h2>
@@ -1123,7 +1120,6 @@ margin-right: 0; }
 <li>本策略統計過濾第二道（半衰期範圍限制）與第三道（Hurst &lt; 0.5）的設計依據——確保選出的配對不僅共整合，且<strong>回歸速度落在交易期可實現的時間尺度內</strong></li>
 <li>半衰期上限設為交易期長度的 1/3（126/3 = 42 日），即出自「交易期內須有足夠回歸次數」的原則</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2016-The profitability of pairs trading strategies distance, cointegration, and copula methols.pdf</code></p>
 </section>
 <section id="文獻-4zhu-2024" class="slide level2">
 <h2>文獻 4：Zhu (2024)</h2>
@@ -1140,7 +1136,6 @@ margin-right: 0; }
 <li>提供 SSD 距離法在<strong>近二十年資料上仍然有效</strong>的實證佐證，支持本策略以 SSD 作為核心排序準則的現代適用性</li>
 <li>本策略階段 4 的「SSD 初篩 → 統計檢定只做前 <span class="math inline">\max(200,\ top\_n \times 15)</span> 組」設計，與其成本分析的結論一致</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2024-Zhu_Pairs_Trading.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">

@@ -1079,7 +1079,6 @@ margin-right: 0; }
 <li>群內雙向 OLS + ADF/半衰期/Hurst 篩選 → SSD/DTW 距離 → PC1 融合排序，取前 <code>top_n</code></li>
 <li>交易期以 <code>ignore_ols_alpha=True</code> 於標準化空間重建 spread</li>
 </ol>
-<p>實作模組：<code>strategies/formation/HDBSCAN_Cluster_SSD_DTW.py</code>（<code>pca_n_components=5, factor_residual=True</code>），殘差化由 <code>strategies/formation/_utils.py</code> 的 <code>_residualize_returns()</code> 執行。</p>
 </section>
 <section id="為何在聚類前做因子殘差化" class="slide level2">
 <h2>為何在聚類前做因子殘差化</h2>
@@ -1106,7 +1105,6 @@ margin-right: 0; }
 <li>本策略階段 1 的殘差化（移除市場＋產業因子、保留特殊性報酬）即此文的核心方法； 以殘差報酬的因子載荷作為聚類座標，使分組反映「特殊性共動」結構</li>
 <li>因子載荷以 <span class="math inline">\sqrt{\text{特徵值}}</span> 加權亦沿用其 eigenportfolio 權重尺度化</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2010-Statistical arbitrage in the U.S. equities market.pdf</code></p>
 </section>
 <section id="文獻-2campello-moulavi-sander-2013許鈞翔-2025" class="slide level2">
 <h2>文獻 2：Campello, Moulavi &amp; Sander (2013)／許鈞翔 (2025)</h2>
@@ -1115,8 +1113,8 @@ margin-right: 0; }
 </blockquote>
 <p><strong>參考部分與理由</strong>：</p>
 <ul>
-<li>Campello et al.：HDBSCAN 密度聚類（自動群數、噪音標記）——階段 2 分組演算法（⚠️ <code>ref/</code> 缺 PDF，需補充）</li>
-<li>許鈞翔 (2025)：群內「共整合篩選 → SSD/DTW 距離 → PC1 融合排序」流程，經 <code>DTW_Cointegration_Paper.py</code> 複用 （📄 <code>ref/2025-最小距離法結合動態時間校正之配對交易研究(許鈞翔).pdf</code>）</li>
+<li>Campello et al.：HDBSCAN 密度聚類（自動群數、噪音標記）——階段 2 分組演算法</li>
+<li>許鈞翔 (2025)：群內「共整合篩選 → SSD/DTW 距離 → PC1 融合排序」流程，經 DTW 距離排序流程 複用</li>
 </ul>
 </section></section>
 <section>
@@ -1146,7 +1144,7 @@ e^{(2)}_{t,i} = e^{(1)}_{t,i} - \hat\gamma_i\, g^{(s_i)}_t</span></p>
 </section>
 <section id="階段-35群內篩選距離排序與-pca5-版相同" class="slide level2">
 <h2>階段 3–5：群內篩選、距離、排序（與 PCA5 版相同）</h2>
-<p>以群集標籤作為分組，複用 <code>DTW_Cointegration_Paper.py</code> 流程：</p>
+<p>以群集標籤作為分組，複用 DTW 距離排序流程 流程：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">

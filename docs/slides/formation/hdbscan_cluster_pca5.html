@@ -1066,7 +1066,7 @@ margin-right: 0; }
 <li>對通過檢定的配對計算 SSD 與 DTW 距離，以 <strong>PCA 融合排序（PC1）</strong>升序選出前 <code>top_n</code> 組</li>
 <li>交易期以 <code>ignore_ols_alpha=True</code> 在標準化空間重建 spread</li>
 </ol>
-<p>實作模組：<code>strategies/formation/HDBSCAN_Cluster_SSD_DTW.py</code>（<code>pca_n_components=5</code>）， 組合 <code>HDBSCAN_PCA_Loadings.py</code>（特徵萃取＋聚類）與 <code>DTW_Cointegration_Paper.py</code>（群內篩選＋排序）。</p>
+<p>組合 報酬 PCA 因子載荷特徵萃取（特徵萃取＋聚類）與 DTW 距離排序流程（群內篩選＋排序）。</p>
 </section>
 <section id="為何取-5-維因子載荷" class="slide level2">
 <h2>為何取 5 維因子載荷</h2>
@@ -1087,7 +1087,7 @@ margin-right: 0; }
 <section id="文獻-1avellaneda-lee-2010" class="slide level2">
 <h2>文獻 1：Avellaneda &amp; Lee (2010)</h2>
 <blockquote>
-<p>Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7), 761–782.</p>
+<p>Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance, 10</em>(7), 761–782.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1098,12 +1098,11 @@ margin-right: 0; }
 <ul>
 <li>「只取前少數強因子作為股票的風險表徵」即本策略取 <span class="math inline">k=5</span> 的理論基礎；其餘載荷計算方式與尺度化同前</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-2sarmento-horta-2020" class="slide level2">
 <h2>文獻 2：Sarmento &amp; Horta (2020)</h2>
 <blockquote>
-<p>Sarmento, S. M., &amp; Horta, N. (2020). Enhancing a pairs trading strategy with the application of machine learning. <em>Expert Systems with Applications</em>, <strong>158</strong>, 113490.</p>
+<p>Sarmento, S. M., &amp; Horta, N. (2020). Enhancing a pairs trading strategy with the application of machine learning. <em>Expert Systems with Applications, 158</em>, 113490.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1113,7 +1112,6 @@ margin-right: 0; }
 <ul>
 <li>本策略把框架中的降維步驟落實為「PCA 取前 5 主成分」：聚類品質依賴輸入表徵的訊噪比，降維是框架的必要成分而非可選項</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-3campello-moulavi-sander-2013" class="slide level2">
 <h2>文獻 3：Campello, Moulavi &amp; Sander (2013)</h2>
@@ -1129,18 +1127,17 @@ margin-right: 0; }
 <ul>
 <li>自動群數決定與離群過濾同前；其密度估計原理亦為本策略「壓縮特徵維度以保全密度訊號」的依據</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-4許鈞翔-2025engle-granger-1987krauss-do-huck-2016" class="slide level2">
 <h2>文獻 4：許鈞翔 (2025)／Engle &amp; Granger (1987)／Krauss, Do &amp; Huck (2016)</h2>
 <blockquote>
-<p>許鈞翔 (2025)。最小距離法結合動態時間校正之配對交易研究。元智大學碩士論文。 Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction. <em>Econometrica</em>, <strong>55</strong>(2). Krauss, C., Do, X. A., &amp; Huck, N. (2016). The profitability of pairs trading strategies. <em>EJOR</em>.</p>
+<p>許鈞翔 (2025)。最小距離法結合動態時間校正之配對交易研究。元智大學碩士論文。 Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction. <em>Econometrica, 55</em>(2). Krauss, C., Do, X. A., &amp; Huck, N. (2016). The profitability of pairs trading strategies. <em>EJOR</em>.</p>
 </blockquote>
 <p><strong>參考部分與理由</strong>：</p>
 <ul>
-<li>許鈞翔 (2025)：群內配對的完整篩選與排序流程（Engle-Granger <span class="math inline">p&lt;0.01</span> → SSD/DTW → PC1 融合排序），經 <code>DTW_Cointegration_Paper.py</code> 模組複用（📄 <code>ref/2025-最小距離法結合動態時間校正之配對交易研究(許鈞翔).pdf</code>）</li>
-<li>Engle &amp; Granger：雙向 OLS + ADF 兩步驟共整合程序（✅ 已收錄）</li>
-<li>Krauss et al.：半衰期（<span class="math inline">1</span>–<span class="math inline">42</span> 日）與 Hurst（<span class="math inline">H&lt;0.5</span>）門檻（📄 <code>ref/2016-The profitability of pairs trading strategies distance, cointegration, and copula methols.pdf</code>）</li>
+<li>許鈞翔 (2025)：群內配對的完整篩選與排序流程（Engle-Granger <span class="math inline">p&lt;0.01</span> → SSD/DTW → PC1 融合排序）</li>
+<li>Engle &amp; Granger：雙向 OLS + ADF 兩步驟共整合程序</li>
+<li>Krauss et al.：半衰期（<span class="math inline">1</span>–<span class="math inline">42</span> 日）與 Hurst（<span class="math inline">H&lt;0.5</span>）門檻</li>
 </ul>
 </section></section>
 <section>

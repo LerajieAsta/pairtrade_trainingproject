@@ -1090,13 +1090,13 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>yF</strong></td>
-<td style="text-align: left;"><code>agglomerative_yF.py</code></td>
+<td style="text-align: left;">yF 版</td>
 <td style="text-align: left;">yfinance <strong>單一時點快照</strong>（SQLite）</td>
 <td style="text-align: left;">有（每個歷史窗都用「今日」數值）</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>FMP</strong></td>
-<td style="text-align: left;"><code>agglomerative_FMP.py</code></td>
+<td style="text-align: left;">FMP 版</td>
 <td style="text-align: left;">FMP <strong>Point-in-Time 逐點</strong>（Parquet）</td>
 <td style="text-align: left;">已修正（每窗取 ≤ 形成期末的最近一筆）</td>
 </tr>
@@ -1133,7 +1133,6 @@ margin-right: 0; }
 </blockquote>
 <p><strong>參考部分</strong>：以企業基本面特徵（而非純價格）識別配對；基本面相近的公司共享估值與現金流驅動因子，價格均衡有基本面基礎。</p>
 <p><strong>為何參考</strong>：混合特徵中基本面區塊（log 市值、盈餘殖利率 <span class="math inline">1/PE</span>）的直接依據。</p>
-<p>📄 <code>ref/2021-In Search of Pairs using Firm Fundamentals.pdf</code></p>
 </section>
 <section id="文獻-2ward-1963avellaneda-lee-2010" class="slide level2">
 <h2>文獻 2：Ward (1963)／Avellaneda &amp; Lee (2010)</h2>
@@ -1142,13 +1141,13 @@ margin-right: 0; }
 </blockquote>
 <p><strong>參考部分與理由</strong>：</p>
 <ul>
-<li>Ward：階層聚集聚類框架與 dendrogram 可事後切割的特性——階段 3 兩段式 <code>distance_threshold</code> 校準之依據（⚠️ <code>ref/</code> 缺 PDF，需補充）</li>
-<li>Avellaneda &amp; Lee：報酬 PCA 因子載荷——價格行為區塊的計算方式（📄 <code>ref/2010-Statistical arbitrage in the U.S. equities market.pdf</code>）</li>
+<li>Ward：階層聚集聚類框架與 dendrogram 可事後切割的特性——階段 3 兩段式 <code>distance_threshold</code> 校準之依據</li>
+<li>Avellaneda &amp; Lee：報酬 PCA 因子載荷——價格行為區塊的計算方式</li>
 </ul>
 </section>
 <section id="文獻-3gatev-goetzmann-rouwenhorst-2006engle-granger-1987krauss-et-al.-2016" class="slide level2">
 <h2>文獻 3：Gatev, Goetzmann &amp; Rouwenhorst (2006)／Engle &amp; Granger (1987)／Krauss et al. (2016)</h2>
-<p><strong>參考部分與理由</strong>：群內 min-SSD 排序（Gatev，📄 <code>ref/2006-...</code>）＋ ADF 共整合（Engle &amp; Granger，⚠️ 缺 PDF）＋ 半衰期/Hurst 過濾（Krauss，📄 <code>ref/2016-...</code>），經 <code>ssd_rolling.py</code> 複用。</p>
+<p><strong>參考部分與理由</strong>：群內 min-SSD 排序（Gatev）＋ ADF 共整合（Engle &amp; Granger）＋ 半衰期/Hurst 過濾（Krauss）。</p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">
@@ -1239,12 +1238,12 @@ margin-right: 0; }
 </tr>
 <tr class="even">
 <td style="text-align: left;">yF 資料源</td>
-<td style="text-align: center;"><code>dataset/fundamental/fundamentals_sp500.db</code></td>
+<td style="text-align: center;">基本面快照資料</td>
 <td style="text-align: left;">yfinance 快照</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">FMP 資料源</td>
-<td style="text-align: center;"><code>dataset/fundamental/sp500_pit_2000_2025_monthly.parquet</code></td>
+<td style="text-align: center;">PIT 逐點資料</td>
 <td style="text-align: left;">PIT 逐點</td>
 </tr>
 </tbody>

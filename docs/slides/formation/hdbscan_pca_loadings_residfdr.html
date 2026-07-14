@@ -1079,7 +1079,6 @@ margin-right: 0; }
 <li><strong>成本可行性過濾</strong>：剔除 spread 振幅不足以覆蓋往返交易成本（0.58%）的配對</li>
 <li>依品質評分取前 <code>top_n</code></li>
 </ol>
-<p>實作模組：<code>strategies/formation/HDBSCAN_PCA_Loadings.py</code>（<code>feature_mode=&quot;pca_loadings&quot;, factor_residual=True, use_fdr=True, use_cost_filter=True</code>），共整合篩選繼承自 <code>HDBSCAN_UMAP.py</code> 的多濾網品質評分流程。</p>
 </section>
 <section id="動機控制大規模配對搜尋的偽陽性與費用侵蝕" class="slide level2">
 <h2>動機：控制大規模配對搜尋的偽陽性與費用侵蝕</h2>
@@ -1098,7 +1097,6 @@ margin-right: 0; }
 </blockquote>
 <p><strong>參考部分</strong>：報酬因子分解（因子暴露 + 特殊性報酬），統計套利建於殘差報酬。</p>
 <p><strong>為何參考</strong>：階段 1 的因子殘差化與 5 維因子載荷聚類座標之依據（同 Resid 版）。</p>
-<p>📄 <code>ref/2010-Statistical arbitrage in the U.S. equities market.pdf</code></p>
 </section>
 <section id="文獻-2benjamini-hochberg-1995" class="slide level2">
 <h2>文獻 2：Benjamini &amp; Hochberg (1995)</h2>
@@ -1114,7 +1112,6 @@ margin-right: 0; }
 <ul>
 <li>階段 3 對約 12.5 萬對候選的共整合 p 值直接套用 BH 程序（<code>_bh_fdr_threshold</code>）： 以寬鬆 ADF 門檻（<span class="math inline">p&lt;0.10</span>）放行候選，最後統一以 BH 臨界值過濾—— 比固定 <span class="math inline">p&lt;0.01</span> 更能同時兼顧「不漏真配對」與「壓制偽共整合」</li>
 </ul>
-<p>⚠️ <strong><code>ref/</code> 資料夾內無此文獻 PDF，需補充。</strong></p>
 </section>
 <section id="文獻-3do-faff-2012" class="slide level2">
 <h2>文獻 3：Do &amp; Faff (2012)</h2>
@@ -1126,7 +1123,6 @@ margin-right: 0; }
 <ul>
 <li>階段 4 成本可行性過濾的依據：要求單次往返的預期擷取 <span class="math inline">entry_z \times \sigma_{spread}</span> 須 <span class="math inline">\ge</span> 往返成本（<span class="math inline">2 \times 0.29\% = 0.58\%</span>），在形成期就剔除註定被費用吃光的配對</li>
 </ul>
-<p>📄 <code>ref/2012 - ARE PAIRS TRADING PROFITS ROBUST TO TRADING COSTS.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">

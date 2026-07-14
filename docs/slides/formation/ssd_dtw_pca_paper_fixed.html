@@ -1132,7 +1132,7 @@ margin-right: 0; }
 <li>兩距離<strong>標準化後輸入 PCA，取第一主成分（PC1）分數</strong>作為融合排序依據，升序選出前 <code>top_n</code> 組</li>
 <li>交易期以 <code>ignore_ols_alpha=True</code> 統一在標準化空間重建 spread；並對進場門檻與發散停損做網格掃描</li>
 </ol>
-<p>實作模組：<code>strategies/formation/DTW_Cointegration_Paper.py</code>（<code>method=&quot;ssd_dtw_pca&quot;</code>）； config 條目 <code>SSD-DTW-PCA Paper Fixed</code> 透過 <code>formation_strategy_id_base</code> 讀取 formation-only 條目 <code>DTW Paper (SSD-DTW-PCA)</code> 產生的配對。</p>
+<p>config 條目 <code>SSD-DTW-PCA Paper Fixed</code> 透過 <code>formation_strategy_id_base</code> 讀取 formation-only 條目 <code>DTW Paper (SSD-DTW-PCA)</code> 產生的配對。</p>
 </section>
 
 <section>
@@ -1156,12 +1156,11 @@ margin-right: 0; }
 <li>本策略為此論文<strong>實驗組（SSD + DTW 融合）</strong>的對齊實作：SSD 衡量同步走勢距離、DTW 衡量容許時間錯位的走勢距離，PCA 融合捕捉兩指標的共同變異，避免單一距離度量的偏頗</li>
 <li>論文以 S&amp;P 500 成分股實證：融合排序在多種交易期與止損條件下顯著優於單獨 SSD，與單獨 DTW 相比亦普遍領先——此為採用融合排序的直接依據</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2025-最小距離法結合動態時間校正之配對交易研究(許鈞翔).pdf</code></p>
 </section>
 <section id="文獻-2sakoe-chiba-1978" class="slide level2">
 <h2>文獻 2：Sakoe &amp; Chiba (1978)</h2>
 <blockquote>
-<p>Sakoe, H., &amp; Chiba, S. (1978). Dynamic programming algorithm optimization for spoken word recognition. <em>IEEE Transactions on Acoustics, Speech, and Signal Processing</em>, <strong>26</strong>(1), 43–49.</p>
+<p>Sakoe, H., &amp; Chiba, S. (1978). Dynamic programming algorithm optimization for spoken word recognition. <em>IEEE Transactions on Acoustics, Speech, and Signal Processing, 26</em>(1), 43–49.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1171,12 +1170,11 @@ margin-right: 0; }
 <ul>
 <li>融合排序的 DTW 分量以帶約束形式實作（<span class="math inline">W = 15</span> 天）：限制不合理的長距離時間對齊，並將計算複雜度降至 <span class="math inline">O(N \cdot W)</span></li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-3engle-granger-1987" class="slide level2">
 <h2>文獻 3：Engle &amp; Granger (1987)</h2>
 <blockquote>
-<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica</em>, <strong>55</strong>(2), 251–276.</p>
+<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica, 55</em>(2), 251–276.</p>
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
@@ -1186,7 +1184,6 @@ margin-right: 0; }
 <ul>
 <li>階段 3 的「雙向 OLS + ADF」為此程序的實作；對兩個回歸方向各檢定一次、取 p 值較小者，避免因方向選擇錯過共整合配對</li>
 </ul>
-<p>✅ <strong>已收錄於 <code>ref/</code> 資料夾內。</strong></p>
 </section>
 <section id="文獻-4krauss-do-huck-2016" class="slide level2">
 <h2>文獻 4：Krauss, Do &amp; Huck (2016)</h2>
@@ -1201,12 +1198,11 @@ margin-right: 0; }
 <ul>
 <li>統計過濾第二道（半衰期 <span class="math inline">1</span>–<span class="math inline">42</span> 日）與第三道（<span class="math inline">H &lt; 0.5</span>）的門檻設計依據</li>
 </ul>
-<p>📄 文獻檔案：<code>ref/2016-The profitability of pairs trading strategies distance, cointegration, and copula methols.pdf</code></p>
 </section></section>
 <section>
 <section id="各階段行為" class="title-slide slide level1 center">
 <h1>各階段行為</h1>
-<p>策略在每個滾動形成窗（252 交易日，每 21 日滾動）內依序執行以下七個階段。 階段 1–5 與 DTW 距離的計算流程共用同一模組（<code>DTW_Cointegration_Paper.py</code>），差異在階段 6 的排序機制。</p>
+<p>策略在每個滾動形成窗（252 交易日，每 21 日滾動）內依序執行以下七個階段。 階段 1–5 與 DTW 距離的計算流程共用同一模組（DTW 距離排序流程），差異在階段 6 的排序機制。</p>
 </section>
 <section id="階段-1資料範圍界定與產業分組" class="slide level2 scrollable">
 <h2>階段 1：資料範圍界定與產業分組</h2>

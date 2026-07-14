@@ -337,24 +337,29 @@
       </a>
     </div>
 
-    <p class="section-label">🏆 績效比較</p>
+    <p class="section-label">🏆 績效比較與指標定義</p>
     <div class="cards">
       <a class="card" href="slides/comparison.html">
         <div class="card-icon">📊</div>
-        <h2>現役 10 策略績效總比較</h2>
+        <h2>現役策略績效總比較</h2>
         <p>result.db 動態產生：最佳 Sharpe／年化排行、全網格散佈、Z-Score vs DRL 疊加</p>
+      </a>
+      <a class="card" href="slides/performance_guide.html">
+        <div class="card-icon">📖</div>
+        <h2>績效指標定義與公式</h2>
+        <p>儀表板所有指標的說明、依據、公式與意涵：報酬/資本口徑、風險調整、交易統計、統計檢定</p>
       </a>
     </div>
 
-    <p class="section-label">🏆 績效摘要（2026-07-05）</p>
+    <p class="section-label">🏆 主要結論（誠實會計，扣 0.58% 往返成本）</p>
     <div class="highlights">
-      <div class="highlight-row"><span>最佳 Sharpe — SSD-DTW-PCA (Paper-Fixed)，Top3/SL0%/EZ2.5</span><span class="value">0.558</span></div>
-      <div class="highlight-row"><span>最佳年化報酬 — Agglomerative (Fundamentals-DRL-THR)，Top1/SL5%</span><span class="value">2.89%</span></div>
-      <div class="highlight-row"><span>唯一雙指標優於 SSD 基準的 ML 配對法 — Agglomerative (Fundamentals)</span><span class="value">Sharpe 0.35／年化 2.70%</span></div>
+      <div class="highlight-row"><span>最強誠實策略 — Agglomerative 基本面（yF/FMP），Top1，regime-robust、逆週期</span><span class="value">年化 ~3.3%／PF ~1.2</span></div>
+      <div class="highlight-row"><span>研究框架 #1 因子殘差化配強排序器有效；#4 MST 圖候選、#5 Beta 先驗為負面消融</span><span class="value">見比較投影片</span></div>
+      <div class="highlight-row"><span>校正 best-of-15 選擇偏誤後 Deflated Sharpe 全部 &lt; 0.95（無單一配置統計顯著為正）</span><span class="value">DSR &lt; 0.95</span></div>
     </div>
 
     <div class="strategies">
-      <h3>現役策略（strategies/config.py，13 交易 + 2 formation-only）</h3>
+      <h3>現役策略（15 交易 + 2 formation-only）</h3>
       <div class="strategy-item"><span class="dot"></span><span>#1 SSD Basic — 累積回報指數 SSD + 固定 β=1（Gatev 2006 基礎原型）</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#2 SSD Rolling — Z-Score log-price SSD + OLS β</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#3 SSD Rolling Distance — 距離基準交易（回歸 vs 距離對照）</span></div>
@@ -362,17 +367,19 @@
       <div class="strategy-item"><span class="dot"></span><span>#5 SSD-DTW-PCA Paper Fixed — SSD⊕DTW PCA 融合排序</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#6 SSD Rolling DRL THR — #2 配對 + DRL 門檻選擇式 v4</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#7 HDBSCAN Cluster PCA5 — 5 維因子載荷聚類（分組消融對照組）</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#8 HDBSCAN Cluster PCA5 Resid — 因子殘差化後聚類</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#9 HDBSCAN PCA-Loadings ResidFDR — 殘差化 + BH-FDR + 成本過濾</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#10 Agglomerative Fundamentals (yF) — 基本面快照分群</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#11 Agglomerative Fundamentals DRL THR (yF) — #10 配對 + DRL v4</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#12 Agglomerative Fundamentals (FMP) — 基本面逐點(PIT)分群</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#13 Agglomerative Fundamentals DRL THR (FMP) — #12 配對 + DRL v4</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#8 HDBSCAN Cluster PCA5 Resid — 因子殘差化後聚類（研究框架 #1）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#9 HDBSCAN PCA-Loadings ResidFDR — 殘差化 + BH-FDR + 成本過濾（#1+#2+#3）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#10 MST PartialCorr Cointegration — 偏相關網路圖候選生成（研究框架 #4）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#11 Agglomerative Fundamentals (yF) — 基本面快照分群</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#12 Agglomerative Fundamentals DRL THR (yF) — #11 配對 + DRL v4</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#13 Agglomerative Fundamentals (FMP) — 基本面逐點(PIT)分群</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#14 Agglomerative Fundamentals DRL THR (FMP) — #13 配對 + DRL v4</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#15 Agglomerative SEC-PIT Beta — SEC/FMP PIT ⊕ Beta 風險先驗（研究框架 #5）</span></div>
       <div class="strategy-item muted"><span class="dot formation-only"></span><span>DTW Paper (DTW)／(SSD-DTW-PCA) — formation-only：只產生 #4/#5 借用的配對，不參與回測</span></div>
     </div>
 
     <div class="footer">
-      LerajieAsta / pairtrade_trainingproject ・ 最後更新 2026-07-06
+      LerajieAsta / pairtrade_trainingproject ・ 最後更新 2026-07-14
     </div>
   </div>
 </body>

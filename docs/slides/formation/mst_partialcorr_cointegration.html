@@ -1080,7 +1080,6 @@ margin-right: 0; }
 <li>SSD／DTW 距離 → PCA 融合 PC1 排序，取前 <code>top_n</code></li>
 <li>交易期以 <code>ignore_ols_alpha=True</code> 於標準化空間重建 spread</li>
 </ol>
-<p>實作模組：<code>strategies/formation/MST_PartialCorr_Cointegration.py</code>（<code>partial_corr=True, graph_method=&quot;mst+knn&quot;, knn_k=5, factor_residual=True, method=&quot;ssd_dtw_pca&quot;</code>）。</p>
 </section>
 <section id="為何用偏相關圖作候選生成" class="slide level2">
 <h2>為何用「偏相關圖」作候選生成</h2>
@@ -1095,7 +1094,7 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>實測為負面結果（可寫的消融證據）</strong>：三方對照中 MST 圖候選最差（中位 Sharpe 顯著為負），且與獲利的聚類配對幾乎零重疊——顯示候選生成的關鍵<strong>不是</strong>稀疏優雅的圖拓撲，而是給強距離排序器一個「含得到真正可交易對」的豐富候選池。此結果反證「HDBSCAN 聚類的優勢是特定的、非任何候選生成器皆可」。詳見 <code>notebooks/comparison.ipynb</code> 與 <code>analysis/regime_cost_dsr_eval.py</code>。</p>
+<p><strong>實測為負面結果（可寫的消融證據）</strong>：三方對照中 MST 圖候選最差（中位 Sharpe 顯著為負），且與獲利的聚類配對幾乎零重疊——顯示候選生成的關鍵<strong>不是</strong>稀疏優雅的圖拓撲，而是給強距離排序器一個「含得到真正可交易對」的豐富候選池。此結果反證「HDBSCAN 聚類的優勢是特定的、非任何候選生成器皆可」。詳見績效比較報告與穩健性評估。</p>
 </div>
 </div>
 </div>
@@ -1148,7 +1147,7 @@ margin-right: 0; }
 <li><strong>市場因子</strong> <span class="math inline">f^{mkt}_t=\frac{1}{N}\sum_i R_{t,i}</span>，逐股對 <span class="math inline">[1,f^{mkt}]</span> OLS 取殘差 <span class="math inline">e^{(1)}</span></li>
 <li><strong>產業因子</strong>（≥3 檔的產業）：<span class="math inline">g^{s}_t=</span> 同產業市場殘差橫斷面平均，逐股再取殘差 <span class="math inline">e^{(2)}</span></li>
 </ol>
-<p>偏相關圖建於<strong>特殊性報酬</strong> <span class="math inline">e^{(2)}</span>，避免被市場 β 齊漲齊跌主導、且更耐 regime。由 <code>_utils.py</code> 的 <code>_residualize_returns()</code> 執行（<code>factor_residual=True</code>）。</p>
+<p>偏相關圖建於<strong>特殊性報酬</strong> <span class="math inline">e^{(2)}</span>，避免被市場 β 齊漲齊跌主導、且更耐 regime。由 共用的因子殘差化工具 執行（<code>factor_residual=True</code>）。</p>
 </section>
 <section id="階段-2偏相關矩陣依據ledoit-wolf-2004kenett-et-al.-2010" class="slide level2">
 <h2>階段 2：偏相關矩陣（依據：Ledoit &amp; Wolf 2004／Kenett et al. 2010）</h2>
@@ -1168,7 +1167,7 @@ margin-right: 0; }
 </section>
 <section id="階段-4逐候選邊共整合篩選依據engle-granger-1987" class="slide level2 scrollable">
 <h2>階段 4：逐候選邊共整合篩選（依據：Engle &amp; Granger 1987）</h2>
-<p>對每條候選邊 <span class="math inline">(a,b)</span>，複用 <code>_utils.py</code> 的核心 gate（與 HDBSCAN 系列一致）：</p>
+<p>對每條候選邊 <span class="math inline">(a,b)</span>，複用 共用的核心篩選 gate（與 HDBSCAN 系列一致）：</p>
 <ol type="1">
 <li>log-price 相關 <span class="math inline">\ge</span> <code>min_corr</code>（0.5）</li>
 <li>雙向 OLS + ADF，取 p 值較小方向；<span class="math inline">p\le</span> <code>adf_pvalue_threshold</code>（0.01）</li>
@@ -1185,7 +1184,7 @@ margin-right: 0; }
 <h2>階段 6：交易期參數使用</h2>
 <p><code>ignore_ols_alpha=True</code>，交易期於<strong>標準化空間</strong>重建 spread：</p>
 <p><span class="math display">P^{\prime}_{i,t}=\frac{\ln P_{i,t}-\mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},\qquad \text{Spread}_t=P^{\prime}_{A,t}-\beta\,P^{\prime}_{B,t}</span></p>
-<p>輸出 <code>Ticker_A/B, Rank, Hedge_Ratio, OLS_Alpha, Spread_Mean/Std, Log_Mean/Std_A/B</code> 供 <code>zscore_trading.py</code>（路徑 B）使用。</p>
+<p>輸出 <code>Ticker_A/B, Rank, Hedge_Ratio, OLS_Alpha, Spread_Mean/Std, Log_Mean/Std_A/B</code> 供 Z-Score 交易模組（路徑 B）使用。</p>
 </section></section>
 <section id="參數總表" class="title-slide slide level1 center">
 <h1>參數總表</h1>
