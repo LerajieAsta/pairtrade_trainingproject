@@ -13,16 +13,16 @@
 | :---: | :--- | :--- | :--- | :--- |
 | 0 | SSD Basic | `ssd_basic.py` | Z-Score | 傳統距離法基礎原型（命題1 基準） |
 | 1 | SSD Rolling | `ssd_rolling.py` | Z-Score | SSD 距離法基準（命題1 基準） |
-| 2 | SSD Rolling Distance | `ssd_rolling.py`（借用 #1） | Distance | 回歸 vs 距離交易對照（GGR 2006） |
-| 3 | DTW Paper Fixed (DTW) | 借用 DTW Paper 配對 | Z-Score（路徑 B） | DTW／共整合基準（命題1 基準） |
-| 4 | SSD-DTW-PCA Paper Fixed | 借用配對 | Z-Score（路徑 B） | 距離排序基準（命題1 基準） |
-| 5 | SSD Rolling DRL THR | 借用 #1 配對 | DRL-THR | **命題2**：DRL vs Z-Score（SSD 對照） |
-| 6 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **命題1**：機器學習分組（HDBSCAN vs GICS） |
-| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **命題1**：+因子殘差化（命題1 主力） |
-| 8 | Agglomerative Fundamentals (yF) | `agglomerative_yF.py` | Z-Score | **命題1**：ML 基本面分組（yF 快照，主力） |
-| 9 | Agglomerative Fundamentals DRL THR (yF) | 借用 #8 配對 | DRL-THR | **命題2**：DRL vs Z-Score（Agg-yF 對照） |
-| 10 | Agglomerative Fundamentals (FMP) | `agglomerative_FMP.py` | Z-Score | **命題1**：ML 基本面分組（FMP PIT，主力） |
-| 11 | Agglomerative Fundamentals DRL THR (FMP) | 借用 #10 配對 | DRL-THR | **命題2**：DRL vs Z-Score（Agg-FMP 對照） |
+| 2 | SSD (Distance) | `ssd_rolling.py`（借用 #1） | Distance | 回歸 vs 距離交易對照（GGR 2006） |
+| 3 | DTW | 借用 DTW Paper 配對 | Z-Score（路徑 B） | DTW／共整合基準（命題1 基準） |
+| 4 | SSD-DTW-PCA | 借用配對 | Z-Score（路徑 B） | 距離排序基準（命題1 基準） |
+| 5 | SSD (DRL) | 借用 #1 配對 | DRL-THR | **命題2**：DRL vs Z-Score（SSD 對照） |
+| 6 | HDBSCAN | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **命題1**：機器學習分組（HDBSCAN vs GICS） |
+| 7 | HDBSCAN (殘差) | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **命題1**：+因子殘差化（命題1 主力） |
+| 8 | Agglomerative (yF) | `agglomerative_yF.py` | Z-Score | **命題1**：ML 基本面分組（yF 快照，主力） |
+| 9 | Agglomerative (yF·DRL) | 借用 #8 配對 | DRL-THR | **命題2**：DRL vs Z-Score（Agg-yF 對照） |
+| 10 | Agglomerative (FMP) | `agglomerative_FMP.py` | Z-Score | **命題1**：ML 基本面分組（FMP PIT，主力） |
+| 11 | Agglomerative (FMP·DRL) | 借用 #10 配對 | DRL-THR | **命題2**：DRL vs Z-Score（Agg-FMP 對照） |
 | 12 | DTW Paper (DTW) | `DTW_Cointegration_Paper.py` | formation-only | 產生 #3 借用的原版配對 |
 | 13 | DTW Paper (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only | 產生 #4 借用的原版配對 |
 
@@ -48,7 +48,7 @@
 ```text
 pairtrade_trainingproject/
 ├── strategies/
-│   ├── config.py                  # 全域參數、現役策略清單（15 交易 + 2 formation-only）、敏感性 OFAT 產生器
+│   ├── config.py                  # 全域參數、現役策略清單（12 交易 + 2 formation-only）、敏感性 OFAT 產生器
 │   ├── db_utils.py                # SQLite 讀寫工具
 │   ├── portfolio_manager.py       # 組合層級資金管理
 │   ├── preprocess_equity.py       # 權益曲線前處理
@@ -66,7 +66,7 @@ pairtrade_trainingproject/
 │   └── trading/
 │       ├── zscore_trading.py          # Z-Score 狀態機（基礎類，三條 Spread 路徑；現役走路徑 B）
 │       ├── distance_trading.py        # 距離基準交易（GGR 2006，#2）
-│       └── drl_threshold_trading.py   # DRL 門檻選擇式 v4（#5、#11、#13）
+│       └── drl_threshold_trading.py   # DRL 門檻選擇模組（#5、#9、#11）
 ├── analysis/                      # 評估層（讀 result.db，不重跑）
 │   ├── regime_cost_dsr_eval.py    # 研究框架 #6：regime 分層 + break-even 成本表 + Deflated Sharpe
 │   └── sensitivity_report.py      # OFAT 參數敏感性報表
@@ -83,7 +83,7 @@ pairtrade_trainingproject/
 ├── formation_data/
 │   └── formation_pairs_sp500_Tiingo.db  # 形成期主合併資料庫（LFS；可用 run_formation.py 完整重建）
 ├── notebooks/                     # 策略筆記本（一策略一本；Quarto revealjs 投影片，見 notebooks/README.md）
-│   ├── formation/                 # 形成期策略 ×8（ssd_basic/rolling、dtw、ssd-dtw-pca、hdbscan×3、agglomerative）
+│   ├── formation/                 # 形成期策略 ×7（ssd_basic/rolling、dtw、ssd-dtw-pca、hdbscan×2、agglomerative）
 │   ├── trading/                   # 交易期策略 ×3（zscore、distance、drl_threshold）
 │   └── comparison.ipynb           # 現役策略績效總比較（讀 config + result.db 動態產生）
 ├── docs/                          # GitHub Pages：index.html 入口 + slides/（quarto render 產出投影片）

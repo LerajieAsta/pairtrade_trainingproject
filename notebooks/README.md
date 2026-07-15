@@ -7,17 +7,17 @@ notebooks/
 ├── formation/                              # 形成期策略（每形成法一本，共 7 本）
 │   ├── ssd_basic.ipynb                     # SSD Basic（基礎原型）
 │   ├── ssd_rolling.ipynb                   # SSD Rolling
-│   ├── dtw_paper_fixed.ipynb               # DTW Paper Fixed
-│   ├── ssd_dtw_pca_paper_fixed.ipynb       # SSD-DTW-PCA Paper Fixed
-│   ├── hdbscan_cluster_pca5.ipynb          # HDBSCAN Cluster PCA5（分組消融對照組）
-│   ├── hdbscan_cluster_pca5_resid.ipynb    # HDBSCAN Cluster PCA5 Resid（因子殘差化，命題1 主力）
+│   ├── dtw_paper_fixed.ipynb               # DTW
+│   ├── ssd_dtw_pca_paper_fixed.ipynb       # SSD-DTW-PCA
+│   ├── hdbscan_cluster_pca5.ipynb          # HDBSCAN（分組消融對照組）
+│   ├── hdbscan_cluster_pca5_resid.ipynb    # HDBSCAN (殘差)（因子殘差化，命題1 主力）
 │   └── agglomerative_fundamentals.ipynb    # Agglomerative Fundamentals（yF 快照 / FMP 逐點，命題1 主力）
 │
 │   （負面結果 ResidFDR / MST / SEC-PIT Beta 已封存至 archive/notebooks/negative_results/）
 ├── trading/                                # 交易期策略（每交易模組一本）
 │   ├── zscore_trading.ipynb                # Z-Score 狀態機（回歸基準）
 │   ├── distance_trading.ipynb              # 距離基準交易（GGR 2006，回歸 vs 距離對照）
-│   └── drl_threshold_trading.ipynb         # DRL 門檻選擇式 v4（DRL THR 系 4 策略）
+│   └── drl_threshold_trading.ipynb         # DRL 門檻選擇模組（DRL THR 系 3 策略）
 ├── comparison.ipynb                        # 現役策略績效總比較（讀 results/result.db）
 ├── _quarto.yml                             # revealjs 投影片設定（大字型、zoom、KaTeX）
 └── slides.scss                             # 主題（34px root、中文字型、表格縮放）

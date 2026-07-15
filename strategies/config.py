@@ -214,7 +214,7 @@ strategies_raw_all = [
         "formation_strategy_id_base": "SSD Rolling",
         "trading_module":   "strategies.trading.distance_trading",
         "sub_dir":          "SSD_Rolling_Distance",
-        "db_method":        "SSD (Rolling-Distance)",
+        "db_method":        "SSD (Distance)",
         "trade_method":     "Distance",
         "params":  {
             **base_params,
@@ -232,7 +232,7 @@ strategies_raw_all = [
         "formation_strategy_id_base": "DTW Paper (DTW)",
         "trading_module":   "strategies.trading.zscore_trading",
         "sub_dir":          "DTW_Paper_Fixed",
-        "db_method":        "DTW (Paper-Fixed)",
+        "db_method":        "DTW",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -247,7 +247,7 @@ strategies_raw_all = [
         "formation_strategy_id_base": "DTW Paper (SSD-DTW-PCA)",
         "trading_module":   "strategies.trading.zscore_trading",
         "sub_dir":          "SSD_DTW_PCA_Paper_Fixed",
-        "db_method":        "SSD-DTW-PCA (Paper-Fixed)",
+        "db_method":        "SSD-DTW-PCA",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -279,7 +279,7 @@ strategies_raw_all = [
         "formation_strategy_id_base": "SSD Rolling",
         "trading_module":   "strategies.trading.drl_threshold_trading",
         "sub_dir":          "SSD_Rolling_DRL_THR",
-        "db_method":        "SSD (Rolling-DRL-THR)",
+        "db_method":        "SSD (DRL)",
         "trade_method":     "DRL",
         "params": {
             **base_params,
@@ -295,7 +295,7 @@ strategies_raw_all = [
         "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
         "trading_module":   "strategies.trading.zscore_trading",
         "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5",
-        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-PCA5)",
+        "db_method":        "HDBSCAN",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -316,7 +316,7 @@ strategies_raw_all = [
         "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
         "trading_module":   "strategies.trading.zscore_trading",
         "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5_Resid",
-        "db_method":        "HDBSCAN (Cluster-SSD-DTW-PCA-PCA5-Resid)",
+        "db_method":        "HDBSCAN (殘差)",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -345,7 +345,7 @@ strategies_raw_all = [
         "formation_module": "strategies.formation.agglomerative_yF",
         "trading_module":   "strategies.trading.zscore_trading",
         "sub_dir":          "Agglomerative_Fundamentals_yF",
-        "db_method":        "Agglomerative (Fundamentals-yF)",
+        "db_method":        "Agglomerative (yF)",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -368,7 +368,7 @@ strategies_raw_all = [
         "formation_strategy_id_base": "Agglomerative Fundamentals (yF)",
         "trading_module":   "strategies.trading.drl_threshold_trading",
         "sub_dir":          "Agglomerative_Fundamentals_DRL_THR_yF",
-        "db_method":        "Agglomerative (Fundamentals-DRL-THR-yF)",
+        "db_method":        "Agglomerative (yF·DRL)",
         "trade_method":     "DRL",
         "params": {
             **base_params,
@@ -383,7 +383,7 @@ strategies_raw_all = [
         "formation_module": "strategies.formation.agglomerative_FMP",
         "trading_module":   "strategies.trading.zscore_trading",
         "sub_dir":          "Agglomerative_Fundamentals_FMP",
-        "db_method":        "Agglomerative (Fundamentals-FMP)",
+        "db_method":        "Agglomerative (FMP)",
         "trade_method":     "Z-Score",
         "params": {
             **base_params,
@@ -405,7 +405,7 @@ strategies_raw_all = [
         "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
         "trading_module":   "strategies.trading.drl_threshold_trading",
         "sub_dir":          "Agglomerative_Fundamentals_DRL_THR_FMP",
-        "db_method":        "Agglomerative (Fundamentals-DRL-THR-FMP)",
+        "db_method":        "Agglomerative (FMP·DRL)",
         "trade_method":     "DRL",
         "params": {
             **base_params,

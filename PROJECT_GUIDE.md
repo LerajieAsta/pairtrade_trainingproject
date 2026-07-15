@@ -139,16 +139,16 @@ STRATEGIES_SLICE="6:8" python run_trading.py   # 只跑 #6 HDBSCAN PCA5、#7 PCA
 | :---: | :--- | :--- | :--- | :--- |
 | 0 | SSD Basic | `ssd_basic.py` | `zscore_trading.py` | 最基礎原型 |
 | 1 | SSD Rolling | `ssd_rolling.py` | `zscore_trading.py` | SSD 家族基準 |
-| 2 | SSD Rolling Distance | 借用 #1 配對 | `distance_trading.py` | 回歸 vs 距離交易對照（GGR 2006） |
-| 3 | DTW Paper Fixed (DTW) | 借用 DTW Paper 配對 | `zscore_trading.py`（路徑 B） | DTW 基準 |
-| 4 | SSD-DTW-PCA Paper Fixed | 借用配對 | `zscore_trading.py`（路徑 B） | 距離排序基準 |
-| 5 | SSD Rolling DRL THR | 借用 #1 配對 | `drl_threshold_trading.py` | DRL 疊加對照組 |
-| 6 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py`（5 維） | `zscore_trading.py` | 分組消融：HDBSCAN vs GICS |
-| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid | `HDBSCAN_Cluster_SSD_DTW.py`（+殘差） | `zscore_trading.py` | **命題1** ML 分組 + 因子殘差化（命題1 主力） |
-| 8 | Agglomerative Fundamentals (yF) | `agglomerative_yF.py` | `zscore_trading.py` | **命題1** ML 基本面分組（yF 快照，主力） |
-| 9 | Agglomerative Fundamentals DRL THR (yF) | 借用 #8 配對 | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（Agg-yF） |
-| 10 | Agglomerative Fundamentals (FMP) | `agglomerative_FMP.py` | `zscore_trading.py` | **命題1** ML 基本面分組（FMP PIT，主力） |
-| 11 | Agglomerative Fundamentals DRL THR (FMP) | 借用 #10 配對 | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（Agg-FMP） |
+| 2 | SSD (Distance) | 借用 #1 配對 | `distance_trading.py` | 回歸 vs 距離交易對照（GGR 2006） |
+| 3 | DTW | 借用 DTW Paper 配對 | `zscore_trading.py`（路徑 B） | DTW 基準 |
+| 4 | SSD-DTW-PCA | 借用配對 | `zscore_trading.py`（路徑 B） | 距離排序基準 |
+| 5 | SSD (DRL) | 借用 #1 配對 | `drl_threshold_trading.py` | DRL 疊加對照組 |
+| 6 | HDBSCAN | `HDBSCAN_Cluster_SSD_DTW.py`（5 維） | `zscore_trading.py` | 分組消融：HDBSCAN vs GICS |
+| 7 | HDBSCAN (殘差) | `HDBSCAN_Cluster_SSD_DTW.py`（+殘差） | `zscore_trading.py` | **命題1** ML 分組 + 因子殘差化（命題1 主力） |
+| 8 | Agglomerative (yF) | `agglomerative_yF.py` | `zscore_trading.py` | **命題1** ML 基本面分組（yF 快照，主力） |
+| 9 | Agglomerative (yF·DRL) | 借用 #8 配對 | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（Agg-yF） |
+| 10 | Agglomerative (FMP) | `agglomerative_FMP.py` | `zscore_trading.py` | **命題1** ML 基本面分組（FMP PIT，主力） |
+| 11 | Agglomerative (FMP·DRL) | 借用 #10 配對 | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（Agg-FMP） |
 | 12/13 | DTW Paper (DTW) / (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only（跳過回測） | 產生 #3/#4 借用的原版配對 |
 
 **formation-only 條目**：DTW Paper 原版兩條目以 `formation_only: True` 旗標僅產生配對供 #3/#4
@@ -195,7 +195,7 @@ DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Loadings DRL
 | 策略 | 分組依據 | 排序邏輯 | 關鍵 Formation_Params |
 | :--- | :--- | :--- | :--- |
 | SSD Rolling (#1) | 真實 GICS 產業 | min-SSD + 三道統計過濾 | `Log_Mean/Std_A/B`, `Spread_Mean/Std` |
-| DTW Paper Fixed (#3/#4) | 真實 GICS 產業 | DTW / SSD-DTW-PCA 距離 | `OLS_Alpha`（交易端因 `ignore_ols_alpha=True` 而忽略）, `Log_Mean/Std_A/B` |
+| DTW (#3/#4) | 真實 GICS 產業 | DTW / SSD-DTW-PCA 距離 | `OLS_Alpha`（交易端因 `ignore_ols_alpha=True` 而忽略）, `Log_Mean/Std_A/B` |
 | HDBSCAN Cluster SSD-DTW-PCA (#6/#7) | HDBSCAN 聚類（報酬 PCA 因子載荷，5 維；#7 建於因子殘差） | 沿用 DTW 模組的 SSD-DTW-PCA 排序 | 同上 + `Sector_A/B`（真實 GICS 回填） |
 | Agglomerative Fundamentals (#10/#12/#14) | Agglomerative 聚類（價格 PCA⊕市值⊕PE⊕GICS；#14 再加 Beta） | 沿用 SSD Rolling 的 min-SSD 排序 | `Log_Mean/Std_A/B` + `Cluster_ID`、`MarketCap`、`TrailingPE` |
 
@@ -303,7 +303,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
    `trading_module` 及所有 params；若要借用其他策略已算好的配對，加上
    `formation_strategy_id_base` 指向該策略名稱
 5. 依序執行 `run_formation.py` → `run_trading.py`
-6. 用 `results/result.db` 的 `strategy_summaries` 與現有基準（SSD Rolling / SSD-DTW-PCA Paper Fixed）
+6. 用 `results/result.db` 的 `strategy_summaries` 與現有基準（SSD Rolling / SSD-DTW-PCA）
    做同條件對照；驗證無效則移入 `archive/config_archived_strategies.py` 並記錄診斷結論（不刪除歷史數據）
 
 ---
