@@ -1058,19 +1058,7 @@ margin-right: 0; }
 <section>
 <section id="策略概述" class="title-slide slide level1 center">
 <h1>策略概述</h1>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>提示</strong></p>
-</div>
-<div class="callout-content">
-<p>投影片操作：<strong>Alt + 點擊</strong> 可縮放任何圖片/表格；<code>O</code> 鍵總覽、<code>F</code> 全螢幕。</p>
-</div>
-</div>
-</div>
+
 </section>
 <section id="一句話說明" class="slide level2">
 <h2>一句話說明</h2>
@@ -1091,64 +1079,6 @@ margin-right: 0; }
 </ol>
 <p><strong>動作選單（9 選 1）</strong>：不交易（SKIP）＋ 8 種門檻組合＝進場門檻 <span class="math inline">\in\{1.5, 2.0, 2.5, 3.0\}</span> × 出場門檻 <span class="math inline">\in\{0.0, 0.5\}</span>。</p>
 <p>使用本引擎的策略：SSD Rolling（門檻學習版）、Agglomerative Fundamentals（門檻學習版），各自借用對應 Z-Score 策略的形成期配對。</p>
-</section>
-<section id="術語對照給非-ai-領域讀者" class="slide level2">
-<h2>術語對照（給非 AI 領域讀者）</h2>
-<p>本文件為求精確會用到少數機器學習術語，以下先以白話對照，正文出現時不再逐一解釋：</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">術語</th>
-<th style="text-align: left;">白話說明</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">神經網路 / MLP（多層感知器）</td>
-<td style="text-align: left;">一個可調參數的數學函數，輸入一組數字、輸出一組數字；透過看大量例子自動調整參數，學會「輸入→輸出」的對應關係。本文的網路：輸入 12 個特徵 → 輸出 9 個門檻的預測報酬。</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">監督式學習 / 回歸</td>
-<td style="text-align: left;">給模型一批「題目（特徵）＋標準答案（真實報酬）」，讓它學會由題目預測答案。本策略即屬此類。</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;"><span class="math inline">\arg\max</span>（取最大者）</td>
-<td style="text-align: left;">「使某個數值最大的那個選項」。例：在 9 個門檻的預測報酬中取 <span class="math inline">\arg\max</span>，就是挑預測報酬最高的門檻。</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">滾動前向（walk-forward）</td>
-<td style="text-align: left;">站在每一期的當下，只用「該時點之前就已完全結束、結果已知」的資料來訓練與決策，絕不使用之後才發生的資訊。量化金融杜絕前視偏誤的標準做法。</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">反事實（counterfactual）</td>
-<td style="text-align: left;">即使實際只執行了一個門檻，仍對「沒選的其他門檻」在同一段價格上模擬一遍、算出它們各自會有的報酬。</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">全資訊 vs 部分回饋（bandit）</td>
-<td style="text-align: left;">若每個選項的結果事後都能算出（全資訊）→ 直接看完整答案卷學習；若只能看到自己選的那個結果（部分回饋）→ 才需要試誤探索。本策略屬全資訊，故用監督學習而非強化學習的試誤機制。</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">特徵標準化 / 截尾（clip）</td>
-<td style="text-align: left;">把單位與量級各異的輸入縮放到共同尺度、並截掉極端離群值，讓每個輸入的重要性起點一致、訓練更穩定（見階段 2）。</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">epoch / batch</td>
-<td style="text-align: left;">epoch＝把訓練資料完整看過一遍；batch＝每次更新參數所抽取的一小批樣本。</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Adam / 學習率 / MSE</td>
-<td style="text-align: left;">Adam＝一種自動調整步長的參數更新法；學習率＝每步調整的幅度；MSE（均方誤差）＝「預測值與真實值差距的平方之平均」，本策略以最小化 MSE 為訓練目標。</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">ReLU</td>
-<td style="text-align: left;">一種非線性轉換：把負值歸零、正值保留，讓網路能表達較複雜的關係。</td>
-</tr>
-</tbody>
-</table>
 </section></section>
 <section>
 <section id="參考文獻與引用對應" class="title-slide slide level1 center">
@@ -1232,6 +1162,7 @@ P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
 <li><strong>截尾</strong>把罕見的極端值壓回合理範圍，避免單一離群樣本扭曲訓練。</li>
 </ul>
 <p>選 <span class="math inline">[-3, 3]</span> 是因為若特徵近似常態分布，<span class="math inline">\pm3</span> 標準差已涵蓋約 99.7% 的正常情形，超出者合理視為離群值而截平。這是機器學習標準的<strong>特徵前處理（feature scaling）</strong>，與金融上把不同指標標準化到可比較尺度的作法同理。</p>
+<p><strong>這個範圍會擷取到怎樣的值</strong>：縮放後，<span class="math inline">0</span> 附近代表「接近該配對的典型/平均狀態」，<span class="math inline">\pm1</span> 左右是輕微偏離，接近 <span class="math inline">\pm3</span> 已屬相當極端但仍完整保留其方向與大小；真正罕見的極端值（例如 Z 值瞬間衝到 <span class="math inline">\pm10</span>、半衰期估到上百天）則一律壓平到邊界 <span class="math inline">\pm3</span>——模型仍知道「這是極端情形」，但不會被單一離群值的絕對大小綁架。</p>
 </div>
 </div>
 </div>
@@ -1329,18 +1260,12 @@ P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
 </section>
 <section id="階段-3滾動前向訓練無前視保證" class="slide level2">
 <h2>階段 3：滾動前向訓練（無前視保證）</h2>
-<blockquote>
-<p><strong>滾動前向（walk-forward）的白話</strong>：想像站在每一期的當下，只能用「那個時間點之前就已經完全結束、報酬已成定局」的配對當教材，不能偷看之後才發生的事。這是量化金融杜絕前視偏誤的標準驗證方式。</p>
-</blockquote>
+<p><strong>滾動前向（walk-forward）</strong>：站在每一期的當下，只用「那個時間點之前就已經完全結束、報酬已成定局」的配對當教材，不能偷看之後才發生的事——這是量化金融杜絕前視偏誤的標準做法。</p>
 <p><strong>樣本資格</strong>：訓練資料庫（緩衝區）中每筆樣本都記錄它的交易期結束日 <span class="math inline">t_e</span>；本期（交易起始日 <span class="math inline">trade\_start_k</span>）只用「已經完結」的樣本訓練：</p>
 <p><span class="math display">\text{可用樣本} = \{(f, r, t_e) \in \text{緩衝區} : t_e &lt; trade\_start_k\}</span></p>
-<p><strong>神經網路結構與訓練</strong>（術語見開頭對照表）：</p>
-<ul>
-<li>結構：輸入 12 個特徵 → 兩層各 64 個神經元（中間接 ReLU 非線性）→ 輸出 9 個數字（對應 9 個門檻的預測報酬）；以式表示為 <span class="math inline">\text{Linear}(12 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 64) \to \text{ReLU} \to \text{Linear}(64 \to 9)</span>。</li>
-<li>訓練：用 Adam 最佳化器（自動調步長的梯度下降）、學習率 <span class="math inline">10^{-3}</span>，以均方誤差（MSE，預測報酬與實際報酬差距的平方）為目標，反覆看資料 40 遍（epoch），每遍隨機抽一批（batch，大小 <span class="math inline">\min(4096, n)</span>）更新參數。</li>
-<li>觸發條件：可用樣本數 <span class="math inline">\ge</span> 200 且較上次訓練有新樣本時，才重新訓練（否則沿用既有模型）。</li>
-</ul>
-<p><strong>數值變異性</strong>：網路權重初始化與抽批洗牌<strong>不固定隨機種子</strong>，故單次回測的數值是隨機變數；因此以<strong>多次獨立重跑</strong>評估其分布，避免以單次結果下定論。</p>
+<p><strong>決策網路（一個小型神經網路）</strong>：輸入 12 個特徵 → 兩層各 64 個神經元（中間接 ReLU，一種把負值歸零、正值保留的非線性轉換，讓網路能表達較複雜的關係）→ 輸出 9 個數字（對應 9 個門檻的預測報酬）。</p>
+<p><strong>訓練方式</strong>：以「預測報酬與實際報酬的差距平方之平均」（均方誤差）為要縮小的目標，用一種會自動調整步長的梯度下降法（Adam，學習率 <span class="math inline">10^{-3}</span>）反覆調整網路參數；每輪把資料完整看過一遍（稱為一個 epoch，共 40 輪），每次隨機抽一小批樣本更新。只有在可用樣本數 <span class="math inline">\ge 200</span>、且較上次訓練有新樣本時才重新訓練。</p>
+<p><strong>數值變異性</strong>：網路的初始參數與抽樣順序不固定隨機種子，故單次回測的數字是隨機變數；因此以多次獨立重跑評估其分布，不以單次結果下定論。</p>
 <p><strong>狀態隔離</strong>：不同參數變體（策略名稱 + Top N + 停損 + 產業上限）各自擁有獨立的網路與訓練資料庫，同一程式行程內依序執行時互不污染。</p>
 </section>
 <section id="階段-4決策挑一個門檻" class="slide level2 scrollable">
@@ -1350,7 +1275,7 @@ P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
 \arg\max_a \ \text{網路預測報酬}(f)_a &amp; \text{樣本充足且特徵可用} \\
 (2.0,\ 0.0) \ \text{（基準門檻）} &amp; \text{否則}
 \end{cases}</span></p>
-<p>其中 <span class="math inline">\arg\max</span> 即「取使預測報酬最大的那個門檻」（見開頭術語對照）。</p>
+<p>其中 <span class="math inline">\arg\max</span>（取最大者）意即「在 9 個門檻的預測報酬中，挑數值最高的那一個」。</p>
 <p>動作選單：</p>
 <p><span class="math display">\mathcal{A} = \{\text{SKIP}\} \cup \{(e, x) : e \in \{1.5, 2.0, 2.5, 3.0\},\ x \in \{0.0, 0.5\}\}, \qquad |\mathcal{A}| = 9</span></p>
 <p><strong>三個結構性保證</strong>：</p>
