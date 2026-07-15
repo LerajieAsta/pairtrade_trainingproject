@@ -330,55 +330,6 @@ strategies_raw_all = [
             "factor_residual":      True,
         },
     },
-    # 6c. HDBSCAN PCA-Loadings + 因子殘差化 + BH-FDR（研究框架 #1+#2 合併示範）
-    #     用 HDBSCAN_UMAP 的群內共整合+品質分數篩選路徑（非 SSD-DTW 排序），
-    #     故因子殘差特徵與 FDR 校正皆能直接影響最終選對 → 檢驗兩者的淨貢獻。
-    {
-        "name":             "HDBSCAN PCA-Loadings ResidFDR",
-        "formation_module": "strategies.formation.HDBSCAN_PCA_Loadings",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "HDBSCAN_PCA_Loadings_ResidFDR",
-        "db_method":        "HDBSCAN (PCA-Loadings-ResidFDR)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params, **_HDBSCAN_UMAP_COMMON, **_HDBSCAN_UMAP_FILTERS,
-            "reduce_method":     "none",
-            "pca_n_components":  5,
-            "feature_mode":      "pca_loadings",
-            "factor_residual":   True,    # #1
-            "use_fdr":           True,    # #2
-            "fdr_alpha":         0.05,
-            "use_cost_filter":   True,    # #3
-            "roundtrip_cost":    0.0058,  # 0.29%×2（Do & Faff 2012）
-            "cost_margin":       1.0,
-        },
-    },
-    # 6d. MST / 偏相關圖 候選生成器（研究框架 #4）——命題 1 的第三種候選生成方式。
-    #     同排序（SSD-DTW-PCA）、同交易端（路徑 B，ignore_ols_alpha），唯一差異 =
-    #     候選生成：偏相關網路圖（MST+kNN）取代 HDBSCAN 聚類 / GICS 產業分組。
-    #     偏相關（Ledoit-Wolf 收縮精確矩陣）在控制其餘全體後只留 A–B 直接共動，
-    #     去除市場/龍頭中介的間接相關 → 更貼近共整合的經濟來源。factor_residual=True
-    #     與勝出的 PCA5 Resid 對齊，公平比較「圖候選 vs 聚類候選」。
-    {
-        "name":             "MST PartialCorr Cointegration",
-        "formation_module": "strategies.formation.MST_PartialCorr_Cointegration",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "MST_PartialCorr_Cointegration",
-        "db_method":        "MST (PartialCorr-SSD-DTW-PCA)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "graph_method":         "mst+knn",
-            "knn_k":                5,
-            "partial_corr":         True,
-            "factor_residual":      True,   # #1：與 PCA5 Resid 對齊
-            "method":               "ssd_dtw_pca",
-            "dtw_window":           15,
-            "adf_pvalue_threshold": 0.01,
-            "umap_random_state":    42,
-            "ignore_ols_alpha":     True,   # 路徑 B：與形成期標準化空間一致
-        },
-    },
     # 7. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings
     #     ⊕ GICS one-hot ⊕ log(市值) ⊕ 盈餘殖利率(1/PE)」混合特徵空間做
     #     Agglomerative（average-linkage、依合併距離分位數校準
@@ -461,31 +412,6 @@ strategies_raw_all = [
             "drl_hidden_size": 64,
             "thr_train_epochs": 40,
             "thr_min_train_samples": 200,
-        },
-    },
-    # 11. Agglomerative SEC-PIT + Beta 風險先驗（研究框架 #5）——與 #9 FMP 版
-    #     唯一差異 = 特徵多一個「Beta（系統性風險，形成期滾動估計、全覆蓋、PIT）」
-    #     區塊。隔離「加入基本面風險先驗」對分群→配對品質的淨貢獻。市值/PE 沿用
-    #     PIT parquet（覆蓋稀疏，多數插補），Beta 才是真正有訊號的全覆蓋風險特徵。
-    {
-        "name":             "Agglomerative SEC-PIT Beta",
-        "formation_module": "strategies.formation.agglomerative_sec_pit",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "Agglomerative_SEC_PIT_Beta",
-        "db_method":        "Agglomerative (SEC-PIT-Beta)",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "pca_n_components":            5,
-            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
-            "price_feature_weight":        1.0,
-            "fundamentals_feature_weight": 1.0,
-            "sector_onehot_weight":        1.0,
-            "beta_feature_weight":         1.0,
-            "agg_linkage":                 "average",
-            "agg_threshold_percentile":    75.0,
-            "min_cluster_size":            5,
-            "adf_pvalue_threshold":        0.05,
         },
     },
     # ── DTW Paper 原版（formation-only：僅產生形成期配對供 #2/#3 借用） ──────
@@ -571,10 +497,6 @@ if _env_slice:
 SENSITIVITY_TIER1_FORMATION = {
     "adf_pvalue_threshold": [0.01, 0.05, 0.10],   # 基準 0.01(HDBSCAN)/0.05(Agg)
     "pca_n_components":     [3, 5, 10, 15],        # 基準 5
-    # beta_feature_weight（#5 Agg SEC-PIT+β 專屬）：1.0 已知有害（中位 Sharpe
-    # −0.500 vs FMP −0.227）；掃低權重驗證是否存在中性/有益區間。0.0 = β 區塊
-    # 歸零 ≈ 無 β 控制組（只剩價格 PCA+PIT 市值/PE+產業）。
-    "beta_feature_weight":  [0.0, 0.25, 0.5, 1.0],
 }
 # 論文主力策略（口試敏感性分析聚焦對象）
 SENSITIVITY_BASES = [
@@ -584,9 +506,7 @@ SENSITIVITY_BASES = [
 ]
 # 特定參數僅對特定策略有意義（beta_feature_weight 只有 SEC-PIT+β 有 β 區塊；
 # 若套到無此參數的策略，會被 run_formation 的 inspect.signature 過濾成無效重複）。
-SENSITIVITY_PARAM_BASES = {
-    "beta_feature_weight": ["Agglomerative SEC-PIT Beta"],
-}
+SENSITIVITY_PARAM_BASES = {}  # （beta_feature_weight → SEC-PIT Beta 已封存）
 _SENSITIVITY_INT_PARAMS = {"pca_n_components"}
 
 
@@ -622,7 +542,7 @@ _SENSITIVITY_TRADING_LIST = {
 }
 
 def _build_all_sensitivity():
-    """全掃：所有 formation 敏感性變體（adf×pca×beta）＋ 三主力 entry_z 交易掃描。
+    """全掃：所有 formation 敏感性變體（adf×pca）＋ 三主力 entry_z 交易掃描。
     回傳 (formation_變體清單, entry_z_基準清單)。單次 run_formation+run_trading 覆蓋 Tier-1。"""
     form_variants = []
     for _p, _vals in SENSITIVITY_TIER1_FORMATION.items():
@@ -649,7 +569,7 @@ if _sens_all:
     strategies_raw_all = strategies_raw_all + _form_variants   # 附加尾端（不動既有索引）
     strategies_raw = _form_variants + _ez_bases
     print(f"[config] 敏感性【全掃】模式：{len(_form_variants)} 個 formation 變體"
-          f"（adf×pca×beta）+ {len(_ez_bases)} 支主力 entry_z 掃描 = {len(strategies_raw)} 條。"
+          f"（adf×pca）+ {len(_ez_bases)} 支主力 entry_z 掃描 = {len(strategies_raw)} 條。"
           f"單次 run_formation + run_trading 涵蓋 Tier-1 全部。")
 elif _sens_param:
     _venv = os.environ.get("SENSITIVITY_VALUES", "").strip()

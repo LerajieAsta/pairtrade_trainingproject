@@ -4,33 +4,38 @@
 
 ---
 
-## 策略清單（`strategies_raw_all`，15 個交易策略 + 2 個 formation-only 條目，0-based 索引）
+本研究兩大命題：**命題1（形成期）** 機器學習分組能找到比傳統距離／共整合法更高品質的配對；
+**命題2（交易期）** 深度學習（DRL）能比傳統 Z-Score 有更好的交易績效。
+
+## 策略清單（`strategies_raw_all`，12 個交易策略 + 2 個 formation-only 條目，0-based 索引）
 
 | # | 策略 | 形成期模組 | 交易期 | 角色 |
 | :---: | :--- | :--- | :--- | :--- |
-| 0 | SSD Basic | `ssd_basic.py` | Z-Score | 最基礎原型 |
-| 1 | SSD Rolling | `ssd_rolling.py` | Z-Score | SSD 家族基準 |
+| 0 | SSD Basic | `ssd_basic.py` | Z-Score | 傳統距離法基礎原型（命題1 基準） |
+| 1 | SSD Rolling | `ssd_rolling.py` | Z-Score | SSD 距離法基準（命題1 基準） |
 | 2 | SSD Rolling Distance | `ssd_rolling.py`（借用 #1） | Distance | 回歸 vs 距離交易對照（GGR 2006） |
-| 3 | DTW Paper Fixed (DTW) | 借用 DTW Paper 配對 | Z-Score（路徑 B） | DTW 基準 |
-| 4 | SSD-DTW-PCA Paper Fixed | 借用配對 | Z-Score（路徑 B） | 距離排序基準 |
-| 5 | SSD Rolling DRL THR | 借用 #1 配對 | DRL-THR | DRL 疊加對照組 |
-| 6 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | 分組消融：HDBSCAN vs GICS（5 維 PCA） |
-| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **研究框架 #1**：因子殘差化（vs #6） |
-| 8 | HDBSCAN PCA-Loadings ResidFDR | `HDBSCAN_PCA_Loadings.py` | Z-Score | **研究框架 #1+#2+#3**：殘差＋BH-FDR＋成本過濾 |
-| 9 | MST PartialCorr Cointegration | `MST_PartialCorr_Cointegration.py` | Z-Score | **研究框架 #4**：偏相關圖候選生成器 |
-| 10 | Agglomerative Fundamentals (yF) | `agglomerative_yF.py` | Z-Score | 分組消融：價格 PCA ⊕ 基本面（yF 靜態快照） |
-| 11 | Agglomerative Fundamentals DRL THR (yF) | 借用 #10 配對 | DRL-THR | DRL 疊加（yF） |
-| 12 | Agglomerative Fundamentals (FMP) | `agglomerative_FMP.py` | Z-Score | 基本面 Point-in-Time（FMP parquet，無前視） |
-| 13 | Agglomerative Fundamentals DRL THR (FMP) | 借用 #12 配對 | DRL-THR | DRL 疊加（FMP） |
-| 14 | Agglomerative SEC-PIT Beta | `agglomerative_sec_pit.py` | Z-Score | **研究框架 #5**：SEC PIT ⊕ Beta 風險先驗（vs #12） |
-| 15 | DTW Paper (DTW) | `DTW_Cointegration_Paper.py` | formation-only | 產生 #3 借用的原版配對 |
-| 16 | DTW Paper (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only | 產生 #4 借用的原版配對 |
+| 3 | DTW Paper Fixed (DTW) | 借用 DTW Paper 配對 | Z-Score（路徑 B） | DTW／共整合基準（命題1 基準） |
+| 4 | SSD-DTW-PCA Paper Fixed | 借用配對 | Z-Score（路徑 B） | 距離排序基準（命題1 基準） |
+| 5 | SSD Rolling DRL THR | 借用 #1 配對 | DRL-THR | **命題2**：DRL vs Z-Score（SSD 對照） |
+| 6 | HDBSCAN Cluster SSD-DTW-PCA PCA5 | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **命題1**：機器學習分組（HDBSCAN vs GICS） |
+| 7 | HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid | `HDBSCAN_Cluster_SSD_DTW.py` | Z-Score | **命題1**：+因子殘差化（命題1 主力） |
+| 8 | Agglomerative Fundamentals (yF) | `agglomerative_yF.py` | Z-Score | **命題1**：ML 基本面分組（yF 快照，主力） |
+| 9 | Agglomerative Fundamentals DRL THR (yF) | 借用 #8 配對 | DRL-THR | **命題2**：DRL vs Z-Score（Agg-yF 對照） |
+| 10 | Agglomerative Fundamentals (FMP) | `agglomerative_FMP.py` | Z-Score | **命題1**：ML 基本面分組（FMP PIT，主力） |
+| 11 | Agglomerative Fundamentals DRL THR (FMP) | 借用 #10 配對 | DRL-THR | **命題2**：DRL vs Z-Score（Agg-FMP 對照） |
+| 12 | DTW Paper (DTW) | `DTW_Cointegration_Paper.py` | formation-only | 產生 #3 借用的原版配對 |
+| 13 | DTW Paper (SSD-DTW-PCA) | `DTW_Cointegration_Paper.py` | formation-only | 產生 #4 借用的原版配對 |
+
+> **已封存的負面結果（2026-07-15）**：研究框架消融策略 ResidFDR（#1+#2+#3）、MST 偏相關圖（#4）、
+> SEC-PIT Beta（#5）經全時段回測皆為負面／劣於骨幹，已移至 `archive/config_archived_strategies.py`
+> 與 `archive/notebooks/negative_results/`（程式碼與 result.db 歷史數據保留，可復活）。這些負面結果
+> 仍有學術價值：證明「框架的增益是特定的——好的基礎表徵已捕捉結構，激進修剪／堆疊特徵常是稀釋」。
 
 > **formation-only 條目**：`DTW Paper (DTW)` / `(SSD-DTW-PCA)` 以 `formation_only: True` 旗標僅產生配對供 #3/#4 借用，`run_trading.py` 跳過回測（原版交易端為座標 artifact，維持封存）。全部形成期配對因此可在任何機器以 `run_formation.py` 本地重算，不依賴 repo LFS。
 
 切換執行範圍：用環境變數免改檔覆寫（0-based Python 切片，支援逗號複合），如 `STRATEGIES_SLICE="6:9" python run_trading.py` 只跑 #6–#8。
 
-**研究框架 #1–#6（畢業論文次步）**：#1 因子殘差化、#2 BH-FDR 多重檢定校正、#3 成本可行性過濾（策略 #7/#8/#9/#14）＋ #6 評估層（`analysis/`：regime 分層、break-even 成本表、Deflated Sharpe）。關鍵結論見下方績效摘要與 `analysis/`。
+**研究框架 #1–#6（畢業論文次步）**：#1 因子殘差化（**有效**，保留於現役 #7 HDBSCAN Cluster Resid）；#2 BH-FDR、#3 成本過濾、#4 MST 圖候選、#5 Beta 先驗（**負面**，已封存）；#6 評估層（`analysis/`：regime 分層、break-even 成本表、Deflated Sharpe，續留現役）。關鍵結論見下方績效摘要與 `analysis/`。
 
 **參數敏感性分析（口試委員要求）**：`config.py` 內建 OFAT 變體產生器。`$env:SENSITIVITY_ALL="1"; python run_formation.py; python run_trading.py` 一次產生 Tier-1 全部變體（`adf_pvalue_threshold`、`pca_n_components`、`beta_feature_weight`、`entry_z`），再 `python -m analysis.sensitivity_report` 看敏感度曲線。
 
@@ -50,13 +55,12 @@ pairtrade_trainingproject/
 │   ├── formation/
 │   │   ├── _utils.py                  # 共用統計工具（OLS、ADF、Hurst、_residualize_returns、_bh_fdr_threshold、_cost_viable）
 │   │   ├── ssd_basic.py / ssd_rolling.py  # SSD 家族（#0/#1；ssd_rolling 亦被 #2/#5 複用）
-│   │   ├── DTW_Cointegration_Paper.py # DTW 形成期（#3/#4 借用配對；#6/#7/#9 複用排序邏輯）
-│   │   ├── HDBSCAN_PCA_Loadings.py    # 報酬 PCA 因子載荷特徵萃取（被 #6/#7/#8 複用；#8 直接使用）
-│   │   ├── HDBSCAN_Cluster_SSD_DTW.py # HDBSCAN 聚類 + SSD-DTW-PCA 排序組合（#6/#7）
-│   │   ├── MST_PartialCorr_Cointegration.py # 偏相關網路圖候選生成器 + 共整合 + SSD-DTW 排序（#9，研究框架 #4）
-│   │   ├── agglomerative_yF.py        # Agglomerative（價格 PCA ⊕ 基本面靜態快照）+ SSD 排序（#10/#11）
-│   │   ├── agglomerative_FMP.py       # 同上，改用 FMP Point-in-Time parquet（#12/#13）
-│   │   ├── agglomerative_sec_pit.py   # 子類 FMP，加 Beta 風險先驗（#14，研究框架 #5）
+│   │   ├── DTW_Cointegration_Paper.py # DTW 形成期（#3/#4 借用配對；#6/#7 複用排序邏輯）
+│   │   ├── HDBSCAN_PCA_Loadings.py    # 報酬 PCA 因子載荷特徵萃取（被 #6/#7 複用）
+│   │   ├── HDBSCAN_Cluster_SSD_DTW.py # HDBSCAN 聚類 + SSD-DTW-PCA 排序組合（#6/#7，命題1 主力）
+│   │   ├── agglomerative_yF.py        # Agglomerative（價格 PCA ⊕ 基本面靜態快照）+ SSD 排序（#8/#9）
+│   │   ├── agglomerative_FMP.py       # 同上，改用 FMP Point-in-Time parquet（#10/#11，命題1 主力）
+│   │   ├── MST_PartialCorr_Cointegration.py / agglomerative_sec_pit.py  # 已封存策略模組（負面結果，保留供復活）
 │   │   ├── ml_pair_quality.py / HDBSCAN_MultiScale.py / HDBSCAN_UMAP.py / ensemble.py  # 已封存（程式碼保留）
 │   │   └── __init__.py
 │   └── trading/

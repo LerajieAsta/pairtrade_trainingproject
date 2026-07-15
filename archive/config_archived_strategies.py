@@ -99,6 +99,26 @@
   兩批配對一起留在資料庫裡（同一期配對數超過 top_n）。此 bug 修復已保留
   在現役程式碼中，不隨本策略封存而回退。
 
+【研究框架消融 — 負面結果（2026-07-15 封存）】
+  三個「研究框架次步」策略經全時段回測皆為負面/劣於現役骨幹，退出現役清單：
+  - HDBSCAN (PCA-Loadings-ResidFDR)：研究框架 #1+#2+#3（因子殘差化＋BH-FDR＋成本
+    過濾）合併示範。中位 Sharpe −0.402（全組最差）；BH-FDR 確實把強平率由 ~58%
+    降到 39%，但存活配對仍靠弱的 PCA-Loadings 品質分數排序 → 少而不精。證明
+    「激進統計修剪救不了弱排序器」；#1 殘差化的正面效果保留在現役 #7
+    HDBSCAN Cluster PCA5 Resid（配強 SSD-DTW 排序，最佳年化 +1.24%）。
+  - MST (PartialCorr-SSD-DTW-PCA)：研究框架 #4，偏相關網路圖（Ledoit-Wolf 精確
+    矩陣）候選生成。中位 Sharpe −1.474（三方候選對照最差），且與獲利的聚類配對
+    幾乎零重疊——圖稀疏骨幹按相關強度選邊，是 tradeable 共整合的差代理。可寫的
+    反證：候選生成的關鍵是「豐富且含可交易對的候選池」，非稀疏優雅的圖拓撲。
+  - Agglomerative (SEC-PIT-Beta)：研究框架 #5，Agglomerative 加 Beta 風險先驗。
+    等權(1.0)加入 Beta 全面變差（中位 Sharpe −0.500 vs FMP −0.227）；高變異的
+    Beta 主導分群距離、稀釋既有良好表徵。敏感性掃描證實低權重(0.25)才中性偏正。
+  模組檔案保留於 strategies/formation/（HDBSCAN_PCA_Loadings.py 仍被 #6/#7 使用；
+  MST_PartialCorr_Cointegration.py、agglomerative_sec_pit.py 保留供復活）；
+  對應 notebook 移至 archive/notebooks/negative_results/。研究框架 #6 評估層
+  （analysis/regime_cost_dsr_eval.py、sensitivity_report.py）為分析工具，續留現役。
+  母題：好的基礎表徵已捕捉結構，額外堆疊特徵/激進修剪常是稀釋而非增益。
+
 復活方式：from archive.config_archived_strategies import strategies_raw_archived
           strategies_raw_all += strategies_raw_archived（或挑選單一項目加回）
 
