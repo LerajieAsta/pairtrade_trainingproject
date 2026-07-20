@@ -155,6 +155,136 @@ from strategies.config import (
 )
 
 strategies_raw_archived = [
+    # ══ 交易端微觀規則戰役（2026-07-19 封存，P1/P2/P4 全數負面/中性）═══════
+    # 背景：FMP Top1 交易解剖顯示期末強平桶（238 筆，勝率 21.4%）ΣPnL -19,530，
+    #   >63d 未收斂勝率 26-46% → 提出時間停損/提早出場/DRL 時間維度三案。
+    # P1 TS63/TS42（時間停損，zscore_trading.max_holding_days 已接線）：
+    #   全網格一致劣化（TS63 Top1 Δ年化 -0.71pp；TS42 -1.23pp）。
+    #   根因=後見之明偏誤：追蹤 174 筆 >63d 交易，第 63 天浮虧 -13,745、
+    #   期末回升至 -11,166（平均每筆 +15 回血）——63d 是損益低谷，
+    #   時間停損砍在谷底，且放棄 63-90d 桶近半數晚收斂贏家。
+    #   教訓：「最終虧損者持倉長」≠「提早出場更好」；部分均值回歸仍在回歸。
+    # P2 XZ05（exit_z 0→0.5 提早下車）：全網格 -0.14~-0.28pp。
+    #   勝率微升但單筆獲利縮水更多；省下的尾部風險 < 放棄的收斂利潤。
+    # P4 DRL-v5（動作選單加 max_hold∈{0,63}，17 動作）：
+    #   最佳年化 2.01% vs v4 2.25%——重訓噪音範圍內的中性結果；
+    #   agent 拿到反事實真值後大多學會不用時間停損，與 P1 結論互洽。
+    #   thr_menu_version=5 機制保留於 drl_threshold_trading.py 供復活。
+    # 總結論：交易端微觀規則已系統性掃過（含更早的 DynCap 配置端），
+    #   2.25-2.28% 為現有訊號組天花板；僅存實證槓桿為 regime 條件化進場
+    #   （獲利集中於橫斷面分散度 Q4：+8,674 vs Q1+Q2 -4,920）。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) TS63",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_TS63",
+        "db_method":        "Agglomerative (FMP-TS63)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05, "max_holding_days": 63},
+    },
+    {
+        "name":             "Agglomerative Fundamentals (FMP) TS42",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_TS42",
+        "db_method":        "Agglomerative (FMP-TS42)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05, "max_holding_days": 42},
+    },
+    {
+        "name":             "Agglomerative Fundamentals (FMP) XZ05",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_XZ05",
+        "db_method":        "Agglomerative (FMP-XZ05)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05, "exit_z": 0.5},
+    },
+    {
+        "name":             "Agglomerative Fundamentals DRL THR (FMP) v5",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DRL_v5",
+        "db_method":        "Agglomerative (FMP·DRL-v5)",
+        "trade_method":     "DRL",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "drl_hidden_size": 64, "thr_train_epochs": 40,
+                   "thr_min_train_samples": 200, "thr_menu_version": 5},
+    },
+    # ── FMP-Resid：Agglo-FMP × 因子殘差（2026-07-19 封存，負面結果）────────
+    # 假說：合體兩個各自驗證有效的成分——FMP PIT 基本面分群（最佳年化 2.28%）
+    #   × 因子殘差化表徵（在 HDBSCAN Cluster 管線中有效）——應能再推高配對品質。
+    # 驗證（vs Agglomerative (FMP) 基準，唯一差異 factor_residual=True）：
+    #   15 網格 0 個正 Sharpe（中位 -0.69）；最佳年化 -0.90% vs 基準 2.28%；
+    #   SL0% 各 TopN 一致劣化 ΔSharpe -0.46~-0.57（系統性失效，非參數噪音）。
+    # 根因：(1) 表徵/交易空間錯位——殘差化群集聚「特殊性共動」，但下游
+    #   ssd_rolling 的 min-SSD 排序與 spread 建構在原始標準化價格空間，
+    #   β 差異使群內 SSD 最小配對在原始空間反而不穩（HDBSCAN Cluster 版因
+    #   下游為嚴格雙向 OLS+ADF 0.01 共整合篩選而能擋掉錯配，Agglo 的
+    #   ADF 0.05+SSD 排序擋不住）；(2) 特徵自相矛盾——殘差化移除產業共動，
+    #   GICS one-hot 區塊（12 維）又把它加回，兩區塊互相抵銷。
+    # 學術價值：「成分有效 ≠ 可移植」——殘差化的有效性依賴下游排序機制相容。
+    # 復活：agglomerative_FMP.Formation(factor_residual=True) 參數保留；
+    #   result.db 保留 METHOD='Agglomerative (FMP-Resid)' 15 筆網格結果；
+    #   formation DB 保留 'Agglomerative Fundamentals (FMP) Resid_MSR0' 2767 列。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) Resid",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_Resid",
+        "db_method":        "Agglomerative (FMP-Resid)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "factor_residual":             True,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+        },
+    },
+    # ── DynCap：動態槽位資金配置（2026-07-19 封存，負面結果）──────────────
+    # 假說：靜態等權切槽（equity ÷ top_n×6）使 40%+ 資金閒置，動用資本年化
+    #   （~4.6-5.9%）被稀釋成帳面 ~2%；以歷史同時承諾數 75 百分位校準有效
+    #   槽位數應可把帳面年化推上 3%。
+    # 驗證（vs Agglomerative (yF) 靜態基準，同配對同交易端）：
+    #   最佳年化 1.80% → 1.62%（不升反降）；Top1 -0.16pp、Top3 +0.67pp、
+    #   Top10 -2.60pp（MDD -13%→-58.5%）、Top20 -2.96pp（MDD -7%→-58.3%）。
+    # 根因：幾何複利下集中配置同倍放大報酬與波動，vol drag（≈σ²/2）把
+    #   放大的算術報酬吃回並倒貼；閒置現金實為靜態等權的隱性波動控制。
+    #   排隊護欄另使 Top20 利用率 35%→28%，失分散而未得集中收益。
+    # 學術價值：實證「動用資本年化無法靠配置端集中免費兌現」。
+    # 復活：PortfolioManager(dynamic_slots=True, slot_percentile, pair_cap_frac,
+    #   slot_warmup_obs) 機制仍在 strategies/portfolio_manager.py；
+    #   result.db 保留 METHOD='Agglomerative (yF-DynCap)' 15 筆網格結果。
+    {
+        "name":             "Agglomerative Fundamentals (yF) DynCap",
+        "formation_module": "strategies.formation.agglomerative_yF",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (yF)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_yF_DynCap",
+        "db_method":        "Agglomerative (yF-DynCap)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_db_path":        "./dataset/fundamental/fundamentals_sp500.db",
+            "adf_pvalue_threshold":        0.05,
+            "dynamic_slots":               True,
+            "slot_percentile":             75.0,
+            "pair_cap_frac":               0.15,
+            "slot_warmup_obs":             8,
+        },
+    },
     # ── SSD Basic：2026-07-06 已自本清單拉回 strategies/config.py 現役
     #    （一切策略的基礎原型，Gatev 2006 累積回報指數 + 固定 β=1） ─────────
     # ── HDBSCAN Cluster 系列精簡（2026-07-06）：僅保留 PCA5 Z-Score 版於現役

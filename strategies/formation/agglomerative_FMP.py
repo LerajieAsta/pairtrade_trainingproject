@@ -132,6 +132,7 @@ class Formation:
         min_tickers_for_pairing: int = 2,
         # ── 特徵組 ──────────────────────────────────────────────
         pca_n_components: int = 5,
+        factor_residual: bool = False,   # 方案 C：價格區塊建於因子殘差（去市場+產業共動）
         fundamentals_parquet_path: str = "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
         price_feature_weight: float = 1.0,
         fundamentals_feature_weight: float = 1.0,
@@ -152,6 +153,7 @@ class Formation:
         self.top_n = top_n
         self.real_sector_mapping = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
+        self.factor_residual = factor_residual
 
         self.pca_n_components = pca_n_components
         self.fundamentals_parquet_path = fundamentals_parquet_path
@@ -187,6 +189,9 @@ class Formation:
             reduce_method="none",
             pca_n_components=self.pca_n_components,
             umap_random_state=self.umap_random_state,
+            # 方案 C：loadings 建於因子殘差化報酬（_residualize_returns 需真實 GICS 標籤）
+            factor_residual=self.factor_residual,
+            sector_mapping=self.real_sector_mapping,
         )
         price_loadings, valid_tickers = price_former._build_feature_matrix()
         if len(valid_tickers) < self.min_tickers_for_pairing:

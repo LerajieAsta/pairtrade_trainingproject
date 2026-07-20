@@ -26,7 +26,9 @@ class Trading:
                  use_dynamic_stop: bool = False, dynamic_stop_z: float = 3.0,
                  portfolio_stop_loss_pct: float = 0.10, use_vol_adjust: bool = False,
                  vol_regime_threshold: float = 0.0,
-                 hold_to_period_end: bool = False):
+                 hold_to_period_end: bool = False,
+                 max_holding_days: int = 0,
+                 entry_gate: dict = None):
         self.price_df = price_df.copy()
         # Pre-clean 50%+ daily moves once for the full matrix — avoids repeating per pair
         _pct = self.price_df.pct_change().abs()
@@ -50,6 +52,14 @@ class Trading:
         # 收斂持有模式（GGR 式）：進場後不做 Z-Score 回歸出場，持有至期末強制平倉
         # （停損機制仍然有效）。用於測試「長持收斂」相對「快進快出均值回歸」的貢獻。
         self.hold_to_period_end = hold_to_period_end
+        # 時間停損（P1，2026-07-19 接線）：持倉達 N 天仍未收斂 → 強平並凍結該
+        # 配對至期末。依據交易解剖：>63d 未收斂配對勝率 26-46%、期末強平桶
+        # ΣPnL 大幅為負——超時即視為均衡斷裂。0 = 停用（預設，維持既有行為）。
+        self.max_holding_days = int(max_holding_days or 0)
+        # P3 regime 條件化進場（2026-07-19）：entry_gate[date]=False 的日子暫停
+        # 「新開倉」（持倉與出場不受影響）。gate 由 run_trading 以 walk-forward
+        # 橫斷面分散度分位數預先計算（見 _build_dispersion_gate）。None = 停用。
+        self.entry_gate = entry_gate
 
         # 市場波動政體過濾：vol_regime_threshold > 0 時，年化波動率超過閾值期間暫停新開倉
         self.vol_regime_threshold = vol_regime_threshold
@@ -292,11 +302,13 @@ class Trading:
 
                 is_cap_stop = self.stop_loss_pct > 0 and (-current_trade_pnl / self.capital_per_pair) >= self.stop_loss_pct
                 is_z_stop = self.use_dynamic_stop and self.dynamic_stop_z > 0 and abs(z) > self.dynamic_stop_z
+                # P1 時間停損：持倉達 max_holding_days 仍未收斂 → 視為均衡斷裂
+                is_time_stop = self.max_holding_days > 0 and state.days_held >= self.max_holding_days
 
-                if is_cap_stop or is_z_stop:
+                if is_cap_stop or is_z_stop or is_time_stop:
                     self._execute_close(state, current_trade_pnl, stop_loss=True)
                     closed_trade_pnl = current_trade_pnl
-                    current_status = "STOP_LOSS_TRIGGERED"
+                    current_status = "TIME_STOP" if (is_time_stop and not (is_cap_stop or is_z_stop)) else "STOP_LOSS_TRIGGERED"
                 else:
                     if self.hold_to_period_end:
                         # 收斂持有模式：不做 Z-Score 出場，持有至期末（PERIOD_END_EXIT 結算）
@@ -318,7 +330,12 @@ class Trading:
                     self.vol_regime_threshold > 0
                     and self._mkt_vol_dict.get(date, 0.0) > self.vol_regime_threshold
                 )
-                if not in_high_vol and abs(z) > self.entry_z:
+                # P3：低分散度 regime 暫停新開倉
+                gate_blocked = (
+                    self.entry_gate is not None
+                    and not self.entry_gate.get(date, True)
+                )
+                if not in_high_vol and not gate_blocked and abs(z) > self.entry_z:
                     entered, unrealized_pnl = self._execute_entry(state, z, p_a, p_b, c_beta)
                     if entered:
                         current_status = "ENTER_SHORT_A" if state.position == -1 else "ENTER_LONG_A"
@@ -326,6 +343,8 @@ class Trading:
                         current_status = "HOLD_CASH (COOLDOWN)"
                 elif in_high_vol:
                     current_status = "HOLD_CASH (HIGH_VOL_REGIME)"
+                elif gate_blocked and abs(z) > self.entry_z:
+                    current_status = "HOLD_CASH (LOW_DISP_GATE)"
                 else:
                     current_status = "HOLD_CASH"
 
@@ -347,7 +366,7 @@ class Trading:
             out_days.append(state.days_held)
             out_delta.append(float(daily_delta))
 
-            if current_status in ["STOP_LOSS_TRIGGERED", "EXIT"]:
+            if current_status in ["STOP_LOSS_TRIGGERED", "TIME_STOP", "EXIT"]:
                 state.days_held = 0
 
             if state.is_stopped and i < len(dates_arr) - 1:

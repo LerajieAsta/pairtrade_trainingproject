@@ -54,6 +54,32 @@ from strategies.config import (
 # 斷點續傳檢查
 # ════════════════════════════════════════════════════════════════════════════
 
+_disp_gate_cache: dict = {}
+
+def _build_dispersion_gate(price_pivot, pctl: float) -> dict:
+    """
+    P3 regime 條件化進場（walk-forward，無前視）：
+      1. 每日橫斷面分散度 = 全體成分股日報酬的橫斷面標準差
+      2. disp30 = 其 30 日滾動平均（訊號平滑）
+      3. 對「昨日以前」的 disp30 做 expanding 分位排名（min 252 日暖身）
+      4. gate[date] = True 若當日 disp30 的歷史分位 >= pctl/100（允許新開倉）
+    暖身期一律允許（維持基準行為）。回傳 {Timestamp: bool}。
+    """
+    key = (id(price_pivot), float(pctl))
+    if key in _disp_gate_cache:
+        return _disp_gate_cache[key]
+    ret = price_pivot.pct_change(fill_method=None)
+    disp = ret.std(axis=1)
+    disp30 = disp.rolling(30, min_periods=10).mean().shift(1)   # 只用昨日以前資訊
+    r = disp30.expanding(min_periods=252).rank()
+    n = disp30.expanding(min_periods=252).count()
+    pct_rank = r / n
+    gate = {ts: (bool(v >= pctl / 100.0) if pd.notna(v) else True)
+            for ts, v in pct_rank.items()}
+    _disp_gate_cache[key] = gate
+    return gate
+
+
 def _build_filename(params: dict) -> str:
     top_n = params.get("top_n", 10)
     sl    = int(params.get("stop_loss_pct", 0.0) * 100)
@@ -66,6 +92,21 @@ def _build_filename(params: dict) -> str:
     suffix = ""
     if abs(ez - 2.0) > 1e-9 or dsz > 0:
         suffix = f"_EZ{int(round(ez * 10))}_DSZ{int(round(dsz * 10))}"
+    # 方案 A：動態槽位配置變體附加後綴，與靜態結果並存於 result.db
+    if params.get("dynamic_slots", False):
+        suffix += f"_DYN{int(params.get('slot_percentile', 75.0))}"
+    # P2：非預設出場門檻（exit_z != 0）
+    xz = float(params.get("exit_z", 0.0))
+    if abs(xz) > 1e-9:
+        suffix += f"_XZ{int(round(xz * 10))}"
+    # P1：時間停損（max_holding_days > 0）
+    mhd = int(params.get("max_holding_days", 0) or 0)
+    if mhd > 0:
+        suffix += f"_MHD{mhd}"
+    # P3：低分散度進場閘門
+    dg = float(params.get("disp_gate_pctl", 0.0) or 0.0)
+    if dg > 0:
+        suffix += f"_DG{int(dg)}"
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def check_trading_completed(strategy_config: dict, output_root: str, results_db_path: str = "", dataset_name: str = "") -> bool:
@@ -168,8 +209,13 @@ def worker_task(
         progress_stream.total_steps = total_periods
 
         # max_pairs = top_n × 並行期數，確保任意時點總部署 ≤ current_equity
+        # dynamic_slots（方案 A）：以歷史同時承諾數分位數校準有效槽位，提高資金利用率
         pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL,
-                              max_pairs=params.get("top_n", 10) * CONCURRENT_PERIODS)
+                              max_pairs=params.get("top_n", 10) * CONCURRENT_PERIODS,
+                              dynamic_slots=bool(params.get("dynamic_slots", False)),
+                              slot_percentile=float(params.get("slot_percentile", 75.0)),
+                              pair_cap_frac=float(params.get("pair_cap_frac", 0.15)),
+                              warmup_obs=int(params.get("slot_warmup_obs", 8)))
         all_trade_logs = []
 
         # ── 逐滾動期續傳（Z-Score 策略；DRL 因 walk-forward 訓練狀態暫不套用） ──
@@ -289,8 +335,10 @@ def worker_task(
                 pair_data = param_map[pair]
                 form_params = pair_data["Params"]
 
+                _dg = float(params.get("disp_gate_pctl", 0.0) or 0.0)
                 kwargs = {
                     "price_df": trade_prices_extended,  # 傳入延伸價格數據，修復前期 NaN 交易缺失問題
+                    "entry_gate": _build_dispersion_gate(price_pivot, _dg) if _dg > 0 else None,
                     "trade_dates": trade_dates,
                     "selected_pairs": pd.DataFrame(),
                     "capital_per_pair": capital,

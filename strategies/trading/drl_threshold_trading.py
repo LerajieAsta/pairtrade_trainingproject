@@ -35,10 +35,21 @@ from dataclasses import dataclass
 
 torch.set_num_threads(1)
 
-# 動作選單：index 0 = SKIP；1–8 = (entry_z, exit_z)
-_ACTIONS = [None] + [(ez, xz) for ez in (1.5, 2.0, 2.5, 3.0) for xz in (0.0, 0.5)]
-_BASELINE_IDX = _ACTIONS.index((2.0, 0.0))          # 靜態基準動作
-N_ACTIONS = len(_ACTIONS)
+# 動作選單（版本化）：動作統一為 (entry_z, exit_z, max_hold) 三元組；max_hold=0 表示不限。
+#   v4（預設）：SKIP + 8 組 (ez, xz)，max_hold 恆 0 —— 與歷史結果完全相容。
+#   v5（P4）：SKIP + (ez × xz × mh)，mh ∈ {0, 63} —— 時間維度入選單，agent 可對
+#       每配對自選「耐心上限」；63d 依據交易解剖（>63d 未收斂勝率 26-46%）。
+def _build_actions(menu_version: int):
+    if menu_version >= 5:
+        acts = [None] + [(ez, xz, mh)
+                         for ez in (1.5, 2.0, 2.5, 3.0)
+                         for xz in (0.0, 0.5)
+                         for mh in (0, 63)]
+    else:
+        acts = [None] + [(ez, xz, 0) for ez in (1.5, 2.0, 2.5, 3.0) for xz in (0.0, 0.5)]
+    return acts, acts.index((2.0, 0.0, 0))
+
+_ACTIONS_V4, _BASELINE_V4 = _build_actions(4)
 N_FEAT = 12
 
 
@@ -56,12 +67,12 @@ class PairState:
 
 
 class ThresholdNet(nn.Module):
-    def __init__(self, feat_dim=N_FEAT, hidden=64):
+    def __init__(self, feat_dim=N_FEAT, hidden=64, n_actions=9):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(feat_dim, hidden), nn.ReLU(),
             nn.Linear(hidden, hidden), nn.ReLU(),
-            nn.Linear(hidden, N_ACTIONS),
+            nn.Linear(hidden, n_actions),
         )
 
     def forward(self, x):
@@ -70,7 +81,7 @@ class ThresholdNet(nn.Module):
 
 def _fast_threshold_pnl(z: np.ndarray, pa: np.ndarray, pb: np.ndarray,
                         hedge_ratio: float, capital: float, friction: float,
-                        entry_z: float, exit_z: float) -> float:
+                        entry_z: float, exit_z: float, max_hold: int = 0) -> float:
     """
     以指定門檻在交易期上模擬 Z-Score 狀態機，回傳期末已實現 PnL。
     與 zscore_trading 相同語意（進場 |z|>ez、出場 z 穿越 ±exit_z、期末強平），
@@ -79,19 +90,25 @@ def _fast_threshold_pnl(z: np.ndarray, pa: np.ndarray, pb: np.ndarray,
     tw = 1.0 + abs(hedge_ratio)
     st = PairState()
     T = len(z)
+    frozen = False
     for i in range(T):
         zi, p_a, p_b = z[i], pa[i], pb[i]
         if st.position != 0:
+            st.days_held += 1
             is_exit = (st.position == -1 and zi <= exit_z) or (st.position == 1 and zi >= -exit_z)
-            if is_exit or i == T - 1:
+            is_time = max_hold > 0 and st.days_held >= max_hold
+            if is_exit or is_time or i == T - 1:
+                if is_time and not is_exit:
+                    frozen = True   # 超時=均衡斷裂：本期凍結，不再進場
                 raw = st.shares_a * (p_a - st.entry_price_a) + st.shares_b * (p_b - st.entry_price_b)
                 fee = (abs(st.shares_a) * p_a + abs(st.shares_b) * p_b) * friction
                 st.realized_pnl += raw - st.trade_entry_fee - fee
                 st.position = 0
                 st.shares_a = st.shares_b = 0.0
                 st.trade_entry_fee = 0.0
+                st.days_held = 0
                 continue
-        elif abs(zi) > entry_z and i < T - 1:
+        elif (not frozen) and abs(zi) > entry_z and i < T - 1:
             v_a = capital / tw
             v_b = capital * abs(hedge_ratio) / tw
             if zi > entry_z:
@@ -115,6 +132,7 @@ class Trading:
                  drl_lr: float = 1e-3,
                  thr_train_epochs: int = 40,       # 每期增量訓練 epoch 數
                  thr_min_train_samples: int = 200,  # 樣本不足時使用基準動作
+                 thr_menu_version: int = 4,         # P4：5 = 選單含 max_hold 時間維度
                  full_price_df: pd.DataFrame = None,
                  formation_start: str = None, formation_end: str = None,
                  variant_id: str = "default", **kwargs):
@@ -134,6 +152,9 @@ class Trading:
 
         self.formation_start = formation_start
         self.formation_end = formation_end
+        self.menu_version = int(thr_menu_version)
+        self.actions, self.baseline_idx = _build_actions(self.menu_version)
+        self.n_actions = len(self.actions)
         self.variant_id = variant_id
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -176,10 +197,10 @@ class Trading:
     def _get_shared(self):
         # 依 variant_id（含策略名稱、Top_n、停損、MSR）區分，避免同一 worker process
         # 生命週期內依序處理的不同策略變體共用同一份網路/緩衝區，互相污染訓練資料。
-        key = self.variant_id
+        key = f"{self.variant_id}|menu_v{self.menu_version}"
         sh = Trading._shared.get(key)
         if sh is None:
-            net = ThresholdNet(N_FEAT, self.hidden).to(self.device)
+            net = ThresholdNet(N_FEAT, self.hidden, self.n_actions).to(self.device)
             sh = {"net": net, "opt": optim.Adam(net.parameters(), lr=self.lr),
                   "buffer": [], "trained_n": 0}
             Trading._shared[key] = sh
@@ -257,7 +278,7 @@ class Trading:
 
         # ── 決策：訓練樣本足夠 → net argmax；否則基準動作 ────────────────
         trade_start_ts = valid_idx[0]
-        action_idx = _BASELINE_IDX
+        action_idx = self.baseline_idx
         if feats is not None:
             n_eligible = self._train_if_ready(sh, trade_start_ts)
             if n_eligible >= self.min_samples:
@@ -268,18 +289,19 @@ class Trading:
 
         # ── 反事實標籤：9 個動作在本期的實際報酬（僅供「未來」期訓練） ────
         if feats is not None:
-            rets = np.zeros(N_ACTIONS, dtype=np.float32)
-            for ai, act in enumerate(_ACTIONS):
+            rets = np.zeros(self.n_actions, dtype=np.float32)
+            for ai, act in enumerate(self.actions):
                 if act is None:
                     continue
                 rets[ai] = _fast_threshold_pnl(z_t, pa_arr, pb_arr, hedge_ratio,
                                                self.capital_per_pair, self.friction_rate,
-                                               act[0], act[1]) / self.capital_per_pair * 100.0
+                                               act[0], act[1], act[2]) / self.capital_per_pair * 100.0
             sh["buffer"].append((feats, rets, valid_idx[-1]))
 
         # ── 以選定動作執行正式模擬（完整交易紀錄） ────────────────────────
-        chosen = _ACTIONS[action_idx]
+        chosen = self.actions[action_idx]
         st = PairState()
+        pair_frozen = False
         out = {k: [] for k in ["dates", "pa", "pb", "hr", "z", "pos", "unreal", "real",
                                "cum", "status", "tpnl", "days", "delta"]}
         T = len(valid_idx)
@@ -290,25 +312,28 @@ class Trading:
             status = "HOLD_CASH (SKIP)" if chosen is None else "HOLD_CASH"
 
             if chosen is not None:
-                ez, xz = chosen
+                ez, xz, mh = chosen
                 if st.position != 0:
                     st.days_held += 1
                     raw = st.shares_a * (p_a - st.entry_price_a) + st.shares_b * (p_b - st.entry_price_b)
                     fee = (abs(st.shares_a) * p_a + abs(st.shares_b) * p_b) * self.friction_rate
                     cur_pnl = raw - st.trade_entry_fee - fee
                     is_exit = (st.position == -1 and zi <= xz) or (st.position == 1 and zi >= -xz)
-                    if is_exit and i < T - 1:
+                    is_time = mh > 0 and st.days_held >= mh
+                    if is_time and not is_exit:
+                        pair_frozen = True
+                    if (is_exit or is_time) and i < T - 1:
                         st.realized_pnl += cur_pnl
                         closed_pnl = cur_pnl
                         st.position = 0
                         st.shares_a = st.shares_b = 0.0
                         st.trade_entry_fee = 0.0
                         st.days_held = 0
-                        status = "EXIT"
+                        status = "TIME_STOP" if (is_time and not is_exit) else "EXIT"
                     else:
                         unrealized = cur_pnl
                         status = "HOLDING"
-                elif abs(zi) > ez and i < T - 1:
+                elif (not pair_frozen) and abs(zi) > ez and i < T - 1:
                     tw = 1.0 + abs(hedge_ratio)
                     v_a = self.capital_per_pair / tw
                     v_b = self.capital_per_pair * abs(hedge_ratio) / tw

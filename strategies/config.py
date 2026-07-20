@@ -111,7 +111,10 @@ base_params = {
     "min_spread_std":               1e-6,
     "min_tickers_for_pairing":      2,
     "use_vol_adjust":               use_vol_adjust,
-    "max_holding_days":             30,
+    # P1 時間停損：2026-07-19 起 zscore_trading 已實際接線此參數（TIME_STOP）。
+    # 預設 0 = 停用，維持全部既有策略行為不變；啟用見 FMP TS 系列 A/B 條目。
+    # （舊值 30 從未被引擎使用，改為 0 以免接線後意外改變所有策略。）
+    "max_holding_days":             0,
     "top_n_list":                   [1, 3, 5, 10, 20],
     "stop_loss_list":               [0.0, 0.05, 0.15],
     "max_sector_ratio_list":        [0.0],
@@ -360,6 +363,11 @@ strategies_raw_all = [
             "adf_pvalue_threshold":        0.05,
         },
     },
+    # （DynCap 動態槽位配置：2026-07-19 驗證為負面結果——集中配置放大波動拖累，
+    #   最佳年化 1.80%→1.62%、Top10/20 MDD 惡化至 -58%。已封存至
+    #   archive/config_archived_strategies.py「DynCap」節；PortfolioManager 的
+    #   dynamic_slots 機制保留供復活。結論：閒置現金是低波動的代價，
+    #   配置端集中無法免費兌現「動用資本年化」。）
     # 8. Agglomerative Fundamentals DRL THR —— DRL-THR 疊加在 Agglomerative
     #    Fundamentals 配對底上（借用 #7 的形成期配對，不需重跑形成期）。
     {
@@ -397,6 +405,45 @@ strategies_raw_all = [
             "min_cluster_size":            5,
             "adf_pvalue_threshold":        0.05,
         },
+    },
+    # （方案 C「Agglo-FMP × 因子殘差」：2026-07-19 驗證為負面結果——15 網格
+    #   0 個正 Sharpe（中位 -0.69），最佳年化 -0.90% vs 基準 2.28%。根因：殘差化
+    #   表徵與下游原始價格空間 SSD 排序錯位，且與 GICS one-hot 特徵互相抵銷。
+    #   已封存至 archive/config_archived_strategies.py「FMP-Resid」節；
+    #   agglomerative_FMP.factor_residual 參數保留供復活。）
+    # （P1/P2/P4 交易端優化戰役：2026-07-19 全數封存為負面/中性結果——
+    #   TS63/TS42 時間停損（後見之明偏誤：63d 為損益低谷，砍在谷底）、
+    #   XZ05 提早出場（省的風險 < 放棄的收斂利潤）、DRL 選單 v5 時間維度
+    #   （重訓噪音範圍內，agent 學會不用它）。完整診斷與數據見
+    #   archive/config_archived_strategies.py「交易端微觀規則戰役」節。
+    #   結論：交易端微觀規則已系統性掃過，2.25-2.28% 為現有訊號組天花板；
+    #   僅存的實證槓桿為 regime 條件化進場（見下方 DG 系列 A/B）。）
+    # ── P3 A/B：regime 條件化進場（低分散度閘門，2026-07-19）───────────────
+    # 依據：FMP Top1 日損益依橫斷面分散度四分位分層——Q4 貢獻 +8,674、
+    # Q1+Q2 合計 -4,920（全部淨利來自分散度最高的 25% 交易日）。
+    # 機制：walk-forward 30 日分散度的歷史分位 < pctl 時暫停「新開倉」
+    # （持倉/出場不受影響；expanding 分位 min 252 日暖身，無前視）。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DG50",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DG50",
+        "db_method":        "Agglomerative (FMP-DG50)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "disp_gate_pctl": 50.0},
+    },
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DG25",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DG25",
+        "db_method":        "Agglomerative (FMP-DG25)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "disp_gate_pctl": 25.0},
     },
     # 10. Agglomerative Fundamentals DRL THR FMP —— DRL-THR 疊加在 FMP 版本上
     {
