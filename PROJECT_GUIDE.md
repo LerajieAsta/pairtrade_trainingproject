@@ -65,10 +65,15 @@ pairtrade_trainingproject/
 │   ├── scripts/                   # 一次性工具腳本
 │   ├── docs/                      # 歷次學術 HTML 簡報（含舊版 formation/trading.html）
 │   └── h200/                      # H200 GPU 伺服器相關（2026-07-06 起不再使用）
+├── tools/                         # 輔助工具（皆從專案根執行）
+│   ├── status.py                  #   pt status：資料/形成期/交易期/投影片 狀態總覽 + 建議動作
+│   ├── snapshot_run.py            #   全量重跑前歸檔 result.db（原根目錄，2026-07 移入）
+│   └── run_drl_variance.py        #   DRL 訓練變異數多輪評估（原根目錄，2026-07 移入）
 ├── dashboard.py                   # Streamlit 績效比對儀表板
 ├── run_formation.py               # 形成期主程式
 ├── run_trading.py                 # 交易期主程式
-├── run.bat                        # 一鍵啟動 Dashboard
+├── pt.bat                         # 統一指令入口：pt status/formation/trading/all/dashboard/slides/variance/snapshot/fetch-*
+├── run.bat                        # 一鍵啟動 Dashboard（= pt dashboard，保留相容）
 ├── setup.bat                      # 環境初始化腳本（Windows；setup.sh 已封存至 archive/h200/）
 ├── requirements.txt               # Python 套件清單
 └── pyproject.toml                 # 套件配置（Editable Install）
@@ -120,8 +125,8 @@ results/
 
 重跑三種模式：
 1. **選擇性重跑**（改一個策略）：`STRATEGIES_SLICE="i:j" python run_trading.py` —— result.db 逐 config 覆寫，其餘不動。
-2. **全量重跑前先歸檔舊版**：`python snapshot_run.py <tag>` 把 result.db 搬到 `archive/` 並匯出 summary CSV，再 `FORCE_RERUN=True` 重建。可新舊並存比較、回滾。
-3. **輕量對照**：`python snapshot_run.py <tag> --summary-only` 只匯出 summary CSV 不動 DB。
+2. **全量重跑前先歸檔舊版**：`python tools/snapshot_run.py <tag>`（或 `pt snapshot <tag>`）把 result.db 搬到 `archive/` 並匯出 summary CSV，再 `FORCE_RERUN=True` 重建。可新舊並存比較、回滾。
+3. **輕量對照**：`python tools/snapshot_run.py <tag> --summary-only` 只匯出 summary CSV 不動 DB。
 
 ---
 

@@ -90,11 +90,16 @@ pairtrade_trainingproject/
 ├── archive/                       # 歷史存檔（分類索引見 archive/README.md）
 │   ├── notebooks/ formation/ trading/ scripts/ docs/ h200/
 │   └── config_archived_strategies.py  # 已封存策略 config 與完整診斷
+├── tools/                         # 輔助工具（從專案根執行）
+│   ├── status.py                  #   pt status：資料/形成期/交易期/投影片 狀態總覽 + 建議動作
+│   ├── snapshot_run.py            #   全量重跑前歸檔 result.db
+│   └── run_drl_variance.py        #   DRL 訓練變異數多輪評估
+├── analysis/                      # 評估層（regime 分層、break-even 成本、Deflated Sharpe、敏感度）
 ├── dashboard.py                   # Streamlit 績效比對儀表板
-├── snapshot_run.py                # 全量重跑前歸檔 result.db 工具
 ├── run_formation.py               # 形成期主程式（多行程平行）
 ├── run_trading.py                 # 交易期主程式（多行程平行）
-├── run.bat / setup.bat            # 一鍵啟動 Dashboard／環境初始化（Windows）
+├── pt.bat                         # ★ 統一指令入口（pt status / formation / trading / dashboard / slides…）
+├── run.bat / setup.bat            # 一鍵啟動 Dashboard／環境初始化（保留相容）
 └── requirements.txt               # Python 套件清單
 ```
 
@@ -102,22 +107,24 @@ pairtrade_trainingproject/
 
 ## 快速啟動
 
-### 1. 環境初始化
+所有日常操作都走統一入口 `pt.bat`（不帶參數顯示完整指令表）：
 
 ```bat
-setup.bat
+pt setup        # 1. 環境初始化（建立 Project/ 虛擬環境 + 安裝套件）
+pt status       # 2. 專案狀態總覽——哪些策略缺形成期/交易期數據、附建議動作
+pt all          # 3. 形成期 + 交易期一鍵連跑（或分開 pt formation / pt trading）
+pt dashboard    # 4. Streamlit 績效儀表板
+pt slides       # 5. 渲染全部 Quarto 投影片 → docs/slides/
 ```
 
-自動建立 `Project/` 虛擬環境並安裝 `requirements.txt` 所有套件。
+其他：`pt variance N`（DRL 變異數 N 輪）、`pt snapshot tag`（重跑前歸檔 result.db）、
+`pt fetch-price / fetch-fund / fetch-fmp`（資料下載）。
 
-### 2. 執行回測
+### 傳統呼叫方式（保留相容）
 
 ```bash
-# 步驟一：形成期（篩選配對，寫入 formation_data/）
-python run_formation.py
-
-# 步驟二：交易期（逐日模擬，輸出 results/ 與 dataset/audit_report.csv）
-python run_trading.py
+python run_formation.py    # 形成期：篩選配對 → formation_data/
+python run_trading.py      # 交易期：逐日模擬 → results/result.db
 ```
 
 兩個主程式均支援：
