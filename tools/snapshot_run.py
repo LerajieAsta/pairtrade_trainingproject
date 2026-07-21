@@ -26,6 +26,14 @@
 import os
 import sys
 import shutil
+
+# 路徑 shim：本工具位於 tools/，將專案根加入 sys.path 並切換 CWD（相對路徑以根為準）
+from pathlib import Path as _Path
+_ROOT = _Path(__file__).resolve().parent.parent
+import os as _os, sys as _sys
+_os.chdir(_ROOT)
+if str(_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_ROOT))
 import sqlite3
 from datetime import datetime
 

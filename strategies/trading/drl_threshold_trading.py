@@ -81,7 +81,8 @@ class ThresholdNet(nn.Module):
 
 def _fast_threshold_pnl(z: np.ndarray, pa: np.ndarray, pb: np.ndarray,
                         hedge_ratio: float, capital: float, friction: float,
-                        entry_z: float, exit_z: float, max_hold: int = 0) -> float:
+                        entry_z: float, exit_z: float, max_hold: int = 0,
+                        allow: np.ndarray = None) -> float:
     """
     以指定門檻在交易期上模擬 Z-Score 狀態機，回傳期末已實現 PnL。
     與 zscore_trading 相同語意（進場 |z|>ez、出場 z 穿越 ±exit_z、期末強平），
@@ -108,7 +109,7 @@ def _fast_threshold_pnl(z: np.ndarray, pa: np.ndarray, pb: np.ndarray,
                 st.trade_entry_fee = 0.0
                 st.days_held = 0
                 continue
-        elif (not frozen) and abs(zi) > entry_z and i < T - 1:
+        elif (not frozen) and (allow is None or allow[i]) and abs(zi) > entry_z and i < T - 1:
             v_a = capital / tw
             v_b = capital * abs(hedge_ratio) / tw
             if zi > entry_z:
@@ -133,6 +134,7 @@ class Trading:
                  thr_train_epochs: int = 40,       # 每期增量訓練 epoch 數
                  thr_min_train_samples: int = 200,  # 樣本不足時使用基準動作
                  thr_menu_version: int = 4,         # P4：5 = 選單含 max_hold 時間維度
+                 entry_gate: dict = None,           # P3：低分散度閘門（date->bool，False 暫停新開倉）
                  full_price_df: pd.DataFrame = None,
                  formation_start: str = None, formation_end: str = None,
                  variant_id: str = "default", **kwargs):
@@ -156,6 +158,7 @@ class Trading:
         self.actions, self.baseline_idx = _build_actions(self.menu_version)
         self.n_actions = len(self.actions)
         self.variant_id = variant_id
+        self.entry_gate = entry_gate
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ── 形成期特徵（12 維，標準化 ~[-3,3]） ──────────────────────────────
@@ -262,6 +265,13 @@ class Trading:
         z_t = z_of(pa_t, pb_t)
         pa_arr, pb_arr = pa_t.values.astype(float), pb_t.values.astype(float)
 
+        # P3 閘門遮罩（None = 全允許）；反事實標籤與正式模擬共用，
+        # 確保訓練標籤 = 閘門下可實現的報酬
+        if self.entry_gate is not None:
+            gate_arr = np.array([self.entry_gate.get(ts, True) for ts in valid_idx], dtype=bool)
+        else:
+            gate_arr = None
+
         # 形成期特徵
         feats = None
         try:
@@ -295,7 +305,8 @@ class Trading:
                     continue
                 rets[ai] = _fast_threshold_pnl(z_t, pa_arr, pb_arr, hedge_ratio,
                                                self.capital_per_pair, self.friction_rate,
-                                               act[0], act[1], act[2]) / self.capital_per_pair * 100.0
+                                               act[0], act[1], act[2],
+                                               allow=gate_arr) / self.capital_per_pair * 100.0
             sh["buffer"].append((feats, rets, valid_idx[-1]))
 
         # ── 以選定動作執行正式模擬（完整交易紀錄） ────────────────────────
@@ -333,7 +344,7 @@ class Trading:
                     else:
                         unrealized = cur_pnl
                         status = "HOLDING"
-                elif (not pair_frozen) and abs(zi) > ez and i < T - 1:
+                elif (not pair_frozen) and (gate_arr is None or gate_arr[i]) and abs(zi) > ez and i < T - 1:
                     tw = 1.0 + abs(hedge_ratio)
                     v_a = self.capital_per_pair / tw
                     v_b = self.capital_per_pair * abs(hedge_ratio) / tw

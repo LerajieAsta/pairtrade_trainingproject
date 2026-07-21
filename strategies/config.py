@@ -445,6 +445,36 @@ strategies_raw_all = [
         "params": {**base_params, "adf_pvalue_threshold": 0.05,
                    "disp_gate_pctl": 25.0},
     },
+    # P3 組合格：DG25 × 高進場門檻（兩個獨立正效應疊加，朝 3% 目標）
+    # 基準 EZ 掃描最佳：EZ3.0 Top1 SL0 = 2.28%、EZ2.5 = 2.10%；DG25 全格 +0.2~0.5pp
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DG25 EZ",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DG25_EZ",
+        "db_method":        "Agglomerative (FMP-DG25-EZ)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "disp_gate_pctl": 25.0,
+                   "stop_loss_list": [0.0],
+                   "entry_z_list":   [2.5, 3.0]},
+    },
+    # P3 組合格：DG25 × DRL 疊加（閘門同時作用於反事實標籤與正式模擬，
+    # 訓練標籤 = 閘門下可實現的報酬，無標籤/執行不一致）
+    {
+        "name":             "Agglomerative Fundamentals DRL THR (FMP) DG25",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DRL_DG25",
+        "db_method":        "Agglomerative (FMP·DRL-DG25)",
+        "trade_method":     "DRL",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "drl_hidden_size": 64, "thr_train_epochs": 40,
+                   "thr_min_train_samples": 200,
+                   "disp_gate_pctl": 25.0},
+    },
     # 10. Agglomerative Fundamentals DRL THR FMP —— DRL-THR 疊加在 FMP 版本上
     {
         "name":             "Agglomerative Fundamentals DRL THR (FMP)",
