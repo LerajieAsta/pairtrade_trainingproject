@@ -43,8 +43,8 @@ import pandas as pd
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
 
-from strategies.formation.HDBSCAN_PCA_Loadings import Formation as _PriceFeatureFormation
-from strategies.formation.ssd_rolling import Formation as _SSDFormation
+from strategies.formation._features import build_return_pca_loadings
+from strategies.formation._ranking import rank_within_groups
 
 # ── GICS 產業別名正規化（跨資料源標籤不一致問題） ─────────────────────────
 _SECTOR_CANONICAL_MAP = {
@@ -187,16 +187,14 @@ class Formation:
         return rec.get(field) if rec else None
 
     def _build_feature_matrix(self) -> tuple[np.ndarray, list[str]]:
-        price_former = _PriceFeatureFormation(
+        # 價格行為特徵取自中性共用層（不再借用 HDBSCAN 模組的內部方法）
+        price_loadings, valid_tickers = build_return_pca_loadings(
             price_df=self.price_df,
-            form_start=self.form_start,
-            form_end=self.form_end,
-            top_n=self.top_n,
-            reduce_method="none",
             pca_n_components=self.pca_n_components,
-            umap_random_state=self.umap_random_state,
+            factor_residual=getattr(self, "factor_residual", False),
+            sector_mapping=self.real_sector_mapping,
+            random_state=self.umap_random_state,
         )
-        price_loadings, valid_tickers = price_former._build_feature_matrix()
         if len(valid_tickers) < self.min_tickers_for_pairing:
             return np.empty((0, 0)), []
 
@@ -243,20 +241,11 @@ class Formation:
         return X, valid_tickers
 
     def _cluster(self, X: np.ndarray) -> np.ndarray:
-        n = X.shape[0]
-        if n < 2:
-            return np.zeros(n, dtype=int)
-
-        probe = AgglomerativeClustering(n_clusters=1, linkage=self.agg_linkage, compute_distances=True).fit(X)
-        distances = probe.distances_
-        threshold = float(np.percentile(distances, self.agg_threshold_percentile)) if len(distances) > 0 else 0.0
-        if threshold <= 0.0:
-            threshold = float(np.max(distances)) if len(distances) > 0 else 1e-6
-            if threshold <= 0.0:
-                threshold = 1e-6
-
-        final = AgglomerativeClustering(n_clusters=None, distance_threshold=threshold, linkage=self.agg_linkage).fit(X)
-        return final.labels_
+        # 分群邏輯已抽至中性共用層 strategies.formation._clustering。
+        from strategies.formation._clustering import cluster_agglomerative
+        return cluster_agglomerative(
+            X, linkage=self.agg_linkage,
+            threshold_percentile=self.agg_threshold_percentile)
 
     def run(self) -> pd.DataFrame:
         X, valid_tickers = self._build_feature_matrix()
@@ -280,17 +269,17 @@ class Formation:
             f"過小群併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）"
         )
 
-        ssd_form = _SSDFormation(
+        selected = rank_within_groups(
+            method=getattr(self, "ranking_backend", "ssd"),
             price_df=self.price_df[valid_tickers],
             form_start=self.form_start,
             form_end=self.form_end,
+            group_map=cluster_map,
             top_n=self.top_n,
-            sector_mapping=cluster_map,
             min_tickers_for_pairing=self.min_tickers_for_pairing,
             adf_pvalue_threshold=self.adf_pvalue_threshold,
             trading_window=self.trading_window,
         )
-        selected = ssd_form.run()
         if selected.empty:
             self.selected_pairs = selected
             return selected

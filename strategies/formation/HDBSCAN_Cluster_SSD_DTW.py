@@ -23,8 +23,9 @@ HDBSCAN Cluster + SSD-DTW-PCA 分組消融實驗模組
 
 import pandas as pd
 
-from strategies.formation.HDBSCAN_PCA_Loadings import Formation as _ClusterFormation
-from strategies.formation.DTW_Cointegration_Paper import Formation as _DTWFormation
+from strategies.formation._features import build_return_pca_loadings
+from strategies.formation._clustering import cluster_hdbscan
+from strategies.formation._ranking import rank_within_groups
 
 
 class Formation:
@@ -65,21 +66,13 @@ class Formation:
         self.real_sector_mapping     = sector_mapping or {}
         self.min_tickers_for_pairing = min_tickers_for_pairing
 
-        # 聚類器：只用它的特徵萃取 + HDBSCAN，不用它的配對篩選
-        self._cluster = _ClusterFormation(
-            price_df   = price_df,
-            form_start = form_start,
-            form_end   = form_end,
-            top_n      = top_n,
-            reduce_method            = "none",
-            pca_n_components         = pca_n_components,
-            hdbscan_min_cluster_size = hdbscan_min_cluster_size,
-            hdbscan_min_samples      = hdbscan_min_samples,
-            hdbscan_metric           = hdbscan_metric,
-            umap_random_state        = umap_random_state,
-            sector_mapping           = sector_mapping,   # 因子殘差化需產業標籤
-            factor_residual          = factor_residual,
-        )
+        # 特徵萃取 + 分群參數（經中性共用層 _features / _clustering 組裝）
+        self.pca_n_components         = pca_n_components
+        self.factor_residual          = factor_residual
+        self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
+        self.hdbscan_min_samples      = hdbscan_min_samples
+        self.hdbscan_metric           = hdbscan_metric
+        self.umap_random_state        = umap_random_state
 
         self.method               = method
         self.adf_pvalue_threshold = adf_pvalue_threshold
@@ -90,13 +83,24 @@ class Formation:
         self.selected_pairs:  pd.DataFrame = pd.DataFrame()
 
     def run(self) -> pd.DataFrame:
-        # 1. HDBSCAN 聚類（報酬 PCA 因子載荷空間）
-        X, valid_tickers = self._cluster._build_feature_matrix()
+        # 1. 報酬 PCA 因子載荷特徵 + HDBSCAN 聚類（皆經中性共用層）
+        X, valid_tickers = build_return_pca_loadings(
+            price_df=self.price_df,
+            pca_n_components=self.pca_n_components,
+            factor_residual=self.factor_residual,
+            sector_mapping=self.real_sector_mapping,
+            random_state=self.umap_random_state,
+        )
         if len(valid_tickers) < self.min_tickers_for_pairing:
             self.selected_pairs = pd.DataFrame()
             return self.selected_pairs
 
-        labels = self._cluster._hdbscan_cluster(X)
+        labels = cluster_hdbscan(
+            X,
+            min_cluster_size=self.hdbscan_min_cluster_size,
+            min_samples=self.hdbscan_min_samples,
+            metric=self.hdbscan_metric,
+        )
         self.cluster_labels_ = {t: int(l) for t, l in zip(valid_tickers, labels)}
 
         # 2. 聚類標籤 → 分組 map（噪音 = "Unknown"，DTW 流程自動跳過）
@@ -108,20 +112,19 @@ class Formation:
         n_noise    = int((labels == -1).sum())
         print(f"  [Formation] HDBSCAN 分組：{n_clusters} 群 | 噪音 {n_noise}/{len(valid_tickers)} 檔（排除）")
 
-        # 3. 沿用 DTW Paper 流程：群內共整合篩選 + SSD/DTW 距離 + PCA 融合排序
-        dtw_form = _DTWFormation(
+        # 3. 群內共整合篩選 + SSD/DTW 距離 + PCA 融合排序（經中性排序層）
+        selected = rank_within_groups(
+            method                  = self.method,
             price_df                = self.price_df[valid_tickers],
             form_start              = self.form_start,
             form_end                = self.form_end,
+            group_map               = cluster_map,
             top_n                   = self.top_n,
-            sector_mapping          = cluster_map,
             min_tickers_for_pairing = self.min_tickers_for_pairing,
             dtw_window              = self.dtw_window,
-            method                  = self.method,
             adf_pvalue_threshold    = self.adf_pvalue_threshold,
             trading_window          = self.trading_window,
         )
-        selected = dtw_form.run()
         if selected.empty:
             self.selected_pairs = selected
             return selected

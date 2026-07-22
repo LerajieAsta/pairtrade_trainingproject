@@ -409,37 +409,14 @@ class Formation:
         return self._umap_reduce(X)
 
     def _hdbscan_cluster(self, X: np.ndarray) -> np.ndarray:
-        min_cs   = self.hdbscan_min_cluster_size
-        min_samp = self.hdbscan_min_samples
-
-        while min_cs >= 2:
-            cs   = min(min_cs, max(2, X.shape[0] // 5))
-            samp = max(1, min(min_samp, cs - 1))
-
-            if HDBSCAN_LIB == "hdbscan":
-                clf = hdbscan.HDBSCAN(
-                    min_cluster_size = cs,
-                    min_samples      = samp,
-                    metric           = self.hdbscan_metric,
-                    core_dist_n_jobs = -1,
-                )
-            else:
-                clf = sklearn_HDBSCAN(
-                    min_cluster_size = cs,
-                    min_samples      = samp,
-                    metric           = self.hdbscan_metric,
-                    n_jobs           = -1,
-                )
-
-            labels = clf.fit_predict(X)
-            if len(set(labels) - {-1}) >= 1:
-                return labels
-
-            min_cs   //= 2
-            min_samp   = max(1, min_samp // 2)
-
-        print("  [Formation] HDBSCAN 未找到任何群落。")
-        return np.full(X.shape[0], -1)
+        # 分群邏輯已抽至中性共用層 strategies.formation._clustering，供任何策略共用。
+        from strategies.formation._clustering import cluster_hdbscan
+        return cluster_hdbscan(
+            X,
+            min_cluster_size=self.hdbscan_min_cluster_size,
+            min_samples=self.hdbscan_min_samples,
+            metric=self.hdbscan_metric,
+        )
 
     def _cointegration_within_clusters(
         self,

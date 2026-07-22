@@ -1,4 +1,11 @@
 """
+TODO（中性層，2026-07 重構）：本封存策略仍以舊方式 import HDBSCAN_PCA_Loadings
+的內部方法取特徵。復活時應改用中性共用層：
+  strategies.formation._features.build_return_pca_loadings
+  strategies.formation._clustering.cluster_agglomerative
+  strategies.formation._ranking.rank_within_groups
+（現役 agglomerative_yF/FMP 已完成此遷移，見 tools/formation_regression.py 等價測試。）
+
 Agglomerative + SEC PIT 基本面 ⊕ Beta 風險先驗 形成期模組（研究框架次步 #5）
 ======================================================================
 

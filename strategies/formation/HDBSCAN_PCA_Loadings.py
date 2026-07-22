@@ -48,61 +48,16 @@ class Formation(_UMAPFormation):
     """
 
     def _build_feature_matrix(self) -> tuple[np.ndarray, list[str]]:
-        log_prices = np.log(self.price_df)
-        tickers    = log_prices.columns.tolist()
-
-        # 與父類一致的有效性檢查（run_formation 已 dropna，此處為防禦性過濾）
-        valid_tickers = []
-        cols = []
-        for ticker in tickers:
-            series = log_prices[ticker].values
-            if len(series) < 30 or not np.all(np.isfinite(series)):
-                continue
-            valid_tickers.append(ticker)
-            cols.append(series)
-
-        if len(valid_tickers) < 2:
-            return np.empty((0, 0)), []
-
-        # 日報酬矩陣 (T-1 × N)，逐股標準化 → PCA 等同於對相關矩陣做特徵分解
-        R  = np.diff(np.column_stack(cols), axis=0)
-
-        # 研究框架 #1：分群前先移除市場（+產業）因子，讓 PCA 建在特殊性報酬上
-        # （避免被市場 β 齊漲齊跌主導、且更耐 regime）。
-        if getattr(self, "factor_residual", False):
-            from strategies.formation._utils import _residualize_returns
-            sec = [self.sector_mapping.get(t.upper(), self.sector_mapping.get(t, "Unknown"))
-                   for t in valid_tickers]
-            R = _residualize_returns(R, sector_labels=sec)
-            print("  [Formation] 因子殘差化：已移除市場+產業共動（分群建於特殊性報酬）")
-
-        mu = R.mean(axis=0)
-        sd = R.std(axis=0, ddof=1)
-        sd[sd < 1e-12] = 1e-12
-        Rs = (R - mu) / sd
-        Rs = np.nan_to_num(Rs, nan=0.0, posinf=0.0, neginf=0.0)   # 防退化欄位造成 SVD 不收斂
-
-        n_factors = max(1, min(self.pca_n_components, Rs.shape[0] - 1, Rs.shape[1] - 1))
-        pca = PCA(n_components=n_factors, random_state=self.umap_random_state)
-        try:
-            pca.fit(Rs)
-        except np.linalg.LinAlgError:
-            # 殘差化可能使部分欄位共線 → 預設 gesdd SVD 不收斂；
-            # 加微擾動破除退化 + 改用 randomized solver（對退化矩陣幾乎不會不收斂）。
-            rng = np.random.default_rng(self.umap_random_state)
-            pca = PCA(n_components=n_factors, svd_solver="randomized",
-                      random_state=self.umap_random_state)
-            pca.fit(Rs + rng.normal(0.0, 1e-6, Rs.shape))
-
-        # loadings (N × k)：每檔股票在各風險因子上的暴露，
-        # 以 sqrt(特徵值) 加權使歐氏距離反映因子重要性
-        loadings = pca.components_.T * np.sqrt(pca.explained_variance_)
-
-        print(
-            f"  [Formation] PCA loadings：{len(valid_tickers)} 檔 × {n_factors} 因子 | "
-            f"累計解釋變異 {pca.explained_variance_ratio_.sum():.1%}"
+        # 特徵萃取邏輯已抽至中性共用層 strategies.formation._features
+        # （報酬 PCA 因子載荷 + 因子殘差化），供任何分群策略共用。
+        from strategies.formation._features import build_return_pca_loadings
+        return build_return_pca_loadings(
+            price_df         = self.price_df,
+            pca_n_components  = self.pca_n_components,
+            factor_residual   = getattr(self, "factor_residual", False),
+            sector_mapping    = self.sector_mapping,
+            random_state      = self.umap_random_state,
         )
-        return loadings, valid_tickers
 
     def _umap_reduce(self, X: np.ndarray) -> np.ndarray:
         # 額外支援 reduce_method="none"：loadings 直接餵 HDBSCAN
