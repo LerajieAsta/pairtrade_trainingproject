@@ -583,6 +583,50 @@ strategies_raw_all = [
 # #5 SSD Rolling DRL THR、#8 Agglomerative DRL THR）
 # ＋ 2 個 formation-only 條目（DTW Paper 原版 ×2，只產生配對不回測）
 # ⚠️ FORCE_RERUN=True 時會忽略斷點續傳全部重算
+
+# ── 3×3 分群 × 排序 消融矩陣（2026-07 中性化重構後宣告式展開）──────────────
+# 固定特徵 = 混合特徵（報酬 PCA ⊕ FMP PIT 基本面 ⊕ GICS one-hot），三種分群共用；
+# 唯一變因 = 分群方法 × 群內排序準則。全部指向中性組裝器 cluster_formation。
+# K-means 群數對齊同期 Agglomerative（見 cluster_formation._cluster）。
+# 註：AGG-SSD 格經回歸測試證實 bit-identical 復現現役 Agglomerative (FMP)。
+_GRID_COMMON = {
+    "pca_n_components":            5,
+    "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+    "price_feature_weight":        1.0,
+    "fundamentals_feature_weight": 1.0,
+    "sector_onehot_weight":        1.0,
+    "agg_linkage":                 "average",
+    "agg_threshold_percentile":    75.0,
+    "min_cluster_size":            5,
+    "hdbscan_min_cluster_size":    5,
+    "hdbscan_min_samples":         2,
+    "adf_pvalue_threshold":        0.05,
+    "dtw_window":                  15,
+}
+_GRID_CLUSTERS = {"hdbscan": "HDB", "agglomerative": "AGG", "kmeans": "KM"}
+_GRID_RANKINGS = {"ssd": "SSD", "dtw": "DTW", "ssd_dtw_pca": "SDP"}
+_grid_entries = []
+for _cm, _cs in _GRID_CLUSTERS.items():
+    for _rb, _rs in _GRID_RANKINGS.items():
+        _p = {**base_params, **_GRID_COMMON,
+              "feature_mode": "fundamentals_mix",
+              "cluster_method": _cm, "ranking_backend": _rb}
+        if _rb != "ssd":     # DTW 排序端輸出 OLS_Alpha → 交易端走標準化空間
+            _p["ignore_ols_alpha"] = True
+        _grid_entries.append({
+            "name":             f"Grid {_cs}-{_rs}",
+            "formation_module": "strategies.formation.cluster_formation",
+            "trading_module":   "strategies.trading.zscore_trading",
+            "sub_dir":          f"Grid_{_cs}_{_rs}",
+            "db_method":        f"Grid ({_cs}-{_rs})",
+            "trade_method":     "Z-Score",
+            "params":           _p,
+        })
+# 插在 formation-only 條目之前（保持 formation-only 於清單尾端）
+_fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_only")),
+               len(strategies_raw_all))
+strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
+
 strategies_raw = strategies_raw_all[:]
 
 # ── 跨機器免改檔覆寫：環境變數 STRATEGIES_SLICE ───────────────────────────

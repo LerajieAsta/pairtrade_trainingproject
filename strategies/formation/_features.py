@@ -15,9 +15,15 @@
 本模組不做分群、不做排序，只把價格矩陣轉為每檔股票的因子暴露向量。
 """
 import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 from strategies.formation._utils import _residualize_returns
+from strategies.formation._fundamentals import (
+    CANONICAL_SECTORS, UNKNOWN_SECTOR_IDX, canonicalize_sector,
+    load_pit_fundamentals, impute_by_group, winsorize,
+)
 
 
 def build_return_pca_loadings(
@@ -106,3 +112,95 @@ def build_return_pca_loadings(
             f"累計解釋變異 {pca.explained_variance_ratio_.sum():.1%}"
         )
     return loadings, valid_tickers
+
+
+def build_fundamentals_mix_features(
+    price_df,
+    form_end: str,
+    sector_mapping: dict = None,
+    pca_n_components: int = 5,
+    factor_residual: bool = False,
+    fundamentals_parquet_path: str = "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+    price_feature_weight: float = 1.0,
+    fundamentals_feature_weight: float = 1.0,
+    sector_onehot_weight: float = 1.0,
+    random_state: int = 42,
+    min_tickers: int = 2,
+    verbose: bool = True,
+) -> tuple[np.ndarray, list[str]]:
+    """
+    混合特徵：報酬 PCA 因子載荷 ⊕ 公司基本面（log 市值、盈餘殖利率 1/PE）⊕ GICS 產業 one-hot。
+
+    三個區塊各自 StandardScaler 後依權重拼接（避免 joint 標準化讓 one-hot 欄位數
+    稀釋連續特徵的距離量測）。基本面取自 FMP Point-in-Time：對每個形成窗取
+    日期 ≤ form_end 的最近一筆記錄（無前視）。
+
+    為 agglomerative_FMP._build_feature_matrix 的逐位元等價抽取；供任何分群策略共用
+    （3×3 消融矩陣的固定特徵）。回傳 (X, valid_tickers)，有效股不足時回 (空, [])。
+    """
+    sm = sector_mapping or {}
+
+    def _lookup_sector(ticker):
+        return sm.get(ticker.upper(), sm.get(ticker, "Unknown"))
+
+    price_loadings, valid_tickers = build_return_pca_loadings(
+        price_df=price_df, pca_n_components=pca_n_components,
+        factor_residual=factor_residual, sector_mapping=sm,
+        random_state=random_state, verbose=verbose,
+    )
+    if len(valid_tickers) < min_tickers:
+        return np.empty((0, 0)), []
+
+    pit_df = load_pit_fundamentals(fundamentals_parquet_path)
+
+    # 取 <= form_end 的最近一筆 PIT 記錄
+    target_date = pd.to_datetime(form_end)
+    current_fundamentals = {}
+    if not pit_df.empty:
+        dates = pit_df.index.get_level_values("date").unique()
+        valid_dates = dates[dates <= target_date]
+        if len(valid_dates) > 0:
+            closest_date = valid_dates.max()
+            current_fundamentals = pit_df.xs(closest_date, level="date").to_dict("index")
+
+    canonical_sectors = []
+    market_caps = np.full(len(valid_tickers), np.nan)
+    earnings_yields = np.full(len(valid_tickers), np.nan)
+
+    for i, ticker in enumerate(valid_tickers):
+        rec = current_fundamentals.get(ticker.upper(), {})
+        raw_sector = rec.get("industry") if pd.notna(rec.get("industry")) else _lookup_sector(ticker)
+        canonical_sectors.append(canonicalize_sector(raw_sector))
+        market_cap = rec.get("market_cap")
+        pe_ratio = rec.get("pe_ratio")
+        if pd.notna(market_cap) and market_cap > 0:
+            market_caps[i] = np.log1p(market_cap)
+        if pd.notna(pe_ratio) and pe_ratio != 0:
+            earnings_yields[i] = 1.0 / pe_ratio
+
+    canonical_sectors = np.array(canonical_sectors)
+    n_missing_mc = int(np.isnan(market_caps).sum())
+    n_missing_pe = int(np.isnan(earnings_yields).sum())
+
+    market_caps = winsorize(impute_by_group(market_caps, canonical_sectors))
+    earnings_yields = winsorize(impute_by_group(earnings_yields, canonical_sectors))
+
+    onehot = np.zeros((len(valid_tickers), len(CANONICAL_SECTORS) + 1))
+    sector_index = {s: i for i, s in enumerate(CANONICAL_SECTORS)}
+    for i, sector in enumerate(canonical_sectors):
+        onehot[i, sector_index.get(sector, UNKNOWN_SECTOR_IDX)] = 1.0
+
+    price_scaled = StandardScaler().fit_transform(price_loadings) * price_feature_weight
+    fundamentals_cont = np.column_stack([market_caps, earnings_yields])
+    fundamentals_scaled = StandardScaler().fit_transform(fundamentals_cont) * fundamentals_feature_weight
+    sector_weighted = onehot * sector_onehot_weight
+
+    X = np.hstack([price_scaled, fundamentals_scaled, sector_weighted])
+
+    if verbose:
+        print(
+            f"  [Formation] 混合特徵矩陣：{len(valid_tickers)} 檔 | "
+            f"價格因子 {price_loadings.shape[1]} 維 + 基本面 2 維（市值缺失 "
+            f"{n_missing_mc}、PE 缺失 {n_missing_pe} 已插補）+ 產業 one-hot {onehot.shape[1]} 維"
+        )
+    return X, valid_tickers

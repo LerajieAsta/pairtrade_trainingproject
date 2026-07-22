@@ -1,0 +1,194 @@
+"""
+通用分群配對形成期組裝器（中性命名，與具體演算法無關）
+======================================================================
+把「特徵 → 分群 → 群內排序」三個中性層組裝成參數驅動的形成期策略：
+
+    Formation(
+        feature_mode   = "fundamentals_mix" | "price_pca",
+        cluster_method = "hdbscan" | "agglomerative" | "kmeans",
+        ranking_backend= "ssd" | "dtw" | "ssd_dtw_pca",
+        ...,
+    ).run()
+
+用途：以宣告式參數展開「分群 × 排序」消融矩陣（如 3×3），無需為每個組合
+手寫一個策略模組。新增分群法 → _clustering.py 加 backend；新增排序準則 →
+_ranking.py 加 backend；新增組合 → config 一行。
+
+K-means 特例：K-means 需預先指定群數。本組裝器以「同期 Agglomerative 的群數」
+作為 k（資料驅動、與其他分群量級可比），先跑一次 Agglomerative 取群數再餵給
+K-means。
+"""
+import numpy as np
+import pandas as pd
+
+from strategies.formation._features import (
+    build_return_pca_loadings, build_fundamentals_mix_features,
+)
+from strategies.formation._clustering import cluster, cluster_agglomerative
+from strategies.formation._ranking import rank_within_groups
+
+
+class Formation:
+    def __init__(
+        self,
+        price_df: pd.DataFrame,
+        form_start: str,
+        form_end: str,
+        top_n: int = 20,
+        sector_mapping: dict = None,
+        min_tickers_for_pairing: int = 2,
+        # ── 組裝選擇 ───────────────────────────────────────────────
+        feature_mode: str = "fundamentals_mix",
+        cluster_method: str = "agglomerative",
+        ranking_backend: str = "ssd",
+        # ── 特徵組 ─────────────────────────────────────────────────
+        pca_n_components: int = 5,
+        factor_residual: bool = False,
+        fundamentals_parquet_path: str = "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+        price_feature_weight: float = 1.0,
+        fundamentals_feature_weight: float = 1.0,
+        sector_onehot_weight: float = 1.0,
+        umap_random_state: int = 42,
+        # ── 分群組 ─────────────────────────────────────────────────
+        hdbscan_min_cluster_size: int = 5,
+        hdbscan_min_samples: int = 2,
+        hdbscan_metric: str = "euclidean",
+        agg_linkage: str = "average",
+        agg_threshold_percentile: float = 75.0,
+        min_cluster_size: int = 5,
+        # ── 排序組 ─────────────────────────────────────────────────
+        adf_pvalue_threshold: float = 0.05,
+        trading_window: int = 126,
+        dtw_window: int = 15,
+        **kwargs,
+    ):
+        self.price_df = price_df
+        self.form_start = form_start
+        self.form_end = form_end
+        self.top_n = top_n
+        self.real_sector_mapping = sector_mapping or {}
+        self.min_tickers_for_pairing = min_tickers_for_pairing
+
+        self.feature_mode = feature_mode
+        self.cluster_method = cluster_method
+        self.ranking_backend = ranking_backend
+
+        self.pca_n_components = pca_n_components
+        self.factor_residual = factor_residual
+        self.fundamentals_parquet_path = fundamentals_parquet_path
+        self.price_feature_weight = price_feature_weight
+        self.fundamentals_feature_weight = fundamentals_feature_weight
+        self.sector_onehot_weight = sector_onehot_weight
+        self.umap_random_state = umap_random_state
+
+        self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
+        self.hdbscan_min_samples = hdbscan_min_samples
+        self.hdbscan_metric = hdbscan_metric
+        self.agg_linkage = agg_linkage
+        self.agg_threshold_percentile = agg_threshold_percentile
+        self.min_cluster_size = min_cluster_size
+
+        self.adf_pvalue_threshold = adf_pvalue_threshold
+        self.trading_window = trading_window
+        self.dtw_window = dtw_window
+
+        self.cluster_labels_: dict = {}
+        self.selected_pairs: pd.DataFrame = pd.DataFrame()
+
+    def _lookup_sector(self, ticker: str) -> str:
+        return self.real_sector_mapping.get(
+            ticker.upper(), self.real_sector_mapping.get(ticker, "Unknown"))
+
+    # ── 特徵 ───────────────────────────────────────────────────────
+    def _build_feature_matrix(self) -> tuple[np.ndarray, list[str]]:
+        if self.feature_mode == "price_pca":
+            return build_return_pca_loadings(
+                price_df=self.price_df,
+                pca_n_components=self.pca_n_components,
+                factor_residual=self.factor_residual,
+                sector_mapping=self.real_sector_mapping,
+                random_state=self.umap_random_state,
+            )
+        # 預設：混合特徵（報酬 PCA ⊕ 基本面 ⊕ 產業）
+        return build_fundamentals_mix_features(
+            price_df=self.price_df,
+            form_end=self.form_end,
+            sector_mapping=self.real_sector_mapping,
+            pca_n_components=self.pca_n_components,
+            factor_residual=self.factor_residual,
+            fundamentals_parquet_path=self.fundamentals_parquet_path,
+            price_feature_weight=self.price_feature_weight,
+            fundamentals_feature_weight=self.fundamentals_feature_weight,
+            sector_onehot_weight=self.sector_onehot_weight,
+            random_state=self.umap_random_state,
+            min_tickers=self.min_tickers_for_pairing,
+        )
+
+    # ── 分群（含 K-means 群數對齊 Agglomerative）────────────────────
+    def _cluster(self, X: np.ndarray) -> np.ndarray:
+        if self.cluster_method == "kmeans":
+            agg_labels = cluster_agglomerative(
+                X, linkage=self.agg_linkage,
+                threshold_percentile=self.agg_threshold_percentile)
+            n_k = len(set(int(l) for l in agg_labels))
+            print(f"  [Formation] K-means 群數對齊 Agglomerative：k={n_k}")
+            return cluster("kmeans", X, n_clusters=n_k,
+                           random_state=self.umap_random_state)
+        if self.cluster_method == "hdbscan":
+            return cluster("hdbscan", X,
+                           min_cluster_size=self.hdbscan_min_cluster_size,
+                           min_samples=self.hdbscan_min_samples,
+                           metric=self.hdbscan_metric)
+        return cluster("agglomerative", X,
+                       linkage=self.agg_linkage,
+                       threshold_percentile=self.agg_threshold_percentile)
+
+    # ── 主流程 ─────────────────────────────────────────────────────
+    def run(self) -> pd.DataFrame:
+        X, valid_tickers = self._build_feature_matrix()
+        if len(valid_tickers) < self.min_tickers_for_pairing:
+            self.selected_pairs = pd.DataFrame()
+            return self.selected_pairs
+
+        labels = self._cluster(X)
+        self.cluster_labels_ = {t: int(l) for t, l in zip(valid_tickers, labels)}
+
+        # 群標籤 → 分組 map（過小群 / 噪音 併入 Unknown，排序端自動跳過）
+        cluster_sizes = pd.Series(labels).value_counts()
+        cluster_map = {
+            t: (f"Cluster_{l}" if cluster_sizes[l] >= self.min_cluster_size else "Unknown")
+            for t, l in zip(valid_tickers, labels)
+        }
+        n_clusters = len({v for v in cluster_map.values() if v != "Unknown"})
+        n_unknown = sum(1 for v in cluster_map.values() if v == "Unknown")
+        print(
+            f"  [Formation] {self.cluster_method} 分組：{n_clusters} 群 | "
+            f"過小群/噪音併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）"
+        )
+
+        # 群內共整合篩選 + 距離排序（經中性排序層）
+        selected = rank_within_groups(
+            method=self.ranking_backend,
+            price_df=self.price_df[valid_tickers],
+            form_start=self.form_start,
+            form_end=self.form_end,
+            group_map=cluster_map,
+            top_n=self.top_n,
+            min_tickers_for_pairing=self.min_tickers_for_pairing,
+            adf_pvalue_threshold=self.adf_pvalue_threshold,
+            trading_window=self.trading_window,
+            dtw_window=self.dtw_window,
+        )
+        if selected.empty:
+            self.selected_pairs = selected
+            return selected
+
+        # 補回真實 GICS 產業（供 MSR 產業分散與結果分析；Sector 保留群標籤）
+        selected = selected.copy()
+        selected["Sector_A"] = [self._lookup_sector(t) for t in selected["Ticker_A"]]
+        selected["Sector_B"] = [self._lookup_sector(t) for t in selected["Ticker_B"]]
+        selected["Cluster_ID_A"] = [cluster_map.get(t, "Unknown") for t in selected["Ticker_A"]]
+        selected["Cluster_ID_B"] = [cluster_map.get(t, "Unknown") for t in selected["Ticker_B"]]
+
+        self.selected_pairs = selected
+        return selected
