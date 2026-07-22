@@ -622,6 +622,39 @@ for _cm, _cs in _GRID_CLUSTERS.items():
             "trade_method":     "Z-Score",
             "params":           _p,
         })
+# ── DRL 疊加：對矩陣 top-2 贏家格（AGG-SSD、HDB-SDP）疊 DRL 門檻選擇式 ──────
+# 借用該格已算好的形成期配對（formation_strategy_id_base），零重跑 formation；
+# 交易端換成 drl_threshold_trading（走標準化空間 z_of，不讀 OLS_Alpha）。
+# 驗證「配對品質矩陣（Z-Score）× DRL 交易端增益」的正交第二層。
+for _cl_m, _cl_s, _rk_m, _rk_s in [("agglomerative", "AGG", "ssd", "SSD"),
+                                    ("hdbscan", "HDB", "ssd_dtw_pca", "SDP")]:
+    _pd = {**base_params, **_GRID_COMMON,
+           "feature_mode": "fundamentals_mix",
+           "cluster_method": _cl_m, "ranking_backend": _rk_m,
+           "drl_hidden_size": 64, "thr_train_epochs": 40, "thr_min_train_samples": 200}
+    _grid_entries.append({
+        "name":             f"Grid {_cl_s}-{_rk_s} DRL",
+        "formation_module": "strategies.formation.cluster_formation",
+        "formation_strategy_id_base": f"Grid {_cl_s}-{_rk_s}",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          f"Grid_{_cl_s}_{_rk_s}_DRL",
+        "db_method":        f"Grid ({_cl_s}-{_rk_s}-DRL)",
+        "trade_method":     "DRL",
+        "params":           _pd,
+    })
+    # 三層疊加：好配對 × DRL 交易端 × DG25 低分散度閘門（三個已驗證正交增益）
+    _pdg = {**_pd, "disp_gate_pctl": 25.0}
+    _grid_entries.append({
+        "name":             f"Grid {_cl_s}-{_rk_s} DRL DG25",
+        "formation_module": "strategies.formation.cluster_formation",
+        "formation_strategy_id_base": f"Grid {_cl_s}-{_rk_s}",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          f"Grid_{_cl_s}_{_rk_s}_DRL_DG25",
+        "db_method":        f"Grid ({_cl_s}-{_rk_s}-DRL-DG25)",
+        "trade_method":     "DRL",
+        "params":           _pdg,
+    })
+
 # 插在 formation-only 條目之前（保持 formation-only 於清單尾端）
 _fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_only")),
                len(strategies_raw_all))

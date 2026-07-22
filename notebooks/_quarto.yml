@@ -6,6 +6,7 @@ project:
     - trading/*.ipynb
     - comparison.ipynb
     - performance_guide.ipynb
+    - cluster_ranking_ablation.ipynb
 
 lang: zh-TW
 
