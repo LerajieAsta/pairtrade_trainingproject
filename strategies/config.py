@@ -406,6 +406,60 @@ strategies_raw_all = [
             "adf_pvalue_threshold":        0.05,
         },
     },
+    # 9b. Agglomerative Fundamentals (FMP) DTW —— 教授要求：分群相同、群內排序端
+    #     由 min-SSD 換成 DTW（雙向 OLS + ADF + Sakoe-Chiba DTW 距離升序）。
+    #     經中性排序層 _ranking(ranking_backend="dtw") 組裝，與 FMP 基準單一變因對照。
+    #     DTW 排序端輸出 OLS_Alpha → 交易端需 ignore_ols_alpha=True 走標準化空間（路徑 B）。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DTW",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DTW",
+        "db_method":        "Agglomerative (FMP-DTW)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+            "ranking_backend":             "dtw",
+            "dtw_window":                  15,
+            "ignore_ols_alpha":            True,
+        },
+    },
+    # 9c. Agglomerative Fundamentals (FMP) SSD-DTW-PCA —— 第三種群內排序：
+    #     SSD 與 DTW 距離標準化後 PCA 融合、取第一主成分升序（許鈞翔 2025 實驗組）。
+    #     同樣經中性排序層 _ranking(ranking_backend="ssd_dtw_pca") 組裝——展示中性化
+    #     後新增排序準則零改碼。與 FMP(SSD)、FMP-DTW 構成三種排序的單變因對照。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) SSD-DTW-PCA",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_SDP",
+        "db_method":        "Agglomerative (FMP-SSD-DTW-PCA)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+            "ranking_backend":             "ssd_dtw_pca",
+            "dtw_window":                  15,
+            "ignore_ols_alpha":            True,
+        },
+    },
     # （方案 C「Agglo-FMP × 因子殘差」：2026-07-19 驗證為負面結果——15 網格
     #   0 個正 Sharpe（中位 -0.69），最佳年化 -0.90% vs 基準 2.28%。根因：殘差化
     #   表徵與下游原始價格空間 SSD 排序錯位，且與 GICS one-hot 特徵互相抵銷。

@@ -142,9 +142,11 @@ class Formation:
         agg_linkage: str = "average",
         agg_threshold_percentile: float = 75.0,
         min_cluster_size: int = 5,
-        # ── 排序/共整合組（轉傳 ssd_rolling） ──────────────────────
+        # ── 排序/共整合組（經中性排序層 _ranking）──────────────────
         adf_pvalue_threshold: float = 0.05,
         trading_window: int = 126,
+        ranking_backend: str = "ssd",   # "ssd"（預設）| "dtw" | "ssd_dtw_pca"
+        dtw_window: int = 15,           # DTW backend 用
         **kwargs,
     ):
         self.price_df = price_df
@@ -168,6 +170,8 @@ class Formation:
 
         self.adf_pvalue_threshold = adf_pvalue_threshold
         self.trading_window = trading_window
+        self.ranking_backend = ranking_backend
+        self.dtw_window = dtw_window
 
         self._fundamentals: dict = {}
         self.cluster_labels_: dict = {}
@@ -291,6 +295,7 @@ class Formation:
             min_tickers_for_pairing=self.min_tickers_for_pairing,
             adf_pvalue_threshold=self.adf_pvalue_threshold,
             trading_window=self.trading_window,
+            dtw_window=getattr(self, "dtw_window", 15),
         )
         if selected.empty:
             self.selected_pairs = selected
