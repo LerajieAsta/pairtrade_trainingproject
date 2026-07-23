@@ -37,10 +37,11 @@ class Formation:
         top_n: int = 20,
         sector_mapping: dict = None,
         min_tickers_for_pairing: int = 2,
-        # ── 組裝選擇 ───────────────────────────────────────────────
+        # ── 組裝選擇（形成期三維度：分組 × 排序 × 篩選）───────────────
         feature_mode: str = "fundamentals_mix",
-        cluster_method: str = "agglomerative",
+        cluster_method: str = "agglomerative",   # 亦可 "gics"：直接用真實產業分組，不跑分群
         ranking_backend: str = "ssd",
+        filter_mode: str = "coint",              # "coint"（三道統計過濾）| "none"（純排序消融）
         # ── 特徵組 ─────────────────────────────────────────────────
         pca_n_components: int = 5,
         factor_residual: bool = False,
@@ -72,6 +73,7 @@ class Formation:
         self.feature_mode = feature_mode
         self.cluster_method = cluster_method
         self.ranking_backend = ranking_backend
+        self.filter_mode = filter_mode
 
         self.pca_n_components = pca_n_components
         self.factor_residual = factor_residual
@@ -145,26 +147,40 @@ class Formation:
 
     # ── 主流程 ─────────────────────────────────────────────────────
     def run(self) -> pd.DataFrame:
-        X, valid_tickers = self._build_feature_matrix()
-        if len(valid_tickers) < self.min_tickers_for_pairing:
-            self.selected_pairs = pd.DataFrame()
-            return self.selected_pairs
+        # ── 分組：GICS 產業（不跑分群）或資料驅動分群 ─────────────────
+        if self.cluster_method == "gics":
+            valid_tickers = [t for t in self.price_df.columns
+                             if self.price_df[t].notna().sum() >= 30]
+            if len(valid_tickers) < self.min_tickers_for_pairing:
+                self.selected_pairs = pd.DataFrame()
+                return self.selected_pairs
+            cluster_map = {t: self._lookup_sector(t) for t in valid_tickers}
+            self.cluster_labels_ = {}
+            n_groups = len({v for v in cluster_map.values() if v != "Unknown"})
+            n_unknown = sum(1 for v in cluster_map.values() if v == "Unknown")
+            print(f"  [Formation] GICS 產業分組：{n_groups} 產業 | "
+                  f"Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）")
+        else:
+            X, valid_tickers = self._build_feature_matrix()
+            if len(valid_tickers) < self.min_tickers_for_pairing:
+                self.selected_pairs = pd.DataFrame()
+                return self.selected_pairs
 
-        labels = self._cluster(X)
-        self.cluster_labels_ = {t: int(l) for t, l in zip(valid_tickers, labels)}
+            labels = self._cluster(X)
+            self.cluster_labels_ = {t: int(l) for t, l in zip(valid_tickers, labels)}
 
-        # 群標籤 → 分組 map（過小群 / 噪音 併入 Unknown，排序端自動跳過）
-        cluster_sizes = pd.Series(labels).value_counts()
-        cluster_map = {
-            t: (f"Cluster_{l}" if cluster_sizes[l] >= self.min_cluster_size else "Unknown")
-            for t, l in zip(valid_tickers, labels)
-        }
-        n_clusters = len({v for v in cluster_map.values() if v != "Unknown"})
-        n_unknown = sum(1 for v in cluster_map.values() if v == "Unknown")
-        print(
-            f"  [Formation] {self.cluster_method} 分組：{n_clusters} 群 | "
-            f"過小群/噪音併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）"
-        )
+            # 群標籤 → 分組 map（過小群 / 噪音 併入 Unknown，排序端自動跳過）
+            cluster_sizes = pd.Series(labels).value_counts()
+            cluster_map = {
+                t: (f"Cluster_{l}" if cluster_sizes[l] >= self.min_cluster_size else "Unknown")
+                for t, l in zip(valid_tickers, labels)
+            }
+            n_clusters = len({v for v in cluster_map.values() if v != "Unknown"})
+            n_unknown = sum(1 for v in cluster_map.values() if v == "Unknown")
+            print(
+                f"  [Formation] {self.cluster_method} 分組：{n_clusters} 群 | "
+                f"過小群/噪音併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）"
+            )
 
         # 群內共整合篩選 + 距離排序（經中性排序層）
         selected = rank_within_groups(
@@ -178,6 +194,7 @@ class Formation:
             adf_pvalue_threshold=self.adf_pvalue_threshold,
             trading_window=self.trading_window,
             dtw_window=self.dtw_window,
+            enable_filters=(self.filter_mode != "none"),
         )
         if selected.empty:
             self.selected_pairs = selected

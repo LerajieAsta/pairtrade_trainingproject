@@ -32,6 +32,7 @@ def rank_within_groups(
     adf_pvalue_threshold: float = None,
     trading_window: int = 126,
     dtw_window: int = 15,
+    enable_filters: bool = True,   # False → 跳過三道統計過濾（純排序消融）
     **_ignored,
 ) -> pd.DataFrame:
     """
@@ -52,6 +53,7 @@ def rank_within_groups(
             sector_mapping=group_map,
             min_tickers_for_pairing=min_tickers_for_pairing,
             trading_window=trading_window,
+            enable_filters=enable_filters,
         )
         if adf_pvalue_threshold is not None:
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
@@ -69,6 +71,7 @@ def rank_within_groups(
             dtw_window=dtw_window,
             method=method,
             trading_window=trading_window,
+            enable_filters=enable_filters,
         )
         if adf_pvalue_threshold is not None:
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold

@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import scipy.spatial.distance as ssd
 from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._cointegration import screen_pair
 
 
 warnings.filterwarnings("ignore")
@@ -34,6 +35,8 @@ class Formation:
         self.min_tickers_for_pairing = min_tickers_for_pairing
         self.adf_pvalue_threshold = adf_pvalue_threshold
         self.halflife_max = kwargs.get("trading_window", 126) / 3.0
+        # 篩選消融開關（預設 True＝現行行為）：False 時跳過 ADF/半衰期/Hurst
+        self.enable_filters = kwargs.get("enable_filters", True)
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -112,35 +115,18 @@ class Formation:
             beta = row["Hedge_Ratio"]
             
             spread = y_val - beta * x_val
-            
-            # 步驟 1：ADF 共整合（過濾隨機漫步）
-            stat, pval = _adf_stat(spread, max_lags=1)
-            if pval >= self.adf_pvalue_threshold:
+
+            # 三道統計過濾（中性共用層；enable_filters=False 時整層跳過 → 純排序消融）
+            passed, _stats = screen_pair(
+                spread,
+                adf_pvalue_threshold=self.adf_pvalue_threshold,
+                halflife_min=1.0, halflife_max=self.halflife_max,
+                hurst_threshold=0.50, adf_max_lags=1,
+                enabled=self.enable_filters,
+            )
+            if not passed:
                 continue
 
-            # 步驟 2：OU 半衰期
-            dy = np.diff(spread)
-            y_lag = spread[:-1]
-            n_dy = len(dy)
-            x_mat = np.column_stack([np.ones(n_dy), y_lag])
-            try:
-                coeffs, _, _, _ = np.linalg.lstsq(x_mat, dy, rcond=None)
-                lambda_val = coeffs[1]
-            except Exception:
-                lambda_val = 0.0
-                
-            if lambda_val >= 0.0:
-                continue
-                
-            halflife = -np.log(2) / lambda_val
-            if halflife < 1.0 or halflife > self.halflife_max:
-                continue
-
-            # 步驟 3：Hurst 指數（均值回歸傾向）
-            hurst = _compute_hurst(spread, already_stationary=True)
-            if hurst >= 0.50:
-                continue
-                
             spread_mean = np.mean(spread)
             spread_std = np.std(spread, ddof=1) if len(spread) > 1 else 0.0
             

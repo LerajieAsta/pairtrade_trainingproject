@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._cointegration import screen_pair
 
 def _sakoe_chiba_dtw(x: np.ndarray, y: np.ndarray, window: int = 15) -> float:
     """
@@ -62,6 +63,8 @@ class Formation:
         self.method = method.lower()
         self.adf_pvalue_threshold = adf_pvalue_threshold
         self.halflife_max = trading_window / 3.0
+        # 篩選消融開關（預設 True＝現行行為）：False 時跳過 ADF/半衰期/Hurst
+        self.enable_filters = kwargs.get("enable_filters", True)
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -127,33 +130,21 @@ class Formation:
                         best_alpha, best_beta, best_resid = al_ba, be_ba, re_ba
                         best_a, best_b = ticker_b, ticker_a
 
-                    # 步驟 2：ADF 篩選
-                    if best_pval >= self.adf_pvalue_threshold:
+                    # 步驟 2-4：三道統計過濾（中性共用層）
+                    # ADF 已於雙向 OLS 取得（best_stat/best_pval），以 precomputed_adf 傳入避免重算；
+                    # enable_filters=False 時整層跳過 → 純排序消融（雙向選向仍執行）
+                    passed, _stats = screen_pair(
+                        best_resid,
+                        adf_pvalue_threshold=self.adf_pvalue_threshold,
+                        halflife_min=1.0, halflife_max=self.halflife_max,
+                        hurst_threshold=0.50,
+                        precomputed_adf=(best_stat, best_pval),
+                        enabled=self.enable_filters,
+                    )
+                    if not passed:
                         continue
 
-                    # 步驟 3：OU 半衰期
-                    dy = np.diff(best_resid)
-                    y_lag = best_resid[:-1]
-                    n_dy = len(dy)
-                    x_mat = np.column_stack([np.ones(n_dy), y_lag])
-                    try:
-                        coeffs, _, _, _ = np.linalg.lstsq(x_mat, dy, rcond=None)
-                        lambda_val = coeffs[1]
-                    except Exception:
-                        lambda_val = 0.0
-                        
-                    if lambda_val >= 0.0:
-                        continue
-                        
-                    halflife = -np.log(2) / lambda_val
-                    if halflife < 1.0 or halflife > self.halflife_max:
-                        continue
 
-                    # 步驟 4：Hurst 指數
-                    hurst = _compute_hurst(best_resid, already_stationary=True)
-                    if hurst >= 0.50:
-                        continue
-                    
                     # 步驟 5：計算 SSD 與 DTW 距離
                     norm_a = self.normalized_df[best_a].values
                     norm_b = self.normalized_df[best_b].values

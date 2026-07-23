@@ -155,6 +155,328 @@ from strategies.config import (
 )
 
 strategies_raw_archived = [
+    # ══ 2026-07-23 封存：被 3×3 Grid 消融矩陣取代的舊分群/疊加系列（14 條）══
+    # 背景：形成期中性化重構後（_features / _clustering / _ranking / cluster_formation），
+    #   「分群 × 排序」的所有組合改由宣告式 3×3 Grid 展開，舊的每組合一模組寫法退場。
+    # 對應關係（封存 → 取代者）：
+    #   Agglomerative (FMP)              → Grid (AGG-SSD)   ※ 經回歸測試 bit-identical，
+    #                                       同窗口選出完全相同的 20 對配對（雜湊一致）
+    #   Agglomerative (FMP-DTW)          → Grid (AGG-DTW)
+    #   Agglomerative (FMP-SSD-DTW-PCA)  → Grid (AGG-SDP)
+    #   Agglomerative (FMP·DRL)          → Grid (AGG-SSD-DRL)
+    #   Agglomerative (FMP·DRL-DG25)     → Grid (AGG-SSD-DRL-DG25)
+    #   HDBSCAN / HDBSCAN (殘差)          → Grid (HDB-*) 系列（同分群演算法，中性層組裝）
+    #   Agglomerative (yF) / (yF·DRL)    → FMP PIT 版取代（yF 為單一時點快照，有前視偏誤）
+    #   Agglomerative (FMP-DG25/DG50/DG25-EZ) → 閘門效應已在 Grid 層驗證並保留
+    #   SSD (Distance) / SSD (DRL)       → 交易端對照，DRL 增益已於 Grid 層量化
+    # 保留的實證價值（歷史數據全在 results/result.db，可直接查詢引用）：
+    #   - DG 閘門系列：DG25 使全網格 Sharpe 轉正、MDD 下降、PF 上升的原始證據
+    #   - FMP·DRL-DG25：五輪變異數 2.68% [2.64, 2.84]（旗艦策略的早期版本）
+    #   - SSD (Distance)：GGR 距離基準 vs 回歸基準的交易端單變因對照
+    # 復活方式：把下方條目貼回 strategies/config.py 的 strategies_raw_all；
+    #   所需 formation 模組（agglomerative_yF/FMP、HDBSCAN_Cluster_SSD_DTW）皆未刪除。
+    # 1b. SSD Rolling Distance（距離基準交易，Gatev et al. 2006 GGR 距離法）
+    #     借用 SSD Rolling 的形成期配對，唯一變因 = 交易端 spread 空間：
+    #       回歸基準（#1 zscore_trading）：spread = OLS 共整合殘差
+    #       距離基準（本策略 distance_trading）：spread = 正規化價格距離（等權、hedge=1）
+    #     構成「回歸 vs 距離」的乾淨單變因對照（指導教授指定）。
+    {
+        "name":             "SSD Rolling Distance",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "formation_strategy_id_base": "SSD Rolling",
+        "trading_module":   "strategies.trading.distance_trading",
+        "sub_dir":          "SSD_Rolling_Distance",
+        "db_method":        "SSD (Distance)",
+        "trade_method":     "Distance",
+        "params":  {
+            **base_params,
+        },
+    },
+    # （HDBSCAN Cluster SSD-DTW-PCA 15 維版與其 DRL THR、PCA5 DRL THR 已於
+    #   2026-07-06 封存——HDBSCAN 系列僅保留 PCA5 Z-Score 版作為分組消融對照組，
+    #   見 archive/config_archived_strategies.py）
+    # ── DRL v4：門檻選擇式（Kim & Kim 2019）──────────────────────────────
+    #   v1–v3 逐日定位動作空間已系統性證偽（OOS 過度交易，Sharpe −1.1~−2.3，
+    #   FQI 系列 2026-07-04 封存至 archive/config_archived_strategies.py）。
+    #   v4 每配對每期只選一個動作：SKIP + 8 組 (entry_z, exit_z) 門檻，
+    #   選單包含基準 (2.0, 0.0) → 策略空間 ⊇ Z-Score；訓練樣本不足時自動用基準。
+    #   反事實全資訊標籤 + walk-forward 監督回歸（無探索問題）。
+    #   HDBSCAN PCA-Loadings DRL THR（命題 2 的第一次嘗試，vs HDBSCAN PCA-Loadings
+    #   Z-Score）已封存：修好 _shared 跨變體污染的 bug 後結果不變（15 組全負
+    #   Sharpe，中位數 −0.41），確認是配對訊號本身太弱，非 DRL 交易端問題。
+    #   見 archive/config_archived_strategies.py。目前活躍對照改為 #1 vs #5、
+    #   #4 vs #6、#7 vs #8。
+    # 5. SSD Rolling DRL THR
+    {
+        "name":             "SSD Rolling DRL THR",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "formation_strategy_id_base": "SSD Rolling",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "SSD_Rolling_DRL_THR",
+        "db_method":        "SSD (DRL)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    # 6. HDBSCAN Cluster SSD-DTW-PCA PCA5 —— HDBSCAN 系列唯一保留的分組消融
+    #    對照組（5 維報酬 PCA 因子載荷聚類 + SSD-DTW-PCA 排序 + 路徑 B 交易）
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5",
+        "db_method":        "HDBSCAN",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "method":               "ssd_dtw_pca",
+            "pca_n_components":     5,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":  2,
+            "umap_random_state":    42,
+            "adf_pvalue_threshold": 0.01,
+            "ignore_ols_alpha":     True,
+        },
+    },
+    # 6b. 同上 + 因子殘差化（研究框架 #1 消融）：聚類前移除市場+產業因子，
+    #     PCA 建於特殊性報酬，理論上降低偽相關、提升 regime 穩健性。
+    #     與 #6 唯一差異 = factor_residual=True → 直接對照殘差化的增量貢獻。
+    {
+        "name":             "HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid",
+        "formation_module": "strategies.formation.HDBSCAN_Cluster_SSD_DTW",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "HDBSCAN_Cluster_SSD_DTW_PCA5_Resid",
+        "db_method":        "HDBSCAN (殘差)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "method":               "ssd_dtw_pca",
+            "pca_n_components":     5,
+            "hdbscan_min_cluster_size": 5,
+            "hdbscan_min_samples":  2,
+            "umap_random_state":    42,
+            "adf_pvalue_threshold": 0.01,
+            "ignore_ols_alpha":     True,
+            "factor_residual":      True,
+        },
+    },
+    # 7. Agglomerative Fundamentals —— 分組消融第三支：以「報酬 PCA loadings
+    #     ⊕ GICS one-hot ⊕ log(市值) ⊕ 盈餘殖利率(1/PE)」混合特徵空間做
+    #     Agglomerative（average-linkage、依合併距離分位數校準
+    #     distance_threshold，非固定 n_clusters/ward，避免重現 HDBSCAN 的
+    #     群組不平衡問題）分群，取代 GICS 靜態分組；分群結果轉為
+    #     sector_mapping 餵給既有 SSD Rolling 排序/共整合流程完全不變
+    #     （min-SSD + Engle-Granger ADF + Hurst）。交易端沿用既有 Z-Score /
+    #     Beta-動態配重（EG Hedge Ratio）/ 停損引擎，未做任何修改。
+    #     基本面資料為單一時點靜態快照（yfinance，見
+    #     fetch/fundamentals_yfinance.py）——已知前視偏誤限制。
+    {
+        "name":             "Agglomerative Fundamentals (yF)",
+        "formation_module": "strategies.formation.agglomerative_yF",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_yF",
+        "db_method":        "Agglomerative (yF)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_db_path":        "./dataset/fundamental/fundamentals_sp500.db",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+        },
+    },
+    # （DynCap 動態槽位配置：2026-07-19 驗證為負面結果——集中配置放大波動拖累，
+    #   最佳年化 1.80%→1.62%、Top10/20 MDD 惡化至 -58%。已封存至
+    #   archive/config_archived_strategies.py「DynCap」節；PortfolioManager 的
+    #   dynamic_slots 機制保留供復活。結論：閒置現金是低波動的代價，
+    #   配置端集中無法免費兌現「動用資本年化」。）
+    # 8. Agglomerative Fundamentals DRL THR —— DRL-THR 疊加在 Agglomerative
+    #    Fundamentals 配對底上（借用 #7 的形成期配對，不需重跑形成期）。
+    {
+        "name":             "Agglomerative Fundamentals DRL THR (yF)",
+        "formation_module": "strategies.formation.agglomerative_yF",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (yF)",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_DRL_THR_yF",
+        "db_method":        "Agglomerative (yF·DRL)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+    # 9. Agglomerative Fundamentals FMP —— 升級為 FMP 長週期 Point-in-Time 數據，無前視偏誤
+    {
+        "name":             "Agglomerative Fundamentals (FMP)",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP",
+        "db_method":        "Agglomerative (FMP)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+        },
+    },
+    # 9b. Agglomerative Fundamentals (FMP) DTW —— 教授要求：分群相同、群內排序端
+    #     由 min-SSD 換成 DTW（雙向 OLS + ADF + Sakoe-Chiba DTW 距離升序）。
+    #     經中性排序層 _ranking(ranking_backend="dtw") 組裝，與 FMP 基準單一變因對照。
+    #     DTW 排序端輸出 OLS_Alpha → 交易端需 ignore_ols_alpha=True 走標準化空間（路徑 B）。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DTW",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DTW",
+        "db_method":        "Agglomerative (FMP-DTW)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+            "ranking_backend":             "dtw",
+            "dtw_window":                  15,
+            "ignore_ols_alpha":            True,
+        },
+    },
+    # 9c. Agglomerative Fundamentals (FMP) SSD-DTW-PCA —— 第三種群內排序：
+    #     SSD 與 DTW 距離標準化後 PCA 融合、取第一主成分升序（許鈞翔 2025 實驗組）。
+    #     同樣經中性排序層 _ranking(ranking_backend="ssd_dtw_pca") 組裝——展示中性化
+    #     後新增排序準則零改碼。與 FMP(SSD)、FMP-DTW 構成三種排序的單變因對照。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) SSD-DTW-PCA",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_SDP",
+        "db_method":        "Agglomerative (FMP-SSD-DTW-PCA)",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "pca_n_components":            5,
+            "fundamentals_parquet_path":   "dataset/fundamental/sp500_pit_2000_2025_monthly.parquet",
+            "price_feature_weight":        1.0,
+            "fundamentals_feature_weight": 1.0,
+            "sector_onehot_weight":        1.0,
+            "agg_linkage":                 "average",
+            "agg_threshold_percentile":    75.0,
+            "min_cluster_size":            5,
+            "adf_pvalue_threshold":        0.05,
+            "ranking_backend":             "ssd_dtw_pca",
+            "dtw_window":                  15,
+            "ignore_ols_alpha":            True,
+        },
+    },
+    # （方案 C「Agglo-FMP × 因子殘差」：2026-07-19 驗證為負面結果——15 網格
+    #   0 個正 Sharpe（中位 -0.69），最佳年化 -0.90% vs 基準 2.28%。根因：殘差化
+    #   表徵與下游原始價格空間 SSD 排序錯位，且與 GICS one-hot 特徵互相抵銷。
+    #   已封存至 archive/config_archived_strategies.py「FMP-Resid」節；
+    #   agglomerative_FMP.factor_residual 參數保留供復活。）
+    # （P1/P2/P4 交易端優化戰役：2026-07-19 全數封存為負面/中性結果——
+    #   TS63/TS42 時間停損（後見之明偏誤：63d 為損益低谷，砍在谷底）、
+    #   XZ05 提早出場（省的風險 < 放棄的收斂利潤）、DRL 選單 v5 時間維度
+    #   （重訓噪音範圍內，agent 學會不用它）。完整診斷與數據見
+    #   archive/config_archived_strategies.py「交易端微觀規則戰役」節。
+    #   結論：交易端微觀規則已系統性掃過，2.25-2.28% 為現有訊號組天花板；
+    #   僅存的實證槓桿為 regime 條件化進場（見下方 DG 系列 A/B）。）
+    # ── P3 A/B：regime 條件化進場（低分散度閘門，2026-07-19）───────────────
+    # 依據：FMP Top1 日損益依橫斷面分散度四分位分層——Q4 貢獻 +8,674、
+    # Q1+Q2 合計 -4,920（全部淨利來自分散度最高的 25% 交易日）。
+    # 機制：walk-forward 30 日分散度的歷史分位 < pctl 時暫停「新開倉」
+    # （持倉/出場不受影響；expanding 分位 min 252 日暖身，無前視）。
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DG50",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DG50",
+        "db_method":        "Agglomerative (FMP-DG50)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "disp_gate_pctl": 50.0},
+    },
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DG25",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DG25",
+        "db_method":        "Agglomerative (FMP-DG25)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "disp_gate_pctl": 25.0},
+    },
+    # P3 組合格：DG25 × 高進場門檻（兩個獨立正效應疊加，朝 3% 目標）
+    # 基準 EZ 掃描最佳：EZ3.0 Top1 SL0 = 2.28%、EZ2.5 = 2.10%；DG25 全格 +0.2~0.5pp
+    {
+        "name":             "Agglomerative Fundamentals (FMP) DG25 EZ",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DG25_EZ",
+        "db_method":        "Agglomerative (FMP-DG25-EZ)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "disp_gate_pctl": 25.0,
+                   "stop_loss_list": [0.0],
+                   "entry_z_list":   [2.5, 3.0]},
+    },
+    # P3 組合格：DG25 × DRL 疊加（閘門同時作用於反事實標籤與正式模擬，
+    # 訓練標籤 = 閘門下可實現的報酬，無標籤/執行不一致）
+    {
+        "name":             "Agglomerative Fundamentals DRL THR (FMP) DG25",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_FMP_DRL_DG25",
+        "db_method":        "Agglomerative (FMP·DRL-DG25)",
+        "trade_method":     "DRL",
+        "params": {**base_params, "adf_pvalue_threshold": 0.05,
+                   "drl_hidden_size": 64, "thr_train_epochs": 40,
+                   "thr_min_train_samples": 200,
+                   "disp_gate_pctl": 25.0},
+    },
+    # 10. Agglomerative Fundamentals DRL THR FMP —— DRL-THR 疊加在 FMP 版本上
+    {
+        "name":             "Agglomerative Fundamentals DRL THR (FMP)",
+        "formation_module": "strategies.formation.agglomerative_FMP",
+        "formation_strategy_id_base": "Agglomerative Fundamentals (FMP)",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          "Agglomerative_Fundamentals_DRL_THR_FMP",
+        "db_method":        "Agglomerative (FMP·DRL)",
+        "trade_method":     "DRL",
+        "params": {
+            **base_params,
+            "drl_hidden_size": 64,
+            "thr_train_epochs": 40,
+            "thr_min_train_samples": 200,
+        },
+    },
+
     # ══ 交易端微觀規則戰役（2026-07-19 封存，P1/P2/P4 全數負面/中性）═══════
     # 背景：FMP Top1 交易解剖顯示期末強平桶（238 筆，勝率 21.4%）ΣPnL -19,530，
     #   >63d 未收斂勝率 26-46% → 提出時間停損/提早出場/DRL 時間維度三案。
