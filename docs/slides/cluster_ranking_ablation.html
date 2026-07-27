@@ -1239,6 +1239,137 @@ margin-right: 0; }
 </section>
 
 <section>
+<section id="七第三維度共整合篩選的貢獻" class="title-slide slide level1 center">
+<h1>七、第三維度：共整合篩選的貢獻</h1>
+<p>形成期的第三個可消融維度——<strong>篩選</strong>（ADF 共整合 + OU 半衰期 + Hurst 三道統計過濾）。 中性化後（<code>_cointegration.screen_pair</code>）篩選成為可開關參數，得以量化其邊際貢獻。</p>
+</section>
+<section id="實驗設計三項對照" class="slide level2">
+<h2>實驗設計：三項對照</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">實驗</th>
+<th style="text-align: left;">分組</th>
+<th style="text-align: left;">排序</th>
+<th style="text-align: center;">篩選</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">① 同產業純排序</td>
+<td style="text-align: left;">GICS</td>
+<td style="text-align: left;">SSD / DTW / SDP</td>
+<td style="text-align: center;">✗</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">② 同產業排序 + 篩選</td>
+<td style="text-align: left;">GICS</td>
+<td style="text-align: left;">SSD / DTW / SDP</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">③ 分群 + 排序 + 篩選</td>
+<td style="text-align: left;">HDB / AGG / KM</td>
+<td style="text-align: left;">SSD / DTW / SDP</td>
+<td style="text-align: center;">✓</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="篩選的貢獻gics-分組固定最佳年化" class="slide level2">
+<h2>篩選的貢獻（GICS 分組固定，最佳年化）</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">排序</th>
+<th style="text-align: center;">無篩選</th>
+<th style="text-align: center;">有篩選</th>
+<th style="text-align: center;">Δ年化</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">SSD</td>
+<td style="text-align: center;">0.79% / Sh 0.22</td>
+<td style="text-align: center;"><strong>1.66% / 0.20</strong></td>
+<td style="text-align: center;"><strong>+0.87pp</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">DTW</td>
+<td style="text-align: center;">0.86% / 0.20</td>
+<td style="text-align: center;">1.10% / 0.18</td>
+<td style="text-align: center;">+0.25pp</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">SSD-DTW-PCA</td>
+<td style="text-align: center;">1.00% / 0.21</td>
+<td style="text-align: center;"><strong>1.65% / 0.35</strong></td>
+<td style="text-align: center;">+0.65pp</td>
+</tr>
+</tbody>
+</table>
+<p><strong>三道統計過濾是真實且一致的增益來源</strong>——三種排序準則下全部為正，SSD 下貢獻近乎翻倍。 純距離排序不足以識別可交易配對：距離度量只回答「歷史走勢多接近」， 共整合檢定才回答「價差是否真的會回歸」，兩者結合才構成有效的配對選取。</p>
+</section></section>
+<section>
+<section id="八四種分組-三種排序皆含篩選" class="title-slide slide level1 center">
+<h1>八、四種分組 × 三種排序（皆含篩選）</h1>
+<p>加入 GICS 產業分組後的完整對照——<strong>傳統產業分組 vs 三種資料驅動分群</strong>：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分組＼排序</th>
+<th style="text-align: center;">SSD</th>
+<th style="text-align: center;">DTW</th>
+<th style="text-align: center;">SSD-DTW-PCA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>GICS（傳統）</strong></td>
+<td style="text-align: center;">1.66% / 0.20</td>
+<td style="text-align: center;">1.10% / 0.18</td>
+<td style="text-align: center;">1.65% / <strong>0.35</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>HDBSCAN</strong></td>
+<td style="text-align: center;">1.29% / 0.17</td>
+<td style="text-align: center;">0.89% / 0.15</td>
+<td style="text-align: center;"><strong>1.70%</strong> / 0.23</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>Agglomerative</strong></td>
+<td style="text-align: center;"><strong>1.77%</strong> / 0.26</td>
+<td style="text-align: center;">0.60% / 0.11</td>
+<td style="text-align: center;">1.13% / 0.18</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>K-means</strong></td>
+<td style="text-align: center;">1.31% / 0.20</td>
+<td style="text-align: center;">−0.06% / 0.03</td>
+<td style="text-align: center;">0.67% / 0.12</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="誠實的負面結果ml-分群相對-gics-的優勢有限" class="slide level2">
+<h2>誠實的負面結果：ML 分群相對 GICS 的優勢有限</h2>
+<ul>
+<li>最佳 ML 分群（Agglomerative × SSD，1.77%）僅<strong>高於 GICS × SSD（1.66%）0.11pp</strong></li>
+<li>HDBSCAN 與 K-means 在 SSD 排序下<strong>反而輸給傳統產業分組</strong></li>
+<li><strong>GICS × SSD-DTW-PCA 是全表最高 Sharpe（0.35）</strong>，年化 1.65% 與最佳者相當</li>
+</ul>
+<p>即：在目前的特徵設定下，「資料驅動分群優於產業分類」這個常見假設<strong>未獲支持</strong>。 這對論文是有價值的誠實結果，也指向下一步的關鍵問題——分群品質受限於<strong>特徵</strong>（見下節）。</p>
+</section>
+<section id="對照文獻特徵維度的落差" class="slide level2">
+<h2>對照文獻：特徵維度的落差</h2>
+<p>ref 內的 ML 配對交易文獻使用的特徵集遠比本研究豐富：</p>
+<blockquote>
+<p>Sanders (2021), <em>Pairs Trading via Unsupervised Learning</em>： 特徵集 = <strong>48 個動量因子</strong>（1–48 月累積報酬）+ <strong>78 個公司特徵</strong>（取自 Green et al. 2017）， 每月更新，以 CRSP 全市場為樣本。作者明言公司特徵「更具前瞻性」—— 走勢曾同步的兩檔股票，若公司特徵迥異，未來可能分道揚鑣。</p>
+</blockquote>
+<p>本研究目前的分群特徵為 <strong>5 維報酬 PCA 因子載荷 ⊕ 2 維基本面（log 市值、盈餘殖利率） ⊕ 12 維 GICS one-hot</strong>，維度與資訊量都遠低於上述文獻。這很可能是 ML 分群未能顯著 超越 GICS 的主因：<strong>分群演算法只能在給定特徵空間中尋找結構，特徵不足時再好的 演算法也無法區分出有意義的群落</strong>。</p>
+<p>後續方向見專案規劃：擴充動量因子集、加入更多可取得的公司特徵與流動性/波動特徵。</p>
+</section></section>
+<section>
 <section id="六完整策略地圖每一層的邊際貢獻" class="title-slide slide level1 center">
 <h1>六、完整策略地圖：每一層的邊際貢獻</h1>
 <pre><code>                配對品質        + DRL 交易端      + regime 閘門
