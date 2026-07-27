@@ -204,3 +204,86 @@ def build_fundamentals_mix_features(
             f"{n_missing_mc}、PE 缺失 {n_missing_pe} 已插補）+ 產業 one-hot {onehot.shape[1]} 維"
         )
     return X, valid_tickers
+
+
+def build_momentum_features(
+    price_df,
+    horizons_months: tuple = (1, 3, 6, 9, 12),
+    include_volatility: bool = True,
+    block_pca_components: int = 0,
+    random_state: int = 42,
+    min_tickers: int = 2,
+    verbose: bool = True,
+) -> tuple[np.ndarray, list[str]]:
+    """
+    多尺度動量特徵（純價格，零額外資料成本）。
+
+    文獻依據：Sanders (2021), *Pairs Trading via Unsupervised Learning* 以
+      48 個 1–48 月動量因子 + 78 個公司特徵分群。本函式在形成窗長度（252 日
+      = 12 個月）容許範圍內取多個時間尺度的累積報酬——動量捕捉「不同時間尺度
+      上的走勢形狀」，與報酬 PCA 載荷（共同因子暴露）互補。
+
+    參數:
+        horizons_months:      動量視窗（月），以 21 交易日 ≈ 1 月換算；
+                              超過形成窗長度者自動跳過
+        include_volatility:   併入 20/60 日已實現波動與下行波動（可交易性特徵）
+        block_pca_components: >0 時對整個特徵區塊做 PCA 降維（避免高維動量
+                              在後續拼接中稀釋其他區塊；0 = 不降維）
+    回傳 (X [N×d], valid_tickers)；特徵已逐欄標準化。
+    """
+    log_prices = np.log(price_df)
+    tickers = log_prices.columns.tolist()
+
+    valid_tickers, cols = [], []
+    for t in tickers:
+        s = log_prices[t].values
+        if len(s) < 30 or not np.all(np.isfinite(s)):
+            continue
+        valid_tickers.append(t)
+        cols.append(s)
+    if len(valid_tickers) < min_tickers:
+        return np.empty((0, 0)), []
+
+    LP = np.column_stack(cols)          # (T × N) 對數價格
+    T = LP.shape[0]
+    feats, names = [], []
+
+    # ── 多尺度動量：各視窗的累積對數報酬 ──────────────────────────────
+    for m in horizons_months:
+        w = min(int(m * 21), T - 1)      # 視窗上限＝形成窗全長（12 月 ≈ 252 日）
+        if w < 5:
+            continue
+        mom = LP[-1, :] - LP[-1 - w, :]  # log(P_t / P_{t-w})
+        if any(n == f"mom{m}m" for n in names):
+            continue
+        feats.append(mom); names.append(f"mom{m}m")
+
+    # ── 波動 / 可交易性特徵 ───────────────────────────────────────────
+    if include_volatility:
+        R = np.diff(LP, axis=0)
+        for w in (20, 60):
+            if w < R.shape[0]:
+                feats.append(R[-w:, :].std(axis=0, ddof=1)); names.append(f"vol{w}d")
+        # 下行波動（僅負報酬）
+        neg = np.where(R < 0, R, 0.0)
+        feats.append(neg[-60:, :].std(axis=0, ddof=1) if R.shape[0] >= 60
+                     else neg.std(axis=0, ddof=1))
+        names.append("downvol60d")
+
+    if not feats:
+        return np.empty((0, 0)), []
+
+    X = np.column_stack(feats)
+    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+    X = StandardScaler().fit_transform(X)
+
+    if block_pca_components and block_pca_components < X.shape[1]:
+        k = max(1, min(block_pca_components, X.shape[0] - 1, X.shape[1]))
+        X = PCA(n_components=k, random_state=random_state).fit_transform(X)
+        if verbose:
+            print(f"  [Formation] 動量特徵：{len(valid_tickers)} 檔 × {len(names)} 原始特徵 "
+                  f"→ PCA {k} 維（{', '.join(names)}）")
+    elif verbose:
+        print(f"  [Formation] 動量特徵：{len(valid_tickers)} 檔 × {len(names)} 維 "
+              f"（{', '.join(names)}）")
+    return X, valid_tickers

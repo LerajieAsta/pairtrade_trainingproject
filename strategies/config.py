@@ -380,6 +380,17 @@ for _rb, _rs in _GRID_RANKINGS.items():
             "params":           _pg,
         })
 
+
+# （特徵消融「多尺度動量」：2026-07-24 驗證為負面結果——三種分群全面劣化
+#   （HDB −0.94pp、AGG −2.43pp 至 −0.65%、KM −1.40pp）。根因：動量度量「過去
+#   漲跌幅」而非「走勢同步性」，且橫斷面變異大於 PCA 載荷，在歐氏距離中主導
+#   分群、稀釋原本有效的因子暴露訊號（與 SEC-PIT-Beta 同一失敗模式）。
+#   註：Sanders (2021) 的動量特徵用於「識別高估/低估股票」而非分群依據，
+#   其分群依據為 78 個公司特徵——正確的擴充方向是結構性基本面特徵。
+#   已封存至 archive/config_archived_strategies.py；
+#   _features.build_momentum_features 與 feature_mode="momentum"/"momentum_mix"
+#   機制保留供復活。）
+
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
 strategies_raw = strategies_raw_all[:]

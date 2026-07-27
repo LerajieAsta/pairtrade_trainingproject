@@ -155,6 +155,66 @@ from strategies.config import (
 )
 
 strategies_raw_archived = [
+    # ══ 2026-07-24 封存：多尺度動量特徵消融（負面結果，3 條）══════════════
+    # 假說：ref 內 ML 配對文獻（Sanders 2021）用 48 動量因子 + 78 公司特徵分群，
+    #   本研究僅 19 維（5 報酬 PCA ⊕ 2 基本面 ⊕ 12 產業 one-hot）；3×3 矩陣顯示
+    #   ML 分群僅小勝 GICS（1.77% vs 1.66%），疑似受限於特徵而非演算法。
+    #   → 加入 8 維多尺度動量/波動（mom 1/3/6/9/12 月 + vol20d/vol60d/downvol60d）。
+    # 驗證（固定 SSD 排序與篩選，唯一變因＝特徵集，各 15 網格）：
+    #   HDBSCAN       1.29% → 0.35%（−0.94pp）
+    #   Agglomerative 1.77% → −0.65%（−2.43pp，15 格 0 個正 Sharpe）
+    #   K-means       1.31% → −0.09%（−1.40pp）
+    #   三種分群全面劣化，非參數噪音。
+    # 根因：(1) 動量度量「過去漲跌幅」而非「走勢同步性」——漲幅相近 ≠ 價差會
+    #   回歸，與配對交易的目標不一致；(2) 動量的橫斷面變異大於 PCA 載荷，在
+    #   歐氏距離中主導分群、稀釋原本有效的因子暴露訊號（與 SEC-PIT-Beta
+    #   「高變異特徵主導距離」同一失敗模式）。
+    # 對文獻的正確理解：Sanders (2021) 的動量特徵用於「識別高估/低估股票」
+    #   （交易訊號層），分群依據是 78 個公司特徵，且作者強調公司特徵「更具
+    #   前瞻性」。正確的擴充方向是結構性基本面特徵，非價格動量。
+    # 學術價值：排除一條看似合理的特徵擴充路徑，成本僅 45 網格。
+    # 復活：_features.build_momentum_features 與 cluster_formation 的
+    #   feature_mode="momentum"/"momentum_mix"、momentum_* 參數皆保留。
+    {
+        "name":             "Grid HDB-SSD MOM",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Grid_HDB_SSD_MOM",
+        "db_method":        "Grid (HDB-SSD-MOM)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "feature_mode": "momentum_mix",
+                   "cluster_method": "hdbscan", "ranking_backend": "ssd",
+                   "pca_n_components": 5, "adf_pvalue_threshold": 0.05,
+                   "momentum_horizons": (1, 3, 6, 9, 12),
+                   "momentum_include_vol": True, "momentum_weight": 1.0},
+    },
+    {
+        "name":             "Grid AGG-SSD MOM",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Grid_AGG_SSD_MOM",
+        "db_method":        "Grid (AGG-SSD-MOM)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "feature_mode": "momentum_mix",
+                   "cluster_method": "agglomerative", "ranking_backend": "ssd",
+                   "pca_n_components": 5, "adf_pvalue_threshold": 0.05,
+                   "momentum_horizons": (1, 3, 6, 9, 12),
+                   "momentum_include_vol": True, "momentum_weight": 1.0},
+    },
+    {
+        "name":             "Grid KM-SSD MOM",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "Grid_KM_SSD_MOM",
+        "db_method":        "Grid (KM-SSD-MOM)",
+        "trade_method":     "Z-Score",
+        "params": {**base_params, "feature_mode": "momentum_mix",
+                   "cluster_method": "kmeans", "ranking_backend": "ssd",
+                   "pca_n_components": 5, "adf_pvalue_threshold": 0.05,
+                   "momentum_horizons": (1, 3, 6, 9, 12),
+                   "momentum_include_vol": True, "momentum_weight": 1.0},
+    },
+
     # ══ 2026-07-23 封存：被 3×3 Grid 消融矩陣取代的舊分群/疊加系列（14 條）══
     # 背景：形成期中性化重構後（_features / _clustering / _ranking / cluster_formation），
     #   「分群 × 排序」的所有組合改由宣告式 3×3 Grid 展開，舊的每組合一模組寫法退場。

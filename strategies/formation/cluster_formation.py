@@ -23,6 +23,7 @@ import pandas as pd
 
 from strategies.formation._features import (
     build_return_pca_loadings, build_fundamentals_mix_features,
+    build_momentum_features,
 )
 from strategies.formation._clustering import cluster, cluster_agglomerative
 from strategies.formation._ranking import rank_within_groups
@@ -50,6 +51,11 @@ class Formation:
         fundamentals_feature_weight: float = 1.0,
         sector_onehot_weight: float = 1.0,
         umap_random_state: int = 42,
+        # ── 動量特徵組（feature_mode="momentum" / "momentum_mix"）──────
+        momentum_horizons: tuple = (1, 3, 6, 9, 12),
+        momentum_include_vol: bool = True,
+        momentum_block_pca: int = 0,     # >0：動量區塊先 PCA 降維再拼接
+        momentum_weight: float = 1.0,
         # ── 分群組 ─────────────────────────────────────────────────
         hdbscan_min_cluster_size: int = 5,
         hdbscan_min_samples: int = 2,
@@ -82,6 +88,10 @@ class Formation:
         self.fundamentals_feature_weight = fundamentals_feature_weight
         self.sector_onehot_weight = sector_onehot_weight
         self.umap_random_state = umap_random_state
+        self.momentum_horizons = tuple(momentum_horizons)
+        self.momentum_include_vol = momentum_include_vol
+        self.momentum_block_pca = int(momentum_block_pca or 0)
+        self.momentum_weight = float(momentum_weight)
 
         self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
         self.hdbscan_min_samples = hdbscan_min_samples
@@ -103,6 +113,40 @@ class Formation:
 
     # ── 特徵 ───────────────────────────────────────────────────────
     def _build_feature_matrix(self) -> tuple[np.ndarray, list[str]]:
+        if self.feature_mode in ("momentum", "momentum_mix"):
+            # 多尺度動量（+ 波動/可交易性）；"momentum_mix" 再併上混合特徵區塊
+            mom_X, mom_tickers = build_momentum_features(
+                price_df=self.price_df,
+                horizons_months=self.momentum_horizons,
+                include_volatility=self.momentum_include_vol,
+                block_pca_components=self.momentum_block_pca,
+                random_state=self.umap_random_state,
+                min_tickers=self.min_tickers_for_pairing,
+            )
+            if self.feature_mode == "momentum" or len(mom_tickers) < self.min_tickers_for_pairing:
+                return mom_X * self.momentum_weight, mom_tickers
+            base_X, base_tickers = build_fundamentals_mix_features(
+                price_df=self.price_df, form_end=self.form_end,
+                sector_mapping=self.real_sector_mapping,
+                pca_n_components=self.pca_n_components,
+                factor_residual=self.factor_residual,
+                fundamentals_parquet_path=self.fundamentals_parquet_path,
+                price_feature_weight=self.price_feature_weight,
+                fundamentals_feature_weight=self.fundamentals_feature_weight,
+                sector_onehot_weight=self.sector_onehot_weight,
+                random_state=self.umap_random_state,
+                min_tickers=self.min_tickers_for_pairing,
+            )
+            # 兩區塊的有效股票集可能不同 → 取交集後對齊順序
+            common = [t for t in base_tickers if t in set(mom_tickers)]
+            if len(common) < self.min_tickers_for_pairing:
+                return np.empty((0, 0)), []
+            bi = {t: i for i, t in enumerate(base_tickers)}
+            mi = {t: i for i, t in enumerate(mom_tickers)}
+            X = np.hstack([base_X[[bi[t] for t in common]],
+                           mom_X[[mi[t] for t in common]] * self.momentum_weight])
+            return X, common
+
         if self.feature_mode == "price_pca":
             return build_return_pca_loadings(
                 price_df=self.price_df,
