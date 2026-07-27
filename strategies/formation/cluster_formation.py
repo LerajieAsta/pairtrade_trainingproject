@@ -56,6 +56,9 @@ class Formation:
         momentum_include_vol: bool = True,
         momentum_block_pca: int = 0,     # >0：動量區塊先 PCA 降維再拼接
         momentum_weight: float = 1.0,
+        # ── 結構性財報特徵（SEC XBRL PIT；空 tuple = 停用，維持現行行為）──
+        structural_features: tuple = (),
+        structural_weight: float = 1.0,
         # ── 分群組 ─────────────────────────────────────────────────
         hdbscan_min_cluster_size: int = 5,
         hdbscan_min_samples: int = 2,
@@ -92,6 +95,8 @@ class Formation:
         self.momentum_include_vol = momentum_include_vol
         self.momentum_block_pca = int(momentum_block_pca or 0)
         self.momentum_weight = float(momentum_weight)
+        self.structural_features = tuple(structural_features)
+        self.structural_weight = float(structural_weight)
 
         self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
         self.hdbscan_min_samples = hdbscan_min_samples
@@ -134,6 +139,8 @@ class Formation:
                 price_feature_weight=self.price_feature_weight,
                 fundamentals_feature_weight=self.fundamentals_feature_weight,
                 sector_onehot_weight=self.sector_onehot_weight,
+                structural_features=self.structural_features,
+                structural_weight=self.structural_weight,
                 random_state=self.umap_random_state,
                 min_tickers=self.min_tickers_for_pairing,
             )
@@ -166,6 +173,8 @@ class Formation:
             price_feature_weight=self.price_feature_weight,
             fundamentals_feature_weight=self.fundamentals_feature_weight,
             sector_onehot_weight=self.sector_onehot_weight,
+            structural_features=self.structural_features,
+            structural_weight=self.structural_weight,
             random_state=self.umap_random_state,
             min_tickers=self.min_tickers_for_pairing,
         )

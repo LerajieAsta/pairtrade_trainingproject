@@ -155,6 +155,127 @@ from strategies.config import (
 )
 
 strategies_raw_archived = [
+    # ══ 2026-07-25 主軸收斂：現役精簡至 15 條（4 分組 × 3 排序 + 3 DRL）══════
+    # 論文主軸＝「機器學習分群（命題 1）+ 深度學習交易（命題 2）」，現役清單
+    # 只保留直接支撐兩命題的策略；下列為移出主軸者，成果全在 results/result.db。
+    #
+    # 【A. 原生傳統基準 4 條 + formation-only 2 條】（下方 dict 條目）
+    #   SSD (Basic)/(Rolling)、DTW、SSD-DTW-PCA 及其配對來源 DTW Paper ×2。
+    #   移出理由：傳統基準改由 Grid (GICS-SSD/DTW/SDP) 擔任——ADF 門檻統一 0.05，
+    #   與 ML 分群列可比，構成乾淨的 4×3 矩陣；原生條目 ADF 預設不一致
+    #   （ssd_rolling 0.05 vs DTW 模組 0.01），不宜混在同一張表。
+    #   ⚠️ Grid (GICS-SSD) 已驗證與 SSD Rolling 數值完全相同（1.66%/Sh0.20/PF1.19），
+    #   兩者方法論等價，故主軸保留前者不損失任何實證內容。
+    #   論文定位：附錄「文獻原始設定復現」（Gatev 2006 原型、許鈞翔 2025 ADF 0.01）。
+    #
+    # 【B. 篩選消融 3 條】Grid (GICS-SSD-NF/DTW-NF/SDP-NF)（config 迴圈已改為只產生
+    #   coint 分支）。成果：三道統計過濾貢獻 +0.25~0.87pp。
+    #   論文定位：附錄「方法論設計依據——為何加入共整合篩選」。
+    #
+    # 【C. 結構性財報特徵消融 6 條】F09 (HDB/AGG/KM)-(BASE/STRUCT)（2009+ 期間）。
+    #   成果：10 維 SEC XBRL 財報比率對分群品質無顯著貢獻（三分群 Δ 皆在 ±0.22pp
+    #   噪音範圍內）。與動量特徵消融同為「特徵不是瓶頸」的證據。
+    #   論文定位：附錄「特徵工程消融」。
+    #
+    # 【D. regime 閘門三層疊加 3 條】Grid (AGG-SSD/HDB-SDP/KM-SSD)-DRL-DG25。
+    #   成果：AGG 版五輪中位 2.69% [2.65, 2.71]、Sharpe 0.40、最差輪 14/15 正 Sharpe，
+    #   為全專案最穩健配置；但 regime 條件化進場不屬本論文兩命題，
+    #   論文定位：附錄「延伸探索——regime 條件化進場」。
+    #   機制保留：disp_gate_pctl 參數於 zscore_trading / drl_threshold_trading 皆在。
+    #
+    # 復活：把下方條目貼回 strategies/config.py；B/C/D 三組為 config 迴圈展開，
+    #   復活方式見本檔案末的註記與 git 歷史（commit 「主軸收斂」之前的版本）。
+
+    # ── 基準 ────────────────────────────────────────────────────────────────
+    # 0. SSD Basic（Gatev et al. 2006 原型：累積回報指數 + 固定 β=1；
+    #    一切策略的基礎原型，2026-07-06 自封存拉回現役）
+    {
+        "name":             "SSD Basic",
+        "formation_module": "strategies.formation.ssd_basic",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "SSD_Basic",
+        "db_method":        "SSD (Basic)",
+        "trade_method":     "Z-Score",
+        "params":  {**base_params},
+    },
+    # 1. SSD Rolling（SSD 家族代表基準；亦為 DRL / 距離對照的形成來源）
+    {
+        "name":             "SSD Rolling",
+        "formation_module": "strategies.formation.ssd_rolling",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "SSD_Rolling",
+        "db_method":        "SSD (Rolling)",
+        "trade_method":     "Z-Score",
+        "params":  {
+            **base_params,
+        },
+    },
+    # ── DTW 基準（座標修正版；原版為 artifact 已封存） ───────────────────────
+    # DTW Paper 原版的 OLS 在標準化空間擬合但輸出 OLS_Alpha → 交易端路徑 A
+    # 以原始 log-price 空間重建 spread → 常數 Z 偏移（詳見封存檔說明）。
+    # #2/#3 借用原版的形成期配對（formation_strategy_id_base），
+    # 以 ignore_ols_alpha 強制路徑 B（標準化空間），為誠實的 Z-Score 基準。
+    # 2. DTW Paper Fixed（座標修正版）
+    {
+        "name":             "DTW Paper Fixed (DTW)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "formation_strategy_id_base": "DTW Paper (DTW)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "DTW_Paper_Fixed",
+        "db_method":        "DTW",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "method": "dtw",
+            "ignore_ols_alpha": True,   # 強制路徑 B：與形成期一致的標準化空間
+        },
+    },
+    # 3. SSD-DTW-PCA Paper Fixed（座標修正版，目前最佳誠實基準：Top3 Sharpe 0.56）
+    {
+        "name":             "SSD-DTW-PCA Paper Fixed",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "formation_strategy_id_base": "DTW Paper (SSD-DTW-PCA)",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          "SSD_DTW_PCA_Paper_Fixed",
+        "db_method":        "SSD-DTW-PCA",
+        "trade_method":     "Z-Score",
+        "params": {
+            **base_params,
+            "method": "ssd_dtw_pca",
+            "ignore_ols_alpha": True,
+            # T2 實驗（entry_z × dynamic_stop_z 網格）已於 2026-07-06 拆除：
+            # 結論 = DSZ 全面有害（停掉 67% 交易、勝率 61%→33%）、EZ 2.5 微幅較優。
+            # 歷史結果保留於 result.db（ENTRY Z / DYN Z NUM 欄位可篩）。
+        },
+    },
+    # ── DTW Paper 原版（formation-only：僅產生形成期配對供 #2/#3 借用） ──────
+    # 2026-07-05：repo LFS 額度用罄，formation_pairs DB 無法下載，原版配對
+    # 需本地重算。原版「交易端」為座標 artifact 已封存（見 archive/
+    # config_archived_strategies.py），故以 formation_only 旗標讓 run_trading
+    # 跳過回測，只由 run_formation 產生 DTW Paper (DTW)/(SSD-DTW-PCA) 配對。
+    # 置於清單尾端以保持 #1–#10 的 STRATEGIES_SLICE 索引穩定
+    # （注意："-1:" 之類的尾端切片現在會切到 formation-only 條目）。
+    {
+        "name":             "DTW Paper (DTW)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "formation_only":   True,
+        "sub_dir":          "DTW_Paper",
+        "db_method":        "DTW (Paper)",
+        "trade_method":     "Z-Score",
+        "params":  {**base_params, "method": "dtw"},
+    },
+    {
+        "name":             "DTW Paper (SSD-DTW-PCA)",
+        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "formation_only":   True,
+        "sub_dir":          "SSD_DTW_PCA_Paper",
+        "db_method":        "SSD-DTW-PCA (Paper)",
+        "trade_method":     "Z-Score",
+        "params":  {**base_params, "method": "ssd_dtw_pca"},
+    },
+
     # ══ 2026-07-24 封存：多尺度動量特徵消融（負面結果，3 條）══════════════
     # 假說：ref 內 ML 配對文獻（Sanders 2021）用 48 動量因子 + 78 公司特徵分群，
     #   本研究僅 19 維（5 報酬 PCA ⊕ 2 基本面 ⊕ 12 產業 one-hot）；3×3 矩陣顯示

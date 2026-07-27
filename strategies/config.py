@@ -76,8 +76,11 @@ INFO_TABLE = "Constituents"
 TICKER_COL = "Symbol"
 SECTOR_COL = "GICS_Sector"
 
-BACKTEST_START   = "2000-01"
-BACKTEST_END     = "2025-12"
+# 回測期間（可用環境變數覆寫，免改檔做分期實驗）
+#   例：SEC XBRL 結構性財報自 2009 起才有資料 → 該系列實驗以
+#       $env:BACKTEST_START="2009-01" 執行，與全期結果並存於 result.db
+BACKTEST_START   = os.environ.get("BACKTEST_START", "2000-01").strip()
+BACKTEST_END     = os.environ.get("BACKTEST_END", "2025-12").strip()
 FORMATION_WINDOW = 252
 FORWARD_DAYS     = 126
 rolling_step     = 21
@@ -181,96 +184,11 @@ _HDBSCAN_MS_FILTERS = {
 # DRL THR 變體、ML Pair Quality）——原因與數據見 archive/config_archived_strategies.py
 # docstring「HDBSCAN PCA-Loadings 系列」「ML Pair Quality」兩節。
 # 歷史回測結果保留於 results/result.db；復活方式見封存檔 docstring。
-strategies_raw_all = [
-    # ── 基準 ────────────────────────────────────────────────────────────────
-    # 0. SSD Basic（Gatev et al. 2006 原型：累積回報指數 + 固定 β=1；
-    #    一切策略的基礎原型，2026-07-06 自封存拉回現役）
-    {
-        "name":             "SSD Basic",
-        "formation_module": "strategies.formation.ssd_basic",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_Basic",
-        "db_method":        "SSD (Basic)",
-        "trade_method":     "Z-Score",
-        "params":  {**base_params},
-    },
-    # 1. SSD Rolling（SSD 家族代表基準；亦為 DRL / 距離對照的形成來源）
-    {
-        "name":             "SSD Rolling",
-        "formation_module": "strategies.formation.ssd_rolling",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_Rolling",
-        "db_method":        "SSD (Rolling)",
-        "trade_method":     "Z-Score",
-        "params":  {
-            **base_params,
-        },
-    },
-    # ── DTW 基準（座標修正版；原版為 artifact 已封存） ───────────────────────
-    # DTW Paper 原版的 OLS 在標準化空間擬合但輸出 OLS_Alpha → 交易端路徑 A
-    # 以原始 log-price 空間重建 spread → 常數 Z 偏移（詳見封存檔說明）。
-    # #2/#3 借用原版的形成期配對（formation_strategy_id_base），
-    # 以 ignore_ols_alpha 強制路徑 B（標準化空間），為誠實的 Z-Score 基準。
-    # 2. DTW Paper Fixed（座標修正版）
-    {
-        "name":             "DTW Paper Fixed (DTW)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "formation_strategy_id_base": "DTW Paper (DTW)",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "DTW_Paper_Fixed",
-        "db_method":        "DTW",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "method": "dtw",
-            "ignore_ols_alpha": True,   # 強制路徑 B：與形成期一致的標準化空間
-        },
-    },
-    # 3. SSD-DTW-PCA Paper Fixed（座標修正版，目前最佳誠實基準：Top3 Sharpe 0.56）
-    {
-        "name":             "SSD-DTW-PCA Paper Fixed",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "formation_strategy_id_base": "DTW Paper (SSD-DTW-PCA)",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "sub_dir":          "SSD_DTW_PCA_Paper_Fixed",
-        "db_method":        "SSD-DTW-PCA",
-        "trade_method":     "Z-Score",
-        "params": {
-            **base_params,
-            "method": "ssd_dtw_pca",
-            "ignore_ols_alpha": True,
-            # T2 實驗（entry_z × dynamic_stop_z 網格）已於 2026-07-06 拆除：
-            # 結論 = DSZ 全面有害（停掉 67% 交易、勝率 61%→33%）、EZ 2.5 微幅較優。
-            # 歷史結果保留於 result.db（ENTRY Z / DYN Z NUM 欄位可篩）。
-        },
-    },
-    # ── DTW Paper 原版（formation-only：僅產生形成期配對供 #2/#3 借用） ──────
-    # 2026-07-05：repo LFS 額度用罄，formation_pairs DB 無法下載，原版配對
-    # 需本地重算。原版「交易端」為座標 artifact 已封存（見 archive/
-    # config_archived_strategies.py），故以 formation_only 旗標讓 run_trading
-    # 跳過回測，只由 run_formation 產生 DTW Paper (DTW)/(SSD-DTW-PCA) 配對。
-    # 置於清單尾端以保持 #1–#10 的 STRATEGIES_SLICE 索引穩定
-    # （注意："-1:" 之類的尾端切片現在會切到 formation-only 條目）。
-    {
-        "name":             "DTW Paper (DTW)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "formation_only":   True,
-        "sub_dir":          "DTW_Paper",
-        "db_method":        "DTW (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {**base_params, "method": "dtw"},
-    },
-    {
-        "name":             "DTW Paper (SSD-DTW-PCA)",
-        "formation_module": "strategies.formation.DTW_Cointegration_Paper",
-        "trading_module":   "strategies.trading.zscore_trading",
-        "formation_only":   True,
-        "sub_dir":          "SSD_DTW_PCA_Paper",
-        "db_method":        "SSD-DTW-PCA (Paper)",
-        "trade_method":     "Z-Score",
-        "params":  {**base_params, "method": "ssd_dtw_pca"},
-    },
+strategies_raw_all = [    # （2026-07-25 主軸收斂：原生傳統基準 4 條（SSD Basic/Rolling、DTW、SSD-DTW-PCA）
+    #   與其 formation-only 配對來源 2 條，一併移至 archive/config_archived_strategies.py。
+    #   傳統基準改由 Grid (GICS-*) 三格擔任——ADF 門檻統一 0.05，與 ML 分群列可比，
+    #   構成乾淨的 4 分組 × 3 排序矩陣。原生條目為「文獻原始設定復現」，
+    #   其中 Grid (GICS-SSD) 已驗證與 SSD Rolling 數值完全相同。）
 ]
 # 2026-07-04 清理：FQI 系列×3、CONV×2 等歸位 archive/config_archived_strategies.py。
 # 2026-07-06 調整：SSD Basic（基礎原型）自封存拉回現役；HDBSCAN 系列僅保留
@@ -325,8 +243,11 @@ for _cm, _cs in _GRID_CLUSTERS.items():
 # 借用該格已算好的形成期配對（formation_strategy_id_base），零重跑 formation；
 # 交易端換成 drl_threshold_trading（走標準化空間 z_of，不讀 OLS_Alpha）。
 # 驗證「配對品質矩陣（Z-Score）× DRL 交易端增益」的正交第二層。
+# 命題 2：三種 ML 配對底（命題 1 的全部分群方法）各自疊 DRL 交易端，
+# 證明 DRL 增益不依賴特定分群方法。各底取其在 3×3 矩陣中的最佳排序。
 for _cl_m, _cl_s, _rk_m, _rk_s in [("agglomerative", "AGG", "ssd", "SSD"),
-                                    ("hdbscan", "HDB", "ssd_dtw_pca", "SDP")]:
+                                    ("hdbscan", "HDB", "ssd_dtw_pca", "SDP"),
+                                    ("kmeans", "KM", "ssd", "SSD")]:
     _pd = {**base_params, **_GRID_COMMON,
            "feature_mode": "fundamentals_mix",
            "cluster_method": _cl_m, "ranking_backend": _rk_m,
@@ -341,19 +262,6 @@ for _cl_m, _cl_s, _rk_m, _rk_s in [("agglomerative", "AGG", "ssd", "SSD"),
         "trade_method":     "DRL",
         "params":           _pd,
     })
-    # 三層疊加：好配對 × DRL 交易端 × DG25 低分散度閘門（三個已驗證正交增益）
-    _pdg = {**_pd, "disp_gate_pctl": 25.0}
-    _grid_entries.append({
-        "name":             f"Grid {_cl_s}-{_rk_s} DRL DG25",
-        "formation_module": "strategies.formation.cluster_formation",
-        "formation_strategy_id_base": f"Grid {_cl_s}-{_rk_s}",
-        "trading_module":   "strategies.trading.drl_threshold_trading",
-        "sub_dir":          f"Grid_{_cl_s}_{_rk_s}_DRL_DG25",
-        "db_method":        f"Grid ({_cl_s}-{_rk_s}-DRL-DG25)",
-        "trade_method":     "DRL",
-        "params":           _pdg,
-    })
-
 # 插在 formation-only 條目之前（保持 formation-only 於清單尾端）
 _fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_only")),
                len(strategies_raw_all))
@@ -364,7 +272,7 @@ _fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_
 #   (b) filter_mode 可關閉三道統計過濾（ADF/半衰期/Hurst）
 # 三項實驗：① GICS+排序（NF，無篩選）② GICS+排序+篩選 ③ 分群+排序+篩選（= 3×3 Grid）
 for _rb, _rs in _GRID_RANKINGS.items():
-    for _fm, _fs_tag in (("coint", ""), ("none", "-NF")):
+    for _fm, _fs_tag in (("coint", ""),):   # NF（無篩選）消融已移附錄
         _pg = {**base_params, **_GRID_COMMON,
                "cluster_method": "gics", "ranking_backend": _rb,
                "filter_mode": _fm}
@@ -390,6 +298,11 @@ for _rb, _rs in _GRID_RANKINGS.items():
 #   已封存至 archive/config_archived_strategies.py；
 #   _features.build_momentum_features 與 feature_mode="momentum"/"momentum_mix"
 #   機制保留供復活。）
+
+
+# （特徵消融 F09 結構性財報特徵：2026-07-24 驗證為負面結果（三分群 Δ 皆在 ±0.22pp
+#   噪音範圍內），已移至 archive/config_archived_strategies.py；
+#   structural_features 機制保留於 _features / cluster_formation。）
 
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 

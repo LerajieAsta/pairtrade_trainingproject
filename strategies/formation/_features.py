@@ -124,12 +124,15 @@ def build_fundamentals_mix_features(
     price_feature_weight: float = 1.0,
     fundamentals_feature_weight: float = 1.0,
     sector_onehot_weight: float = 1.0,
+    structural_features: tuple = (),      # 結構性財報特徵欄位（SEC XBRL PIT）
+    structural_weight: float = 1.0,
     random_state: int = 42,
     min_tickers: int = 2,
     verbose: bool = True,
 ) -> tuple[np.ndarray, list[str]]:
     """
-    混合特徵：報酬 PCA 因子載荷 ⊕ 公司基本面（log 市值、盈餘殖利率 1/PE）⊕ GICS 產業 one-hot。
+    混合特徵：報酬 PCA 因子載荷 ⊕ 公司基本面（log 市值、盈餘殖利率 1/PE）⊕ GICS 產業 one-hot
+    ⊕（可選）結構性財報特徵（ROE/ROA/負債比/毛利率… 見 fetch_sec_fundamentals）。
 
     三個區塊各自 StandardScaler 後依權重拼接（避免 joint 標準化讓 one-hot 欄位數
     稀釋連續特徵的距離量測）。基本面取自 FMP Point-in-Time：對每個形成窗取
@@ -166,9 +169,15 @@ def build_fundamentals_mix_features(
     canonical_sectors = []
     market_caps = np.full(len(valid_tickers), np.nan)
     earnings_yields = np.full(len(valid_tickers), np.nan)
+    struct_cols = [c for c in structural_features]
+    struct_vals = {c: np.full(len(valid_tickers), np.nan) for c in struct_cols}
 
     for i, ticker in enumerate(valid_tickers):
         rec = current_fundamentals.get(ticker.upper(), {})
+        for c in struct_cols:
+            v = rec.get(c)
+            if v is not None and pd.notna(v) and np.isfinite(float(v)):
+                struct_vals[c][i] = float(v)
         raw_sector = rec.get("industry") if pd.notna(rec.get("industry")) else _lookup_sector(ticker)
         canonical_sectors.append(canonicalize_sector(raw_sector))
         market_cap = rec.get("market_cap")
@@ -195,13 +204,31 @@ def build_fundamentals_mix_features(
     fundamentals_scaled = StandardScaler().fit_transform(fundamentals_cont) * fundamentals_feature_weight
     sector_weighted = onehot * sector_onehot_weight
 
-    X = np.hstack([price_scaled, fundamentals_scaled, sector_weighted])
+    blocks = [price_scaled, fundamentals_scaled, sector_weighted]
+
+    # 結構性財報特徵區塊：同樣以產業中位數插補 + winsorize + 標準化 + 權重
+    n_struct_missing = {}
+    if struct_cols:
+        cols_arr = []
+        for c in struct_cols:
+            v = struct_vals[c]
+            n_struct_missing[c] = int(np.isnan(v).sum())
+            v = winsorize(impute_by_group(v, canonical_sectors))
+            cols_arr.append(v)
+        struct_mat = np.column_stack(cols_arr)
+        struct_scaled = StandardScaler().fit_transform(struct_mat) * structural_weight
+        blocks.append(struct_scaled)
+
+    X = np.hstack(blocks)
 
     if verbose:
         print(
             f"  [Formation] 混合特徵矩陣：{len(valid_tickers)} 檔 | "
             f"價格因子 {price_loadings.shape[1]} 維 + 基本面 2 維（市值缺失 "
             f"{n_missing_mc}、PE 缺失 {n_missing_pe} 已插補）+ 產業 one-hot {onehot.shape[1]} 維"
+            + (f" + 結構性財報 {len(struct_cols)} 維（缺失 "
+               + ", ".join(f"{c}:{n}" for c, n in n_struct_missing.items()) + " 已插補）"
+               if struct_cols else "")
         )
     return X, valid_tickers
 
