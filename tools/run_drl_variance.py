@@ -41,8 +41,12 @@ if str(_ROOT) not in _sys.path:
     _sys.path.insert(0, str(_ROOT))
 
 RESULT_DB = "results/result.db"
-RUNS_CSV = "results/drl_variance_runs.csv"
-SUMMARY_CSV = "results/drl_variance_summary.csv"
+# 檔名可用環境變數覆寫，讓不同策略陣容的變異數結果分開存放
+#   （舊陣容結果在 results/analysis/drl_variance_runs.csv，勿混寫）
+_VAR_TAG = os.environ.get("DRL_VARIANCE_TAG", "").strip()
+_suffix = f"_{_VAR_TAG}" if _VAR_TAG else ""
+RUNS_CSV = f"results/analysis/drl_variance_runs{_suffix}.csv"
+SUMMARY_CSV = f"results/analysis/drl_variance_summary{_suffix}.csv"
 LOG_DIR = "results/logs"
 
 

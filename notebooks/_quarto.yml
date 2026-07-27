@@ -4,9 +4,9 @@ project:
   render:
     - formation/*.ipynb
     - trading/*.ipynb
+    - main_results.ipynb
     - comparison.ipynb
     - performance_guide.ipynb
-    - cluster_ranking_ablation.ipynb
 
 lang: zh-TW
 
