@@ -357,6 +357,29 @@ for _cl_m, _cl_s, _rk_m, _rk_s in [("agglomerative", "AGG", "ssd", "SSD"),
 # 插在 formation-only 條目之前（保持 formation-only 於清單尾端）
 _fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_only")),
                len(strategies_raw_all))
+
+# ── 同產業（GICS）分組 × 排序 × 篩選 消融（形成期第三維度：篩選開關）──────
+# 對照組設計：與 3×3 Grid 共用同一組排序準則與交易端，唯二差異＝
+#   (a) 分組改用真實 GICS 產業（不跑分群、不需特徵矩陣）
+#   (b) filter_mode 可關閉三道統計過濾（ADF/半衰期/Hurst）
+# 三項實驗：① GICS+排序（NF，無篩選）② GICS+排序+篩選 ③ 分群+排序+篩選（= 3×3 Grid）
+for _rb, _rs in _GRID_RANKINGS.items():
+    for _fm, _fs_tag in (("coint", ""), ("none", "-NF")):
+        _pg = {**base_params, **_GRID_COMMON,
+               "cluster_method": "gics", "ranking_backend": _rb,
+               "filter_mode": _fm}
+        if _rb != "ssd":
+            _pg["ignore_ols_alpha"] = True
+        _grid_entries.append({
+            "name":             f"Grid GICS-{_rs}{_fs_tag}",
+            "formation_module": "strategies.formation.cluster_formation",
+            "trading_module":   "strategies.trading.zscore_trading",
+            "sub_dir":          f"Grid_GICS_{_rs}{_fs_tag.replace('-','_')}",
+            "db_method":        f"Grid (GICS-{_rs}{_fs_tag})",
+            "trade_method":     "Z-Score",
+            "params":           _pg,
+        })
+
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
 strategies_raw = strategies_raw_all[:]
