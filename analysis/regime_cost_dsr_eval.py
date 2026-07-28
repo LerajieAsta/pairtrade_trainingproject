@@ -45,17 +45,26 @@ def build_market_regimes(price_db: str = DB_PATH, table: str = TABLE_NAME) -> pd
     """等權市場日報酬 → 波動率三分位 + 126 日趨勢，回傳 DataFrame(index=Date)。"""
     con = sqlite3.connect(price_db)
     # Daily_Prices 寬表或長表？先探測欄位
+    # 長表的識別欄名依資料源而異（Tiingo 用 Symbol，其他用 Ticker），
+    # 兩者皆須支援——否則長表會被誤判為寬表，set_index("Date") 保留重複日期，
+    # 後續 rolling 與 join 全部失效（regime 標記變成逐筆列而非逐日）。
     cols = pd.read_sql(f"SELECT * FROM {table} LIMIT 1", con).columns.tolist()
-    if "Ticker" in cols and "Close" in cols and "Date" in cols:            # 長表
-        px = pd.read_sql(f"SELECT Date, Ticker, Close FROM {table}", con)
+    id_col = next((c for c in ("Ticker", "Symbol") if c in cols), None)
+    px_col = next((c for c in ("Adj_Close", "Close") if c in cols), None)
+    if id_col and px_col and "Date" in cols:                               # 長表
+        px = pd.read_sql(f"SELECT Date, {id_col}, {px_col} FROM {table}", con)
         con.close()
         px["Date"] = pd.to_datetime(px["Date"])
-        wide = px.pivot_table(index="Date", columns="Ticker", values="Close")
+        wide = px.pivot_table(index="Date", columns=id_col, values=px_col)
     else:                                                                  # 寬表（Date + 各 ticker 欄）
         px = pd.read_sql(f"SELECT * FROM {table}", con)
         con.close()
         px["Date"] = pd.to_datetime(px["Date"])
         wide = px.set_index("Date").select_dtypes("number")
+
+    if not wide.index.is_unique:
+        raise ValueError(f"regime 日期索引不唯一（{len(wide)} 列 / "
+                         f"{wide.index.nunique()} 個日期）——價格表格式判定有誤")
 
     wide = wide.replace(0.0, np.nan)                                       # 防 log(0)=-inf
     rets = np.log(wide).diff()

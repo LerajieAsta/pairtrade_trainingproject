@@ -1841,6 +1841,154 @@ margin-right: 0; }
 <blockquote>
 <p><strong>本研究的檢定定位</strong>：命題 2 為<strong>方法之相對優劣</strong>的假設檢定，證據充分； 絕對獲利能力則未達統計顯著，此點列於限制章。</p>
 </blockquote>
+</section>
+<section id="命題-2-的-regime-穩健性" class="slide level2">
+<h2>命題 2 的 Regime 穩健性</h2>
+<p>以等權市場的 63 日滾動波動率三分位與 126 日趨勢標記每個交易日， 分層計算年化 Sharpe。檢驗增益是否僅來自特定市場環境。</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底 / 交易端</th>
+<th style="text-align: center;">Calm</th>
+<th style="text-align: center;">Normal</th>
+<th style="text-align: center;">Turbulent</th>
+<th style="text-align: center;">Bull</th>
+<th style="text-align: center;">Bear</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">GICS × SSD</td>
+<td style="text-align: center;">−0.72</td>
+<td style="text-align: center;">0.03</td>
+<td style="text-align: center;">0.51</td>
+<td style="text-align: center;">0.02</td>
+<td style="text-align: center;">0.35</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GICS × SSD <strong>+ DRL</strong></td>
+<td style="text-align: center;"><strong>−0.47</strong></td>
+<td style="text-align: center;"><strong>0.14</strong></td>
+<td style="text-align: center;">0.51</td>
+<td style="text-align: center;"><strong>0.10</strong></td>
+<td style="text-align: center;"><strong>0.41</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative × SSD</td>
+<td style="text-align: center;">−0.20</td>
+<td style="text-align: center;">−0.17</td>
+<td style="text-align: center;">0.65</td>
+<td style="text-align: center;">0.20</td>
+<td style="text-align: center;">0.30</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Agglomerative <strong>+ DRL</strong></td>
+<td style="text-align: center;"><strong>−0.07</strong></td>
+<td style="text-align: center;"><strong>−0.06</strong></td>
+<td style="text-align: center;"><strong>0.77</strong></td>
+<td style="text-align: center;"><strong>0.36</strong></td>
+<td style="text-align: center;"><strong>0.35</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">HDBSCAN × SDP</td>
+<td style="text-align: center;">−0.23</td>
+<td style="text-align: center;">−0.05</td>
+<td style="text-align: center;">0.53</td>
+<td style="text-align: center;">0.07</td>
+<td style="text-align: center;">0.38</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN <strong>+ DRL</strong></td>
+<td style="text-align: center;"><strong>−0.18</strong></td>
+<td style="text-align: center;"><strong>0.10</strong></td>
+<td style="text-align: center;"><strong>0.64</strong></td>
+<td style="text-align: center;"><strong>0.16</strong></td>
+<td style="text-align: center;"><strong>0.53</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means × SSD</td>
+<td style="text-align: center;">−0.06</td>
+<td style="text-align: center;">−0.09</td>
+<td style="text-align: center;">0.43</td>
+<td style="text-align: center;">0.07</td>
+<td style="text-align: center;">0.32</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">K-means <strong>+ DRL</strong></td>
+<td style="text-align: center;"><strong>−0.05</strong></td>
+<td style="text-align: center;"><strong>−0.05</strong></td>
+<td style="text-align: center;"><strong>0.47</strong></td>
+<td style="text-align: center;"><strong>0.13</strong></td>
+<td style="text-align: center;"><strong>0.34</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>DRL 在 20 個 regime 格中改善 19 格、持平 1 格、劣化 0 格。</strong> 命題 2 的增益不依賴特定市場環境。</p>
+<p><strong>同時揭露一項策略層面的限制</strong>：配對交易的獲利完全集中於 <strong>高波動（0.43 ~ 0.77）與空頭（0.30 ~ 0.53）</strong> 環境； <strong>平靜期所有策略皆為負 Sharpe</strong>（−0.72 ~ −0.05），DRL 只能減輕虧損而無法反轉。 此與本研究另一項發現一致：損益集中於高分散度期間（附錄 D 的 regime 閘門依據）。</p>
+</section>
+<section id="成本敏感度break-even-分析" class="slide level2">
+<h2>成本敏感度：Break-even 分析</h2>
+<p>成本模型可解析求解——進出場費用 = friction × 名目額， 且每配對名目額恰等於每配對資金，故往返 break-even <span class="math inline">c^* = 2\,(0.29\% +     ext{淨利} / \Sigma    ext{名目額})</span>。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底</th>
+<th style="text-align: center;">Z-Score</th>
+<th style="text-align: center;">→ DRL</th>
+<th style="text-align: center;">DRL 提升</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative × SSD</td>
+<td style="text-align: center;">0.666%</td>
+<td style="text-align: center;"><strong>0.700%</strong></td>
+<td style="text-align: center;">+0.034pp</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN × SDP</td>
+<td style="text-align: center;">0.652%</td>
+<td style="text-align: center;"><strong>0.708%</strong></td>
+<td style="text-align: center;">+0.056pp</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">GICS × SSD</td>
+<td style="text-align: center;">0.662%</td>
+<td style="text-align: center;"><strong>0.671%</strong></td>
+<td style="text-align: center;">+0.009pp</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">K-means × SSD</td>
+<td style="text-align: center;">0.645%</td>
+<td style="text-align: center;"><strong>0.651%</strong></td>
+<td style="text-align: center;">+0.006pp</td>
+</tr>
+</tbody>
+</table>
+<p><em>往返 break-even 成本；現行假設為 0.58%（單邊 0.29%，Do &amp; Faff 2012）</em></p>
+<p><strong>DRL 在四種配對底上皆提高成本承受度。</strong> 機制為 SKIP 與較高的進場門檻 共同減少了交易次數，使同樣的毛利分攤在更少的名目額上。</p>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>成本餘裕相當有限</strong></p>
+</div>
+<div class="callout-content">
+<p>最佳策略的往返 break-even 為 0.708%，僅較現行假設 0.58% 高出 <strong>0.13pp（約 22%）</strong>。 若實際摩擦成本高於文獻估計（如流動性較差的標的、較大的部位規模）， 本研究的正報酬結論將不成立。</p>
+<p>此與絕對顯著性檢定的結果一致：策略的邊際極薄， <strong>本研究之結論應限於方法間的相對比較</strong>。</p>
+</div>
+</div>
+</div>
 </section></section>
 <section>
 <section id="附錄摘要" class="title-slide slide level1 center">
@@ -1881,21 +2029,26 @@ margin-right: 0; }
 <td style="text-align: left;">低分散度閘門使全網格 Sharpe 轉正、MDD 下降；三層疊加五輪中位 2.69%［2.65, 2.71］、最差輪 14/15 正 Sharpe</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;"><strong>I</strong></td>
+<td style="text-align: left;">Regime／成本可重現腳本</td>
+<td style="text-align: left;"><code>analysis/regime_cost_dsr_eval.py</code>：regime 分層 Sharpe、break-even 成本、DSR</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;"><strong>H</strong></td>
 <td style="text-align: left;">粒度掃描可重現腳本</td>
 <td style="text-align: left;"><code>analysis/granularity_sweep.py</code>：切割門檻 × 候選池 × 跨產業比例 × 績效</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;"><strong>G</strong></td>
 <td style="text-align: left;">行為解析可重現腳本</td>
 <td style="text-align: left;"><code>analysis/drl_behavior.py</code>：決策分布／SKIP 技巧性／增益來源分解</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;"><strong>F</strong></td>
 <td style="text-align: left;">統計檢定可重現腳本</td>
 <td style="text-align: left;"><code>analysis/proposition2_stats.py</code>：配對 t／Wilcoxon／逐輪檢定／Newey-West／DSR 四項一次產出</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;"><strong>E</strong></td>
 <td style="text-align: left;">參數敏感性</td>
 <td style="text-align: left;">ADF 門檻 0.01 / 0.05 / 0.1 對照，說明本研究採 0.05 的實證依據</td>
@@ -1918,6 +2071,7 @@ margin-right: 0; }
 <ol type="1">
 <li><p><strong>命題 1 未獲支持</strong>：機器學習分群未能建立優於 GICS 產業分類的配對搜尋空間。 9 組配對檢定中 5 組顯著較差、0 組顯著較優；改用 DRL 交易端後結論不變 （AGG vs GICS：<span class="math inline">p = 0.016</span>，方向仍為 GICS 較優）。 受控的粒度掃描進一步顯示：<strong>分群演算法並非關鍵變因</strong>—— 單一切割門檻參數造成的績效變動（2.05pp）遠大於三種演算法間的差距（0.48pp）。 關係呈倒 U 形：粒度過細候選池不足，粒度過粗則跨產業配對自 10% 升至 50%。 兩者在 ML 分群下無法解耦（$ ho = +1.000$），而 GICS 同時具備 「池大」與「產業純」兩項性質——此為其難以被超越的根本原因。</p></li>
 <li><p><strong>命題 2 獲得支持</strong>：DRL 交易端在<strong>五種配對底</strong>上皆顯著優於 Z-Score （<span class="math inline">p</span> = 0.0006 ~ 0.0070），且增益最大者為傳統 GICS 分組—— 此改良與配對來源正交，不依賴機器學習分群。</p></li>
+<li><p><strong>增益具 regime 穩健性與成本穩健性</strong>：DRL 在 20 個市場環境分層中改善 19 格、 劣化 0 格；並在四種配對底上皆提高往返 break-even 成本（最高 0.708%）。</p></li>
 <li><p><strong>增益機制可歸因</strong>：損益分解顯示 48–69% 來自門檻選擇、31–52% 來自 SKIP， 而 SKIP 的選擇性經檢定並不顯著。DRL 的實質貢獻為<strong>情境化的門檻調校</strong>。</p></li>
 <li><p><strong>方法論觀察</strong>：本研究有兩處結論在改用配對檢定後被推翻。 以網格最佳值比較策略會系統性納入選擇偏誤， 跨策略推論應以同參數格的配對檢定為準。</p></li>
 </ol>
@@ -1930,6 +2084,8 @@ margin-right: 0; }
 <li>DRL 未固定隨機種子（已改以五輪中位數±範圍報告）； 五輪對估計中位數尚屬有限，變異數本身的信賴區間未予量化</li>
 <li>DRL 的門檻選擇無法歸因至可解釋的簡單規則，模型內部決策依據仍為黑箱</li>
 <li>網格最佳值存在多重測試偏誤，已以 Deflated Sharpe 量化其影響</li>
+<li><strong>成本餘裕極薄</strong>：最佳策略往返 break-even 僅 0.708%，較現行假設 0.58% 高出 22%； 摩擦成本若高於文獻估計，正報酬結論即不成立</li>
+<li><strong>獲利集中於特定市場環境</strong>：平靜期所有策略皆為負 Sharpe（−0.72 ~ −0.05）， 獲利完全來自高波動與空頭環境；DRL 可減輕平靜期虧損但無法反轉</li>
 <li>樣本限於 S&amp;P 500 大型股，結論未必外推至中小型股或其他市場</li>
 </ul>
 
