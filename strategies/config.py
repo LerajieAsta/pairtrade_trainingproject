@@ -288,6 +288,32 @@ for _rb, _rs in _GRID_RANKINGS.items():
             "params":           _pg,
         })
 
+# ── 傳統分組底 × DRL：命題 1 與命題 2 的交叉對照 ────────────────────────────
+# 命題 1 的配對檢定顯示 ML 分群在 Z-Score 端未優於 GICS（9 組比較 5 組顯著較差）。
+# 本組回答後續問題：ML 分群的價值是否須透過 DL 交易端才顯現？
+#   設計＝同排序、同交易端，唯一變因為分組（GICS vs ML 分群）：
+#     Grid (GICS-SSD-DRL) ↔ Grid (AGG-SSD-DRL)
+#     Grid (GICS-SDP-DRL) ↔ Grid (HDB-SDP-DRL)
+#   結果（2026-07-28）：GICS 底 DRL 的增益反而最大（ΔSharpe +0.402，p=0.0013），
+#   DRL 端直接對照亦為 GICS 較優（AGG vs GICS p=0.016；HDB vs GICS p=0.363 無差異）。
+#   → ML 分群未提供 DL 端可利用的額外結構；命題 1 未獲支持，
+#     命題 2 因涵蓋傳統配對底而普適性更強（五種配對底全部顯著）。
+# 借用 Grid GICS-{SSD,SDP} 已算好的形成期配對，零重跑 formation。
+for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
+    _pgd = {**base_params, **_GRID_COMMON,
+            "cluster_method": "gics", "ranking_backend": _rk_m, "filter_mode": "coint",
+            "drl_hidden_size": 64, "thr_train_epochs": 40, "thr_min_train_samples": 200}
+    _grid_entries.append({
+        "name":             f"Grid GICS-{_rk_s} DRL",
+        "formation_module": "strategies.formation.cluster_formation",
+        "formation_strategy_id_base": f"Grid GICS-{_rk_s}",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          f"Grid_GICS_{_rk_s}_DRL",
+        "db_method":        f"Grid (GICS-{_rk_s}-DRL)",
+        "trade_method":     "DRL",
+        "params":           _pgd,
+    })
+
 
 # （特徵消融「多尺度動量」：2026-07-24 驗證為負面結果——三種分群全面劣化
 #   （HDB −0.94pp、AGG −2.43pp 至 −0.65%、KM −1.40pp）。根因：動量度量「過去
