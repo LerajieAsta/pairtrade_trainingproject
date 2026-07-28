@@ -4144,7 +4144,7 @@ z-index: 1000;
 
 <section id="title-slide" class="quarto-title-block center">
   <h1 class="title">Agglomerative Fundamentals</h1>
-  <p class="subtitle">形成期策略：價格因子 ⊕ 公司基本面 ⊕ 產業之混合特徵 Agglomerative 分群（yF / FMP 兩種資料源）</p>
+  <p class="subtitle">形成期策略：價格因子 ⊕ Point-in-Time 公司基本面 ⊕ 產業之混合特徵階層聚類</p>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -4157,34 +4157,9 @@ z-index: 1000;
 </section>
 <section id="策略概述" class="title-slide slide level1 center">
 <h1>策略概述</h1>
-<p><strong>Agglomerative（yF / FMP）</strong> 是命題 1 的<strong>主力</strong>：用「價格行為 ⊕ 公司基本面（規模、估值）⊕ 產業」的<strong>混合特徵</strong>做階層聚類建立配對搜尋空間。</p>
-<p>直覺：基本面相近（規模相當、估值層級相同）的公司，更可能對相同的宏觀與估值衝擊同向反應，其價格間的長期均衡關係有基本面基礎。本策略有兩個資料源變體，方法論完全相同、僅基本面資料來源不同（見下表）。實測為<strong>全研究最強的誠實策略</strong>。</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th style="text-align: left;">變體</th>
-<th style="text-align: left;">基本面資料來源</th>
-<th style="text-align: left;">前視偏誤</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;"><strong>yF</strong></td>
-<td style="text-align: left;">yfinance <strong>單一時點快照</strong></td>
-<td style="text-align: left;">有（每個歷史窗都用「今日」數值）</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><strong>FMP</strong></td>
-<td style="text-align: left;"><strong>Point-in-Time 逐點</strong>資料</td>
-<td style="text-align: left;">已修正（每窗只取形成期末當時可得的最近一筆）</td>
-</tr>
-</tbody>
-</table>
+<p><strong>Agglomerative</strong> 以「價格行為 ⊕ 公司基本面（規模、估值）⊕ 產業」的<strong>混合特徵</strong> 做階層聚類，建立配對搜尋空間；為命題 1 中 Z-Score 交易端下年化報酬最高的組態 （Agglomerative × SSD，1.77%）。</p>
+<p>直覺：基本面相近（規模相當、估值層級相同）的公司，更可能對相同的宏觀與估值衝擊 同向反應，其價格間的長期均衡關係有基本面基礎——而非僅是歷史走勢的巧合相似。</p>
+<p>基本面資料採 <strong>Point-in-Time 對齊</strong>：每個形成窗只取「日期 ≤ 形成期末」的最近一筆記錄， 確保分群不使用當時尚未公布的資訊。</p>
 </section>
 
 <section>
@@ -4257,14 +4232,14 @@ z-index: 1000;
 <li><strong>average linkage</strong>：對混合特徵（連續 + one-hot）的距離尺度差異較不敏感，降低單一巨型群傾向</li>
 </ul>
 </section>
-<section id="yf-與-fmp-的關鍵差異前視偏誤" class="slide level2">
-<h2>yF 與 FMP 的關鍵差異：前視偏誤</h2>
-<p>兩變體唯一的實質差異在基本面資料的<strong>時間對齊</strong>：</p>
-<ul>
-<li><strong>yF</strong>：市值/本益比為 yfinance 抓取當下的<strong>單一快照</strong>，所有 2000–2025 歷史窗口共用同一組「現在的」數值—— 對早期窗口存在前視偏誤（用未來資訊分群），是免費資料源下已知且刻意接受的限制</li>
-<li><strong>FMP</strong>：從 Point-in-Time Parquet 中，對每個形成窗<strong>取日期 ≤ 形成期末的最近一筆</strong>基本面記錄， 並優先採用該時點的 PIT 產業分類——每個窗口只用當時可得的資訊，<strong>修正了 yF 的前視偏誤</strong></li>
-</ul>
-<p>FMP 變體是為了在保留基本面分群方法的前提下，消除 yF 的前視限制而建立的對照。</p>
+<section id="point-in-time-對齊避免前視偏誤" class="slide level2">
+<h2>Point-in-Time 對齊：避免前視偏誤</h2>
+<p>基本面特徵最容易引入前視偏誤之處，在於<strong>時間對齊</strong>而非數值本身。</p>
+<p>單一時點快照（如自 API 直接抓取「目前」的市值與本益比）會使 2000–2025 的 所有歷史窗口共用同一組<strong>現在的</strong>數值——等同於用未來資訊做歷史分群， 回測績效將被系統性高估。</p>
+<p>本策略自 Point-in-Time 資料集中，對每個形成窗<strong>取日期 ≤ 形成期末的最近一筆</strong> 基本面記錄，並優先採用該時點的產業分類。每個窗口只使用當時可得的資訊。</p>
+<blockquote>
+<p>早期樣本（2009 年前）因 XBRL 尚未強制申報，基本面覆蓋率較低， 缺值以同期產業中位數插補（見階段 1）。</p>
+</blockquote>
 </section></section>
 <section>
 <section id="參考文獻與引用對應" class="title-slide slide level1 center">
@@ -4307,7 +4282,7 @@ z-index: 1000;
 <li><strong>公司基本面（2 維）</strong>：<span class="math inline">[\log(1+\text{MarketCap}),\ 1/PE]</span>；缺值以正規化產業中位數插補後 winsorize（1%–99%）</li>
 <li><strong>產業歸屬（12 維）</strong>：11 個正規化 GICS 產業 + Unknown 的 one-hot（產業別名先正規化，如 Healthcare→Health Care）</li>
 </ul>
-<p><strong>資料源差異</strong>：yF 從 SQLite 快照取 MarketCap/TrailingPE；FMP 從 PIT Parquet 取形成期末當時的 market_cap/pe_ratio 與 PIT 產業。</p>
+<p>基本面兩維自 Point-in-Time 資料集取形成期末當時可得的 market_cap / pe_ratio，產業亦採該時點的 PIT 分類。</p>
 </section>
 <section id="階段-2區塊分別標準化與加權拼接" class="slide level2">
 <h2>階段 2：區塊分別標準化與加權拼接</h2>
@@ -4328,7 +4303,7 @@ z-index: 1000;
 </section>
 <section id="階段-56輸出與交易期銜接" class="slide level2">
 <h2>階段 5–6：輸出與交易期銜接</h2>
-<p>輸出標準欄位 + <code>Sector_A/B</code>（真實 GICS）、<code>Cluster_ID_A/B</code>、<code>MarketCap_A/B</code>、<code>TrailingPE_A/B</code>。 排序流程不輸出 <code>OLS_Alpha</code>，交易期於標準化空間重建 spread（路徑 B）。 形成期統計量整個交易期凍結（無前視——但 yF 變體另有基本面快照的前視限制，見「關鍵差異」一節）。 本策略配對另供 DRL 門檻選擇式交易端使用（見 <code>trading/drl_threshold_trading.ipynb</code>）。</p>
+<p>輸出標準欄位 + <code>Sector_A/B</code>（真實 GICS）、<code>Cluster_ID_A/B</code>、<code>MarketCap_A/B</code>、<code>TrailingPE_A/B</code>。 排序流程不輸出 <code>OLS_Alpha</code>，交易期於標準化空間重建 spread（路徑 B）。 形成期統計量整個交易期凍結，基本面採 PIT 對齊，全流程無前視。 本策略配對另供 DRL 門檻選擇式交易端使用（見 <code>trading/drl_threshold_trading.ipynb</code>）。</p>
 </section></section>
 <section id="參數總表" class="title-slide slide level1 center">
 <h1>參數總表</h1>
@@ -4392,9 +4367,9 @@ z-index: 1000;
 </tr>
 <tr class="even">
 <td style="text-align: left;">基本面資料源</td>
-<td style="text-align: center;">yF 快照 / FMP 逐點</td>
+<td style="text-align: center;">Point-in-Time 逐點</td>
 <td style="text-align: left;">特徵</td>
-<td style="text-align: left;">兩變體差異所在</td>
+<td style="text-align: left;">每窗取日期 ≤ 形成期末的最近一筆</td>
 </tr>
 </tbody>
 </table>

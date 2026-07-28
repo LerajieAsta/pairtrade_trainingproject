@@ -1352,6 +1352,211 @@ margin-right: 0; }
 </div>
 </div>
 </div>
+</section>
+<section id="命題-2-的假設檢定一相對主張" class="slide level2">
+<h2>命題 2 的假設檢定（一）：相對主張</h2>
+<p><strong>H0</strong>：DRL 交易端與 Z-Score 交易端的績效相同。</p>
+<p>檢定採<strong>配對設計</strong>——兩者跑在完全相同的配對、期間與參數格上，唯一差異為交易端。 市場崩盤、配對失效、成本衝擊等共同風險在相減後消去， 故留下的差異序列僅含「交易端決策」一項變異。</p>
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底</th>
+<th style="text-align: center;">ΔSharpe</th>
+<th style="text-align: center;">Δ年化</th>
+<th style="text-align: center;">勝格數</th>
+<th style="text-align: center;">配對 <span class="math inline">t</span></th>
+<th style="text-align: center;"><span class="math inline">p</span></th>
+<th style="text-align: center;">Wilcoxon <span class="math inline">p</span></th>
+<th style="text-align: center;">Cohen’s <span class="math inline">d</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: center;">+0.272</td>
+<td style="text-align: center;">+0.73pp</td>
+<td style="text-align: center;"><strong>15/15</strong></td>
+<td style="text-align: center;">4.65</td>
+<td style="text-align: center;">3.8e−4</td>
+<td style="text-align: center;">6.1e−5</td>
+<td style="text-align: center;"><strong>1.20</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: center;">+0.298</td>
+<td style="text-align: center;">+0.77pp</td>
+<td style="text-align: center;">13/15</td>
+<td style="text-align: center;">3.09</td>
+<td style="text-align: center;">8.0e−3</td>
+<td style="text-align: center;">3.4e−3</td>
+<td style="text-align: center;">0.80</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: center;">+0.293</td>
+<td style="text-align: center;">+0.67pp</td>
+<td style="text-align: center;">13/15</td>
+<td style="text-align: center;">3.93</td>
+<td style="text-align: center;">1.5e−3</td>
+<td style="text-align: center;">6.1e−4</td>
+<td style="text-align: center;">1.01</td>
+</tr>
+</tbody>
+</table>
+<p><strong>逐輪拆解</strong>（五輪獨立重訓各自檢定，確認增益非特定訓練批次所致）：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底</th>
+<th style="text-align: left;">各輪勝格數</th>
+<th style="text-align: center;">各輪 <span class="math inline">p</span> 值範圍</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: left;">15/15　14/15　15/15　15/15　15/15</td>
+<td style="text-align: center;">1.5e−4 ~ 1.0e−3</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: left;">12/15　10/15　11/15　12/15　13/15</td>
+<td style="text-align: center;">3.7e−3 ~ 1.2e−2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: left;">11/15　14/15　12/15　14/15　14/15</td>
+<td style="text-align: center;">7.3e−4 ~ 4.8e−3</td>
+</tr>
+</tbody>
+</table>
+<p><strong>15 個獨立檢定（3 配對底 × 5 輪）全數在 5% 水準下顯著</strong>， 效果量均達 Cohen 之「大」標準（<span class="math inline">d &gt; 0.8</span>）。<strong>命題 2 獲得支持。</strong></p>
+</section>
+<section id="命題-2-的假設檢定二絕對主張" class="slide level2">
+<h2>命題 2 的假設檢定（二）：絕對主張</h2>
+<p><strong>H0</strong>：策略的平均日報酬為零。此處無對照組，須直接對抗市場噪音。</p>
+<p><strong>Newey-West HAC <span class="math inline">t</span> 檢定</strong>（Bartlett kernel，落後 10 階，6,287 交易日）：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底</th>
+<th style="text-align: center;">Z-Score</th>
+<th style="text-align: center;">DRL</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: center;"><span class="math inline">t</span>=1.16, <span class="math inline">p</span>=0.248</td>
+<td style="text-align: center;"><span class="math inline">t</span>=1.71, <span class="math inline">p</span>=0.088</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: center;"><span class="math inline">t</span>=1.02, <span class="math inline">p</span>=0.309</td>
+<td style="text-align: center;"><span class="math inline">t</span>=1.67, <span class="math inline">p</span>=0.095</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: center;"><span class="math inline">t</span>=0.86, <span class="math inline">p</span>=0.391</td>
+<td style="text-align: center;"><span class="math inline">t</span>=1.05, <span class="math inline">p</span>=0.293</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Deflated Sharpe Ratio</strong>（Bailey &amp; López de Prado, 2014；校正 15 格網格搜尋的選擇偏誤）：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底</th>
+<th style="text-align: center;">Z-Score</th>
+<th style="text-align: center;">DRL</th>
+<th style="text-align: center;">DRL 門檻 <span class="math inline">SR_0</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: center;">0.047</td>
+<td style="text-align: center;">0.561</td>
+<td style="text-align: center;">0.313</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: center;">0.002</td>
+<td style="text-align: center;">0.467</td>
+<td style="text-align: center;">0.325</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: center;">0.020</td>
+<td style="text-align: center;">0.329</td>
+<td style="text-align: center;">0.292</td>
+</tr>
+</tbody>
+</table>
+<p><strong>無一達到 0.95 判定門檻</strong>。DRL 使 <span class="math inline">p</span> 值自 ~0.25 降至 0.088，方向一致但未跨越顯著水準。</p>
+</section>
+<section id="兩項檢定為何結論相反" class="slide level2">
+<h2>兩項檢定為何結論相反</h2>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>相對顯著、絕對不顯著，並不矛盾</strong></p>
+</div>
+<div class="callout-content">
+<p>兩者的<strong>虛無假設不同</strong>：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: left;">配對 <span class="math inline">t</span> 檢定</th>
+<th style="text-align: left;">Deflated Sharpe</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><span class="math inline">H_0</span></td>
+<td style="text-align: left;">兩交易端績效相同</td>
+<td style="text-align: left;">策略真實 Sharpe 為零</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">對照物</td>
+<td style="text-align: left;">同配對、同參數格的 Z-Score</td>
+<td style="text-align: left;">零</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">主張性質</td>
+<td style="text-align: left;">相對</td>
+<td style="text-align: left;">絕對</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">校正對象</td>
+<td style="text-align: left;">—（配對設計消去共同風險）</td>
+<td style="text-align: left;">多重測試偏誤</td>
+</tr>
+</tbody>
+</table>
+<p>配對設計消去了兩策略共同承受的市場風險，訊噪比大幅提高； 絕對檢定沒有這個對照，必須從市場噪音中直接辨識訊號。</p>
+</div>
+</div>
+</div>
+<p><strong>檢定力受限於低 Sharpe，而非樣本長度。</strong> Sharpe 0.34、樣本 25 年，理論 <span class="math inline">t \approx 0.34\sqrt{25} = 1.70</span>，與實測 1.71 幾乎相同。 欲使 Sharpe 0.34 之策略達到 <span class="math inline">p &lt; 0.05</span>，約需 33 年樣本。 此為成本後配對交易的普遍特性——Do &amp; Faff (2010) 記錄了配對交易報酬自 2000 年代起的長期衰減。</p>
+<p><strong>DSR 對比需保守解讀。</strong> DRL 的門檻 <span class="math inline">SR_0</span> 低於 Z-Score（0.31 vs 0.56），係因其網格間 Sharpe 變異較小。 此既反映真實的參數穩健性，亦會機械性推高 DSR，不宜將兩者落差全部歸因於績效改善。</p>
+<blockquote>
+<p><strong>本研究的檢定定位</strong>：命題 2 為<strong>方法之相對優劣</strong>的假設檢定，證據充分； 絕對獲利能力則未達統計顯著，此點列於限制章。</p>
+</blockquote>
 </section></section>
 <section>
 <section id="附錄摘要" class="title-slide slide level1 center">
@@ -1392,6 +1597,11 @@ margin-right: 0; }
 <td style="text-align: left;">低分散度閘門使全網格 Sharpe 轉正、MDD 下降；三層疊加五輪中位 2.69%［2.65, 2.71］、最差輪 14/15 正 Sharpe</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;"><strong>F</strong></td>
+<td style="text-align: left;">統計檢定可重現腳本</td>
+<td style="text-align: left;"><code>analysis/proposition2_stats.py</code>：配對 t／Wilcoxon／逐輪檢定／Newey-West／DSR 四項一次產出</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;"><strong>E</strong></td>
 <td style="text-align: left;">參數敏感性</td>
 <td style="text-align: left;">ADF 門檻 0.01 / 0.05 / 0.1 對照，說明本研究採 0.05 的實證依據</td>
@@ -1413,7 +1623,7 @@ margin-right: 0; }
 <h2>結論</h2>
 <ol type="1">
 <li><strong>命題 1 部分成立</strong>：ML 分群在不依賴產業元資料下達到與 GICS 相當、最佳者略優的 配對品質（+0.11pp / Sharpe +0.06）；並揭示排序準則與分組方法的交互作用。</li>
-<li><strong>命題 2 成立</strong>：DRL 交易端在三種 ML 配對底上皆帶來 +0.42 ~ +0.76pp 的年化提升 （五輪重訓中位數），四項指標一致改善，最差輪仍全數優於各自的 Z-Score 基準。</li>
+<li><strong>命題 2 成立</strong>：DRL 交易端在三種 ML 配對底上皆帶來 +0.42 ~ +0.76pp 的年化提升 （五輪重訓中位數）；配對檢定於 3 配對底 × 5 輪共 15 個獨立檢定中全數顯著 （<span class="math inline">p &lt; 0.05</span>，Cohen’s <span class="math inline">d &gt; 0.8</span>）。</li>
 <li><strong>兩命題互補</strong>：交易端改良依賴形成期配對品質——這是本研究對 「配對交易績效可分解性」的核心觀察。</li>
 </ol>
 </section>
@@ -1421,11 +1631,14 @@ margin-right: 0; }
 <h2>限制</h2>
 <ul>
 <li>基本面資料為 FMP / SEC XBRL Point-in-Time，2009 年前 XBRL 未強制申報， 早期窗口的基本面特徵覆蓋率低（以產業中位數插補）</li>
-<li>DRL 未固定隨機種子，單次數值有重訓波動（本研究已改以五輪中位數±範圍報告）； 五輪對估計中位數尚屬有限，變異數本身的信賴區間未予量化</li>
-<li>網格最佳值報告存在多重測試偏誤；穩健性以「正 Sharpe 網格數」與重訓變異數輔助佐證</li>
+<li><strong>策略之絕對獲利能力未達統計顯著</strong>：Newey-West 檢定最佳 <span class="math inline">p = 0.088</span>、 Deflated Sharpe 最高 0.56（未達 0.95）。本研究之結論限於方法間的相對比較， 不宣稱策略具可實現之超額報酬</li>
+<li>DRL 未固定隨機種子，單次數值有重訓波動（已改以五輪中位數±範圍報告）； 五輪對估計中位數尚屬有限，變異數本身的信賴區間未予量化</li>
+<li>網格最佳值存在多重測試偏誤，已以 Deflated Sharpe 量化其影響</li>
 <li>樣本限於 S&amp;P 500 大型股，結論未必外推至中小型股或其他市場</li>
 </ul>
 
+<p>{ “cells”: [ { “cell_type”: “raw”, “id”: “9d5dee6a”, “metadata”: {}, “source”: [ “—”, “title: &quot;Agglomerative Fundamentals&quot;”, “subtitle: &quot;形成期策略：價格因子 ⊕ Point-in-Time 公司基本面 ⊕ 產業之混合特徵階層聚類&quot;”, “author: &quot;李伯修&quot;”, “lang: zh-TW”, “—” ] }, { “cell_type”: “markdown”, “id”: “f8621e70”, “metadata”: {}, “source”: [ “# 策略概述”, “”, “<strong>Agglomerative</strong> 以「價格行為 ⊕ 公司基本面（規模、估值）⊕ 產業」的<strong>混合特徵</strong>”, “做階層聚類，建立配對搜尋空間；為命題 1 中 Z-Score 交易端下年化報酬最高的組態”, “（Agglomerative × SSD，1.77%）。”, “”, “直覺：基本面相近（規模相當、估值層級相同）的公司，更可能對相同的宏觀與估值衝擊”, “同向反應，其價格間的長期均衡關係有基本面基礎——而非僅是歷史走勢的巧合相似。”, “”, “基本面資料採 <strong>Point-in-Time 對齊</strong>：每個形成窗只取「日期 ≤ 形成期末」的最近一筆記錄，”, “確保分群不使用當時尚未公布的資訊。” ] }, { “cell_type”: “markdown”, “id”: “cc43de89”, “metadata”: {}, “source”: [ “# 策略架構”, “”, “與 HDBSCAN 版一樣<strong>只替換「分組」層</strong>——這裡改用「價格 + 基本面 + 產業」混合特徵的階層聚類；其餘篩選、排序、交易與傳統基準完全相同。”, “”, “<code>{mermaid}\n&quot;,     &quot;flowchart LR\n&quot;,     &quot;  P[\&quot;混合特徵&lt;br/&gt;價格因子 ⊕ 基本面 ⊕ 產業\&quot;] --&gt; G[\&quot;分組&lt;br/&gt;Agglomerative 階層聚類\&quot;]\n&quot;,     &quot;  G --&gt; F[\&quot;篩選&lt;br/&gt;群內共整合 + 半衰期 + Hurst\&quot;]\n&quot;,     &quot;  F --&gt; R[\&quot;排序&lt;br/&gt;最小 SSD 距離\&quot;]\n&quot;,     &quot;  R --&gt; T[\&quot;Top N 配對&lt;br/&gt;→ 交易期\&quot;]\n&quot;,     &quot;</code>”, “”, “| 層 | 本策略採用 | 用途 |”, “| :— | :— | :— |”, “| 特徵 | 價格因子載荷 ⊕ 規模/估值 ⊕ 產業別 | 讓「行為＋基本面」都相近的股票靠近 |”, “| 分組 | Agglomerative 階層聚類 | 資料驅動分群，取代 GICS |”, “| 篩選 | 群內共整合 + 半衰期 + Hurst | 確認價差均值回歸 |”, “| 排序 | 最小 SSD 距離 | 挑走勢最接近的對 |”, “| 交易 | Z-Score（標準化空間） | 偏離進場、回歸出場 |” ] }, { “cell_type”: “markdown”, “id”: “abaee664”, “metadata”: {}, “source”: [ “## 為何用 Agglomerative 階層聚類”, “”, “- <strong>每個點都分配群組</strong>（無「雜訊」概念）；不適合成群者以「過小群併入 Unknown」事後排除，排除比例由資料決定”, “- <strong>不預設群數</strong>：以每期合併距離的分位數校準 <code>distance_threshold</code>，群數隨當期分布自然決定”, “- <strong>average linkage</strong>：對混合特徵（連續 + one-hot）的距離尺度差異較不敏感，降低單一巨型群傾向” ] }, { “cell_type”: “markdown”, “id”: “65240efa”, “metadata”: {}, “source”: [ “## Point-in-Time 對齊：避免前視偏誤”, “”, “基本面特徵最容易引入前視偏誤之處，在於<strong>時間對齊</strong>而非數值本身。”, “”, “單一時點快照（如自 API 直接抓取「目前」的市值與本益比）會使 2000–2025 的”, “所有歷史窗口共用同一組<strong>現在的</strong>數值——等同於用未來資訊做歷史分群，”, “回測績效將被系統性高估。”, “”, “本策略自 Point-in-Time 資料集中，對每個形成窗<strong>取日期 ≤ 形成期末的最近一筆</strong>”, “基本面記錄，並優先採用該時點的產業分類。每個窗口只使用當時可得的資訊。”, “”, “&gt; 早期樣本（2009 年前）因 XBRL 尚未強制申報，基本面覆蓋率較低，”, “&gt; 缺值以同期產業中位數插補（見階段 1）。” ] }, { “cell_type”: “markdown”, “id”: “6c8b54ba”, “metadata”: {}, “source”: [ “# 參考文獻與引用對應” ] }, { “cell_type”: “markdown”, “id”: “be41ab50”, “metadata”: {}, “source”: [ “## 文獻 1：Hong &amp; Hwang (2021)”, “”, “&gt; Hong, S., &amp; Hwang, S. (2021). In search of pairs using firm fundamentals: Is pairs trading profitable? <em>The European Journal of Finance</em>, <strong>29</strong>(5).”, “”, “<strong>參考部分</strong>：以企業基本面特徵（而非純價格）識別配對；基本面相近的公司共享估值與現金流驅動因子，價格均衡有基本面基礎。”, “”, “<strong>為何參考</strong>：混合特徵中基本面區塊（log 市值、盈餘殖利率 <span class="math inline">1/PE</span>）的直接依據。”, “” ] }, { “cell_type”: “markdown”, “id”: “8a8106ba”, “metadata”: {}, “source”: [ “## 文獻 2：Ward (1963)／Avellaneda &amp; Lee (2010)”, “”, “&gt; Ward, J. H. (1963). Hierarchical grouping to optimize an objective function. <em>JASA</em>, <strong>58</strong>(301), 236–244.”, “&gt; Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7), 761–782.”, “”, “<strong>參考部分與理由</strong>：”, “”, “- Ward：階層聚集聚類框架與 dendrogram 可事後切割的特性——階段 3 兩段式 <code>distance_threshold</code> 校準之依據”, “- Avellaneda &amp; Lee：報酬 PCA 因子載荷——價格行為區塊的計算方式” ] }, { “cell_type”: “markdown”, “id”: “bd192773”, “metadata”: {}, “source”: [ “## 文獻 3：Gatev, Goetzmann &amp; Rouwenhorst (2006)／Engle &amp; Granger (1987)／Krauss et al. (2016)”, “”, “<strong>參考部分與理由</strong>：群內 min-SSD 排序（Gatev）＋ ADF 共整合（Engle &amp; Granger）＋ 半衰期/Hurst 過濾（Krauss）。” ] }, { “cell_type”: “markdown”, “id”: “c1d01551”, “metadata”: {}, “source”: [ “# 各階段行為” ] }, { “cell_type”: “markdown”, “id”: “27b5b65d”, “metadata”: {}, “source”: [ “## 階段 1：混合特徵矩陣建構”, “”, “三區塊特徵：”, “”, “- <strong>價格行為（5 維）</strong>：借用 價格因子載荷萃取步驟 的報酬 PCA 因子載荷（不用其聚類）”, “- <strong>公司基本面（2 維）</strong>：<span class="math inline">[\\log(1+\\text{MarketCap}),\\ 1/PE]</span>；缺值以正規化產業中位數插補後 winsorize（1%–99%）”, “- <strong>產業歸屬（12 維）</strong>：11 個正規化 GICS 產業 + Unknown 的 one-hot（產業別名先正規化，如 Healthcare→Health Care）”, “”, “基本面兩維自 Point-in-Time 資料集取形成期末當時可得的 market_cap / pe_ratio，產業亦採該時點的 PIT 分類。” ] }, { “cell_type”: “markdown”, “id”: “c0e0d127”, “metadata”: {}, “source”: [ “## 階段 2：區塊分別標準化與加權拼接”, “”, “<span class="math display">X = [\\, w_{price}\\cdot\\text{Scale}(\\text{loadings}) \\ \\|\\ w_{fund}\\cdot\\text{Scale}(f) \\ \\|\\ w_{sector}\\cdot\\text{OneHot} \\,], \\quad w_{price}=w_{fund}=w_{sector}=1.0</span>”, “”, “三區塊<strong>各自</strong> <code>StandardScaler</code> 後加權拼接——避免 joint 標準化讓 12 欄 one-hot 稀釋 2 欄基本面的距離貢獻。” ] }, { “cell_type”: “markdown”, “id”: “3be155d7”, “metadata”: {}, “source”: [ “## 階段 3：Agglomerative 分群與 distance_threshold 校準（依據：Ward 1963）”, “”, “1. <strong>Probe</strong>：<code>n_clusters=1</code> 跑完整合併路徑（<code>compute_distances=True</code>），取全部 <span class="math inline">N-1</span> 個合併距離”, “2. <strong>校準</strong>：<span class="math inline">\\text{threshold} = \\text{percentile}_{75}(\\{d_{merge}\\})</span>”, “3. <strong>分群</strong>：average-linkage 階層聚類（依合併距離分位數校準切割門檻）；過小群（&lt; <code>min_cluster_size</code>=5）併入 <code>\&quot;Unknown\&quot;</code>” ] }, { “cell_type”: “markdown”, “id”: “d1d34aa9”, “metadata”: {}, “source”: [ “## 階段 4：群內 min-SSD 排序與過濾（依據：Gatev 2006）”, “”, “分群標籤當 <code>sector_mapping</code> 餵給 <code>ssd_rolling.Formation</code>：群內 Z-Score 標準化 log-price → SSD 初篩 →”, “協方差 OLS 對沖比例 → 三道過濾（ADF <span class="math inline">p&lt;0.05</span>、半衰期 <span class="math inline">[1,42]</span> 日、Hurst <span class="math inline">&lt;0.5</span>）→ 依 SSD 升序取前 <code>top_n</code>。” ] }, { “cell_type”: “markdown”, “id”: “44d98654”, “metadata”: {}, “source”: [ “## 階段 5–6：輸出與交易期銜接”, “”, “輸出標準欄位 + <code>Sector_A/B</code>（真實 GICS）、<code>Cluster_ID_A/B</code>、<code>MarketCap_A/B</code>、<code>TrailingPE_A/B</code>。”, “排序流程不輸出 <code>OLS_Alpha</code>，交易期於標準化空間重建 spread（路徑 B）。”, “形成期統計量整個交易期凍結，基本面採 PIT 對齊，全流程無前視。”, “本策略配對另供 DRL 門檻選擇式交易端使用（見 <code>trading/drl_threshold_trading.ipynb</code>）。” ] }, { “cell_type”: “markdown”, “id”: “a2a22a41”, “metadata”: {}, “source”: [ “# 參數總表”, “”, “| 參數 | 值 | 對應階段 | 說明 |”, “| :— | :—: | :— | :— |”, “| 形成窗 / 滾動步長 | 252 / 21 交易日 | 全流程輸入 | 約一年 / 一個月 |”, “| 每期配對數 | 網格 [1, 3, 5, 10, 20] | 排序（選取） | 依 SSD 升序取前幾組 |”, “| 價格因子數 | 5 | 特徵 | 價格行為區塊維度 |”, “| 三區塊權重 | 各 1.0 | 特徵 | 價格 / 基本面 / 產業 等權 |”, “| 分群連結法 / 門檻分位 | average / 75% | 分組 | 階層聚類的合併規則與切割門檻 |”, “| 最小群大小 | 5 | 分組 | 過小群併入「未分類」而排除 |”, “| 共整合顯著水準 | 0.05 | 篩選 | 群內共整合檢定門檻 |”, “| 基本面資料源 | Point-in-Time 逐點 | 特徵 | 每窗取日期 ≤ 形成期末的最近一筆 |” ] } ], “metadata”: { “kernelspec”: { “display_name”: “Python 3”, “language”: “python”, “name”: “python3” }, “language_info”: { “codemirror_mode”: { “name”: “ipython”, “version”: 3 }, “file_extension”: “.py”, “mimetype”: “text/x-python”, “name”: “python”, “nbconvert_exporter”: “python”, “pygments_lexer”: “ipython3”, “version”: “3.11.9” } }, “nbformat”: 4, “nbformat_minor”: 5 }</p>
+<p>{ “cells”: [ { “cell_type”: “raw”, “id”: “74700244”, “metadata”: {}, “source”: [ “—”, “title: &quot;Z-Score 狀態機&quot;”, “subtitle: &quot;交易期策略：Spread 重建、Z-Score 訊號、部位管理與風控&quot;”, “author: &quot;李伯修&quot;”, “lang: zh-TW”, “—” ] }, { “cell_type”: “markdown”, “id”: “002e9f19”, “metadata”: {}, “source”: [ “# 策略概述”, “”, “<strong>Z-Score 狀態機</strong>是本研究的<strong>傳統交易基準</strong>：把形成期選出的每一組配對，依「價差偏離幾倍標準差」機械式地進出場——偏離過大時進場（賭它會回歸），回到均值時獲利了結。”, “”, “所有形成期策略（SSD、DTW、HDBSCAN、Agglomerative）的交易端都用這個引擎；命題 2 的深度學習交易（DRL）也以它為對照。它的門檻是<strong>固定的</strong>，這正是 DRL 想改進之處。” ] }, { “cell_type”: “markdown”, “id”: “349d41e7”, “metadata”: {}, “source”: [ “# 策略架構”, “”, “交易期對每組配對逐日推進，分五個環節；<strong>進出場門檻固定</strong>是它與 DRL 版的關鍵差異。”, “”, “<code>{mermaid}\n&quot;,     &quot;flowchart LR\n&quot;,     &quot;  A[\&quot;價差 / Z-Score&lt;br/&gt;形成期統計量重建\&quot;] --&gt; B[\&quot;訊號&lt;br/&gt;偏離進場、回歸出場（固定門檻）\&quot;]\n&quot;,     &quot;  B --&gt; C[\&quot;部位&lt;br/&gt;風險中性配置\&quot;]\n&quot;,     &quot;  C --&gt; D[\&quot;風控&lt;br/&gt;比例停損 + 發散停損 + 冷卻\&quot;]\n&quot;,     &quot;  D --&gt; E[\&quot;期末&lt;br/&gt;未平倉強制結算\&quot;]\n&quot;,     &quot;</code>”, “”, “| 環節 | 本引擎作法 | 用途 |”, “| :— | :— | :— |”, “| 價差重建 | 以形成期凍結統計量在標準化空間重建 | 與形成期一致，避免座標偏移 |”, “| 訊號 | 偏離 2 倍標準差進場、回歸均值出場 | <strong>固定門檻</strong>（DRL 版改為學習挑選） |”, “| 部位配置 | 依對沖比例分配兩腳資金（市場中性） | 對沖市場風險 |”, “| 風控 | 比例停損、價差發散停損、方向冷卻 | 控制單筆與續擴損失 |”, “| 期末 | 未平倉部位強制結算 | 每期獨立結算 |” ] }, { “cell_type”: “markdown”, “id”: “128e0627”, “metadata”: {}, “source”: [ “# 參考文獻與引用對應” ] }, { “cell_type”: “markdown”, “id”: “813f9f8f”, “metadata”: {}, “source”: [ “## 文獻 1：Gatev, Goetzmann &amp; Rouwenhorst (2006)”, “”, “&gt; Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative value arbitrage rule. <em>Review of Financial Studies, 19</em>(3), 797–827.”, “”, “<strong>參考部分</strong>：”, “”, “- 第 3 節交易規則：價差偏離超過<strong>形成期 2 倍標準差</strong>時開倉（做空高估腳、做多低估腳），”, ” 價差<strong>收斂交叉</strong>時平倉，交易期結束時強制平倉“,”- 形成期統計量在交易期<strong>保持不變</strong>的靜態設計“,”- 等金額（市場中性）對沖建倉“,”“,”<strong>為何參考</strong>：“,”“,”- 本引擎的核心狀態機即此交易規則的實作：<code>entry_z = 2.0</code> 對應 2 倍標準差開倉、“,” <code>exit_z = 0.0</code> 對應收斂平倉、<code>PERIOD_END_EXIT</code> 對應期末強制結算“,”- <code>zscore_window = 0</code>（靜態模式）對應其形成期統計量凍結設計“,”” ] }, { “cell_type”: “markdown”, “id”: “f50fd3af”, “metadata”: {}, “source”: [ “## 文獻 2：Do &amp; Faff (2012)”, “”, “&gt; Do, B., &amp; Faff, R. (2012). Are pairs trading profits robust to trading costs? <em>Journal of Financial Research, 35</em>(2), 261–287.”, “”, “<strong>參考部分</strong>：”, “”, “- 配對交易獲利對<strong>交易成本（佣金、市場衝擊、買賣價差）</strong>的敏感性實證：”, ” 未計成本的距離法獲利在納入實際成本後大幅縮水“,”“,”<strong>為何參考</strong>：“,”“,”- 本引擎<strong>每一筆進出場都扣除摩擦成本</strong>（<code>fee_rate = 0.0029</code> + <code>slippage_rate = 0</code>，“,” 往返合計 0.58%（0.29%×2），以兩腳名目金額計算）的設計依據——“,” 避免回測結果高估未計成本的獲利“,”” ] }, { “cell_type”: “markdown”, “id”: “ba988452”, “metadata”: {}, “source”: [ “## 文獻 3：Krauss, Do &amp; Huck (2016)”, “”, “&gt; Krauss, C., Do, X. A., &amp; Huck, N. (2016). The profitability of pairs trading strategies: Distance, cointegration and copula methods. <em>European Journal of Operational Research</em>.”, “”, “<strong>參考部分</strong>：”, “”, “- 停損機制對配對交易風險的控制作用：截斷未收斂配對的損失尾部，但需權衡觸發頻率”, “- 交易成本必須納入回測假設”, “”, “<strong>為何參考</strong>：”, “”, “- 比例停損（<code>stop_loss_pct</code> 網格 [0, 5%, 15%]）與 Z 發散停損（<code>dynamic_stop_z</code>）”, ” 兩道風控的設計依據；網格搜尋讓停損強度成為可比較的實驗變因“,”” ] }, { “cell_type”: “markdown”, “id”: “9a42ec3d”, “metadata”: {}, “source”: [ “# 各階段行為”, “”, “引擎對每個交易期（126 日）的每組配對獨立執行以下流程；”, “滾動步長 21 日使同一時刻最多有 6 個交易期重疊，每期每配對配置獨立資金 <code>capital_per_pair</code>。” ] }, { “cell_type”: “markdown”, “id”: “fce25375”, “metadata”: {}, “source”: [ “## 階段 1：價格資料清理”, “”, “進入模擬前，對整個價格矩陣做一次異常跳動清理：”, “”, “- 單日漲跌幅<strong>絕對值 &gt; 50%</strong> 的價格點視為資料異常（拆股未調整、錯誤報價），”, ” 以前值遞補（<code>ffill</code> 後 <code>bfill</code>）“,”- 兩股取共同交易日交集；有效交易日不足 5 日的配對跳過” ] }, { “cell_type”: “markdown”, “id”: “81d43b07”, “metadata”: {}, “source”: [ “## 階段 2：Spread 與 Z-Score 重建（三種座標路徑）”, “”, “依形成期輸出的欄位自動選擇座標路徑，<strong>與形成期使用完全相同的空間</strong>：”, “”, “| 路徑 | 判定條件 | Spread 定義 | 對應形成期策略 |”, “| :—: | :— | :— | :— |”, “| A | <code>OLS_Alpha</code> 存在且未被忽略 | <span class="math inline">\\ln P_A - \\alpha - \\beta \\ln P_B</span> | （現役無；保留供附錄策略使用） |”, “| B | <code>Log_Mean/Std</code> 存在 | <span class="math inline">P&#39;_A - \\beta P&#39;_B</span>，<span class="math inline">P&#39;_i = \\frac{\\ln P_i - \\mu_i^{form}}{\\sigma_i^{form}}</span> | <strong>現役全部策略</strong>（HDBSCAN／Agglomerative／K-means／GICS × SSD／DTW／SDP） |”, “| B1 | <code>First_Price</code> 存在 | <span class="math inline">\\tilde{P}_A - \\tilde{P}_B</span>，<span class="math inline">\\tilde{P}_i = P_i / P_{i,0}^{form}</span> | 附錄 A：Gatev (2006) 原型復刻 |”, “”, “<strong>Z-Score</strong>（靜態模式 <code>zscore_window = 0</code>，形成期統計量全期凍結）：”, “”, “<span class="math display">Z_t = \\text{clip}\\left(\\frac{\\text{Spread}_t - \\mu_\\epsilon^{form}}{\\max(\\sigma_\\epsilon^{form},\\ \\sigma_{min})},\\ -10,\\ 10\\right)</span>”, “”, “- <span class="math inline">\\sigma_{min} = 10^{-6}</span> 防除零；<span class="math inline">\\pm 10</span> 截尾防極端值污染”, “- 選配：<code>use_vol_adjust = True</code> 時分母放大為 <span class="math inline">\\max(1, \\sigma_{20d}/\\sigma^{form}) \\cdot \\sigma^{form}</span>（現役預設關閉）”, “- 選配：<code>zscore_window &gt; 0</code> 時改用滾動 OLS 重估 <span class="math inline">\\beta</span> 與標準差（現役預設 0，不啟用）” ] }, { “cell_type”: “markdown”, “id”: “80e99994”, “metadata”: {}, “source”: [ “## 階段 3：進場（依據：Gatev et al. 2006）”, “”, “無持倉時逐日檢查：”, “”, “| 條件 | 動作 |”, “| :— | :— |”, “| <span class="math inline">Z_t &gt; entry\\_z</span>（= 2.0） | <strong>做空 spread</strong>：空 A、多 B |”, “| <span class="math inline">Z_t &lt; -entry\\_z</span> | <strong>做多 spread</strong>：多 A、空 B |”, “”, “<strong>風險中性部位配置</strong>（兩腳資金依對沖比例分配）：”, “”, “<span class="math display">W = 1 + |\\beta|, \\qquad v_A = \\frac{C_{pair}}{W}, \\qquad v_B = \\frac{|\\beta| \\cdot C_{pair}}{W}</span>”, “”, “<span class="math display">n_A = \\pm\\frac{v_A}{P_A}, \\qquad n_B = \\mp\\frac{v_B}{P_B}</span>”, “”, “<strong>進場成本</strong>（立即認列）：”, “”, “<span class="math display">\\text{EntryFee} = \\big(|n_A| P_A + |n_B| P_B\\big) \\times (\\text{fee} + \\text{slippage})</span>” ] }, { “cell_type”: “markdown”, “id”: “222c3b9e”, “metadata”: {}, “source”: [ “## 階段 4：持倉評價與出場”, “”, “持倉期間逐日計算含成本的浮動損益（出場費用以當日價格預估）：”, “”, “<span class="math display">\\text{TradePnL}_t = \\underbrace{n_A (P_{A,t} - P_{A,entry}) + n_B (P_{B,t} - P_{B,entry})}_{\\text{原始未實現}} - \\text{EntryFee} - \\widehat{\\text{ExitFee}}_t</span>”, “”, “<strong>出場條件</strong>（依據：Gatev et al. 2006 的收斂平倉）：”, “”, “| 條件 | 狀態標記 |”, “| :— | :— |”, “| 空頭持倉且 <span class="math inline">Z_t \\le exit\\_z</span>（= 0.0） | <code>EXIT</code> |”, “| 多頭持倉且 <span class="math inline">Z_t \\ge -exit\\_z</span> | <code>EXIT</code> |”, “| 交易期最後一日仍持倉 | <code>PERIOD_END_EXIT</code>（強制結算） |”, “”, “出場時 <code>TradePnL</code> 轉入已實現損益；同一配對出場後可再次進場（等待下一次突破）。” ] }, { “cell_type”: “markdown”, “id”: “a817defb”, “metadata”: {}, “source”: [ “## 階段 5：停損與凍結（依據：Krauss et al. 2016）”, “”, “持倉期間優先於出場檢查：”, “”, “| 機制 | 觸發條件 | 行為 |”, “| :— | :— | :— |”, “| <strong>比例停損</strong> | <span class="math inline">-\\text{TradePnL}_t / C_{pair} \\ge stop\\_loss\\_pct</span>（網格 0／5%／15%；0 = 不啟用） | 立即平倉 |”, “| <strong>Z 發散停損</strong> | <code>use_dynamic_stop</code> 且 <span class="math inline">|Z_t| &gt; dynamic\\_stop\\_z</span> | 立即平倉（判定均衡結構破裂） |”, “”, “<strong>凍結規則</strong>：停損觸發後（<code>allow_reentry = False</code>，現役預設），”, “該配對<strong>本交易期剩餘日全部凍結</strong>（狀態 <code>STOPPED</code>，不再進場）——”, “停損被視為「此配對的形成期均衡關係已失效」的訊號，本期內不再信任該配對。” ] }, { “cell_type”: “markdown”, “id”: “755232a0”, “metadata”: {}, “source”: [ “## 階段 6：選配機制（現役預設關閉）”, “”, “| 機制 | 參數 | 行為 |”, “| :— | :— | :— |”, “| 市場波動政體過濾 | <code>vol_regime_threshold &gt; 0</code> | 市場 30 日年化波動率超過閾值時暫停<strong>新開倉</strong>（持倉不受影響） |”, “| 波動率自適應 Z | <code>use_vol_adjust = True</code> | 以 20 日滾動波動放大 Z-Score 分母（見階段 2） |”, “| 收斂持有模式 | <code>hold_to_period_end = True</code> | 進場後不做 Z 回歸出場，持有至期末（停損仍有效） |”, “| 停損後再進場 | <code>allow_reentry = True</code> | 停損不凍結，可再次進場 |”, “”, “這些機制保留為實驗開關，現役網格皆使用預設值（全部關閉）。” ] }, { “cell_type”: “markdown”, “id”: “a1445d90”, “metadata”: {}, “source”: [ “## 階段 7：輸出與損益會計”, “”, “每配對每日輸出一列交易日誌：”, “”, “| 欄位 | 內容 |”, “| :— | :— |”, “| <code>ZScore</code> / <code>Position</code> | 當日訊號值與持倉方向（−1／0／+1） |”, “| <code>Status</code> | <code>HOLD_CASH</code>、<code>ENTER_LONG_A</code>、<code>ENTER_SHORT_A</code>、<code>HOLDING</code>、<code>EXIT</code>、<code>STOP_LOSS_TRIGGERED</code>、<code>PERIOD_END_EXIT</code>、<code>STOPPED</code> |”, “| <code>Unrealized_PnL</code> / <code>Realized_PnL</code> / <code>Cumulative_PnL</code> | 浮動／已實現／累計損益 |”, “| <code>Trade_PnL</code> | 平倉當日的單筆已實現損益（其餘日為 0） |”, “| <code>Daily_Delta</code> | 累計損益的逐日變化（績效統計的基礎數列） |”, “”, “<strong>會計原則</strong>：<code>Trade_PnL</code> 只在平倉日記帳；期間風險以 <code>Unrealized_PnL</code> 呈現；”, “<code>Daily_Delta</code> = 當日累計損益 − 前日累計損益，跨配對加總即得組合層級的日損益。” ] }, { “cell_type”: “markdown”, “id”: “f2e5b026”, “metadata”: {}, “source”: [ “# 參數總表”, “”, “| 參數 | 值 | 對應環節 | 說明 |”, “| :— | :—: | :— | :— |”, “| 交易期長度 | 126 交易日 | 全流程 | 約半年，最多 6 期重疊 |”, “| 每配對資金 | 10,000 | 部位配置 | 每組配對獨立資金 |”, “| 進場 / 出場門檻 | 2.0 / 0.0 倍標準差 | 訊號 | 偏離進場、回歸出場（部分策略掃描進場門檻） |”, “| 統計量模式 | 形成期全期凍結 | 價差重建 | 交易期不重估 |”, “| 價差截尾 | ±10 | 價差重建 | 避免極端 Z 值 |”, “| 往返交易成本 | 0.58% | 風控/損益 | 進出場各按兩腳名目額計 |”, “| 比例停損 | 網格 [0, 5%, 15%] | 風控 | 單筆虧損上限 |”, “| 發散停損 | 部分策略網格 [0, 3, 4] | 風控 | 價差續擴時的停損水位 |”, “| 停損後再進場 | 否 | 風控 | 停損後該配對本期凍結 |” ] } ], “metadata”: { “kernelspec”: { “display_name”: “Python 3”, “language”: “python”, “name”: “python3” }, “language_info”: { “codemirror_mode”: { “name”: “ipython”, “version”: 3 }, “file_extension”: “.py”, “mimetype”: “text/x-python”, “name”: “python”, “nbconvert_exporter”: “python”, “pygments_lexer”: “ipython3”, “version”: “3.11.9” } }, “nbformat”: 4, “nbformat_minor”: 5 }</p>
 </section></section>
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
