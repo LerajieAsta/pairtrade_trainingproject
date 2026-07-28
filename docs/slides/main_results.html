@@ -1317,6 +1317,132 @@ margin-right: 0; }
 <blockquote>
 <p>此機制與本研究另一項發現同源：收緊 ADF 門檻至 0.01 亦使績效下降 （1.77% → 1.27%），因為更嚴的篩選同樣迫使排序往距離更遠的候選尋找。 <strong>兩者共同指向：候選池的充足程度是配對品質的關鍵限制因素。</strong></p>
 </blockquote>
+</section>
+<section id="粒度掃描分群演算法從來不是關鍵變因" class="slide level2">
+<h2>粒度掃描：分群演算法從來不是關鍵變因</h2>
+<p>前頁的兩項代價在原設計中互相混淆——三種分群演算法產生的群數本就不同， 無法斷定落後源於「演算法」還是「粒度」。</p>
+<p><strong>受控實驗</strong>：固定 Agglomerative 演算法、特徵、SSD 排序、篩選與交易端， 唯一變因為切割門檻分位 <span class="math inline">q</span>（分位越高 → 群越少越大 → 候選池越大）。</p>
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: center;">門檻分位</th>
+<th style="text-align: center;">期均配對數</th>
+<th style="text-align: center;">跨產業%</th>
+<th style="text-align: center;">最佳年化</th>
+<th style="text-align: center;">網格均 Sharpe</th>
+<th style="text-align: center;">vs GICS <span class="math inline">p</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: center;">50</td>
+<td style="text-align: center;">6.2</td>
+<td style="text-align: center;">9.7%</td>
+<td style="text-align: center;">−0.13%</td>
+<td style="text-align: center;">−0.237</td>
+<td style="text-align: center;">0.520</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>60</strong></td>
+<td style="text-align: center;">8.7</td>
+<td style="text-align: center;">10.3%</td>
+<td style="text-align: center;"><strong>1.92%</strong></td>
+<td style="text-align: center;"><strong>−0.176</strong></td>
+<td style="text-align: center;">0.142</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">75（基準）</td>
+<td style="text-align: center;">11.5</td>
+<td style="text-align: center;">10.7%</td>
+<td style="text-align: center;">1.77%</td>
+<td style="text-align: center;">−0.240</td>
+<td style="text-align: center;">0.355</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;">90</td>
+<td style="text-align: center;"><strong>15.0</strong></td>
+<td style="text-align: center;">31.9%</td>
+<td style="text-align: center;">0.40%</td>
+<td style="text-align: center;">−0.297</td>
+<td style="text-align: center;">0.248</td>
+</tr>
+<tr class="odd">
+<td style="text-align: center;">95</td>
+<td style="text-align: center;">16.8</td>
+<td style="text-align: center;"><strong>50.0%</strong></td>
+<td style="text-align: center;">0.38%</td>
+<td style="text-align: center;">−0.249</td>
+<td style="text-align: center;">0.430</td>
+</tr>
+<tr class="even">
+<td style="text-align: center;"><strong>GICS</strong></td>
+<td style="text-align: center;"><strong>15.0</strong></td>
+<td style="text-align: center;"><strong>0.0%</strong></td>
+<td style="text-align: center;">1.66%</td>
+<td style="text-align: center;">−0.261</td>
+<td style="text-align: center;">—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>發現一：粒度的影響遠大於演算法的影響。</strong> 單一參數即使最佳年化自 −0.13% 變動至 1.92%（幅度 2.05pp）； 相較之下，固定粒度下三種分群演算法的差距僅 0.48pp（AGG 1.77 / KM 1.31 / HDB 1.29）。 <strong>命題 1 原本比較的「分群演算法」，並非決定配對品質的主要變因。</strong></p>
+<p><strong>發現二：關係為倒 U 形，非單調。</strong> 峰值在 <span class="math inline">q</span> = 60–75，兩端皆劣化。 兩個機制反向作用—— 粒度過細（<span class="math inline">q</span>=50）候選池僅 6.2 對，填不滿目標而被迫接受劣質配對； 粒度過粗（<span class="math inline">q</span>≥90）池雖變大，但跨產業比例自 10% 暴增至 32–50%。 候選池大小與跨產業比例的 Spearman $ ho = +1.000$：<strong>兩者在 ML 分群下無法解耦。</strong></p>
+</section>
+<section id="gics-為何勝出它同時取得兩項優勢" class="slide level2">
+<h2>GICS 為何勝出：它同時取得兩項優勢</h2>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>一組自然的受控對照</strong></p>
+</div>
+<div class="callout-content">
+<p>門檻分位 90 的 ML 分群與 GICS 產業分組<strong>期均配對數同為 15.0</strong>—— 候選池大小完全相同，唯一差異是跨產業比例（31.9% vs 0.0%）。</p>
+<p>該組對照下 GICS 較優（Δ年化 −0.148pp、ΔSharpe −0.036，ML 僅勝 4/15 格）， 惟未達統計顯著（<span class="math inline">p</span> = 0.14 ~ 0.25）。</p>
+</div>
+</div>
+</div>
+<p>產業分組之所以難以被超越，在於它<strong>同時</strong>取得兩項在 ML 分群下互斥的性質：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: center;">候選池大小</th>
+<th style="text-align: center;">產業一致性</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">ML 分群（細）</td>
+<td style="text-align: center;">✘ 不足</td>
+<td style="text-align: center;">✔ 高</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">ML 分群（粗）</td>
+<td style="text-align: center;">✔ 充足</td>
+<td style="text-align: center;">✘ 被破壞</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>GICS</strong></td>
+<td style="text-align: center;"><strong>✔ 充足</strong></td>
+<td style="text-align: center;"><strong>✔ 完全一致（定義上）</strong></td>
+</tr>
+</tbody>
+</table>
+<p>ML 分群依特徵空間的幾何鄰近性切割，擴大群體必然混入其他產業的股票； GICS 則以外生的產業定義直接給出「大且純」的分組。</p>
+<p><strong>這是命題 1 未獲支持的根本原因</strong>，也界定了 ML 分群可能勝出的條件： 唯有當特徵空間能表達產業以外、且與均值回歸相關的相似性維度時， 跨產業配對的代價才可能被補償。本研究的特徵消融 （動量、結構性財報比率，見附錄 C）未能找到此種維度。</p>
+<blockquote>
+<p><strong>誠實界定</strong>：各粒度層級與 GICS 的配對檢定皆未達顯著（<span class="math inline">p</span> = 0.14 ~ 0.52）， 故本節結論為「ML 分群未展現優勢且機制可解釋」， 而非「GICS 在統計上顯著較優」。</p>
+</blockquote>
 </section></section>
 <section>
 <section id="命題-2深度強化學習交易-vs-z-score" class="title-slide slide level1 center">
@@ -1755,16 +1881,21 @@ margin-right: 0; }
 <td style="text-align: left;">低分散度閘門使全網格 Sharpe 轉正、MDD 下降；三層疊加五輪中位 2.69%［2.65, 2.71］、最差輪 14/15 正 Sharpe</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;"><strong>H</strong></td>
+<td style="text-align: left;">粒度掃描可重現腳本</td>
+<td style="text-align: left;"><code>analysis/granularity_sweep.py</code>：切割門檻 × 候選池 × 跨產業比例 × 績效</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;"><strong>G</strong></td>
 <td style="text-align: left;">行為解析可重現腳本</td>
 <td style="text-align: left;"><code>analysis/drl_behavior.py</code>：決策分布／SKIP 技巧性／增益來源分解</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;"><strong>F</strong></td>
 <td style="text-align: left;">統計檢定可重現腳本</td>
 <td style="text-align: left;"><code>analysis/proposition2_stats.py</code>：配對 t／Wilcoxon／逐輪檢定／Newey-West／DSR 四項一次產出</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;"><strong>E</strong></td>
 <td style="text-align: left;">參數敏感性</td>
 <td style="text-align: left;">ADF 門檻 0.01 / 0.05 / 0.1 對照，說明本研究採 0.05 的實證依據</td>
@@ -1785,7 +1916,7 @@ margin-right: 0; }
 <section id="結論" class="slide level2 scrollable">
 <h2>結論</h2>
 <ol type="1">
-<li><p><strong>命題 1 未獲支持</strong>：機器學習分群未能建立優於 GICS 產業分類的配對搜尋空間。 9 組配對檢定中 5 組顯著較差、0 組顯著較優；改用 DRL 交易端後結論不變 （AGG vs GICS：<span class="math inline">p = 0.016</span>，方向仍為 GICS 較優）。 機制為兩項結構性代價：<strong>破壞產業一致性</strong>（跨產業配對 11–25%）與 <strong>縮減候選池</strong>（K-means 期均僅 8.7 對，無法填滿目標 20 對）。</p></li>
+<li><p><strong>命題 1 未獲支持</strong>：機器學習分群未能建立優於 GICS 產業分類的配對搜尋空間。 9 組配對檢定中 5 組顯著較差、0 組顯著較優；改用 DRL 交易端後結論不變 （AGG vs GICS：<span class="math inline">p = 0.016</span>，方向仍為 GICS 較優）。 受控的粒度掃描進一步顯示：<strong>分群演算法並非關鍵變因</strong>—— 單一切割門檻參數造成的績效變動（2.05pp）遠大於三種演算法間的差距（0.48pp）。 關係呈倒 U 形：粒度過細候選池不足，粒度過粗則跨產業配對自 10% 升至 50%。 兩者在 ML 分群下無法解耦（$ ho = +1.000$），而 GICS 同時具備 「池大」與「產業純」兩項性質——此為其難以被超越的根本原因。</p></li>
 <li><p><strong>命題 2 獲得支持</strong>：DRL 交易端在<strong>五種配對底</strong>上皆顯著優於 Z-Score （<span class="math inline">p</span> = 0.0006 ~ 0.0070），且增益最大者為傳統 GICS 分組—— 此改良與配對來源正交，不依賴機器學習分群。</p></li>
 <li><p><strong>增益機制可歸因</strong>：損益分解顯示 48–69% 來自門檻選擇、31–52% 來自 SKIP， 而 SKIP 的選擇性經檢定並不顯著。DRL 的實質貢獻為<strong>情境化的門檻調校</strong>。</p></li>
 <li><p><strong>方法論觀察</strong>：本研究有兩處結論在改用配對檢定後被推翻。 以網格最佳值比較策略會系統性納入選擇偏誤， 跨策略推論應以同參數格的配對檢定為準。</p></li>
@@ -1795,7 +1926,7 @@ margin-right: 0; }
 <h2>限制</h2>
 <ul>
 <li><strong>策略之絕對獲利能力未達統計顯著</strong>：Newey-West 檢定最佳 <span class="math inline">p = 0.088</span>、 Deflated Sharpe 最高 0.56（未達 0.95）。本研究之結論限於方法間的相對比較， 不宣稱策略具可實現之超額報酬</li>
-<li>命題 1 的否定結論限於本設定（混合特徵、S&amp;P 500 大型股、三種分群演算法）。 特徵工程消融（動量、結構性財報比率）皆為負面結果， 但不排除其他特徵設計能改變結論</li>
+<li>命題 1 為「未獲支持」而非「GICS 顯著較優」：粒度掃描中各層級與 GICS 的 配對檢定皆未達顯著（<span class="math inline">p</span> = 0.14 ~ 0.52）。結論限於本設定 （混合特徵、S&amp;P 500 大型股）。特徵工程消融（動量、結構性財報比率） 皆為負面結果，但不排除其他特徵設計能表達產業以外的相似性維度而改變結論</li>
 <li>DRL 未固定隨機種子（已改以五輪中位數±範圍報告）； 五輪對估計中位數尚屬有限，變異數本身的信賴區間未予量化</li>
 <li>DRL 的門檻選擇無法歸因至可解釋的簡單規則，模型內部決策依據仍為黑箱</li>
 <li>網格最佳值存在多重測試偏誤，已以 Deflated Sharpe 量化其影響</li>
