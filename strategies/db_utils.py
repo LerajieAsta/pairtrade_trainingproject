@@ -390,6 +390,10 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         'DATASET': dataset_name, 'RE-ENTRY': reentry, 'VOL ADJ': voladj,
         'METHOD': strategy_name, 'TRADE_METHOD': trade_method, 'TOP N': top_n_str, 'STOP LOSS %': sl_pct, 'Z-WINDOW': zwin,
         'PORT SL %': psl_pct, 'MAX SEC %': msr_pct, 'DYN Z': dsz_val,
+        # 網格維度，必須落庫：交易端變體（entry_z 掃描等）與其基準共用 db_method，
+        # 若這兩欄留白，下游只能靠 _path 檔名後綴反推，每個消費端各自處理易漏。
+        'ENTRY Z': float(params.get('entry_z', 2.0)),
+        'DYN Z NUM': float(params.get('dynamic_stop_z', 0.0)),
         'Final_Equity': float(final_equity),
         'RCC_Raw': float(rcc), 'REC_Raw': float(rec),
         'Cum_Ret_Raw': float(cum_ret), 'Ann_Ret_Raw': float(ann_ret),
@@ -452,8 +456,9 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             "REC_Raw", "Cum_Ret_Raw", "Ann_Ret_Raw", "Sharpe_Raw", "Sortino_Raw", "Calmar_Raw", "MDD_Raw",
             "Win_Rate", "Profit_Factor", "Avg_Trade_Days",
             "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss",
-            "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF",
+            "ENTRY Z", "DYN Z NUM"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             metrics['_path'], metrics['DATASET'],
             metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
@@ -464,7 +469,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             metrics['Win_Rate'], metrics['Profit_Factor'], metrics['Avg_Trade_Days'],
             metrics['Entries'], metrics['Exits'], metrics['Stop_Losses'], metrics['Forced_Closes'],
             metrics['Gross_Profit'], metrics['Gross_Loss'],
-            metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF']
+            metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF'],
+            metrics['ENTRY Z'], metrics['DYN Z NUM']
         ))
 
         df_db = df.copy()
