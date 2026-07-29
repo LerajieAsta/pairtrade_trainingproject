@@ -18,14 +18,34 @@ DRL 每配對每期自 9 個動作中擇一（SKIP 或 8 組 (entry_z, exit_z) �
   三、門檻選擇與配對屬性：進場門檻是否隨排序名次（配對品質代理）變化。
   四、增益來源分解：將 DRL − Z-Score 的總損益差拆為 SKIP 與門檻選擇兩塊，
       定位增益究竟來自「拒絕交易」還是「調整門檻」。
+      ⚠ 此分解為**會計恆等式，不是技巧歸因**——與第二項同一個道理：
+        期望值為負時，隨機跳過亦會產生正的「SKIP 貢獻」。
+        故不可由「SKIP 佔比 36%」推論「模型學會篩掉爛配對」。
+        輸出 CSV 帶 SKIP_性質 欄，以防此表被單獨引用時失去限定條件。
+
+2026-07-29 後續檢定的結論（本模組僅描述行為，不作因果宣稱）：
+  - SKIP 的選擇不優於隨機：置換檢定 75 格中僅 7 格顯著（隨機期望 3.75），
+    機械成分佔實際避損 42–106%（analysis/prop2_skip_permutation.py）
+  - 門檻管道亦非增益來源：把 Z-Score 固定門檻拉到 DRL 的實際中位數 2.2 後，
+    DRL 五種配對底仍全部顯著勝出；門檻管道只複製 4.2–20.9% 且不顯著
+    （analysis/prop2_exposure_control.py）
+  - 「少交易」的直覺不成立：DRL 進場次數是 Z-Score 的 1.6–1.9 倍
+    （利用率較低係因持倉更短，非因交易更少）
+  三者合計排除了增益的三個常見解釋；殘差與「槽位週轉」一致，惟需重跑回測
+  才能直接驗證，現列為後續研究。
 
 用法：python -m analysis.drl_behavior
 """
 import os
 import sqlite3
+import sys
 
 import numpy as np
 import pandas as pd
+
+# Windows 主控台預設 cp950，無法輸出 ∈ / − 等數學符號（config.py 亦作同樣處理）
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 from scipy.stats import mannwhitneyu
 
 RESULT_DB = "results/result.db"
@@ -35,6 +55,12 @@ PAIR_KEY = ["Ticker_A", "Ticker_B", "Period_Start"]
 
 MENU_ENTRY = np.array([1.5, 2.0, 2.5, 3.0])   # 動作選單的 entry_z 取值
 BASELINE_ENTRY = 2.0                           # 靜態基準門檻
+
+# 隨 gain_decomp 一併落檔，確保該表脫離上下文（如被直接引用到論文表格）時
+# 仍帶著限定條件——「SKIP 貢獻 X%」極易被誤讀為模型的選擇技巧。
+SKIP_CAVEAT = ("會計恆等式，非技巧歸因：底層期望值為負時隨機跳過亦會避損；"
+               "置換檢定不顯著（75 格中 7 格，隨機期望 3.75）"
+               "→ 見 analysis/prop2_skip_permutation.py")
 
 # (配對底, Z-Score 策略, DRL 策略)
 PAIRS = [
@@ -46,6 +72,11 @@ PAIRS = [
 ]
 
 
+# 基準格：檔名無後綴。entry_z 等交易端對照變體與基準共用 db_method，
+# 若不濾除會被選為「行為解析格」，使本模組解析到對照組而非現役策略。
+_BASELINE_CELL = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
+
+
 def _behavior_grid(summ, method):
     """
     取 TOP N 最大的一格（同值時取 Sharpe 較高者）。
@@ -53,7 +84,8 @@ def _behavior_grid(summ, method):
     行為解析的對象是模型的決策規律而非某組參數的績效，故選配對數最多的格，
     樣本最充足；TOP N = 1 的格因 Pair_Rank 恆為 1，無法做名次相關分析。
     """
-    g = summ[summ.METHOD == method]
+    g = summ[(summ.METHOD == method)
+             & summ._path.str.contains(_BASELINE_CELL, regex=True, na=False)]
     if g.empty:
         return None
     g = g[g["TOP N"] == g["TOP N"].max()]
@@ -65,7 +97,8 @@ def _matched_paths(summ, zs_method, drl_method):
     d = _behavior_grid(summ, drl_method)
     if d is None:
         return None, None
-    z = summ[(summ.METHOD == zs_method)]
+    z = summ[(summ.METHOD == zs_method)
+             & summ._path.str.contains(_BASELINE_CELL, regex=True, na=False)]
     for col in GRID:
         z = z[z[col] == d[col]]
     return (None if z.empty else z.iloc[0]["_path"]), d["_path"]
@@ -156,6 +189,13 @@ def run():
         # DRL − Z-Score 的總損益差可完全拆為兩塊：
         #   SKIP 貢獻   = −(Z-Score 在被 SKIP 配對上的損益)   ← 避開的部分
         #   門檻貢獻    = (DRL − Z-Score) 在留下的配對上       ← 選門檻賺到的部分
+        #
+        # ⚠ 這是**會計恆等式，不是技巧歸因**。底層策略期望值為負時，跳過任何
+        #   一批配對（含隨機挑選）期望上都會「避開損失」，故「SKIP 貢獻 X%」
+        #   不代表模型學會辨識劣質配對。置換檢定顯示該選擇並不優於隨機
+        #   （75 格中僅 7 格顯著，隨機期望 3.75 格；機械成分佔實際避損 42–106%）
+        #   —— 見 analysis/prop2_skip_permutation.py。
+        #   下方輸出加註 SKIP_性質 欄，避免此表脫離上下文被誤讀。
         if zp is not None and not z.empty:
             m = d[["Ticker_A", "Ticker_B", "Period_Start", "skip", "pnl"]].merge(
                 z[["Ticker_A", "Ticker_B", "Period_Start", "pnl"]],
@@ -171,6 +211,7 @@ def run():
                     "門檻貢獻": round(thr_c, 1),
                     "SKIP 佔比": f"{skip_c / tot * 100:.0f}%" if tot else "—",
                     "門檻佔比": f"{thr_c / tot * 100:.0f}%" if tot else "—",
+                    "SKIP_性質": SKIP_CAVEAT,
                 })
 
         # ── 三、門檻選擇 vs 排序名次 ──────────────────────────────
@@ -196,7 +237,10 @@ def run():
         ("三、進場門檻 vs 排序名次",
          "名次為配對品質代理（數字小＝距離近）。ρ > 0 代表對較差的配對要求更高門檻。", t3),
         ("四、增益來源分解：SKIP vs 門檻選擇",
-         "DRL − Z-Score 的總損益差，拆為「避開被 SKIP 配對」與「在留下的配對上選門檻」兩塊。", t4),
+         "DRL − Z-Score 的總損益差，拆為「避開被 SKIP 配對」與「在留下的配對上選門檻」兩塊。\n"
+         "  ⚠ 此為會計恆等式，非技巧歸因——期望值為負時隨機跳過亦會避損。\n"
+         "     SKIP 的選擇性經置換檢定不顯著（prop2_skip_permutation）；\n"
+         "     門檻管道亦經同門檻對照排除（prop2_exposure_control，複製率僅 4.2–20.9%）。", t4),
     ]:
         print("\n" + "=" * 92)
         print(title)
