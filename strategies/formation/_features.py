@@ -245,7 +245,7 @@ def build_momentum_features(
     """
     多尺度動量特徵（純價格，零額外資料成本）。
 
-    文獻依據：Sanders (2021), *Pairs Trading via Unsupervised Learning* 以
+    文獻依據：Han, He & Toh (2021), *Pairs Trading via Unsupervised Learning* 以
       48 個 1–48 月動量因子 + 78 個公司特徵分群。本函式在形成窗長度（252 日
       = 12 個月）容許範圍內取多個時間尺度的累積報酬——動量捕捉「不同時間尺度
       上的走勢形狀」，與報酬 PCA 載荷（共同因子暴露）互補。

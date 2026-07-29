@@ -54,7 +54,7 @@ SHARES_CONCEPTS_GAAP = ["CommonStockSharesOutstanding",
                         "WeightedAverageNumberOfDilutedSharesOutstanding",
                         "WeightedAverageNumberOfSharesOutstandingBasic"]
 
-# ── 結構性財報特徵（Sanders 2021 / Green et al. 2017 路線）─────────────────
+# ── 結構性財報特徵（Han, He & Toh 2021 / Green et al. 2017 路線）──────────
 # 每個特徵給多個 XBRL 概念別名，取第一個有資料者（跨公司/年度的標籤不一致）。
 # 快取抽樣覆蓋率：Assets/NetIncomeLoss/營運現金流/固定資產 100%、股東權益 95%、
 # 現金 95%、營收 82%、營業利益 80%、總負債 72%、毛利 70%。
@@ -332,7 +332,7 @@ def build_dataset(start="2000-01-01", end="2025-12-31"):
             if facts:
                 eps_pit = _pit_eps_ttm(facts)
                 shares_pit = _pit_shares(facts)
-                # 結構性財報特徵（Sanders/Green 路線）
+                # 結構性財報特徵（Han et al./Green 路線）
                 bal_pit = {k: _pit_instant(facts, c) for k, c in BALANCE_CONCEPTS.items()}
                 flow_pit = {k: _pit_ttm(facts, c) for k, c in FLOW_CONCEPTS.items()}
                 if not eps_pit.empty or not shares_pit.empty:

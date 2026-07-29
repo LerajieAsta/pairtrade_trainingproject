@@ -5,7 +5,7 @@
 
     Formation(
         feature_mode   = "fundamentals_mix" | "price_pca",
-        cluster_method = "hdbscan" | "agglomerative" | "kmeans",
+        cluster_method = "hdbscan" | "agglomerative" | "kmeans" | "gics" | "none",
         ranking_backend= "ssd" | "dtw" | "ssd_dtw_pca",
         ...,
     ).run()
@@ -40,7 +40,9 @@ class Formation:
         min_tickers_for_pairing: int = 2,
         # ── 組裝選擇（形成期三維度：分組 × 排序 × 篩選）───────────────
         feature_mode: str = "fundamentals_mix",
-        cluster_method: str = "agglomerative",   # 亦可 "gics"：直接用真實產業分組，不跑分群
+        # "gics"：直接用真實產業分組，不跑分群
+        # "none"：完全不分組（全市場單一組），分組維度的零點對照
+        cluster_method: str = "agglomerative",
         ranking_backend: str = "ssd",
         filter_mode: str = "coint",              # "coint"（三道統計過濾）| "none"（純排序消融）
         # ── 特徵組 ─────────────────────────────────────────────────
@@ -200,8 +202,24 @@ class Formation:
 
     # ── 主流程 ─────────────────────────────────────────────────────
     def run(self) -> pd.DataFrame:
-        # ── 分組：GICS 產業（不跑分群）或資料驅動分群 ─────────────────
-        if self.cluster_method == "gics":
+        # ── 分組：不分組 / GICS 產業（皆不跑分群）或資料驅動分群 ──────
+        if self.cluster_method == "none":
+            # 全市場單一組——消融矩陣「分組」維度的零點。
+            # 分組層在本管線中只做一件事：限制候選池；真正選配對的是排序層與
+            # 篩選層。故「不分組」是評價分組價值的必要對照（無此格時，比較的
+            # 只是「不同的限制方式」，而非「限制 vs 不限制」）。
+            # 註：本模式不建特徵矩陣，故 sector_onehot_weight 等特徵參數無作用。
+            # 計算量警告：候選對數為 N(N−1)/2（600 檔 ≈ 18 萬對），遠高於群內比較。
+            valid_tickers = [t for t in self.price_df.columns
+                             if self.price_df[t].notna().sum() >= 30]
+            if len(valid_tickers) < self.min_tickers_for_pairing:
+                self.selected_pairs = pd.DataFrame()
+                return self.selected_pairs
+            cluster_map = {t: "All_Market" for t in valid_tickers}
+            self.cluster_labels_ = {}
+            print(f"  [Formation] 不分組（全市場單一組）：{len(valid_tickers)} 檔 | "
+                  f"候選對數 {len(valid_tickers) * (len(valid_tickers) - 1) // 2:,}")
+        elif self.cluster_method == "gics":
             valid_tickers = [t for t in self.price_df.columns
                              if self.price_df[t].notna().sum() >= 30]
             if len(valid_tickers) < self.min_tickers_for_pairing:

@@ -1426,6 +1426,96 @@ margin-right: 0; }
 <p><strong>發現一：粒度的影響遠大於演算法的影響。</strong> 單一參數即使最佳年化自 −0.13% 變動至 1.92%（幅度 2.05pp）； 相較之下，固定粒度下三種分群演算法的差距僅 0.48pp（AGG 1.77 / KM 1.31 / HDB 1.29）。 <strong>命題 1 原本比較的「分群演算法」，並非決定配對品質的主要變因。</strong></p>
 <p><strong>發現二：關係為倒 U 形，非單調。</strong> 峰值在 <span class="math inline">q</span> = 60–75，兩端皆劣化。 兩個機制反向作用—— 粒度過細（<span class="math inline">q</span>=50）候選池僅 6.2 對，填不滿目標而被迫接受劣質配對； 粒度過粗（<span class="math inline">q</span>≥90）池雖變大，但跨產業比例自 10% 暴增至 32–50%。 候選池大小與跨產業比例的 Spearman $ ho = +1.000$：<strong>兩者在 ML 分群下無法解耦。</strong></p>
 </section>
+<section id="實作原因的因子檢驗三處差異全部消融後仍未改善" class="slide level2">
+<h2>實作原因的因子檢驗：三處差異全部消融後仍未改善</h2>
+<p>命題 1 的動機源自 Han, He &amp; Toh (2021)（CRSP 全美股、48 動量因子 + 78 公司特徵分群、 群內做多低估/做空高估、<strong>不施加共整合篩選</strong>，並明文指出跨產業發散亦為利潤來源）。 本研究實作與其有三處差異，皆可能單獨壓抑該假說且從未消融： <strong>特徵含 12 維 GICS 產業 one-hot</strong>、<strong>施加共整合篩選</strong>、<strong>缺「不分組」零點</strong>。</p>
+<p><strong>2×2×2 因子設計</strong>（排序固定 SSD）：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分組</th>
+<th style="text-align: center;">篩選</th>
+<th style="text-align: right;">期均/20</th>
+<th style="text-align: right;">跨產業%</th>
+<th style="text-align: right;">全網格等權年化%</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">GICS 產業</td>
+<td style="text-align: center;">coint</td>
+<td style="text-align: right;">15.0</td>
+<td style="text-align: right;">0.0</td>
+<td style="text-align: right;">−0.333</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">AGG +one-hot</td>
+<td style="text-align: center;">coint</td>
+<td style="text-align: right;">11.5</td>
+<td style="text-align: right;">10.7</td>
+<td style="text-align: right;">−0.234</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">AGG −one-hot</td>
+<td style="text-align: center;">coint</td>
+<td style="text-align: right;">11.3</td>
+<td style="text-align: right;"><strong>39.6</strong></td>
+<td style="text-align: right;">−0.300</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">不分組</td>
+<td style="text-align: center;">coint</td>
+<td style="text-align: right;"><strong>19.4</strong></td>
+<td style="text-align: right;"><strong>75.3</strong></td>
+<td style="text-align: right;">−0.245</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">GICS 產業</td>
+<td style="text-align: center;">none</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">0.0</td>
+<td style="text-align: right;">+0.135</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">AGG +one-hot</td>
+<td style="text-align: center;">none</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">6.8</td>
+<td style="text-align: right;">−0.373</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">AGG −one-hot</td>
+<td style="text-align: center;">none</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">25.3</td>
+<td style="text-align: right;"><strong>+0.226</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">不分組</td>
+<td style="text-align: center;">none</td>
+<td style="text-align: right;">20.0</td>
+<td style="text-align: right;">44.7</td>
+<td style="text-align: right;">+0.184</td>
+</tr>
+</tbody>
+</table>
+<p><strong>形成期結構如預期改變</strong>——產業先驗強度形成單調階梯（跨產業比例 0% → 10.7% → 39.6% → 75.3%）， 證實 one-hot 是一個可控的「產業先驗旋鈕」；且候選池飢餓被隔離為 <strong>「分群 × 篩選」的交互作用</strong>——分群+篩選僅填 11.3–11.5/20，但不分組+篩選達 19.4/20。 單一因子皆不足以造成飢餓。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>但績效未隨之改善</strong></p>
+</div>
+<div class="callout-content">
+<p>20 項單因子對照經 BH-FDR 校正後<strong>僅 1 項顯著</strong>（拿掉 one-hot × 無篩選，Top1 口徑 +3.07pp/年，BH <span class="math inline">p</span>=0.030），且該顯著性<strong>未能在全網格等權口徑複現</strong>（+0.60pp，BH <span class="math inline">p</span>=0.644）。 效果只出現在每期僅持一對、噪音最大的口徑——平均通常提高檢定力，此處相反， 故應視為<strong>與假說一致但未被建立</strong>。八種設計的等權年化全部落在 −0.37% ~ +0.23% 之間。</p>
+<p><strong>本研究無法將命題 1 的否定歸因於上述實作選擇。</strong></p>
+</div>
+</div>
+</div>
+<p>與文獻的差距更可能來自兩項無法以參數調整消除的根本差異： <strong>母體範圍</strong>（S&amp;P 500 約 600 檔 vs CRSP 數千檔；該文已排除「獲利來自小型股」的解釋） 與<strong>交易機制</strong>（群內橫斷面多空 vs 逐配對價差收斂——後者要求價差平穩性，前者不要求）。</p>
+</section>
 <section id="gics-為何勝出它同時取得兩項優勢" class="slide level2">
 <h2>GICS 為何勝出：它同時取得兩項優勢</h2>
 <div class="callout callout-important callout-titled callout-style-default">

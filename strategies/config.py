@@ -325,7 +325,7 @@ for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
 #   （HDB −0.94pp、AGG −2.43pp 至 −0.65%、KM −1.40pp）。根因：動量度量「過去
 #   漲跌幅」而非「走勢同步性」，且橫斷面變異大於 PCA 載荷，在歐氏距離中主導
 #   分群、稀釋原本有效的因子暴露訊號（與 SEC-PIT-Beta 同一失敗模式）。
-#   註：Sanders (2021) 的動量特徵用於「識別高估/低估股票」而非分群依據，
+#   註：Han, He & Toh (2021) 的動量特徵用於「識別高估/低估股票」而非分群依據，
 #   其分群依據為 78 個公司特徵——正確的擴充方向是結構性基本面特徵。
 #   已封存至 archive/config_archived_strategies.py；
 #   _features.build_momentum_features 與 feature_mode="momentum"/"momentum_mix"
@@ -335,6 +335,45 @@ for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
 # （特徵消融 F09 結構性財報特徵：2026-07-24 驗證為負面結果（三分群 Δ 皆在 ±0.22pp
 #   噪音範圍內），已移至 archive/config_archived_strategies.py；
 #   structural_features 機制保留於 _features / cluster_formation。）
+
+# ── 分組 × 篩選 × 產業先驗：命題 1 的機制因子設計（2026-07-29）─────────────
+# 命題 1 的動機來自 Han, He & Toh (2021) *Pairs Trading via Unsupervised Learning*
+# （程式碼舊註解誤植為 "Sanders (2021)"）。該文以 CRSP 全美股、48 動量因子 +
+# 78 公司特徵分群，群內「做多低估、做空高估」，**不施加共整合篩選**，並明文
+# 指出跨產業發散亦為利潤來源。
+#
+# 本研究的實作與其有三處結構性差異，皆可能單獨壓抑該假說，且**從未被消融**：
+#   (a) 特徵含 12 維 GICS one-hot（權重 1.0）。實測：在分群真正會抓的近鄰中，
+#       跨產業配對距離被推遠 +77.9%，同產業 +0.0% —— 特徵設計主動懲罰
+#       「跨產業隱藏配對」，正是假說要找的東西。
+#   (b) 共整合篩選（ADF+半衰期+Hurst）與分群目標衝突：特徵相似的跨產業股票
+#       最不可能通過價差平穩性檢定。ML×無篩選這格從未測過。
+#   (c) 消融矩陣的「分組」維度只有四種分組法，缺「不分組」零點——分組層在本
+#       管線中只負責限制候選池，不比較「限制 vs 不限制」就無法評價其價值。
+#       （舊有 SSD (Basic) 雖不分組，但同時無篩選、β=1，三變因混淆。）
+#
+# 設計：排序固定 ssd（主軸且最省算力），2×2×2 中缺的 5 格。GICS 兩格與
+# AGG 基準格已存在，故不重複建立。
+for _cm_g, _fm_g, _ohw, _tag in (
+    ("agglomerative", "coint", 0.0, "AGG-SSD-NOSEC"),      # 拿掉產業先驗
+    ("agglomerative", "none",  1.0, "AGG-SSD-NF"),         # 拿掉共整合篩選
+    ("agglomerative", "none",  0.0, "AGG-SSD-NF-NOSEC"),   # 兩者都拿掉（最接近 Han et al.）
+    ("none",          "coint", 1.0, "NOGRP-SSD"),          # 不分組 + 篩選
+    ("none",          "none",  1.0, "NOGRP-SSD-NF"),       # 不分組 + 無篩選
+):
+    _pf = {**base_params, **_GRID_COMMON,
+           "feature_mode": "fundamentals_mix",
+           "cluster_method": _cm_g, "ranking_backend": "ssd",
+           "filter_mode": _fm_g, "sector_onehot_weight": _ohw}
+    _grid_entries.append({
+        "name":             f"Grid {_tag}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          f"Grid_{_tag.replace('-', '_')}",
+        "db_method":        f"Grid ({_tag})",
+        "trade_method":     "Z-Score",
+        "params":           _pf,
+    })
 
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
