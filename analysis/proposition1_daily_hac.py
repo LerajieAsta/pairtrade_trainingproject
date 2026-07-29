@@ -50,6 +50,10 @@ BLOCK_L = 126
 N_BOOT = 5000
 SEED = 20260729
 
+# 非劣性邊界（年化報酬百分點）。參照尺度：GICS 臂等權組合的年化報酬約 1.2–1.7%，
+# 故 δ=0.25% 約為其 1/6（嚴格）、δ=1.0% 約為其 2/3（寬鬆到近乎無意義）。
+NI_MARGINS = [0.25, 0.5, 1.0]
+
 
 def _bh_adjust(p: np.ndarray) -> np.ndarray:
     """Benjamini-Hochberg 校正後 p 值（step-up，保單調）。"""
@@ -112,6 +116,16 @@ def run():
         print("⚠ 無可用資料")
         return
 
+    # ── 非劣性檢定 ────────────────────────────────────────────────
+    # 雙尾檢定不顯著 ≠ 兩者相當。要主張「ML 不輸 GICS」須做非劣性檢定：
+    #   H0（劣性）：μ_ML − μ_GICS ≤ −δ      H1（非劣）：μ_ML − μ_GICS > −δ
+    # 於單尾 95% 信賴下界 > −δ 時拒絕 H0。δ 須事前指定且有實質意義，
+    # 此處以年化報酬百分點表示，並附 GICS 臂自身的年化報酬作為尺度參照。
+    res["年化SE%"] = (res["年化Δ%"] / res["NW t"]).abs().round(3)
+    res["單尾95%下界"] = (res["年化Δ%"] - 1.645 * res["年化SE%"]).round(3)
+    for delta in NI_MARGINS:
+        res[f"非劣@δ={delta}%"] = np.where(res["單尾95%下界"] > -delta, "✔", "✘")
+
     res["BH校正p"] = _bh_adjust(res["NW p"].values).round(4)
     res["5%顯著(校正後)"] = np.where(res["BH校正p"] < 0.05, "✔", "✘")
 
@@ -125,6 +139,16 @@ def run():
 
     print("\n--- 落後階敏感度（原始 p，未校正）")
     print(res[["分群", "排序", "NW p", "p@lag63", "p@lag126", "p@lag252"]].to_string(index=False))
+
+    print("\n" + "=" * 104)
+    print("非劣性檢定：H0（劣性）μ_ML − μ_GICS ≤ −δ；單尾 95% 下界 > −δ 方可主張「不輸」")
+    print("=" * 104)
+    ni_cols = ["分群", "排序", "年化Δ%", "年化SE%", "單尾95%下界"] + \
+              [f"非劣@δ={d}%" for d in NI_MARGINS]
+    print(res[ni_cols].to_string(index=False))
+    for d in NI_MARGINS:
+        k = int((res[f"非劣@δ={d}%"] == "✔").sum())
+        print(f"  δ={d}%：9 組中 {k} 組可主張非劣")
 
     n_ml, n_gics = int((res.方向 == "ML優").sum()), int((res.方向 == "GICS優").sum())
     sig = res[res["BH校正p"] < 0.05]
