@@ -130,6 +130,38 @@ def deflated_sharpe(daily_ret: pd.Series, n_trials: int, var_sr_trials: float) -
             "DSR": dsr, "T": T}
 
 
+# ── 試驗宇宙：DSR 的 N 與 var_sr 必須描述同一組試驗 ──────────────────
+# 2026-07-29 修正：原本 n_trials = 該 METHOD 底下的列數（＝15 個參數格），
+# 大幅低估選擇偏誤——result.db 實際有 87 個相異 METHOD、1,435 個回測配置，
+# 其中一大票是試過後封存的負面結果（MST、PCA-Loadings-ResidFDR、F09 結構性
+# 財報、SEC-PIT-Beta、動量特徵、adf/pca 掃描…）。這些全部都是
+# researcher degrees of freedom，依 Bailey & López de Prado (2014) 必須計入 N。
+#
+# 三種口徑各自內部自洽（N 與 var_sr 取自同一集合），主表用 SPEC_MAIN：
+#   cells  N=15    ：僅該策略的 15 個參數格，var 取格間（舊行為，保留供對照）
+#   method N=87    ：相異 METHOD 數，var 取「各 METHOD 最佳 Sharpe」之間
+#   config N=1,435 ：全部回測配置，var 取所有配置 Sharpe 之間
+#
+# N=87 為主口徑：一個 METHOD 內的 15 格高度相關（共用配對、僅組合設定不同），
+# 不宜各算一次試驗；但每個相異 METHOD 代表一次真正獨立的建模決策。
+SPEC_MAIN = "method"
+
+
+def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
+    """回傳 {spec: (n_trials, var_sr_daily)}。變異數換算到每日尺度（÷252）。"""
+    def _var(vals) -> float:
+        v = pd.Series(vals).dropna()
+        return float(np.var(v, ddof=1)) / TRADING_DAYS if len(v) > 1 else 0.0
+
+    g = summ[summ.METHOD == method]
+    per_method_best = summ.groupby("METHOD").Sharpe_Raw.max()
+    return {
+        "cells":  (int(len(g)), _var(g.Sharpe_Raw)),
+        "method": (int(summ.METHOD.nunique()), _var(per_method_best)),
+        "config": (int(len(summ)), _var(summ.Sharpe_Raw)),
+    }
+
+
 # ── 主流程 ──────────────────────────────────────────────────────────
 def _top_n_int(v) -> int:
     return int(str(v).replace("Top", "").strip())
@@ -145,17 +177,14 @@ def run(methods: list[str] = None):
         # 預設：所有 Z-Score 誠實策略（排除 formation-only 與純 DRL 對照）
         methods = [m for m in summ.METHOD.unique() if "DRL" not in m]
 
-    # 每策略最佳配置（Sharpe 最高）＋ 試驗間 Sharpe 變異（該族 15 配置）
-    best_rows, var_sr = {}, {}
+    # 每策略最佳配置（Sharpe 最高）。試驗間 Sharpe 變異改由 _trial_specs 依
+    # 各口徑同步計算，確保 N 與 var_sr 永遠取自同一組試驗。
+    best_rows = {}
     for m in methods:
         g = summ[summ.METHOD == m]
         if g.empty:
             continue
         best_rows[m] = g.loc[g.Sharpe_Raw.idxmax()]
-        # 試驗間 Sharpe 變異需與 deflated_sharpe 內的「每日」Sharpe 同尺度：
-        # summaries 存年化 Sharpe，SR_daily = SR_ann/sqrt(252) → var 除以 252。
-        var_ann = float(np.var(g.Sharpe_Raw.dropna(), ddof=1)) if len(g) > 1 else 0.0
-        var_sr[m] = var_ann / TRADING_DAYS
 
     regimes = build_market_regimes()
     sids = [r["_path"] for r in best_rows.values()]
@@ -172,18 +201,24 @@ def run(methods: list[str] = None):
         c_side_be = CURRENT_FEE_SIDE + p_net / sigma_notional if sigma_notional > 0 else np.nan
         rt_be = 2.0 * c_side_be                                            # 往返 break-even
 
-        n_trials = int((summ.METHOD == m).sum())
-        dsr = deflated_sharpe(daily.get(br["_path"], pd.Series(dtype=float)),
-                              n_trials, var_sr[m])
+        ret = daily.get(br["_path"], pd.Series(dtype=float))
+        specs = _trial_specs(summ, m)
+        dsrs = {k: deflated_sharpe(ret, n, v) for k, (n, v) in specs.items()}
+        main = dsrs[SPEC_MAIN]
         rows1.append({
             "策略": m, "最佳配置": f"Top{top_n}/SL{br['STOP LOSS %']}",
             "Sharpe": round(float(br["Sharpe_Raw"]), 3),
             "淨利$": round(p_net, 0),
             "往返break-even%": round(rt_be * 100, 3),
             "成本餘裕(vs0.58%)": round((rt_be - 0.0058) * 100, 3),
-            "DSR": round(dsr["DSR"], 3),
-            "DSR顯著(>0.95)": "✔" if dsr["DSR"] >= 0.95 else "✘",
-            "N試驗": n_trials, "T日": dsr["T"],
+            "門檻SR0": round(main["SR0_ann"], 3),
+            "DSR": round(main["DSR"], 3),
+            "DSR顯著(>0.95)": "✔" if main["DSR"] >= 0.95 else "✘",
+            # 敏感度三欄：N 的選擇是判斷，故三種口徑並列，讓讀者自行檢視
+            "DSR@N15": round(dsrs["cells"]["DSR"], 3),
+            "DSR@N87": round(dsrs["method"]["DSR"], 3),
+            "DSR@N1435": round(dsrs["config"]["DSR"], 3),
+            "N試驗": specs[SPEC_MAIN][0], "T日": main["T"],
         })
     tbl1 = pd.DataFrame(rows1).sort_values("Sharpe", ascending=False)
 

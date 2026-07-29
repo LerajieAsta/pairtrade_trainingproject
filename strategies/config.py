@@ -289,15 +289,21 @@ for _rb, _rs in _GRID_RANKINGS.items():
         })
 
 # ── 傳統分組底 × DRL：命題 1 與命題 2 的交叉對照 ────────────────────────────
-# 命題 1 的配對檢定顯示 ML 分群在 Z-Score 端未優於 GICS（9 組比較 5 組顯著較差）。
+# 命題 1 未獲支持：9 組直接對照經逐日 HAC + BH-FDR 校正後無一顯著（方向 8/9 偏 GICS）。
+# 註：舊註解曾寫「5 組顯著較差」，係基於已被否定的 n=15 偽重複檢定，勿引用。
 # 本組回答後續問題：ML 分群的價值是否須透過 DL 交易端才顯現？
 #   設計＝同排序、同交易端，唯一變因為分組（GICS vs ML 分群）：
 #     Grid (GICS-SSD-DRL) ↔ Grid (AGG-SSD-DRL)
 #     Grid (GICS-SDP-DRL) ↔ Grid (HDB-SDP-DRL)
-#   結果（2026-07-28）：GICS 底 DRL 的增益反而最大（ΔSharpe +0.402，p=0.0013），
-#   DRL 端直接對照亦為 GICS 較優（AGG vs GICS p=0.016；HDB vs GICS p=0.363 無差異）。
+#   結果（2026-07-29 以逐日差分 Newey-West HAC 重做；舊版 n=15 參數格檢定因
+#   偽重複已降為描述性附錄，見 analysis/proposition2_daily_hac.py docstring）：
+#     GICS 底 DRL 的增益最大（年化 +1.066%，NW p=0.0002），五種配對底全部顯著
+#     （p = 0.0002–0.0177），並經 block bootstrap 無母數對照確認。
 #   → ML 分群未提供 DL 端可利用的額外結構；命題 1 未獲支持，
-#     命題 2 因涵蓋傳統配對底而普適性更強（五種配對底全部顯著）。
+#     命題 2 因涵蓋傳統配對底而普適性更強。
+#   三項替代解釋已排除（prop2_exposure_control / prop2_skip_permutation）：
+#     非拉高門檻、非篩掉爛配對、非減少曝險（DRL 進場次數反為 1.6–1.9 倍）。
+#   絕對績效仍不成立：DSR 於 N=87 試驗宇宙下全數不通過（SR0=0.433 > 最高 SR 0.343）。
 # 借用 Grid GICS-{SSD,SDP} 已算好的形成期配對，零重跑 formation。
 for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
     _pgd = {**base_params, **_GRID_COMMON,
@@ -379,10 +385,17 @@ SENSITIVITY_TIER1_FORMATION = {
     "pca_n_components":     [3, 5, 10, 15],        # 基準 5
 }
 # 論文主力策略（口試敏感性分析聚焦對象）
+# 2026-07-29 修正：原列的三個名字（Agglomerative Fundamentals FMP／yF、
+# HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid）已於 2026-07-24 隨舊架構封存，
+# 不在現役 17 條之列 → make_sensitivity_variants 一律找不到基準而靜默跳過，
+# SENSITIVITY_ALL 與省略 SENSITIVITY_BASE 的用法形同失效。
+# 改為現行論文主軸的三個 ML 配對底（與 analysis/proposition2_*.py 的 PAIRS 對齊）。
+# 需要傳統分組對照時另加 "Grid GICS-SSD" / "Grid GICS-SDP"，或以
+# SENSITIVITY_BASE 環境變數逐一指定。
 SENSITIVITY_BASES = [
-    "Agglomerative Fundamentals (FMP)",
-    "Agglomerative Fundamentals (yF)",
-    "HDBSCAN Cluster SSD-DTW-PCA PCA5 Resid",
+    "Grid AGG-SSD",
+    "Grid HDB-SDP",
+    "Grid KM-SSD",
 ]
 # 特定參數僅對特定策略有意義（beta_feature_weight 只有 SEC-PIT+β 有 β 區塊；
 # 若套到無此參數的策略，會被 run_formation 的 inspect.signature 過濾成無效重複）。

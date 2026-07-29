@@ -25,7 +25,9 @@ import pandas as pd
 from scipy import stats
 from scipy.stats import norm
 
-from analysis.regime_cost_dsr_eval import load_daily_returns, deflated_sharpe
+from analysis.regime_cost_dsr_eval import (
+    SPEC_MAIN, _trial_specs, deflated_sharpe, load_daily_returns,
+)
 
 RESULT_DB = "results/result.db"
 VARIANCE_CSV = "results/analysis/drl_variance_runs_mainaxis.csv"
@@ -113,8 +115,16 @@ def _per_round(summ, runs):
     return pd.DataFrame(rows)
 
 
-def _absolute_tests(summ):
-    """三、四：網格最佳格的 Newey-West 與 Deflated Sharpe。"""
+def _absolute_tests(summ, summ_all=None):
+    """
+    三、四：網格最佳格的 Newey-West 與 Deflated Sharpe。
+
+    summ      ：僅基準格，用來挑「網格最佳配置」並做檢定
+    summ_all  ：完整 strategy_summaries，僅供 DSR 計算試驗宇宙（含所有變體與
+                封存策略——那才是真實的 researcher degrees of freedom）
+    """
+    if summ_all is None:
+        summ_all = summ
     sel = {}
     for name, zs, drl in PAIRS:
         for tag, m in (("Z-Score", zs), ("DRL", drl)):
@@ -134,10 +144,14 @@ def _absolute_tests(summ):
                    "NW t": round(t, 3), "NW p": f"{p:.4f}",
                    "5%顯著": "✔" if p < .05 else "✘"})
 
-        # 試驗間 Sharpe 變異需與 deflated_sharpe 內部的「每日」尺度一致
-        var_sr = float((g.Sharpe_Raw / np.sqrt(TRADING_DAYS)).var(ddof=1))
-        d = deflated_sharpe(r, len(g), var_sr)
-        dsr.append({"配對底": name, "交易端": tag, "N試驗": len(g),
+        # 2026-07-29：N 由 len(g)=15（該策略的參數格數）改為試驗宇宙口徑。
+        # 15 格共用同一批配對、僅組合設定不同，不是 15 次獨立試驗；真正的
+        # researcher degrees of freedom 是 result.db 裡 87 個相異 METHOD
+        # （含試過後封存的負面結果）。N 與 var_sr 取自同一集合（見
+        # regime_cost_dsr_eval._trial_specs 的說明）。
+        n_tr, var_sr = _trial_specs(summ_all, b["METHOD"])[SPEC_MAIN]
+        d = deflated_sharpe(r, n_tr, var_sr)
+        dsr.append({"配對底": name, "交易端": tag, "N試驗": n_tr,
                     "SR年化": round(d["SR_ann"], 3), "門檻SR0": round(d["SR0_ann"], 3),
                     "DSR": round(d["DSR"], 3),
                     "判定": "✔" if d["DSR"] >= .95 else "✘"})
@@ -150,13 +164,22 @@ def run():
                          f"請先執行 DRL_VARIANCE_TAG=mainaxis python -m tools.run_drl_variance")
 
     con = sqlite3.connect(RESULT_DB)
-    summ = pd.read_sql("SELECT * FROM strategy_summaries", con)
+    summ_all = pd.read_sql("SELECT * FROM strategy_summaries", con)
     con.close()
     runs = pd.read_csv(VARIANCE_CSV)
 
+    # 只保留基準格。entry_z 等交易端變體與基準共用 db_method 與同一組
+    # (TOP N, STOP LOSS %, MAX SEC %)，若不濾除，set_index(GRID) 會產生
+    # 重複索引（ValueError: cannot handle a non-unique multi-index），
+    # 且會把對照組混入配對檢定。
+    # 註：DSR 的試驗宇宙仍用完整 summ_all（見 _trial_specs），兩者刻意不同——
+    #     檢定要乾淨的基準格，選擇偏誤校正要完整的試驗史。
+    summ = summ_all[~summ_all._path.str.contains(
+        r"_EZ\d+|_DYN|_MHD|_XZ|_DG", regex=True, na=False)]
+
     t1 = _paired_tests(summ, runs)
     t2 = _per_round(summ, runs)
-    t3, t4 = _absolute_tests(summ)
+    t3, t4 = _absolute_tests(summ, summ_all)
 
     for title, note, tbl in [
         ("一、配對 t 檢定：DRL vs Z-Score（同一參數網格逐格配對）",
