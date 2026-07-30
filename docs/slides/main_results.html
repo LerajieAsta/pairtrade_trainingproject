@@ -1574,6 +1574,81 @@ margin-right: 0; }
 <p><strong>綜合</strong>：形成期實作差異與交易機制差異皆已檢驗，<strong>皆非命題 1 失敗的原因</strong>。 剩餘差距歸因於兩項<strong>資料可得性限制</strong>而非設計選擇——分群特徵 7 維連續 （原文 48 動量因子 + 78 公司特徵）、母體 S&amp;P 500（原文 CRSP 全市場）。</p>
 </blockquote>
 </section>
+<section id="特徵維度與插補管道選哪些配對不決定報酬" class="slide level2">
+<h2>特徵維度與插補管道：選哪些配對，不決定報酬</h2>
+<p>形成期實作差異與交易機制皆已排除後，剩餘殘差之一為<strong>特徵維度</strong>——本研究原為 7 維連續特徵，Han et al. 為 48 動量因子 + 78 公司特徵。自既有 SEC companyfacts 快取解出 40 個 Green et al. 特徵，<strong>10 個通過 70% 覆蓋率</strong>（以 PIT 成分股身分 為分母），連續維度 7 → 17。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">步驟（2012+）</th>
+<th style="text-align: right;">年化Δ%</th>
+<th style="text-align: right;">BH 校正 <span class="math inline">p</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">one-hot → 0</td>
+<td style="text-align: right;">−0.171</td>
+<td style="text-align: right;">0.602 ✘</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">產業插補 → 全域插補</td>
+<td style="text-align: right;">−0.716</td>
+<td style="text-align: right;">0.349 ✘</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>7 維 → 17 維連續</strong></td>
+<td style="text-align: right;"><strong>+0.685</strong></td>
+<td style="text-align: right;">0.349 ✘</td>
+</tr>
+</tbody>
+</table>
+<p>兩大效果幾乎抵消（−0.716 / +0.685），淨值約 −0.03pp。對 GICS 為 +0.253pp （<span class="math inline">p</span>=0.647），<strong>未優於</strong> 7 維版的 +0.455pp。<strong>這些特徵替代了產業先驗，但未超越它。</strong></p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>方法論發現：產業中位數插補是第三條產業資訊管道</strong></p>
+</div>
+<div class="callout-content">
+<p><code>impute_by_group</code> 以<strong>產業中位數</strong>填補缺失。結構性特徵在 2012+ 有 30–50% 缺失， 故那些插補值等同為缺資料的股票加上產業標籤——與 <code>sector_onehot_weight</code> 同一種混淆， 但此前無人計入。<strong>固定特徵、只改插補方式</strong>，2012+ 跨產業配對比例：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">臂</th>
+<th style="text-align: right;">產業插補</th>
+<th style="text-align: right;">全域插補</th>
+<th style="text-align: right;">差</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">AGG-BASE</td>
+<td style="text-align: right;">9.5%</td>
+<td style="text-align: right;">16.5%</td>
+<td style="text-align: right;">+7.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>AGG-STRUCT</strong></td>
+<td style="text-align: right;"><strong>15.7%</strong></td>
+<td style="text-align: right;"><strong>59.3%</strong></td>
+<td style="text-align: right;"><strong>+42.8</strong></td>
+</tr>
+</tbody>
+</table>
+<p>影響在 STRUCT 臂遠大於 BASE 臂（缺失所在），機制明確。</p>
+<p><strong>已封存的 F09 結構性特徵消融因此是在「處理幾乎未施加」的條件下做的</strong>——原設定下 加 10 個特徵僅使跨產業 +6.2pp，全域插補下為 +42.8pp。</p>
+</div>
+</div>
+</div>
+<p><strong>F09 重驗（3 分群 × BASE/STRUCT，唯一改動為插補方式）</strong>：處理效果落在 −0.071 ~ +0.316pp，BH 校正後 0/6 顯著。<strong>原結論不但成立，且由「弱 null」 （處理未真正施加）升級為「強 null」</strong>（處理完整施加、分群大幅改變，仍無效果）。</p>
+<blockquote>
+<p><strong>貫穿命題 1 的模式</strong>：跨產業配對比例在六種設定下自 <strong>0%（GICS）到 75%（不分組）</strong>， 涵蓋 one-hot、插補、特徵集、分組方式四個維度，而 2012+ 績效全部落在 <strong>−1.9% ~ −0.9%、彼此無顯著差異</strong>。 <strong>「選哪些配對」在極大範圍內不影響報酬</strong>——這比「ML 分群無效」更強， 指向報酬由配對選擇以外的因素決定（成本、市場效率、或此策略類別的報酬衰減）。</p>
+</blockquote>
+<p>⚠️ <strong>本節為初步結果</strong>：估值比率（<code>bm</code>/<code>ep</code>/<code>cfp</code>/<code>sp</code>/<code>dy</code>/<code>lev</code>）尚未納入—— 它們需要市值、市值需要未調整股價，而 Tiingo 免費方案每月上限 500 個代號， 774 檔中已取得 495 檔。補齊後將重跑本節。</p>
+</section>
 <section id="gics-為何勝出它同時取得兩項優勢" class="slide level2">
 <h2>GICS 為何勝出：它同時取得兩項優勢</h2>
 <div class="callout callout-important callout-titled callout-style-default">
@@ -2286,7 +2361,11 @@ margin-right: 0; }
 <section id="結論" class="slide level2 scrollable">
 <h2>結論</h2>
 <ol type="1">
-<li><p><strong>命題 1 未獲支持</strong>：機器學習分群未能建立優於 GICS 產業分類的配對搜尋空間。 9 組逐日 HAC 對照經 BH-FDR 校正後<strong>無一顯著</strong>（校正後最小 <span class="math inline">p</span> = 0.4947）， 方向上 8/9 偏 GICS。此為「未獲支持」，<strong>非</strong>「GICS 顯著較優」； 非劣性檢定亦顯示<strong>無法主張兩者相當</strong>（<span class="math inline">\delta</span> = 0.5 pp 時 0/9 通過）。 受控的粒度掃描進一步顯示：<strong>分群演算法並非關鍵變因</strong>—— 單一切割門檻參數造成的績效變動（2.05pp）遠大於三種演算法間的差距（0.48pp）。 關係呈倒 U 形：粒度過細候選池不足，粒度過粗則跨產業配對自 10% 升至 50%。</p></li>
+<li><strong>命題 1 未獲支持</strong>：機器學習分群未能建立優於 GICS 產業分類的配對搜尋空間。 9 組逐日 HAC 對照經 BH-FDR 校正後<strong>無一顯著</strong>（校正後最小 <span class="math inline">p</span> = 0.4947）， 方向上 8/9 偏 GICS。此為「未獲支持」，<strong>非</strong>「GICS 顯著較優」； 非劣性檢定亦顯示<strong>無法主張兩者相當</strong>（<span class="math inline">\delta</span> = 0.5 pp 時 0/9 通過）。 受控的粒度掃描進一步顯示：<strong>分群演算法並非關鍵變因</strong>—— 單一切割門檻參數造成的績效變動（2.05pp）遠大於三種演算法間的差距（0.48pp）。 關係呈倒 U 形：粒度過細候選池不足，粒度過粗則跨產業配對自 10% 升至 50%。 <strong>命題 1 的三項可能實作原因皆已逐一檢驗且皆非失敗原因</strong>：形成期設計 （產業 one-hot、共整合篩選、缺不分組零點）、交易機制（Han et al. 的四項差異 逐步施加）、特徵維度（7 → 17 維連續，初步結果）。</li>
+</ol>
+<p>1b. <strong>貫穿命題 1 的核心發現：「選哪些配對」在極大範圍內不影響報酬。</strong> 跨產業配對比例在六種設定下自 <strong>0%（GICS）到 75%（不分組）</strong>，涵蓋 one-hot 權重、 插補方式、特徵集、分組方式四個維度，而 2012+ 績效全部落在 <strong>−1.9% ~ −0.9%、 彼此無顯著差異</strong>。此結論比「ML 分群無效」更強——它指向報酬由配對選擇以外的 因素決定（交易成本、市場效率、或此策略類別自 2000 年代起的報酬衰減）。</p>
+<p>1c. <strong>方法論發現：產業中位數插補是先前未被計入的第三條產業資訊管道。</strong> <code>impute_by_group</code> 對缺失值填產業中位數；結構性特徵在 2012+ 缺失 30–50%， 故等同為缺資料的股票加上產業標籤。固定特徵、僅改插補方式，AGG-STRUCT 的 跨產業配對比例即自 15.7% 升至 59.3%（+42.8pp），而 BASE 臂僅 +7.0pp。 已封存的 F09 結構性特徵消融因此是在「處理幾乎未施加」下執行；經全域插補重驗， 其「無貢獻」結論<strong>仍成立</strong>，並由弱 null 升級為強 null（3 分群 × BASE/STRUCT 共 6 組，BH 校正後 0/6 顯著）。</p>
+<ol start="2" type="1">
 <li><p><strong>命題 2 獲得支持</strong>：DRL 交易端在<strong>五種配對底</strong>上皆顯著優於 Z-Score （逐日 HAC <span class="math inline">p</span> = 0.0002 ~ 0.0177，block bootstrap 一致）， 且增益最大者為傳統 GICS 分組——此改良與配對來源正交，不依賴機器學習分群。</p></li>
 <li><p><strong>增益具 regime 穩健性與成本穩健性</strong>：DRL 在 20 個市場環境分層中改善 19 格、 劣化 0 格；並在四種配對底上皆提高往返 break-even 成本（最高 0.708%）。</p></li>
 <li><p><strong>增益機制：三項替代解釋已排除</strong>。受控對照顯示增益非源自拉高門檻 （同門檻 2.2 對照下五支仍顯著，門檻管道僅複製 4.2–20.9% 且不顯著）、 非源自篩掉劣質配對（SKIP 置換檢定 75 格僅 7 格顯著，隨機期望 3.75 格）、 非源自減少曝險（DRL 進場次數為 Z-Score 的 1.6–1.9 倍）。 殘差與槽位週轉一致，惟無法直接驗證。</p></li>
@@ -2297,6 +2376,7 @@ margin-right: 0; }
 <h2>限制</h2>
 <ul>
 <li><strong>策略之絕對獲利能力未達統計顯著</strong>：Newey-West 檢定最佳 <span class="math inline">p</span> = 0.088、 Deflated Sharpe 最高 0.320（共同門檻 <span class="math inline">SR_0</span> = 0.433 &gt; 最高 <span class="math inline">SR</span> 0.343）。 本研究之結論限於方法間的相對比較，不宣稱策略具可實現之超額報酬</li>
+<li><strong>公司特徵僅取得可得子集</strong>：Han et al. 使用 48 動量因子 + 78 公司特徵； 本研究自 SEC XBRL 建出 40 個，僅 10 個通過 70% 覆蓋率門檻（連續維度 7 → 17）。 估值比率（<span class="math inline">bm</span>/<span class="math inline">ep</span>/<span class="math inline">cfp</span>/<span class="math inline">sp</span>/<span class="math inline">dy</span>/<span class="math inline">lev</span>）尚未納入——需市值、市值需未調整股價， 而 Tiingo 免費方案每月上限 500 個代號（774 檔中已取得 495 檔）。 另有 11 個特徵<strong>永遠無法取得</strong>（員工數、Compustat 上市年資、sin 股分類、 可轉債／擔保債旗標、財報公布日 EPS 意外），因 XBRL 未標記或需 Compustat</li>
 <li><strong>命題 1 的檢定力不足</strong>：既無法證明 ML 較優，亦無法主張兩者相當 （單尾 95% 下界 −0.56 ~ −1.44 pp）。結論限於本設定 （混合特徵、S&amp;P 500 大型股）。特徵工程消融（動量、結構性財報比率） 皆為負面結果，但不排除其他特徵設計能表達產業以外的相似性維度而改變結論</li>
 <li><strong>命題 2 的單一設定檢定力不足</strong>：等權組合顯著，但 ML 配對底 15 格中僅 4–5 格能單獨達顯著；面對更保守的固定門檻基準（<span class="math inline">entry_z</span>=2.5）時， 五支中四支退為邊緣顯著（<span class="math inline">p \approx</span> 0.06）</li>
 <li><strong>存活者偏誤未完全消除</strong>：170 檔已下市成分股中 49 檔（29%）無價格資料， 且缺失與下市狀態相關（無價格者 43% 已下市 vs 有價格者 17%）。 方向上使絕對績效被高估（故絕對結論偏保守）、對相對比較則同向抵銷</li>
