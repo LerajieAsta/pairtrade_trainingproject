@@ -461,6 +461,42 @@ for _tag, _feats in (("AGG-SSD-NOSEC-GI", ()), ("AGG-SSD-CHARS", _CHARS_10)):
                    "structural_weight": 1.0},
     })
 
+# ── F09 結構性財報特徵消融的重驗（2026-07-30）──────────────────────────────
+# 原始 F09（2026-07-24，已封存）結論：「10 維 SEC XBRL 財報比率對分群品質無顯著
+# 貢獻，三分群 Δ 皆在 ±0.22pp 噪音範圍內」。該實驗在 `impute_scope="group"`
+# （產業中位數插補）下執行。
+#
+# 為何值得重驗：STRUCT 臂的結構性特徵有 30–50% 缺失，被填成**產業中位數**，
+# 而產業資訊**已由 sector_onehot 編碼**。那些插補值因此是冗餘資訊，
+# 使結構性區塊的邊際貢獻被系統性低估。
+# 註：one-hot 在 BASE/STRUCT 兩臂皆為 1.0，於差分中對消，本身不造成偏誤——
+#     問題出在插補值的冗餘，而非 one-hot。
+#
+# 設計：唯一相對原始 F09 的改動是 impute_scope="global"。3 分群 × {BASE, STRUCT}
+# 共 6 格，以完整重驗「三分群皆為噪音」的原宣稱。分析限制在 2012+
+# （XBRL 覆蓋率穩定期），與 prop1_feature_dimension 同口徑。
+_F09_FEATS = ("book_to_market", "roe", "roa", "gross_margin", "op_margin",
+              "leverage", "cash_ratio", "capital_intensity",
+              "asset_turnover", "accruals")
+for _cm_f, _cs_f in (("hdbscan", "HDB"), ("agglomerative", "AGG"), ("kmeans", "KM")):
+    for _arm, _feats in (("BASE", ()), ("STRUCT", _F09_FEATS)):
+        _grid_entries.append({
+            "name":             f"F09GI {_cs_f}-{_arm}",
+            "formation_module": "strategies.formation.cluster_formation",
+            "trading_module":   "strategies.trading.zscore_trading",
+            "sub_dir":          f"F09GI_{_cs_f}_{_arm}",
+            "db_method":        f"F09GI ({_cs_f}-{_arm})",
+            "trade_method":     "Z-Score",
+            "params": {**base_params, **_GRID_COMMON,
+                       "feature_mode": "fundamentals_mix",
+                       "cluster_method": _cm_f, "ranking_backend": "ssd",
+                       "filter_mode": "coint",
+                       "structural_features": _feats,
+                       "structural_weight": 1.0,
+                       # 唯一相對原始 F09 的改動
+                       "impute_scope": "global"},
+        })
+
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
 strategies_raw = strategies_raw_all[:]
