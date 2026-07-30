@@ -104,7 +104,12 @@ def fetch_one(symbol: str, key: str, start: str, end: str):
     if r.status_code != 200:
         return "error", f"HTTP {r.status_code}: {r.text[:200]}"
 
-    rows = r.json()
+    # Tiingo 偶爾以 200 回傳非 JSON（錯誤頁／截斷回應）。若不接住，
+    # JSONDecodeError 會直接中斷整個批次——實測曾因此損失數批的額度。
+    try:
+        rows = r.json()
+    except ValueError:
+        return "error", f"回應非 JSON（前 120 字）：{r.text[:120]!r}"
     if not rows:
         return "nodata", None
     df = pd.DataFrame(rows)
