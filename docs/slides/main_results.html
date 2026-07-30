@@ -1516,6 +1516,64 @@ margin-right: 0; }
 </div>
 <p>與文獻的差距更可能來自兩項無法以參數調整消除的根本差異： <strong>母體範圍</strong>（S&amp;P 500 約 600 檔 vs CRSP 數千檔；該文已排除「獲利來自小型股」的解釋） 與<strong>交易機制</strong>（群內橫斷面多空 vs 逐配對價差收斂——後者要求價差平穩性，前者不要求）。</p>
 </section>
+<section id="交易機制的逐步歸因方向一致但仍不顯著" class="slide level2">
+<h2>交易機制的逐步歸因：方向一致，但仍不顯著</h2>
+<p>形成期實作差異被排除後，剩餘殘差之一為<strong>交易機制</strong>。Han et al. 押的是 <strong>群內短期反轉</strong>（相似兩檔上月分開、下月收斂），本研究押的是 <strong>共整合均值回歸</strong>（價差歷史平穩、現在偏離 2σ）——訊號、持有期、退出條件全不同。</p>
+<p>四項差異逐步施加以維持單變因（直接完整復刻會一次改四個變因）：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">步驟</th>
+<th style="text-align: left;">該步改變</th>
+<th style="text-align: right;">全網格等權年化%</th>
+<th style="text-align: right;">Top1/SL0年化%</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">起點</td>
+<td style="text-align: left;">SSD 距離 + OLS-β + <span class="math inline">z</span>&gt;2 / 126 日</td>
+<td style="text-align: right;">−0.373</td>
+<td style="text-align: right;">−0.909</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">②</td>
+<td style="text-align: left;">β 改 1 等金額</td>
+<td style="text-align: right;">−0.177</td>
+<td style="text-align: right;">−0.370</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">③</td>
+<td style="text-align: left;">選對準則改月報酬發散</td>
+<td style="text-align: right;">−0.092</td>
+<td style="text-align: right;">+0.207</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">④</td>
+<td style="text-align: left;">21 日窗 + 發散即建倉 + 持有至期末</td>
+<td style="text-align: right;">−0.094</td>
+<td style="text-align: right;"><strong>+1.369</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>每一步都改善，但沒有一步顯著</strong></p>
+</div>
+<div class="callout-content">
+<p>Top1 口徑單調改善（−0.909% → +1.369%，計 +2.28pp），惟逐步對照校正前最小 <span class="math inline">p</span> = 0.055、BH 校正後無一顯著；總效果等權 +0.28pp（<span class="math inline">p</span>=0.923）、 Top1 +2.28pp（<span class="math inline">p</span>=0.705）。<code>entry_z</code>=0 搭配持有至期末使單一配對日報酬波動極大， 檢定力極低。<strong>完整復刻交易端後等權年化仍為 −0.094%</strong>，離原文 24.8% 差兩個數量級。</p>
+</div>
+</div>
+</div>
+<p><strong>附帶發現：排序準則本身亦為產業偏誤的來源。</strong> <code>HAN3-REV</code> 的跨產業配對比例 19.7%，而分群設定完全相同、僅排序準則不同的 <code>AGG-SSD-NF</code> 僅 6.8%。SSD 距離偏好同產業配對——同業股票的歷史價格路徑天然更接近。 此點在排序固定為 SSD 的因子設計中無法觀察。</p>
+<blockquote>
+<p><strong>綜合</strong>：形成期實作差異與交易機制差異皆已檢驗，<strong>皆非命題 1 失敗的原因</strong>。 剩餘差距歸因於兩項<strong>資料可得性限制</strong>而非設計選擇——分群特徵 7 維連續 （原文 48 動量因子 + 78 公司特徵）、母體 S&amp;P 500（原文 CRSP 全市場）。</p>
+</blockquote>
+</section>
 <section id="gics-為何勝出它同時取得兩項優勢" class="slide level2">
 <h2>GICS 為何勝出：它同時取得兩項優勢</h2>
 <div class="callout callout-important callout-titled callout-style-default">

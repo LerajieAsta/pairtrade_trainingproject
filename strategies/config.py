@@ -375,6 +375,48 @@ for _cm_g, _fm_g, _ohw, _tag in (
         "params":           _pf,
     })
 
+# ── Han et al. (2021) 交易機制的逐步歸因鏈（2026-07-29）────────────────────
+# 前一組因子設計證實：三處**形成期**實作差異（產業 one-hot、共整合篩選、
+# 缺不分組零點）不足以解釋命題 1 的否定。剩餘兩個殘差為母體範圍（無資料，
+# 不可測）與**交易機制**——本鏈檢驗後者。
+#
+# Han, He & Toh (2021) 的機制與本研究的四項差異，逐步施加以維持單變因：
+#   起點 = Grid (AGG-SSD-NF)：AGG 分群 + SSD 距離 + 無篩選 + OLS-β + z>2/126 日
+#   ②  β 改 1 等金額            → distance_trading（原文："buy one stock and
+#                                 sell the other for the same amount"）
+#   ③  選對準則改月報酬發散      → ranking_backend="reversal"
+#   ④  進出場改月頻固定持有      → 21 日窗、entry_z=0（發散即建倉）、
+#                                 hold_to_period_end（不做收斂出場）
+# ④ 完成即為 Han et al. 的交易端全貌。
+#
+# ⚠ 仍無法關閉的缺口（即使 ④ 完美復刻）：分群依據仍是 7 維連續特徵，
+#   而原文為 48 動量因子 + 78 公司特徵；母體仍為 S&P 500 而非 CRSP 全市場。
+#   故本鏈只能回答「交易機制解釋了多少差距」，不能預期複製 24.8% 的績效。
+_han_base = {**base_params, **_GRID_COMMON,
+             "feature_mode": "fundamentals_mix",
+             "cluster_method": "agglomerative",
+             "filter_mode": "none"}          # 起點已無篩選，全鏈維持
+for _tag, _rb, _extra, _borrow in (
+    # ② 形成期參數與 Grid AGG-SSD-NF 完全相同（唯一變因在交易端），故借用其
+    #    已算好的配對——既省一次 formation，也保證兩臂配對逐筆一致。
+    ("HAN2-B1",      "ssd",      {}, "Grid AGG-SSD-NF"),
+    ("HAN3-REV",     "reversal", {}, None),
+    ("HAN4-MONTHLY", "reversal", {"trading_window": 21, "rolling_step": 21,
+                                  "entry_z": 0.0, "hold_to_period_end": True}, None),
+):
+    _e = {
+        "name":             f"Grid {_tag}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.distance_trading",   # β = 1 等金額
+        "sub_dir":          f"Grid_{_tag.replace('-', '_')}",
+        "db_method":        f"Grid ({_tag})",
+        "trade_method":     "Distance",
+        "params":           {**_han_base, "ranking_backend": _rb, **_extra},
+    }
+    if _borrow:
+        _e["formation_strategy_id_base"] = _borrow
+    _grid_entries.append(_e)
+
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
 strategies_raw = strategies_raw_all[:]

@@ -44,6 +44,12 @@ class Formation:
         # "none"：完全不分組（全市場單一組），分組維度的零點對照
         cluster_method: str = "agglomerative",
         ranking_backend: str = "ssd",
+        # ranking_backend="reversal" 專用（Han, He & Toh 2021 的選對準則）。
+        # 預設值即原文設定：過去 1 個月（21 交易日）、1 倍橫斷面 SD。
+        # sd_scope 對應原文未明言的歧義（"cross-sectional" 是群內或全體）。
+        reversal_lookback: int = 21,
+        reversal_sd_mult: float = 1.0,
+        reversal_sd_scope: str = "pooled",
         filter_mode: str = "coint",              # "coint"（三道統計過濾）| "none"（純排序消融）
         # ── 特徵組 ─────────────────────────────────────────────────
         pca_n_components: int = 5,
@@ -84,6 +90,9 @@ class Formation:
         self.feature_mode = feature_mode
         self.cluster_method = cluster_method
         self.ranking_backend = ranking_backend
+        self.reversal_lookback = reversal_lookback
+        self.reversal_sd_mult = reversal_sd_mult
+        self.reversal_sd_scope = reversal_sd_scope
         self.filter_mode = filter_mode
 
         self.pca_n_components = pca_n_components
@@ -266,6 +275,9 @@ class Formation:
             trading_window=self.trading_window,
             dtw_window=self.dtw_window,
             enable_filters=(self.filter_mode != "none"),
+            lookback=self.reversal_lookback,
+            sd_mult=self.reversal_sd_mult,
+            sd_scope=self.reversal_sd_scope,
         )
         if selected.empty:
             self.selected_pairs = selected

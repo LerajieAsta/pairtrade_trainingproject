@@ -210,8 +210,16 @@ def worker_task(
 
         # max_pairs = top_n × 並行期數，確保任意時點總部署 ≤ current_equity
         # dynamic_slots（方案 A）：以歷史同時承諾數分位數校準有效槽位，提高資金利用率
+        #
+        # 並行期數須**逐策略**推導：run_formation 已支援以 params 覆寫
+        # trading_window / rolling_step（如 Han et al. 復刻的月頻持有為 21/21，
+        # 實際並行 1 期）。沿用全域 CONCURRENT_PERIODS(=6) 會把槽位開成實際的
+        # 6 倍，使每對只分到 1/6 資金、績效被系統性低估。
+        # 既有策略皆為 126/21 → 6，與舊值相同，行為不變。
+        _concurrent = max(1, int(params.get("trading_window", FORWARD_DAYS))
+                          // max(1, int(params.get("rolling_step", rolling_step))))
         pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL,
-                              max_pairs=params.get("top_n", 10) * CONCURRENT_PERIODS,
+                              max_pairs=params.get("top_n", 10) * _concurrent,
                               dynamic_slots=bool(params.get("dynamic_slots", False)),
                               slot_percentile=float(params.get("slot_percentile", 75.0)),
                               pair_cap_frac=float(params.get("pair_cap_frac", 0.15)),

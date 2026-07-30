@@ -77,4 +77,25 @@ def rank_within_groups(
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
         return _DTWFormation(**kw).run()
 
-    raise ValueError(f"未知排序方法 '{method}'，可選：ssd / dtw / ssd_dtw_pca")
+    if method == "reversal":
+        # Han, He & Toh (2021) 的選對準則：群內短期反轉（過去一個月報酬發散）。
+        # 與 ssd/dtw/sdp 的「歷史相似度」不同——押的是單月反轉而非價差平穩性。
+        # 對沖固定 1.0，故須搭配 distance_trading（等權距離 spread）使用。
+        from strategies.formation._reversal import rank_by_reversal
+        return rank_by_reversal(
+            price_df=price_df,
+            form_start=form_start,
+            form_end=form_end,
+            group_map=group_map,
+            top_n=top_n,
+            min_tickers_for_pairing=min_tickers_for_pairing,
+            adf_pvalue_threshold=(adf_pvalue_threshold
+                                  if adf_pvalue_threshold is not None else 0.05),
+            trading_window=trading_window,
+            enable_filters=enable_filters,
+            **{k: v for k, v in _ignored.items()
+               if k in ("lookback", "sd_mult", "sd_scope")},
+        )
+
+    raise ValueError(
+        f"未知排序方法 '{method}'，可選：ssd / dtw / ssd_dtw_pca / reversal")
