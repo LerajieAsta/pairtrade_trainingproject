@@ -126,6 +126,10 @@ def build_fundamentals_mix_features(
     sector_onehot_weight: float = 1.0,
     structural_features: tuple = (),      # 結構性財報特徵欄位（SEC XBRL PIT）
     structural_weight: float = 1.0,
+    # 缺失值插補範圍。"group"＝產業中位數（預設，維持既有 17 策略行為）；
+    # "global"＝全域中位數。命題 1 的特徵擴充實驗須用 "global"——產業中位數插補
+    # 會把 GICS 資訊寫進特徵向量，與 sector_onehot_weight 是同一種混淆。
+    impute_scope: str = "group",
     random_state: int = 42,
     min_tickers: int = 2,
     verbose: bool = True,
@@ -191,8 +195,9 @@ def build_fundamentals_mix_features(
     n_missing_mc = int(np.isnan(market_caps).sum())
     n_missing_pe = int(np.isnan(earnings_yields).sum())
 
-    market_caps = winsorize(impute_by_group(market_caps, canonical_sectors))
-    earnings_yields = winsorize(impute_by_group(earnings_yields, canonical_sectors))
+    _use_grp = (impute_scope != "global")
+    market_caps = winsorize(impute_by_group(market_caps, canonical_sectors, _use_grp))
+    earnings_yields = winsorize(impute_by_group(earnings_yields, canonical_sectors, _use_grp))
 
     onehot = np.zeros((len(valid_tickers), len(CANONICAL_SECTORS) + 1))
     sector_index = {s: i for i, s in enumerate(CANONICAL_SECTORS)}
@@ -213,7 +218,7 @@ def build_fundamentals_mix_features(
         for c in struct_cols:
             v = struct_vals[c]
             n_struct_missing[c] = int(np.isnan(v).sum())
-            v = winsorize(impute_by_group(v, canonical_sectors))
+            v = winsorize(impute_by_group(v, canonical_sectors, _use_grp))
             cols_arr.append(v)
         struct_mat = np.column_stack(cols_arr)
         struct_scaled = StandardScaler().fit_transform(struct_mat) * structural_weight

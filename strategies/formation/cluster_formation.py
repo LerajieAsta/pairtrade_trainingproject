@@ -67,6 +67,9 @@ class Formation:
         # ── 結構性財報特徵（SEC XBRL PIT；空 tuple = 停用，維持現行行為）──
         structural_features: tuple = (),
         structural_weight: float = 1.0,
+        # 缺失值插補範圍："group"（產業中位數，預設）| "global"（全域中位數）。
+        # 命題 1 的特徵擴充實驗須用 "global"，避免產業資訊經插補漏進特徵。
+        impute_scope: str = "group",
         # ── 分群組 ─────────────────────────────────────────────────
         hdbscan_min_cluster_size: int = 5,
         hdbscan_min_samples: int = 2,
@@ -108,6 +111,7 @@ class Formation:
         self.momentum_weight = float(momentum_weight)
         self.structural_features = tuple(structural_features)
         self.structural_weight = float(structural_weight)
+        self.impute_scope = impute_scope
 
         self.hdbscan_min_cluster_size = hdbscan_min_cluster_size
         self.hdbscan_min_samples = hdbscan_min_samples
@@ -152,6 +156,7 @@ class Formation:
                 sector_onehot_weight=self.sector_onehot_weight,
                 structural_features=self.structural_features,
                 structural_weight=self.structural_weight,
+                impute_scope=self.impute_scope,
                 random_state=self.umap_random_state,
                 min_tickers=self.min_tickers_for_pairing,
             )
@@ -186,6 +191,7 @@ class Formation:
             sector_onehot_weight=self.sector_onehot_weight,
             structural_features=self.structural_features,
             structural_weight=self.structural_weight,
+            impute_scope=self.impute_scope,
             random_state=self.umap_random_state,
             min_tickers=self.min_tickers_for_pairing,
         )

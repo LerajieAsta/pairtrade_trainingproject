@@ -417,6 +417,50 @@ for _tag, _rb, _extra, _borrow in (
         _e["formation_strategy_id_base"] = _borrow
     _grid_entries.append(_e)
 
+# ── 特徵維度：Han et al. 的「78 公司特徵」可得子集（2026-07-30）──────────────
+# 前兩組實驗已排除形成期實作差異與交易機制為命題 1 失敗的原因。剩餘殘差之一是
+# **特徵維度**：本研究原為 7 維連續（5 報酬 PCA + 2 基本面），原文為 48 動量因子
+# + 78 公司特徵。本組把可得的公司特徵補上，檢驗維度是否為關鍵。
+#
+# 資料現實（見 fetch/fetch_sec_characteristics.py docstring）：
+#   - SEC XBRL 強制申報自 ~2009 起，2000–2008 無財報特徵
+#   - 40 個建出的特徵中，僅 10 個在「PIT 成分股身分」分母下覆蓋率 >70%
+#   - 估值比率（bm/ep/cfp/sp/dy/lev）因未調整股價快取被 bug 毀損而僅 15–22%，
+#     補抓中（Tiingo 免費方案 ~50 檔/小時）
+#
+# 兩項防污染措施（否則會把 GICS 資訊從後門送進特徵向量）：
+#   - sector_onehot_weight=0：不直接編碼產業
+#   - impute_scope="global"：缺失值用全域中位數，非產業中位數
+#
+# 執行全期以與基準共用期間定義；分析時限制在 2012+（特徵實際存在的期間），
+# 故基準 Grid (GICS-SSD) / Grid (AGG-SSD) 不需重跑。
+# 兩格構成單變因對照——唯一差異為「是否納入那 10 個公司特徵」：
+#   NOSEC-GI : 7 維連續（5 PCA + 市值 + 盈餘殖利率），one-hot=0，全域插補
+#   CHARS    : 17 維連續（同上 + 10 個公司特徵），其餘完全相同
+# 若直接拿 CHARS 對比既有的 AGG-SSD-NOSEC，會同時改動特徵數與插補方式，
+# 無法歸因（與舊 SSD (Basic) 對照的三變因混淆同型）。
+_CHARS_10 = ("agr", "egr", "chtx", "cash_ratio", "roa", "roe",
+             "capital_intensity", "tb", "lgr", "currat")
+_chars_common = {**base_params, **_GRID_COMMON,
+                 "feature_mode": "fundamentals_mix",
+                 "cluster_method": "agglomerative", "ranking_backend": "ssd",
+                 "filter_mode": "coint",
+                 "fundamentals_parquet_path":
+                     "dataset/fundamental/sp500_pit_characteristics_monthly.parquet",
+                 "sector_onehot_weight": 0.0,
+                 "impute_scope": "global"}
+for _tag, _feats in (("AGG-SSD-NOSEC-GI", ()), ("AGG-SSD-CHARS", _CHARS_10)):
+    _grid_entries.append({
+        "name":             f"Grid {_tag}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          f"Grid_{_tag.replace('-', '_')}",
+        "db_method":        f"Grid ({_tag})",
+        "trade_method":     "Z-Score",
+        "params": {**_chars_common, "structural_features": _feats,
+                   "structural_weight": 1.0},
+    })
+
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
 strategies_raw = strategies_raw_all[:]

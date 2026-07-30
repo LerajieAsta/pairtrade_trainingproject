@@ -288,9 +288,12 @@ def _tiingo_raw_monthly_close(symbol: str, start: str, end: str) -> pd.Series:
         except requests.exceptions.RequestException:
             time.sleep(1.0 * (attempt + 1))
     if not rows:
-        s = pd.Series(dtype=float)
-        pd.to_pickle(s, cache)
-        return s
+        # ⚠ 2026-07-30 修正：原本會把空序列寫入快取，而上方第 268 行看到快取就
+        #   直接回傳 → 一次速率限制失敗會被永久記成「該 ticker 無資料」，永不重試。
+        #   實測後果：843 檔中 576 檔（2012–2025 成分股）留下被快取的失敗，
+        #   使所有需要市值的估值比率（bm/ep/cfp/sp/dy/lev）覆蓋率僅 15–22%。
+        #   現改為不快取失敗；補抓與 404/速率限制的區分見 fetch/refetch_tiingo_raw.py。
+        return pd.Series(dtype=float)
     df = pd.DataFrame(rows)
     df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
     df = df.sort_values("date").set_index("date")

@@ -57,14 +57,28 @@ def load_pit_fundamentals(parquet_path: str) -> pd.DataFrame:
     return _fundamentals_cache
 
 
-def impute_by_group(values: np.ndarray, groups: np.ndarray) -> np.ndarray:
-    """以群組（正規化後產業）中位數插補缺失值，群組本身無覆蓋則退回全域中位數。"""
+def impute_by_group(values: np.ndarray, groups: np.ndarray,
+                    use_group_median: bool = True) -> np.ndarray:
+    """
+    插補缺失值。預設以群組（正規化後產業）中位數，群組無覆蓋則退回全域中位數。
+
+    `use_group_median=False` → 一律用全域中位數。
+
+    為何需要這個開關：產業中位數插補會**把產業資訊寫進特徵向量**。在缺失率高時
+    （SEC XBRL 特徵約 20–30% 缺失），相當於為缺資料的股票額外加上一組產業標籤——
+    與 `sector_onehot_weight` 是同一種混淆。檢驗「產業先驗是否有價值」的實驗
+    （命題 1）必須關閉群組插補，否則對照組的資訊會從後門漏進實驗組。
+    """
     values = values.copy()
     nan_mask = np.isnan(values)
     if not nan_mask.any():
         return values
 
     global_median = float(np.nanmedian(values)) if not np.all(nan_mask) else 0.0
+
+    if not use_group_median:
+        values[nan_mask] = global_median
+        return values
 
     for g in np.unique(groups):
         g_mask = groups == g
