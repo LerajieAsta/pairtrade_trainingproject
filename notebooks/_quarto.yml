@@ -4,6 +4,7 @@ project:
   render:
     - formation/*.ipynb
     - trading/*.ipynb
+    - thesis/*.ipynb
     - main_results.ipynb
     - comparison.ipynb
     - performance_guide.ipynb
