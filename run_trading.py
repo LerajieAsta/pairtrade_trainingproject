@@ -457,7 +457,7 @@ def worker_task(
             path_key = f"{dataset_subdir}/{sub_dir}/{filename}"
             
             from strategies.db_utils import export_df_to_db
-            export_df_to_db(
+            _ok = export_df_to_db(
                 df=df_all,
                 strategy_name=strategy_config.get("db_method", name),
                 params=params,
@@ -467,6 +467,15 @@ def worker_task(
                 overwrite=True,
                 trade_method=strategy_config.get("trade_method", "Z-Score")
             )
+            # 回傳值原本被丟棄，於是「database is locked 導致 trade_logs 全部沒寫入」
+            # 仍會報成 SUCCESS——回測跑完了，只是結果沒進庫。這種靜默的部分失敗
+            # 直到事後稽核才會現形，期間的分析全部少算一格。寫不進去就是失敗。
+            # df_all 為空時 export_df_to_db 也回傳 False，但那是「沒有交易可寫」
+            # 而非寫入失敗，不該當成錯誤。
+            if not _ok and not df_all.empty:
+                raise RuntimeError(
+                    f"結果寫入 result.db 失敗：{path_key}。回測已完成但資料未落庫，"
+                    f"半成品列已清除。併發寫入競爭時可調低 CPU_LIMIT_PCT 重跑。")
 
         # 全部期已完成並定稿 summary/CSV → 清除 checkpoint 目錄
         if use_ckpt and os.path.isdir(ckpt_dir):

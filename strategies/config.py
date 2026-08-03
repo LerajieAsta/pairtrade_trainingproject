@@ -45,12 +45,18 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)  # type: ignore
 
 # ── 共用常數 ─────────────────────────────────────────────────────────────
-FORCE_RERUN = False
+# 預設 False（斷點續傳）。上游資料變動時需要重算特定幾格，改檔再改回來容易忘記，
+# 故比照 STRATEGIES_SLICE 開放環境變數覆寫——兩者搭配即「只強制重跑這幾格」：
+#   $env:FORCE_RERUN="1"; $env:STRATEGIES_SLICE="25:27"; python run_formation.py
+FORCE_RERUN = os.environ.get("FORCE_RERUN", "").strip().lower() in ("1", "true", "yes")
 # 交易期是否另存人類可讀的 Trade Log CSV。續傳與儀表板均以 result.db 為準，
 # 故 CSV 為可選產物；False 省下 ~14GB（大型網格）且不影響回測/續傳/儀表板。
 # 2026-07-08 起關閉：改採純 result.db 工作流。需人類可讀 CSV 時再設 True。
 WRITE_TRADE_CSV = False
-CPU_LIMIT_PCT = 0.95
+# 併發度愈高，寫 result.db 的競爭愈兇。2026-08-03 的重跑就有一格因
+# 「database is locked」丟掉全部 trade_logs 列，而摘要列仍寫成功——執行器照樣
+# 回報 SUCCESS，缺漏只在事後稽核才被發現。補跑時調低本值可換取寫入穩定。
+CPU_LIMIT_PCT = float(os.environ.get("CPU_LIMIT_PCT", "0.95"))
 DRL_MAX_WORKERS = 10  # 本機 CPU-only（無 CUDA），torch.set_num_threads(1)，10 並行安全
 DB_PROFILES = {
     "sp500_Current": {

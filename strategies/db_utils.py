@@ -13,6 +13,7 @@
 import os
 import re
 import sys
+import time
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -521,9 +522,35 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
         try:
             conn.rollback()
             conn.close()
-        except:
+        except Exception:
             pass
+        # rollback 不足以還原一致性：overwrite 模式已先刪掉這個 path_key 的舊資料，
+        # 而摘要列曾被觀察到在 trade_logs 寫入失敗後仍留在庫裡（2026-08-03，
+        # 12 路並行下的 database is locked）。結果是「有摘要、無逐日明細」——
+        # 分析端讀得到績效卻讀不到序列，等權平均會少算一格而不報錯。
+        # 故補一次獨立連線的清除，寧可整格缺席，也不要半格資料冒充完整。
+        _purge_path_key(db_path, path_key)
         return False
+
+
+def _purge_path_key(db_path: str, path_key: str) -> None:
+    """刪除某個 path_key 在三張表中的所有列，讓失敗的寫入不留半成品。"""
+    for attempt in range(3):
+        try:
+            c = sqlite3.connect(db_path, timeout=60.0)
+            c.execute("DELETE FROM strategy_summaries WHERE _path = ?;", (path_key,))
+            c.execute("DELETE FROM trade_logs WHERE strategy_id = ?;", (path_key,))
+            c.execute("DELETE FROM strategy_pairs WHERE strategy_id = ?;", (path_key,))
+            c.commit()
+            c.close()
+            print(f"  🧹 已清除半成品資料 {path_key}")
+            return
+        except Exception as e:
+            if attempt == 2:
+                print(f"  ⚠ 清除半成品失敗 {path_key}: {e}\n"
+                      f"     資料庫可能殘留「有摘要、無明細」的列，請執行完整性稽核。")
+            else:
+                time.sleep(1.0 * (attempt + 1))
 
 
 def init_formation_db(db_path="formation_data/formation_pairs.db"):

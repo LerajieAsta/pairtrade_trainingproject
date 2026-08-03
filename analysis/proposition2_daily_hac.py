@@ -155,6 +155,24 @@ def load_daily_sids(sids: list[str], use_cache: bool = True) -> pd.DataFrame:
     return cached[have]
 
 
+def invalidate_cached_sids(prefixes: list[str]) -> int:
+    """
+    刪掉快取中符合任一前綴的 strategy_id 欄，回傳刪除欄數。
+
+    快取只以 strategy_id 為鍵，沒有上游資料的指紋，所以「重跑一條既有策略」
+    不會讓它失效——load_daily_sids 看到欄位已存在就直接回傳舊序列，分析結果
+    會與重跑前逐位元相同而不報任何錯。凡是重跑過 run_trading 的策略，都必須
+    先呼叫本函式再做分析。
+    """
+    if not os.path.exists(CACHE):
+        return 0
+    cached = pd.read_parquet(CACHE)
+    drop = [c for c in cached.columns if any(c.startswith(p) for p in prefixes)]
+    if drop:
+        cached.drop(columns=drop).to_parquet(CACHE)
+    return len(drop)
+
+
 def method_paths(methods: list[str]) -> pd.DataFrame:
     """回傳 strategy_summaries 的 (METHOD, _path)，供呼叫端自行挑格子。"""
     con = sqlite3.connect(f"file:{RESULT_DB}?mode=ro", uri=True)

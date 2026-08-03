@@ -16,9 +16,9 @@ Green et al. 風格特徵後，**僅 10 個在 PIT 成分股身分分母下覆�
     Grid (AGG-SSD)            7 維，one-hot=1.0，產業中位數插補   ← 現行主軸
     Grid (AGG-SSD-NOSEC)      7 維，one-hot=0，  產業中位數插補
     Grid (AGG-SSD-NOSEC-GI)   7 維，one-hot=0，  **全域插補**
-    Grid (AGG-SSD-CHARS)      **17 維**，one-hot=0，全域插補
+    Grid (AGG-SSD-CHARS)      **19 維**，one-hot=0，全域插補
 
-CHARS − NOSEC-GI 即「+10 個公司特徵」的淨效果。若直接拿 CHARS 對比 NOSEC，
+CHARS − NOSEC-GI 即「+12 個公司特徵」的淨效果。若直接拿 CHARS 對比 NOSEC，
 會同時改動特徵數與插補方式而無法歸因。
 
 為何插補方式自成一步
@@ -57,7 +57,7 @@ CHAIN = [
     ("現行主軸",       "Grid (AGG-SSD)",           "7 維，one-hot=1.0，產業插補"),
     ("拿掉 one-hot",   "Grid (AGG-SSD-NOSEC)",     "one-hot → 0"),
     ("改全域插補",     "Grid (AGG-SSD-NOSEC-GI)",  "產業插補 → 全域插補"),
-    ("+10 公司特徵",   "Grid (AGG-SSD-CHARS)",     "7 維 → 17 維連續"),
+    ("+12 公司特徵",   "Grid (AGG-SSD-CHARS)",     "7 維 → 19 維連續"),
 ]
 GICS = "Grid (GICS-SSD)"          # 命題 1 的對照基準
 
