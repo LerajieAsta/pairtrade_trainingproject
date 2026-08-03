@@ -136,7 +136,23 @@ def run():
             cols = [sidmap[c] for c in cells if sidmap.get(c) in px.columns]
             return px[cols].mean(axis=1)
 
-        cells0 = sorted(set(zmap[2.0]) & set(dmap[2.0]))
+        def aligned(cands: list[str], *sidmaps: dict) -> list[str]:
+            """只保留「每一臂都有逐日明細」的格子。
+
+            格子清單來自 strategy_summaries，但 px 來自 trade_logs——兩者可能不一致
+            （併發寫入競爭會讓某格只剩摘要，見 tools/audit_result_db.py）。若不先取
+            交集，ew() 會單方面丟掉缺的那格，於是差分的兩臂平均在不同的籃子上，
+            混入籃子成分差異。本對照的整個設計就是要讓兩臂除了進場門檻外完全可比，
+            這種不對稱正好打在方法的要害上，所以缺格寧可兩邊一起排除。
+            """
+            keep = [c for c in cands if all(m.get(c) in px.columns for m in sidmaps)]
+            dropped = sorted(set(cands) - set(keep))
+            if dropped:
+                print(f"  ⚠ {base}：{dropped} 缺逐日明細，兩臂一併排除以維持對齊"
+                      f"（{len(cands)} → {len(keep)} 格）")
+            return keep
+
+        cells0 = aligned(sorted(set(zmap[2.0]) & set(dmap[2.0])), zmap[2.0], dmap[2.0])
         z0, drl = ew(zmap[2.0], cells0), ew(dmap[2.0], cells0)
 
         # 對照 A：DRL − ZS(2.0)
@@ -148,7 +164,10 @@ def run():
                      "5%顯著": "✔" if pA < 0.05 else "✘", "複製率%": ""})
 
         for ez in ez_avail:
-            cells = sorted(set(zmap[ez]) & set(dmap[2.0]))
+            # zmap[2.0] 也列入對齊條件——對照 C 用得到它，B 與 C 共用同一個籃子，
+            # 兩者才彼此可比，複製率（C 相對 A 的比值）也才有意義。
+            cells = aligned(sorted(set(zmap[ez]) & set(dmap[2.0])),
+                            zmap[ez], dmap[2.0], zmap[2.0])
             if not cells:
                 continue
             zz = ew(zmap[ez], cells)
