@@ -29,12 +29,19 @@ ticker→CIK 對照中則缺該檔（同樣插補）。
 """
 
 import os
+import sys
 import time
 import json
 import sqlite3
 import requests
 import numpy as np
 import pandas as pd
+
+# Windows 主控台預設 cp950，編不出進度訊息裡的 ✅／✔ 等符號。收尾 print 在
+# to_parquet 之後，崩在這裡會讓人誤以為整批解析白跑——實際上檔案早就寫好了。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 # SEC 要求所有請求帶可識別的 User-Agent（請改成你的 email）
 SEC_USER_AGENT = os.environ.get("SEC_USER_AGENT", "PairsTradingThesis research@example.com")

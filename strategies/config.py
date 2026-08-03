@@ -434,13 +434,18 @@ for _tag, _rb, _extra, _borrow in (
 #
 # 執行全期以與基準共用期間定義；分析時限制在 2012+（特徵實際存在的期間），
 # 故基準 Grid (GICS-SSD) / Grid (AGG-SSD) 不需重跑。
-# 兩格構成單變因對照——唯一差異為「是否納入那 10 個公司特徵」：
+# 兩格構成單變因對照——唯一差異為「是否納入那 12 個公司特徵」：
 #   NOSEC-GI : 7 維連續（5 PCA + 市值 + 盈餘殖利率），one-hot=0，全域插補
-#   CHARS    : 17 維連續（同上 + 10 個公司特徵），其餘完全相同
+#   CHARS    : 19 維連續（同上 + 12 個公司特徵），其餘完全相同
 # 若直接拿 CHARS 對比既有的 AGG-SSD-NOSEC，會同時改動特徵數與插補方式，
 # 無法歸因（與舊 SSD (Basic) 對照的三變因混淆同型）。
-_CHARS_10 = ("agr", "egr", "chtx", "cash_ratio", "roa", "roe",
-             "capital_intensity", "tb", "lgr", "currat")
+#
+# 名單＝characteristics_coverage.csv 中覆蓋率 >70% 者（分母為 2012+ 真實成分股
+# 身分，非面板交叉積）。2026-08-03 補齊 Tiingo 原始價快取後由 10 個增為 12 個：
+# 新增的 bm、ep 是評價類特徵，先前因 market_cap 覆蓋率僅 10.5% 而卡在 22%／21%，
+# 補抓後升至 83%／80%。這使本組首度含有帶價格資訊的特徵，不再是純會計面。
+_CHARS = ("agr", "egr", "bm", "chtx", "cash_ratio", "roa", "roe", "ep",
+          "capital_intensity", "tb", "lgr", "currat")
 _chars_common = {**base_params, **_GRID_COMMON,
                  "feature_mode": "fundamentals_mix",
                  "cluster_method": "agglomerative", "ranking_backend": "ssd",
@@ -449,7 +454,7 @@ _chars_common = {**base_params, **_GRID_COMMON,
                      "dataset/fundamental/sp500_pit_characteristics_monthly.parquet",
                  "sector_onehot_weight": 0.0,
                  "impute_scope": "global"}
-for _tag, _feats in (("AGG-SSD-NOSEC-GI", ()), ("AGG-SSD-CHARS", _CHARS_10)):
+for _tag, _feats in (("AGG-SSD-NOSEC-GI", ()), ("AGG-SSD-CHARS", _CHARS)):
     _grid_entries.append({
         "name":             f"Grid {_tag}",
         "formation_module": "strategies.formation.cluster_formation",
