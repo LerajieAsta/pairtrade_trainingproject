@@ -150,9 +150,35 @@ def deflated_sharpe(daily_ret: pd.Series, n_trials: int, var_sr_trials: float) -
 #   method N=87    ：相異 METHOD 數，var 取「各 METHOD 最佳 Sharpe」之間
 #   config N=1,435 ：全部回測配置，var 取所有配置 Sharpe 之間
 #
-# N=87 為主口徑：一個 METHOD 內的 15 格高度相關（共用配對、僅組合設定不同），
+# N 為主口徑：一個 METHOD 內的 15 格高度相關（共用配對、僅組合設定不同），
 # 不宜各算一次試驗；但每個相異 METHOD 代表一次真正獨立的建模決策。
 SPEC_MAIN = "method"
+
+# ── 未完成的回測：不是試驗，不計入宇宙（2026-08-04）─────────────────
+# 這兩條的形成期沒跑到底（其餘 DTW 系策略皆為 295 期），交易期忠實地只跑了
+# 已有的那幾期，於是產出遠短於其他族的序列。短樣本的 Sharpe 極值由抽樣噪音
+# 主導——實測短樣本族的 Sharpe 離散度是長樣本族的 2.3 倍（0.322 vs 0.141），
+# 而 DTW 的 0.817 是全宇宙最大值，單獨把門檻 SR0 從 0.3845 撐到 0.4145。
+# Bailey & López de Prado 的 var_sr 假設各次試驗可比；把 3.4 年的估計與 25 年的
+# 估計混在一起算橫斷面變異並不成立。
+# 兩條皆已非現役（現役 33 條全部走 cluster_formation），僅留於 result.db 為歷史。
+INCOMPLETE_RUNS = {
+    "DTW":         "形成期 36/295（2000-01-03~2002-12-06），交易序列僅 861 日",
+    "SSD-DTW-PCA": "形成期 64/295（2000-01-03~2005-04-11），交易序列僅 1,449 日",
+}
+
+# ── 試驗宇宙清點：釘死，否則論文表無法重現 ──────────────────────────
+# N 與 var_sr 原本每次從活資料庫實地清點。這使數字隨回測累積而變動——寫作當下
+# 是 N=87，2026-08-04 已是 103（排除未完成者後 101）。審查者手上的 result.db
+# 與寫作當下不同，DSR 表就對不上，而且不會有任何錯誤訊息。
+# 故此處釘死為常數並記錄清點日期；_trial_specs 仍會實地清點作交叉比對，
+# 發現漂移時警告（代表你加了新策略，該重新清點並更新論文的 N）。
+TRIAL_CENSUS_DATE = "2026-08-04"
+TRIAL_CENSUS = {
+    #          N      var_sr（每日尺度）
+    "method": (101,   9.13511197067e-05),
+    "config": (1869,  0.000525501711502),
+}
 
 
 def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
@@ -162,17 +188,28 @@ def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
     var_sr 取自 Sharpe_Raw 的橫斷面變異，而 Sharpe_Raw 是複利口徑；自
     2026-08-04 起 load_daily_returns 也是複利，兩者才落在同一尺度上
     （在此之前門檻由複利離散度導出、卻套在單利的 Sharpe 上）。
+
+    method / config 兩個全域口徑取自 TRIAL_CENSUS 的釘死值（否則論文表隨資料庫
+    累積而變動、無法重現）；實地清點仍會執行，僅用於偵測漂移並警告。
+    cells 口徑是該 METHOD 自己的參數格，本來就是局部量，維持實地計算。
     """
     def _var(vals) -> float:
         v = pd.Series(vals).dropna()
         return float(np.var(v, ddof=1)) / TRADING_DAYS if len(v) > 1 else 0.0
 
     g = summ[summ.METHOD == method]
-    per_method_best = summ.groupby("METHOD").Sharpe_Raw.max()
+    live = summ[~summ.METHOD.isin(INCOMPLETE_RUNS)]
+    live_n = {"method": int(live.METHOD.nunique()), "config": int(len(live))}
+    for spec, (pinned_n, _) in TRIAL_CENSUS.items():
+        if live_n[spec] != pinned_n:
+            print(f"  ⚠ 試驗宇宙已漂移：{spec} 口徑實地清點 {live_n[spec]}，"
+                  f"TRIAL_CENSUS 釘死 {pinned_n}（清點於 {TRIAL_CENSUS_DATE}）。"
+                  f"DSR 仍用釘死值；若要改用新宇宙，請更新常數並同步修改論文的 N。")
+
     return {
         "cells":  (int(len(g)), _var(g.Sharpe_Raw)),
-        "method": (int(summ.METHOD.nunique()), _var(per_method_best)),
-        "config": (int(len(summ)), _var(summ.Sharpe_Raw)),
+        "method": TRIAL_CENSUS["method"],
+        "config": TRIAL_CENSUS["config"],
     }
 
 
@@ -190,6 +227,14 @@ def run(methods: list[str] = None):
     if methods is None:
         # 預設：所有 Z-Score 誠實策略（排除 formation-only 與純 DRL 對照）
         methods = [m for m in summ.METHOD.unique() if "DRL" not in m]
+
+    # 未完成的回測不列入評估——它們既不計入試驗宇宙（見 INCOMPLETE_RUNS），
+    # 也不該以 3.4 年的 Sharpe 與其他族的 25 年 Sharpe 並列比較。
+    dropped = [m for m in methods if m in INCOMPLETE_RUNS]
+    if dropped:
+        methods = [m for m in methods if m not in INCOMPLETE_RUNS]
+        for m in dropped:
+            print(f"  [略過] {m}：{INCOMPLETE_RUNS[m]}")
 
     # 每策略最佳配置（Sharpe 最高）。試驗間 Sharpe 變異改由 _trial_specs 依
     # 各口徑同步計算，確保 N 與 var_sr 永遠取自同一組試驗。
