@@ -31,6 +31,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from strategies import returns as strategy_returns
 from strategies.config import DB_PATH, TABLE_NAME, INITIAL_CAPITAL
 
 RESULT_DB = "results/result.db"
@@ -82,20 +83,27 @@ def build_market_regimes(price_db: str = DB_PATH, table: str = TABLE_NAME) -> pd
 
 # ── 每策略最佳配置的日報酬序列 ──────────────────────────────────────
 def load_daily_returns(strategy_ids: list[str], result_db: str = RESULT_DB) -> dict:
-    """回傳 {strategy_id: pd.Series(日報酬, index=Date)}；報酬 = ΣDaily_Delta / 初始資金。"""
-    con = sqlite3.connect(result_db)
-    placeholders = ",".join("?" * len(strategy_ids))
-    q = (f"SELECT strategy_id, Date, SUM(Daily_Delta) AS pnl "
-         f"FROM trade_logs WHERE strategy_id IN ({placeholders}) "
-         f"GROUP BY strategy_id, Date")
-    df = pd.read_sql(q, con, params=strategy_ids)
-    con.close()
-    df["Date"] = pd.to_datetime(df["Date"])
-    out = {}
-    for sid, g in df.groupby("strategy_id"):
-        s = g.set_index("Date")["pnl"].sort_index() / INITIAL_CAPITAL
-        out[sid] = s
-    return out
+    """
+    回傳 {strategy_id: pd.Series(日報酬, index=Date)}。
+
+    2026-08-04：改由 strategies.returns 供應，口徑自「ΣDaily_Delta / 初始資金」
+    （單利）改為「Daily_Delta / 前一日權益」（複利）。
+
+    原本這張表在同一列裡混用兩種口徑：「Sharpe」欄取自 strategy_summaries
+    （db_utils 算的複利值），而「門檻SR0」與「DSR」由本函式的單利序列算出，
+    連 _trial_specs 的 var_sr 都取自複利的 Sharpe_Raw 橫斷面變異——等於拿複利
+    離散度導出的門檻去比單利的 Sharpe。改用複利後三者落在同一個定義上。
+
+    複利亦是引擎實際的行為：portfolio_manager.allocate_capital 以
+    current_equity / max_pairs 決定部位規模，故承擔風險的資本本來就隨權益走。
+
+    序列的生命期由該策略自己的首末交易日界定（見 strategies.returns），
+    上線前不補零——舊實作對晚上線的策略族（如 2009 才有資料的 F09）會被
+    上游的聯集補零稀釋 |Sharpe|。此處 dropna 後的形狀與舊版相同：
+    index 只含該策略存在的交易日。
+    """
+    daily = strategy_returns.daily_returns(strategy_ids, result_db=result_db)
+    return {sid: daily[sid].dropna() for sid in daily.columns}
 
 
 # ── Deflated Sharpe Ratio ───────────────────────────────────────────
@@ -148,7 +156,13 @@ SPEC_MAIN = "method"
 
 
 def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
-    """回傳 {spec: (n_trials, var_sr_daily)}。變異數換算到每日尺度（÷252）。"""
+    """
+    回傳 {spec: (n_trials, var_sr_daily)}。變異數換算到每日尺度（÷252）。
+
+    var_sr 取自 Sharpe_Raw 的橫斷面變異，而 Sharpe_Raw 是複利口徑；自
+    2026-08-04 起 load_daily_returns 也是複利，兩者才落在同一尺度上
+    （在此之前門檻由複利離散度導出、卻套在單利的 Sharpe 上）。
+    """
     def _var(vals) -> float:
         v = pd.Series(vals).dropna()
         return float(np.var(v, ddof=1)) / TRADING_DAYS if len(v) > 1 else 0.0
