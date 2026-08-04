@@ -42,7 +42,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from analysis.proposition1_daily_hac import _bh_adjust
+from analysis.block_bootstrap import bh_adjust as _bh_adjust, bootstrap_test
 from analysis.proposition2_daily_hac import (
     INITIAL_CAPITAL, OUT_DIR, TRADING_DAYS,
     baseline_only, load_daily_sids, method_paths, newey_west,
@@ -78,13 +78,14 @@ def _ann(s) -> float:
 
 
 def _diff_test(a, b, start=None):
-    """b − a 的逐日差分 HAC；start 給定時只取該日之後。"""
+    """b − a 的逐日差分檢定（block bootstrap 主、NW 對照）；start 給定時只取該日之後。"""
     j = pd.concat([b.rename("t"), a.rename("c")], axis=1).fillna(0.0)
     if start:
         j = j[j.index >= start]
     d = (j["t"] - j["c"]).values
-    t, p, _ = newey_west(d)
-    return _ann(d), t, p, len(d)
+    # 主檢定同 4.1／4.2：block bootstrap；NW 保留為對照欄
+    _, p_nw, _ = newey_west(d)
+    return _ann(d), p_nw, bootstrap_test(d)["BB p"], len(d)
 
 
 def run():
@@ -112,21 +113,21 @@ def run():
     # ── 表二：逐步單變因對照（2012+）──
     crows = []
     for (ta, ma, _), (tb, mb, wb) in zip(CHAIN, CHAIN[1:]):
-        ann, t, p, n = _diff_test(ser[ma], ser[mb], WINDOW_START)
+        ann, p_nw, p, n = _diff_test(ser[ma], ser[mb], WINDOW_START)
         crows.append({"步驟": f"{ta}→{tb}", "改變": wb, "年化Δ%": round(ann, 3),
-                      "交易日": n, "NW t": round(t, 3), "NW p": round(p, 4)})
+                      "交易日": n, "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4)})
     t2 = pd.DataFrame(crows)
-    t2["BH校正p"] = _bh_adjust(t2["NW p"].values).round(4)
+    t2["BH校正p"] = _bh_adjust(t2["BB p"].values).round(4)
     t2["校正後顯著"] = np.where(t2["BH校正p"] < 0.05, "✔", "✘")
 
     # ── 表三：各步 vs GICS（命題 1 的直接檢定，2012+）──
     grows = []
     for tag, m, _ in CHAIN:
-        ann, t, p, n = _diff_test(ser[GICS], ser[m], WINDOW_START)
+        ann, p_nw, p, n = _diff_test(ser[GICS], ser[m], WINDOW_START)
         grows.append({"ML 設定": tag, "年化Δ%(ML−GICS)": round(ann, 3),
-                      "NW t": round(t, 3), "NW p": round(p, 4)})
+                      "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4)})
     t3 = pd.DataFrame(grows)
-    t3["BH校正p"] = _bh_adjust(t3["NW p"].values).round(4)
+    t3["BH校正p"] = _bh_adjust(t3["BB p"].values).round(4)
     t3["校正後顯著"] = np.where(t3["BH校正p"] < 0.05, "✔", "✘")
 
     pd.set_option("display.width", 250)
@@ -137,7 +138,7 @@ def run():
     print(f"\n（SEC XBRL 自 ~2009 起，覆蓋率至 2012 才穩定；全期數字含大量特徵全缺的年份）")
 
     print("\n" + "=" * 100)
-    print(f"表二：逐步單變因對照（{WINDOW_START[:4]}+，逐日差分 HAC，BH 校正）")
+    print(f"表二：逐步單變因對照（{WINDOW_START[:4]}+，逐日差分 block bootstrap，BH 校正）")
     print("=" * 100)
     print(t2.to_string(index=False))
 

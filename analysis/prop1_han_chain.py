@@ -28,7 +28,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from analysis.proposition1_daily_hac import _bh_adjust
+from analysis.block_bootstrap import bh_adjust as _bh_adjust, bootstrap_test
 from analysis.proposition2_daily_hac import (
     INITIAL_CAPITAL, OUT_DIR, TRADING_DAYS,
     baseline_only, load_daily_sids, method_paths, newey_west,
@@ -83,7 +83,7 @@ def run():
         })
     t1_df = pd.DataFrame(rows)
 
-    # ── 表二：逐步單變因對照（相鄰兩步的逐日差分 HAC）──
+    # ── 表二：逐步單變因對照（相鄰兩步的逐日差分 block bootstrap）──
     crows = []
     for (tag_a, m_a, _), (tag_b, m_b, what_b) in zip(CHAIN, CHAIN[1:]):
         for scope, idx in (("全網格等權", 0), ("Top1/SL0", 1)):
@@ -93,17 +93,18 @@ def run():
             # 對齊日期（HAN4 期數不同）；未持倉日補 0
             j = pd.concat([b.rename("t"), a.rename("c")], axis=1).fillna(0.0)
             d = (j["t"] - j["c"]).values
-            t, p, _ = newey_west(d)
+            p = bootstrap_test(d)["BB p"]
+            _, p_nw, _ = newey_west(d)
             crows.append({
                 "步驟": f"{tag_a}→{tag_b}", "改變": what_b, "口徑": scope,
                 "年化Δ%": round(float(d.mean()) * TRADING_DAYS / INITIAL_CAPITAL * 100, 3),
-                "交易日": len(d), "NW t": round(t, 3), "NW p": round(p, 4),
+                "交易日": len(d), "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4),
             })
     t2_df = pd.DataFrame(crows)
     if not t2_df.empty:
         for scope in t2_df["口徑"].unique():
             m = t2_df["口徑"] == scope
-            t2_df.loc[m, "BH校正p"] = _bh_adjust(t2_df.loc[m, "NW p"].values).round(4)
+            t2_df.loc[m, "BH校正p"] = _bh_adjust(t2_df.loc[m, "BB p"].values).round(4)
         t2_df["校正後顯著"] = np.where(t2_df["BH校正p"] < 0.05, "✔", "✘")
 
     # ── 表三：完整復刻 vs 起點（總效果）──
@@ -114,10 +115,11 @@ def run():
             continue
         j = pd.concat([b.rename("t"), a.rename("c")], axis=1).fillna(0.0)
         d = (j["t"] - j["c"]).values
-        t, p, _ = newey_west(d)
+        p = bootstrap_test(d)["BB p"]
+        _, p_nw, _ = newey_west(d)
         trows.append({"對照": "④ 完整復刻 − 起點", "口徑": scope,
                       "年化Δ%": round(float(d.mean()) * TRADING_DAYS / INITIAL_CAPITAL * 100, 3),
-                      "NW t": round(t, 3), "NW p": round(p, 4)})
+                      "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4)})
     t3_df = pd.DataFrame(trows)
 
     pd.set_option("display.width", 240)
@@ -127,7 +129,7 @@ def run():
     print(t1_df.to_string(index=False))
 
     print("\n" + "=" * 100)
-    print("表二：逐步單變因對照（逐日報酬差 + Newey-West HAC，BH 校正）")
+    print("表二：逐步單變因對照（逐日報酬差 + block bootstrap，BH 校正）")
     print("=" * 100)
     print(t2_df.to_string(index=False))
 

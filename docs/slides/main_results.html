@@ -1103,7 +1103,7 @@ margin-right: 0; }
 <p><strong>本研究的推論口徑</strong></p>
 </div>
 <div class="callout-content">
-<p>跨策略比較以<strong>逐日報酬差 + Newey-West HAC</strong> 為準，抽樣單位為<strong>時間</strong>。</p>
+<p>跨策略比較以<strong>逐日報酬差 + 循環 block bootstrap</strong>（<span class="math inline">L</span>=126，10,000 次重抽）為準， 抽樣單位為<strong>時間</strong>，一切績效主張皆以<strong>全網格等權組合</strong>為口徑。</p>
 <p>早期版本以「15 個參數網格」為抽樣單位做配對 <span class="math inline">t</span> 檢定，但該 15 格共用同一份資料、 同一段期間與同一批配對（<span class="math inline">top_n</span>=10 與 20 共用 10 個配對；三種停損是同一批交易的 不同出場規則），觀測高度相關，獨立性假設不成立（pseudo-replication， 有效樣本數 <span class="math inline">\approx</span> 1 條回測路徑）。該版本結果已降為描述性附錄。</p>
 <p><strong>改用時間維度後，效果量幾乎不變</strong>（命題 2 年化 +0.719% vs 舊 +0.732pp）， 但<strong>推論結論改變</strong>：命題 1 原稱「5 組顯著較差」者，經校正後無一顯著。</p>
 </div>
@@ -1229,7 +1229,7 @@ margin-right: 0; }
 </section>
 <section id="命題-1-的假設檢定無顯著差異且無法主張相當" class="slide level2">
 <h2>命題 1 的假設檢定：無顯著差異，且無法主張相當</h2>
-<p>逐日報酬差 <span class="math inline">\Delta r_t = r_{ML,t} - r_{GICS,t}</span>（15 格等權組合，6,287 交易日）， Newey-West HAC，<span class="math inline">H_0</span>：兩者績效相同。9 組比較以 Benjamini-Hochberg 控制 FDR。</p>
+<p>逐日報酬差 <span class="math inline">\Delta r_t = r_{ML,t} - r_{GICS,t}</span>（15 格等權組合，6,287 交易日）， 循環 block bootstrap（<span class="math inline">L</span>=126），<span class="math inline">H_0</span>：兩者績效相同。9 組比較以 Benjamini-Hochberg 控制 FDR。</p>
 <table class="caption-top">
 <colgroup>
 <col style="width: 21%">
@@ -1248,59 +1248,59 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: center;">−0.135 (p=0.700)</td>
-<td style="text-align: center;">−0.139 (p=0.722)</td>
-<td style="text-align: center;">−0.182 (p=0.646)</td>
+<td style="text-align: center;">−0.135 (p=0.674)</td>
+<td style="text-align: center;">−0.139 (p=0.680)</td>
+<td style="text-align: center;">−0.182 (p=0.543)</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: center;"><strong>+0.099</strong> (p=0.804)</td>
-<td style="text-align: center;">−0.449 (p=0.237)</td>
-<td style="text-align: center;">−0.521 (p=0.165)</td>
+<td style="text-align: center;"><strong>+0.099</strong> (p=0.793)</td>
+<td style="text-align: center;">−0.449 (p=0.273)</td>
+<td style="text-align: center;">−0.521 (p=0.124)</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: center;">−0.106 (p=0.815)</td>
-<td style="text-align: center;">−0.631 (p=0.122)</td>
-<td style="text-align: center;">−0.762 (p=0.063)</td>
+<td style="text-align: center;">−0.106 (p=0.825)</td>
+<td style="text-align: center;">−0.631 (p=0.126)</td>
+<td style="text-align: center;">−0.762 (p=0.058)</td>
 </tr>
 </tbody>
 </table>
-<p><em>年化報酬差（百分點，ML − GICS）；原始 <span class="math inline">p</span> 值。<strong>BH 校正後最小 <span class="math inline">p</span> = 0.4947</strong></em></p>
-<p><strong>9 組比較中，校正後 0 組顯著</strong>；方向上 8 組偏 GICS、1 組偏 ML。 （9 組彼此不獨立——每三組共用同一個 GICS 臂，故不對方向一致性施加正式檢定。） Block bootstrap（<span class="math inline">L</span>=126）與落後階 {63, 126, 252} 之敏感度檢查結論一致。</p>
+<p><em>年化報酬差（百分點，ML − GICS）；原始 <span class="math inline">p</span> 值。<strong>BH 校正後最小 <span class="math inline">p</span> = 0.377</strong></em></p>
+<p><strong>9 組比較中，校正後 0 組顯著</strong>；方向上 8 組偏 GICS、1 組偏 ML。 （9 組彼此不獨立——每三組共用同一個 GICS 臂，故不對方向一致性施加正式檢定。）</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>「不顯著」不等於「兩者相當」</strong></p>
+<p><strong>「不顯著」不等於「兩者相當」——看區間寬度</strong></p>
 </div>
 <div class="callout-content">
-<p>主張 ML 分群「不輸」GICS 需<strong>非劣性檢定</strong>：訂定可容忍劣化 <span class="math inline">\delta</span>， 並證明單尾 95% 信賴下界 <span class="math inline">&gt; -\delta</span>。本研究的下界落在 <strong>−0.56 ~ −1.44 個百分點</strong>：</p>
+<p><strong>9 組的 95% 信賴區間全部涵蓋 0，寬度介於 1.2 ~ 1.9 個百分點</strong>：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
-<th style="text-align: center;">非劣性邊界 <span class="math inline">\delta</span></th>
-<th style="text-align: center;">9 組中可主張非劣</th>
+<th style="text-align: left;"></th>
+<th style="text-align: center;">最窄</th>
+<th style="text-align: center;">最寬</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: center;">0.25 pp</td>
-<td style="text-align: center;"><strong>0 組</strong></td>
+<td style="text-align: left;">組別</td>
+<td style="text-align: center;">HDBSCAN × SDP</td>
+<td style="text-align: center;">K-means × SSD</td>
 </tr>
 <tr class="even">
-<td style="text-align: center;">0.50 pp</td>
-<td style="text-align: center;"><strong>0 組</strong></td>
-</tr>
-<tr class="odd">
-<td style="text-align: center;">1.00 pp</td>
-<td style="text-align: center;">5 組</td>
+<td style="text-align: left;">95% CI (pp)</td>
+<td style="text-align: center;">[−0.76, +0.42]</td>
+<td style="text-align: center;">[−1.09, +0.75]</td>
 </tr>
 </tbody>
 </table>
-<p>而 GICS 參照臂自身的等權組合年化報酬為 <strong>−0.33% / −0.40% / −0.11%</strong>（SSD / DTW / SDP）。 <span class="math inline">\delta</span> = 1.00 pp 已達參照臂整體績效的數倍，不具實質意義。</p>
+<p>而 GICS 參照臂自身的等權組合年化報酬為 <strong>−0.33% / −0.40% / −0.11%</strong>（SSD / DTW / SDP） → <strong>區間寬度是參照臂整體績效的數倍</strong>。</p>
+<p>亦即資料同時無法排除「ML 優於 GICS 達 0.8 pp」與「劣於 GICS 達 1.1 pp」。</p>
 <p><strong>結論：本研究對此比較檢定力不足，既無法證明 ML 較優，亦無法主張兩者相當。</strong></p>
 </div>
 </div>
@@ -1787,7 +1787,7 @@ margin-right: 0; }
 </section>
 <section id="命題-2-的三個發現" class="slide level2">
 <h2>命題 2 的三個發現</h2>
-<p><strong>1. 增益普適於所有配對底，包含傳統分組</strong> 五種配對底（3 種 ML 分群 + 2 種 GICS 排序組合）疊加 DRL 後全部顯著改善， 逐日 HAC <span class="math inline">p</span> 值介於 0.0002 ~ 0.0177。<strong>傳統 GICS × SSD 底的增益最大 （年化 +1.066 pp，<span class="math inline">p</span> = 0.0002）</strong>，顯示 DRL 交易端是一個與配對來源正交的獨立改良—— 此普適性比僅在 ML 配對底上驗證更強。</p>
+<p><strong>1. 增益普適於所有配對底，包含傳統分組</strong> 五種配對底（3 種 ML 分群 + 2 種 GICS 排序組合）疊加 DRL 後全部顯著改善， 逐日 bootstrap <span class="math inline">p</span> 值介於 0.0000 ~ 0.0042。<strong>傳統 GICS × SSD 底的增益最大 （年化 +1.066 pp，<span class="math inline">p</span> = 0.0014）</strong>，顯示 DRL 交易端是一個與配對來源正交的獨立改良—— 此普適性比僅在 ML 配對底上驗證更強。</p>
 <p><strong>2. DRL 大幅提升參數穩健性</strong> GICS × SSD 底的正 Sharpe 網格數自 5/15 增至 13/15。 DRL 為每組配對每期自選門檻，等同於將原本需人工調校的參數交由模型依情境決定， 因而降低對外生參數設定的敏感度。</p>
 <p><strong>3. 增益的來源：三項常見解釋皆已排除（見下節）</strong> DRL 的動作選單含 SKIP 與 8 組門檻，但受控對照顯示增益<strong>既非</strong>拉高進場門檻、 <strong>亦非</strong>篩掉劣質配對、<strong>更非</strong>減少曝險——DRL 的進場次數反而是 Z-Score 的 1.6–1.9 倍。 殘差與「槽位週轉」一致，惟本研究無法直接驗證，列為後續研究。</p>
 <blockquote>
@@ -1950,135 +1950,176 @@ margin-right: 0; }
 <h2>命題 2 的假設檢定（一）：相對主張</h2>
 <p><strong><span class="math inline">H_0</span></strong>：DRL 交易端與 Z-Score 交易端的績效相同。</p>
 <p>檢定採<strong>配對設計</strong>——兩者跑在完全相同的配對、期間與參數格上，唯一差異為交易端。 市場崩盤、配對失效、成本衝擊等共同風險在相減後消去， 留下的差異序列僅含「交易端決策」一項變異。此即命題 2 檢定力遠高於絕對檢定的原因。 （附帶效果：無風險利率於兩臂相減時對消，本檢定不受 Sharpe 口徑未扣 rf 的影響。）</p>
-<p><strong>主檢定</strong>：逐日報酬差 + Newey-West HAC，6,287 交易日。</p>
+<p><strong>主檢定</strong>：逐日報酬差 + 循環 block bootstrap（<span class="math inline">L</span>=126，10,000 次），6,287 交易日。</p>
 <table class="caption-top">
 <colgroup>
-<col style="width: 13%">
-<col style="width: 17%">
-<col style="width: 17%">
-<col style="width: 17%">
-<col style="width: 17%">
-<col style="width: 17%">
+<col style="width: 16%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
 </colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">配對底</th>
 <th style="text-align: center;">年化Δ (pp)</th>
+<th style="text-align: center;">95% CI (pp)</th>
 <th style="text-align: center;">資訊比率</th>
-<th style="text-align: center;">NW <span class="math inline">t</span></th>
-<th style="text-align: center;">NW <span class="math inline">p</span></th>
-<th style="text-align: center;">Block bootstrap <span class="math inline">p</span> (<span class="math inline">L</span>=126)</th>
+<th style="text-align: center;"><span class="math inline">p</span></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">GICS × SSD（傳統）</td>
 <td style="text-align: center;"><strong>+1.066</strong></td>
+<td style="text-align: center;">[+0.52, +1.74]</td>
 <td style="text-align: center;">0.702</td>
-<td style="text-align: center;">3.78</td>
-<td style="text-align: center;"><strong>0.0002</strong></td>
-<td style="text-align: center;">0.0018</td>
+<td style="text-align: center;"><strong>0.0014</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN × SDP</td>
 <td style="text-align: center;">+0.896</td>
+<td style="text-align: center;">[+0.49, +1.34]</td>
 <td style="text-align: center;">0.600</td>
-<td style="text-align: center;">3.58</td>
-<td style="text-align: center;"><strong>0.0003</strong></td>
-<td style="text-align: center;">0.0004</td>
+<td style="text-align: center;"><strong>0.0000</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative × SSD</td>
 <td style="text-align: center;">+0.719</td>
+<td style="text-align: center;">[+0.31, +1.17]</td>
 <td style="text-align: center;">0.555</td>
-<td style="text-align: center;">2.89</td>
-<td style="text-align: center;"><strong>0.0038</strong></td>
-<td style="text-align: center;">0.0010</td>
+<td style="text-align: center;"><strong>0.0020</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS × SDP（傳統）</td>
 <td style="text-align: center;">+0.707</td>
+<td style="text-align: center;">[+0.33, +1.11]</td>
 <td style="text-align: center;">0.538</td>
-<td style="text-align: center;">2.90</td>
-<td style="text-align: center;"><strong>0.0038</strong></td>
-<td style="text-align: center;">0.0008</td>
+<td style="text-align: center;"><strong>0.0001</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means × SSD</td>
 <td style="text-align: center;">+0.589</td>
+<td style="text-align: center;">[+0.22, +1.00]</td>
 <td style="text-align: center;">0.455</td>
-<td style="text-align: center;">2.37</td>
-<td style="text-align: center;"><strong>0.0177</strong></td>
-<td style="text-align: center;">0.0026</td>
+<td style="text-align: center;"><strong>0.0042</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>五種配對底全部顯著</strong>，且對落後階 {auto, 63, 126, 252} 穩健 （拉長至 252 階仍全數顯著，三組反而更強）； 無母數的循環 block bootstrap（<span class="math inline">L</span> ∈ {21, 126, 252}，5,000 次重抽）結論一致， 顯示結果不依賴 HAC 的常態近似。</p>
+<p><strong>五種配對底全部顯著，且五個信賴區間完全落在零的右側</strong>—— 最保守的下界仍為 <strong>+0.22 pp</strong>，故方向性主張在最不利的區間端點下依然成立。</p>
+
 <p><strong>逐輪複核</strong>（三種 ML 配對底各五輪獨立重訓，以舊網格配對口徑複核方向一致性）： Agglomerative 15/15、14/15、15/15、15/15、15/15；HDBSCAN 10~13/15；K-means 11~14/15。 五輪 Sharpe 全距僅 0.013 ~ 0.047，遠小於效果量，增益非特定訓練批次所致。</p>
 <blockquote>
-<p>逐格檢定顯示：ML 配對底 15 格中僅 4–5 格能<strong>單獨</strong>達顯著（GICS 底 7–9 格）。 等權組合顯著係因平均掉各格特異噪音；<strong>單一參數設定的檢定力不足</strong>，此點須據實揭露。</p>
+<p>逐格檢定顯示：ML 配對底 15 格中僅 5–6 格能<strong>單獨</strong>達顯著（GICS 底 7–8 格）。 等權組合顯著係因平均掉各格特異噪音；<strong>單一參數設定的檢定力不足</strong>，此點須據實揭露。</p>
 </blockquote>
-</section>
+<aside><div>
+<p>全程並行計算 Newey-West HAC 作為參數法對照，<strong>14 組對照兩法結論完全一致</strong>（命題 2 五組皆顯著、命題 1 九組皆不顯著）；完整雙欄見 <code>results/analysis/</code> 各 CSV。</p>
+</div></aside></section>
 <section id="命題-2-的假設檢定二絕對主張" class="slide level2">
 <h2>命題 2 的假設檢定（二）：絕對主張</h2>
-<p><strong>H0</strong>：策略的平均日報酬為零。此處無對照組，須直接對抗市場噪音。</p>
-<p><strong>Newey-West HAC <span class="math inline">t</span> 檢定</strong>（Bartlett kernel，落後 10 階，6,287 交易日）：</p>
+<p><strong>H0</strong>：策略的平均日報酬為零。此處無對照組，須直接對抗市場噪音。 口徑同全篇：<strong>15 格等權組合</strong> → 沒有東西可挑，故無選擇偏誤需要校正。</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
 <th style="text-align: left;">配對底</th>
-<th style="text-align: center;">Z-Score</th>
-<th style="text-align: center;">DRL</th>
+<th style="text-align: left;">交易端</th>
+<th style="text-align: right;">年化</th>
+<th style="text-align: center;">95% CI (pp)</th>
+<th style="text-align: right;"><span class="math inline">p</span></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: center;"><span class="math inline">t</span>=1.16, <span class="math inline">p</span>=0.248</td>
-<td style="text-align: center;"><span class="math inline">t</span>=1.71, <span class="math inline">p</span>=0.088</td>
+<td style="text-align: left;">Z-Score</td>
+<td style="text-align: right;">−0.23%</td>
+<td style="text-align: center;">[−1.35, +1.14]</td>
+<td style="text-align: right;">0.717</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: left;">DRL</td>
+<td style="text-align: right;">+0.48%</td>
+<td style="text-align: center;">[−0.84, +2.16]</td>
+<td style="text-align: right;">0.531</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: left;">Z-Score</td>
+<td style="text-align: right;">−0.29%</td>
+<td style="text-align: center;">[−1.61, +1.40]</td>
+<td style="text-align: right;">0.710</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: center;"><span class="math inline">t</span>=1.02, <span class="math inline">p</span>=0.309</td>
-<td style="text-align: center;"><span class="math inline">t</span>=1.67, <span class="math inline">p</span>=0.095</td>
+<td style="text-align: left;">DRL</td>
+<td style="text-align: right;">+0.61%</td>
+<td style="text-align: center;">[−0.90, +2.57]</td>
+<td style="text-align: right;">0.498</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: center;"><span class="math inline">t</span>=0.86, <span class="math inline">p</span>=0.391</td>
-<td style="text-align: center;"><span class="math inline">t</span>=1.05, <span class="math inline">p</span>=0.293</td>
+<td style="text-align: left;">Z-Score</td>
+<td style="text-align: right;">−0.44%</td>
+<td style="text-align: center;">[−1.36, +0.64]</td>
+<td style="text-align: right;">0.398</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: left;">DRL</td>
+<td style="text-align: right;">+0.15%</td>
+<td style="text-align: center;">[−0.99, +1.48]</td>
+<td style="text-align: right;">0.817</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Deflated Sharpe Ratio</strong>（Bailey &amp; López de Prado, 2014）。 試驗宇宙取 <code>result.db</code> 的 <strong>87 個相異策略</strong>（全庫共 1,659 個回測配置， 含試過後封存的負面結果——MST、PCA-Loadings-ResidFDR、結構性財報、SEC-PIT-Beta、 動量特徵、ADF/PCA 掃描等，皆屬 researcher degrees of freedom 而須計入）：</p>
+<p><strong>六個區間全部橫跨零，無一顯著。</strong> 三個 Z-Score 臂點估計皆負、三個 DRL 臂皆正， 且兩臂相減恰為上一節的 Δ 值（Agglomerative：0.484 − (−0.234) = 0.718 ≈ 0.719） → 兩節數字<strong>彼此自洽</strong>。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>這是結構性限制，不是樣本不足</strong></p>
+</div>
+<div class="callout-content">
+<p>等權組合的年化 Sharpe 僅 <strong>0.05 ~ 0.18</strong>，而絕對檢定的 <span class="math inline">t \approx SR\sqrt{\text{年數}}</span>：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
-<th style="text-align: left;">配對底</th>
-<th style="text-align: center;">Z-Score</th>
-<th style="text-align: center;">DRL</th>
+<th style="text-align: left;">配對底（DRL 臂）</th>
+<th style="text-align: right;">年化 Sharpe</th>
+<th style="text-align: right;">實測 <span class="math inline">t</span></th>
+<th style="text-align: right;">達 <span class="math inline">p&lt;0.05</span> 所需年數</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">Agglomerative</td>
-<td style="text-align: center;">0.150</td>
-<td style="text-align: center;"><strong>0.320</strong></td>
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">0.176</td>
+<td style="text-align: right;">0.93</td>
+<td style="text-align: right;"><strong>123</strong></td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: center;">0.110</td>
-<td style="text-align: center;">0.257</td>
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">0.164</td>
+<td style="text-align: right;">0.80</td>
+<td style="text-align: right;">143</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: center;">0.089</td>
-<td style="text-align: center;">0.122</td>
+<td style="text-align: right;">0.053</td>
+<td style="text-align: right;">0.26</td>
+<td style="text-align: right;">1,356</td>
 </tr>
 </tbody>
 </table>
-<p><strong>共同門檻 <span class="math inline">SR_0</span> = 0.433（年化）；全部策略中最高的 <span class="math inline">SR</span> 僅 0.343。</strong> 純靠運氣就該達到的水準都沒有任何一條策略達到，<strong>無一通過 0.95 判定門檻</strong>。</p>
+<p><strong>本研究不主張任何單一策略的絕對獲利能力具統計顯著性。</strong></p>
+</div>
+</div>
+</div>
 <blockquote>
-<p>早期版本以「該策略自身的 15 個參數格」為試驗數（<span class="math inline">N</span>=15），大幅低估選擇偏誤。 改用 <span class="math inline">N</span>=87 後<strong>並非一律變嚴</strong>——<span class="math inline">var_{SR}</span> 隨試驗集合改變，Z-Score 臂的 DSR 上升、 DRL 臂下降。附錄並列 <span class="math inline">N</span> ∈ {15, 87, 1659} 三種口徑供檢視。</p>
+<p><strong>附錄的 Deflated Sharpe</strong>：若改報「網格最佳格」，數字較高但內含 15 選 1 的偏誤。 DSR 顯示其縮水幅度——門檻 <span class="math inline">SR_0</span> = 0.415，全部策略最高 <span class="math inline">SR</span> 僅 0.343， DSR 落在 0.10 ~ 0.36，無一通過 0.95。<strong>此表不構成正文的主張。</strong></p>
 </blockquote>
 </section>
 <section id="兩項檢定為何結論相反" class="slide level2">
@@ -3544,6 +3585,105 @@ window.QuartoSupport = function () {
         ]
       });
     </script>
+    <!-- deck-nav:start — 投影片頁首導覽（首頁／附錄／上一頁／下一頁）
+         由 notebooks/_quarto.yml 的 include-after-body 注入；
+         已渲染的舊 HTML 由 tools/inject_deck_nav.py 補上同一段。 -->
+    <style>
+.deck-nav {
+position: fixed;
+top: 0.55rem;
+right: 0.7rem;
+z-index: 60;
+display: flex;
+gap: 0.35rem;
+align-items: center;
+font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+font-size: 13px;
+opacity: 0.4;
+transition: opacity 0.15s;
+}
+.deck-nav:hover { opacity: 1; }
+.deck-nav a {
+display: inline-block;
+max-width: 15em;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+padding: 0.24em 0.7em;
+border: 1px solid rgba(120, 130, 140, 0.35);
+border-radius: 999px;
+background: rgba(255, 255, 255, 0.9);
+color: #2b3137 !important;
+text-decoration: none !important;
+line-height: 1.5;
+}
+.deck-nav a:hover {
+border-color: #0d6efd;
+color: #0d6efd !important;
+background: #fff;
+}
+.deck-nav a.home { font-weight: 600; }
+@media print { .deck-nav { display: none !important; } }
+@media (max-width: 700px) { .deck-nav a { max-width: 7em; } }
+</style>
+    <script>
+    (function () {
+      if (document.querySelector('.deck-nav')) return;              // 避免重複注入
+      if (window.location.search.indexOf('print-pdf') !== -1) return; // 匯出 PDF 時不顯示
+
+      var THESIS = [
+        ['slides/thesis/ch1_introduction.html', '第一章 緒論'],
+        ['slides/thesis/ch2_literature.html',   '第二章 文獻探討'],
+        ['slides/thesis/ch3_methodology.html',  '第三章 研究方法'],
+        ['slides/thesis/ch4_results.html',      '第四章 實證結果'],
+        ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
+        ['slides/main_results.html',            '主要結果總覽']
+      ];
+      var APPENDIX = [
+        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
+        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
+        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/comparison.html',                         '現役策略績效總比較'],
+        ['slides/performance_guide.html',                  '績效指標定義與公式']
+      ];
+
+      var here = decodeURIComponent(window.location.pathname).split('/').pop();
+      if (!here) return;
+
+      var track = null, idx = -1;
+      [['thesis', THESIS], ['appendix', APPENDIX]].forEach(function (t) {
+        t[1].forEach(function (row, i) {
+          if (row[0].split('/').pop() === here) { track = t[0]; idx = i; }
+        });
+      });
+      if (idx < 0) return;                                          // 不在清單內就不顯示
+
+      var list = track === 'thesis' ? THESIS : APPENDIX;
+      var root = new Array(list[idx][0].split('/').length).join('../');
+
+      function btn(href, text, cls) {
+        var a = document.createElement('a');
+        a.href = root + href;
+        a.textContent = text;
+        if (cls) a.className = cls;
+        return a;
+      }
+
+      var nav = document.createElement('nav');
+      nav.className = 'deck-nav';
+      nav.appendChild(btn('index.html', '⌂ 首頁', 'home'));
+      if (track === 'appendix') nav.appendChild(btn('appendix.html', '附錄'));
+      if (idx > 0) nav.appendChild(btn(list[idx - 1][0], '‹ ' + list[idx - 1][1]));
+      if (idx < list.length - 1) nav.appendChild(btn(list[idx + 1][0], list[idx + 1][1] + ' ›'));
+      document.body.appendChild(nav);
+    })();
+    </script>
+    <!-- deck-nav:end -->
     <script id="quarto-html-after-body" type="application/javascript">
       window.document.addEventListener("DOMContentLoaded", function (event) {
         const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")

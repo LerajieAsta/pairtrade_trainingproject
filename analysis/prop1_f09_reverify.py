@@ -39,7 +39,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-from analysis.proposition1_daily_hac import _bh_adjust
+from analysis.block_bootstrap import bh_adjust as _bh_adjust, bootstrap_test
 from analysis.proposition2_daily_hac import (
     INITIAL_CAPITAL, OUT_DIR, TRADING_DAYS,
     baseline_only, load_daily_sids, method_paths, newey_west,
@@ -69,8 +69,9 @@ def _diff(a, b, start=WINDOW_START):
     j = pd.concat([b.rename("t"), a.rename("c")], axis=1).fillna(0.0)
     j = j[j.index >= start]
     d = (j["t"] - j["c"]).values
-    t, p, _ = newey_west(d)
-    return _ann(d), t, p, len(d)
+    # 主檢定同 4.1／4.2：block bootstrap；NW 保留為對照欄
+    _, p_nw, _ = newey_west(d)
+    return _ann(d), p_nw, bootstrap_test(d)["BB p"], len(d)
 
 
 def run():
@@ -87,14 +88,14 @@ def run():
     for cs, _ in CLUSTERS:
         for pre, lbl in (("F09", "產業插補（原始）"), ("F09GI", "全域插補（重驗）")):
             b, s = ser[f"{pre} ({cs}-BASE)"], ser[f"{pre} ({cs}-STRUCT)"]
-            ann, t, p, n = _diff(b, s)
+            ann, p_nw, p, n = _diff(b, s)
             rows.append({"分群": cs, "插補": lbl,
                          "BASE 年化%": round(_ann(b[b.index >= WINDOW_START]), 3),
                          "STRUCT 年化%": round(_ann(s[s.index >= WINDOW_START]), 3),
                          "處理效果Δ%": round(ann, 3),
-                         "NW t": round(t, 3), "NW p": round(p, 4)})
+                         "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4)})
     t1 = pd.DataFrame(rows)
-    t1["BH校正p"] = _bh_adjust(t1["NW p"].values).round(4)
+    t1["BH校正p"] = _bh_adjust(t1["BB p"].values).round(4)
     t1["校正後顯著"] = np.where(t1["BH校正p"] < 0.05, "✔", "✘")
 
     # ── 表二：同一臂下「全域插補 − 產業插補」（插補方式本身的效果）──
@@ -102,11 +103,11 @@ def run():
     for cs, _ in CLUSTERS:
         for arm in ("BASE", "STRUCT"):
             g, gi = ser[f"F09 ({cs}-{arm})"], ser[f"F09GI ({cs}-{arm})"]
-            ann, t, p, n = _diff(g, gi)
+            ann, p_nw, p, n = _diff(g, gi)
             rows2.append({"臂": f"{cs}-{arm}", "年化Δ%(全域−產業)": round(ann, 3),
-                          "NW t": round(t, 3), "NW p": round(p, 4)})
+                          "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4)})
     t2 = pd.DataFrame(rows2)
-    t2["BH校正p"] = _bh_adjust(t2["NW p"].values).round(4)
+    t2["BH校正p"] = _bh_adjust(t2["BB p"].values).round(4)
     t2["校正後顯著"] = np.where(t2["BH校正p"] < 0.05, "✔", "✘")
 
     pd.set_option("display.width", 250)

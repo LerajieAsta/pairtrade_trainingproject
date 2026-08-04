@@ -40,6 +40,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+from analysis.block_bootstrap import bootstrap_test
 from analysis.proposition2_daily_hac import (
     INITIAL_CAPITAL, OUT_DIR, RESULT_DB, TRADING_DAYS,
     load_daily_sids, method_paths, newey_west,
@@ -157,10 +158,13 @@ def run():
 
         # 對照 A：DRL − ZS(2.0)
         dA = (drl - z0).values
-        tA, pA, _ = newey_west(dA)
+        rA = bootstrap_test(dA)
+        pA = rA["BB p"]
+        _, pA_nw, _ = newey_west(dA)
         gainA = _stats(dA)["年化Δ%"]
         rows.append({"配對底": base, "對照": "A｜DRL − ZS(2.0)", "entry_z": 2.0,
-                     **_stats(dA), "NW t": round(tA, 3), "NW p": round(pA, 4),
+                     **_stats(dA), "CI下界": rA["CI下界"], "CI上界": rA["CI上界"],
+                     "BB p": pA, "NW p（對照）": round(pA_nw, 4),
                      "5%顯著": "✔" if pA < 0.05 else "✘", "複製率%": ""})
 
         for ez in ez_avail:
@@ -175,18 +179,24 @@ def run():
 
             # 對照 B：DRL − ZS(ez)
             dB = (drl_c - zz).values
-            tB, pB, _ = newey_west(dB)
+            rB = bootstrap_test(dB)
+            pB = rB["BB p"]
+            _, pB_nw, _ = newey_west(dB)
             rows.append({"配對底": base, "對照": f"B｜DRL − ZS({ez})", "entry_z": ez,
-                         **_stats(dB), "NW t": round(tB, 3), "NW p": round(pB, 4),
+                         **_stats(dB), "CI下界": rB["CI下界"], "CI上界": rB["CI上界"],
+                         "BB p": pB, "NW p（對照）": round(pB_nw, 4),
                          "5%顯著": "✔" if pB < 0.05 else "✘", "複製率%": ""})
 
             # 對照 C：ZS(ez) − ZS(2.0)，並算門檻管道的複製率
             dC = (zz - ew(zmap[2.0], cells)).values
-            tC, pC, _ = newey_west(dC)
+            rC = bootstrap_test(dC)
+            pC = rC["BB p"]
+            _, pC_nw, _ = newey_west(dC)
             gainC = _stats(dC)["年化Δ%"]
             rep = round(gainC / gainA * 100, 1) if gainA else np.nan
             rows.append({"配對底": base, "對照": f"C｜ZS({ez}) − ZS(2.0)", "entry_z": ez,
-                         **_stats(dC), "NW t": round(tC, 3), "NW p": round(pC, 4),
+                         **_stats(dC), "CI下界": rC["CI下界"], "CI上界": rC["CI上界"],
+                         "BB p": pC, "NW p（對照）": round(pC_nw, 4),
                          "5%顯著": "✔" if pC < 0.05 else "✘", "複製率%": rep})
 
         # 曝險對齊驗證
@@ -205,7 +215,7 @@ def run():
 
     pd.set_option("display.width", 250)
     print("\n" + "=" * 92)
-    print("曝險對照：DRL vs 同門檻的 Z-Score（等權組合逐日差分 HAC）")
+    print("曝險對照：DRL vs 同門檻的 Z-Score（等權組合逐日差分 block bootstrap）")
     print("=" * 92)
     for base in res.配對底.unique():
         print(f"\n--- {base}（DRL 實際門檻中位數 {DRL_MEDIAN_Z.get(base, '—')}）")

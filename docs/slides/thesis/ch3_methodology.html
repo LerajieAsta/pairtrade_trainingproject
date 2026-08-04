@@ -1127,7 +1127,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>滾動步長 <strong>小於</strong> 交易期長度 → 任一時點有 <strong>6 個交易期同時運行</strong> → <strong>逐期報酬序列存在結構性自相關</strong>。</p>
-<p>此性質決定了 §3.5 為何不能以「期」為抽樣單位， 以及為何必須使用 HAC 標準誤。</p>
+<p>此性質決定了 §3.5 為何不能以「期」為抽樣單位， 以及為何主檢定必須使用能保住自相關結構的 <strong>block bootstrap</strong>。</p>
 </div>
 </div>
 </div>
@@ -1638,32 +1638,87 @@ margin-right: 0; }
 </div>
 <p><strong>本研究改以「時間」為抽樣單位。</strong></p>
 </section>
-<section id="主檢定與對照檢定" class="slide level2">
-<h2>主檢定與對照檢定</h2>
-<h3 id="主檢定逐日報酬差-newey-west-hac">主檢定：逐日報酬差 + Newey-West HAC</h3>
-<p><span class="math display">\Delta r_t = r_{  ext{處理},t} - r_{    ext{對照},t}, \quad t = 1, \dots, 6287</span></p>
-<p>檢定 <span class="math inline">H_0: E[\Delta r] = 0</span>，Bartlett kernel HAC 標準誤（Newey &amp; West, 1987）， 吸收 6 期重疊部位造成的自相關。</p>
+<section id="主檢定逐日報酬差-循環-block-bootstrap" class="slide level2 scrollable">
+<h2>主檢定：逐日報酬差 + 循環 block bootstrap</h2>
+<p><span class="math display">\Delta r_t = r_{\text{處理},t} - r_{\text{對照},t}, \quad t = 1, \dots, 6287</span></p>
+<p>檢定 <span class="math inline">H_0: E[\Delta r] = 0</span>。6 期重疊部位使 <span class="math inline">\Delta r_t</span> 自相關， 故以循環 block bootstrap（Künsch 1989；Politis &amp; Romano 1992）處理：</p>
+<ol type="1">
+<li>首尾相接成環 → 抽長度 <span class="math inline">L</span> 的區塊接成等長新序列 → 重複 <strong>10,000</strong> 次</li>
+<li>平移該分布使中心為零（施加 <span class="math inline">H_0</span>）→ 雙尾 <span class="math inline">p</span></li>
+<li><strong>未平移</strong>的分布取 2.5／97.5 百分位 → <strong>95% 信賴區間</strong></li>
+</ol>
 <p><strong>未持倉日記為 0</strong>，非遺漏值——該日確實沒有部位； 視為遺漏將系統性排除策略「不交易」的行為。</p>
-<p><strong>落後階同時報 {auto, 63, 126, 252}</strong>——經驗法則在 <span class="math inline">Tpprox6300</span> 給出 10 階， 但持有期達 126 日，自相關可能延伸更遠。結論若隨落後階改變即為不穩健。</p>
-<h3 id="對照檢定循環-block-bootstrap">對照檢定：循環 block bootstrap</h3>
-<p>HAC 依賴常態近似，而配對交易日報酬<strong>厚尾偏態</strong>（大量零值日 + 少數大額平倉）。 去平均施加 <span class="math inline">H_0</span> → 首尾相接成環 → 抽長度 <span class="math inline">L</span> 區塊重組 → 5,000 次。</p>
-<p><span class="math inline">L \in \{21, 126, 252\}</span>。<strong><span class="math inline">L=126</span> 為原則下限</strong>； 若僅 <span class="math inline">L=21</span> 顯著，代表結論依賴切斷長程相關，不可採信。</p>
+<p><strong><span class="math inline">L = 126</span>＝一個完整交易期</strong>。區塊內部的持倉相關性完整保留， 區塊之間才允許被打散。此值由 <code>FORWARD_DAYS</code> 直接決定，非搜尋而得， 故<strong>不作 <span class="math inline">L</span> 敏感度分析</strong>。</p>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>為何不採 Newey-West HAC</strong></p>
+</div>
+<div class="callout-content">
+<p>兩法全程並行計算，<strong>14 組對照結論完全一致</strong>（命題 2 五組皆顯著、命題 1 九組皆不顯著）。 換掉的理由不在結果而在<strong>假設與自由度</strong>：</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: left;">HAC</th>
+<th style="text-align: left;">block bootstrap</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">分布假設</td>
+<td style="text-align: left;">漸近常態</td>
+<td style="text-align: left;">無</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">額外自由度</td>
+<td style="text-align: left;"><strong>落後階</strong>（須另跑多組證明穩健）</td>
+<td style="text-align: left;">無（<span class="math inline">L</span> 由交易期長度給定）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">日報酬厚尾偏態</td>
+<td style="text-align: left;">近似可能失準</td>
+<td style="text-align: left;">不受影響</td>
+</tr>
+</tbody>
+</table>
+<p>HAC 保留為各表的<strong>對照欄</strong>。</p>
+</div>
+</div>
+</div>
 </section>
-<section id="多重檢定絕對績效與非劣性" class="slide level2">
-<h2>多重檢定、絕對績效與非劣性</h2>
-<p><strong>多重檢定校正</strong>　同一命題涉及多組對照時（如命題 1 的 9 組）， 以 <strong>Benjamini-Hochberg</strong> 控制 FDR，同時報告原始與校正後 <span class="math inline">p</span> 值。</p>
-<p><strong>絕對績效</strong> - Newey-West 絕對檢定：<span class="math inline">H_0</span> 為平均日報酬 = 0，<strong>無對照組</strong> - <strong>Deflated Sharpe Ratio</strong>（Bailey &amp; López de Prado, 2014）： 校正「多次試驗中挑最佳者」的選擇偏誤。 試驗數 <span class="math inline">N</span> 以資料庫<strong>相異策略數 87</strong> 為主口徑， 附錄並列 <span class="math inline">N \in \{15,\ 87,\ 1659\}</span> —— <span class="math inline">N</span> 是判斷而非事實，故三者並陳。</p>
+<section id="信賴區間多重檢定與報告口徑" class="slide level2">
+<h2>信賴區間、多重檢定與報告口徑</h2>
+<h3 id="信賴區間取代非劣性檢定">信賴區間取代非劣性檢定</h3>
+<p>「無顯著差異」<strong>不等於</strong>「兩者相當」。區分兩者只需看<strong>區間寬度</strong>：</p>
+<ul>
+<li>區間涵蓋 0 且<strong>兩端皆小</strong> → 效果縱使存在也不具實質意義</li>
+<li>區間涵蓋 0 但<strong>兩端皆大</strong> → <strong>檢定力不足</strong>，資料無法區分</li>
+</ul>
+<p>命題 1 即屬後者。舊版以非劣性檢定處理同一問題，須事前指定並辯護 容忍邊界 <span class="math inline">\delta</span>；CI 承載相同資訊且不需此判斷，故改採 CI。</p>
+<h3 id="多重檢定校正">多重檢定校正</h3>
+<p>同一命題涉及多組對照時（如命題 1 的 9 組）， 以 <strong>Benjamini-Hochberg</strong> 控制 FDR，同時報告原始與校正後 <span class="math inline">p</span> 值。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>非劣性檢定</strong></p>
+<p><strong>報告口徑：一律全網格等權組合</strong></p>
 </div>
 <div class="callout-content">
-<p>「無顯著差異」<strong>不等於</strong>「兩者相當」。</p>
-<p>主張後者需<strong>預先指定</strong>可容忍劣化 <span class="math inline">\delta</span>，並證明單尾 95% 信賴下界 <span class="math inline">&gt; -\delta</span>。 本研究於命題 1 報告 <span class="math inline">\delta \in \{0.25,\ 0.5,\ 1.0\}</span> 個百分點的判定。</p>
+<p>一切績效主張與統計檢定，皆以該策略 <strong>15 個參數配置的等權組合</strong>為口徑。</p>
+<p>改報「網格最佳格」會內含 15 選 1 的選擇偏誤，必須再以 Deflated Sharpe 之類的 程序扣回去——而該程序的關鍵參數（試驗數 <span class="math inline">N</span>）是判斷而非事實。 <strong>等權組合沒有東西可挑，選擇偏誤自源頭消失。</strong></p>
+<p>代價是絕對績效數字低於最佳格。這正是誠實的代價： 研究者事前並不知道哪一格會勝出。</p>
+<p><em>例外</em>：§4.6.1 regime 分層與 §4.6.2 break-even 成本表以最佳格計算—— 二者刻畫風險的<strong>形狀</strong>而非主張績效水準，且最佳格對其論證方向是保守的。</p>
 </div>
 </div>
 </div>
@@ -1687,7 +1742,7 @@ margin-right: 0; }
 <li><strong>形成期</strong>：四層架構使此原則成為<strong>結構上的保證</strong></li>
 <li><strong>交易期</strong>：利用「可在同一批配對上施行」的性質達成同樣效果</li>
 </ul>
-<p>統計方面，以<strong>時間</strong>為抽樣單位取代參數網格， 並以 <strong>HAC 與 block bootstrap 雙軌</strong>檢定， 使相對比較的推論基礎不依賴單一方法論假設。</p>
+<p>統計方面，以<strong>時間</strong>為抽樣單位取代參數網格， 以 <strong>block bootstrap</strong> 為單一主檢定（同時給出 <span class="math inline">p</span> 值與信賴區間）， 並一律以<strong>全網格等權組合</strong>為報告口徑—— 使推論不依賴分布假設，也不留下「挑最佳配置」的空間。</p>
 </div>
 </div>
 </div>
@@ -2849,6 +2904,105 @@ window.QuartoSupport = function () {
         ]
       });
     </script>
+    <!-- deck-nav:start — 投影片頁首導覽（首頁／附錄／上一頁／下一頁）
+         由 notebooks/_quarto.yml 的 include-after-body 注入；
+         已渲染的舊 HTML 由 tools/inject_deck_nav.py 補上同一段。 -->
+    <style>
+.deck-nav {
+position: fixed;
+top: 0.55rem;
+right: 0.7rem;
+z-index: 60;
+display: flex;
+gap: 0.35rem;
+align-items: center;
+font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+font-size: 13px;
+opacity: 0.4;
+transition: opacity 0.15s;
+}
+.deck-nav:hover { opacity: 1; }
+.deck-nav a {
+display: inline-block;
+max-width: 15em;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+padding: 0.24em 0.7em;
+border: 1px solid rgba(120, 130, 140, 0.35);
+border-radius: 999px;
+background: rgba(255, 255, 255, 0.9);
+color: #2b3137 !important;
+text-decoration: none !important;
+line-height: 1.5;
+}
+.deck-nav a:hover {
+border-color: #0d6efd;
+color: #0d6efd !important;
+background: #fff;
+}
+.deck-nav a.home { font-weight: 600; }
+@media print { .deck-nav { display: none !important; } }
+@media (max-width: 700px) { .deck-nav a { max-width: 7em; } }
+</style>
+    <script>
+    (function () {
+      if (document.querySelector('.deck-nav')) return;              // 避免重複注入
+      if (window.location.search.indexOf('print-pdf') !== -1) return; // 匯出 PDF 時不顯示
+
+      var THESIS = [
+        ['slides/thesis/ch1_introduction.html', '第一章 緒論'],
+        ['slides/thesis/ch2_literature.html',   '第二章 文獻探討'],
+        ['slides/thesis/ch3_methodology.html',  '第三章 研究方法'],
+        ['slides/thesis/ch4_results.html',      '第四章 實證結果'],
+        ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
+        ['slides/main_results.html',            '主要結果總覽']
+      ];
+      var APPENDIX = [
+        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
+        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
+        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/comparison.html',                         '現役策略績效總比較'],
+        ['slides/performance_guide.html',                  '績效指標定義與公式']
+      ];
+
+      var here = decodeURIComponent(window.location.pathname).split('/').pop();
+      if (!here) return;
+
+      var track = null, idx = -1;
+      [['thesis', THESIS], ['appendix', APPENDIX]].forEach(function (t) {
+        t[1].forEach(function (row, i) {
+          if (row[0].split('/').pop() === here) { track = t[0]; idx = i; }
+        });
+      });
+      if (idx < 0) return;                                          // 不在清單內就不顯示
+
+      var list = track === 'thesis' ? THESIS : APPENDIX;
+      var root = new Array(list[idx][0].split('/').length).join('../');
+
+      function btn(href, text, cls) {
+        var a = document.createElement('a');
+        a.href = root + href;
+        a.textContent = text;
+        if (cls) a.className = cls;
+        return a;
+      }
+
+      var nav = document.createElement('nav');
+      nav.className = 'deck-nav';
+      nav.appendChild(btn('index.html', '⌂ 首頁', 'home'));
+      if (track === 'appendix') nav.appendChild(btn('appendix.html', '附錄'));
+      if (idx > 0) nav.appendChild(btn(list[idx - 1][0], '‹ ' + list[idx - 1][1]));
+      if (idx < list.length - 1) nav.appendChild(btn(list[idx + 1][0], list[idx + 1][1] + ' ›'));
+      document.body.appendChild(nav);
+    })();
+    </script>
+    <!-- deck-nav:end -->
     <script id="quarto-html-after-body" type="application/javascript">
       window.document.addEventListener("DOMContentLoaded", function (event) {
         const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")

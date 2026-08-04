@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-命題 2 主檢定：逐日報酬差 + Newey-West HAC
+命題 2 主檢定：逐日報酬差 + 循環 block bootstrap
 ======================================================================
 取代 `proposition2_stats._paired_tests` 的 15 格配對 t 檢定作為**主檢定**。
 
@@ -16,21 +16,23 @@
 
     Δr_t = r_DRL,t − r_ZScore,t         （逐日，約 6,300 個交易日）
 
-檢定 H0: E[Δr] = 0，標準誤用 Bartlett kernel HAC（Newey & West 1987）吸收
-重疊部位造成的自相關。
+檢定 H0: E[Δr] = 0，並以循環 block bootstrap（L=126）處理重疊部位造成的
+自相關，同時輸出雙尾 p 與 95% 信賴區間。方法與 L 的選擇理由見
+`analysis.block_bootstrap`。
 
-為什麼是 HAC 而非「逐滾動期 ΔSharpe」
-------------------------------------
+為什麼不是「逐滾動期 ΔSharpe」
+------------------------------
 FORWARD_DAYS=126 / rolling_step=21 → 任一時點有 6 個交易期同時在跑
 （CONCURRENT_PERIODS=6）。以「期」為單位的話，相鄰 6 期共用 5/6 的日曆時間，
-只是把偽重複從參數維度搬到時間維度。HAC 標準誤正是為這種自相關設計的，
-不必刪資料、不必降 n。
+只是把偽重複從參數維度搬到時間維度。逐日序列 + 區塊重抽正是為這種自相關
+設計的，不必刪資料、不必降 n。
 
-落後階的選擇
-------------
-Newey-West 經驗法則 4(T/100)^(2/9) 在 T≈6300 時給出 10 階，但持有期長達 126 日，
-自相關可能延伸得更遠。故同時報 lags ∈ {auto, 63, 126, 252}——若結論隨落後階
-改變，該結論就不穩健，必須據實揭露。
+HAC 的角色
+----------
+`newey_west` 仍保留在本模組，一則供其他分析模組沿用，二則在主表附一欄
+作為「參數法與無母數法結論一致」的對照。它不再是任何一章的主檢定，
+故也不再需要 lags ∈ {auto, 63, 126, 252} 的落後階敏感度分析——
+換成 bootstrap 後根本沒有落後階要選。
 
 兩種聚合口徑
 ------------
@@ -50,6 +52,8 @@ import sys
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
+
+from analysis.block_bootstrap import BLOCK_L, bootstrap_test
 
 # Windows 主控台預設 cp950，無法輸出 U+2212 等符號（config.py 亦作同樣處理）
 if hasattr(sys.stdout, "reconfigure"):
@@ -71,10 +75,8 @@ PAIRS = [
     ("GICS-SDP（傳統）", "Grid (GICS-SDP)", "Grid (GICS-SDP-DRL)"),
 ]
 
-LAG_SPECS = ["auto", 63, 126, 252]
 
-
-# ── HAC ─────────────────────────────────────────────────────────────
+# ── HAC（對照用，非主檢定）──────────────────────────────────────────
 def newey_west(r: np.ndarray, lags=None):
     """H0: E[r]=0。Bartlett kernel HAC 標準誤。回傳 (t, p, lags_used)。"""
     r = np.asarray(r, dtype=float)
@@ -247,7 +249,7 @@ def run():
 
     px = load_daily(methods)
 
-    ew_rows, cell_rows, lag_rows = [], [], []
+    ew_rows, cell_rows = [], []
 
     for base, zs_m, drl_m in PAIRS:
         z_ids, d_ids = m2s.get(zs_m, []), m2s.get(drl_m, [])
@@ -264,57 +266,44 @@ def run():
         z_ew = px[[zc[c] for c in cells]].mean(axis=1)
         d_ew = px[[dc[c] for c in cells]].mean(axis=1)
         diff = (d_ew - z_ew).values
-        t, p, L = newey_west(diff)
+        res = bootstrap_test(diff)
+        _, p_nw, _ = newey_west(diff)      # 對照欄，見模組 docstring
         ew_rows.append({"配對底": base, "格數": len(cells), "交易日": len(diff),
                         **_series_stats(diff),
-                        "落後階": L, "NW t": round(t, 3), "NW p": round(p, 4),
-                        "5%顯著": "✔" if p < 0.05 else "✘"})
+                        "CI下界": res["CI下界"], "CI上界": res["CI上界"],
+                        "BB p": res["BB p"], "5%顯著": res["顯著"],
+                        "NW p（對照）": round(p_nw, 4)})
 
-        # 落後階敏感度：持有期 126 日，自動法則的 10 階可能不足
-        for spec in LAG_SPECS:
-            t2, p2, L2 = newey_west(diff, lags=spec)
-            lag_rows.append({"配對底": base, "落後階設定": spec, "實際階": L2,
-                             "NW t": round(t2, 3), "NW p": round(p2, 4),
-                             "5%顯著": "✔" if p2 < 0.05 else "✘"})
-
-        # ── B. 逐格檢定（次口徑）
-        ts, sig = [], 0
+        # ── B. 逐格檢定（次口徑）：單一參數設定的檢定力
+        anns, sig = [], 0
         for c in cells:
-            dd = (px[dc[c]] - px[zc[c]]).values
-            tc, pc, _ = newey_west(dd)
-            ts.append(tc)
-            sig += int(pc < 0.05 and tc > 0)
+            rc = bootstrap_test((px[dc[c]] - px[zc[c]]).values)
+            anns.append(rc["年化Δ%"])
+            sig += int(rc["BB p"] < 0.05 and rc["年化Δ%"] > 0)
         cell_rows.append({"配對底": base, "格數": len(cells),
                           "正向顯著格數": f"{sig}/{len(cells)}",
-                          "t中位": round(float(np.median(ts)), 3),
-                          "t最小": round(float(np.min(ts)), 3),
-                          "t最大": round(float(np.max(ts)), 3)})
+                          "年化Δ中位": round(float(np.median(anns)), 3),
+                          "年化Δ最小": round(float(np.min(anns)), 3),
+                          "年化Δ最大": round(float(np.max(anns)), 3)})
 
     ew = pd.DataFrame(ew_rows)
     cells_df = pd.DataFrame(cell_rows)
-    lags_df = pd.DataFrame(lag_rows)
 
     pd.set_option("display.width", 250)
-    print("\n" + "=" * 78)
-    print("一、等權組合逐日差分 HAC（主口徑）　H0: E[r_DRL − r_ZScore] = 0")
-    print("=" * 78)
+    print("\n" + "=" * 88)
+    print("一、等權組合逐日差分 + block bootstrap（主口徑）")
+    print(f"    H0: E[r_DRL − r_ZScore] = 0；L={BLOCK_L}，10,000 次重抽")
+    print("=" * 88)
     print(ew.to_string(index=False))
 
-    print("\n" + "=" * 78)
-    print("二、落後階敏感度（持有期 126 日 → 自動法則的 10 階可能不足）")
-    print("=" * 78)
-    print(lags_df.pivot(index="配對底", columns="落後階設定",
-                        values="NW p").to_string())
-
-    print("\n" + "=" * 78)
-    print("三、逐格檢定（次口徑；15 格各自做 HAC）")
-    print("=" * 78)
+    print("\n" + "=" * 88)
+    print("二、逐格檢定（次口徑；15 格各自重抽）——單一參數設定的檢定力")
+    print("=" * 88)
     print(cells_df.to_string(index=False))
 
     ew.to_csv(f"{OUT_DIR}/prop2_daily_hac_ew.csv", index=False, encoding="utf-8-sig")
-    lags_df.to_csv(f"{OUT_DIR}/prop2_daily_hac_lags.csv", index=False, encoding="utf-8-sig")
     cells_df.to_csv(f"{OUT_DIR}/prop2_daily_hac_cells.csv", index=False, encoding="utf-8-sig")
-    print(f"\n→ {OUT_DIR}/prop2_daily_hac_{{ew,lags,cells}}.csv")
+    print(f"\n→ {OUT_DIR}/prop2_daily_hac_{{ew,cells}}.csv")
 
 
 if __name__ == "__main__":

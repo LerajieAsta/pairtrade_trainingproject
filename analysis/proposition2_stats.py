@@ -9,11 +9,20 @@
     二、逐輪穩健性：五輪獨立重訓各自檢定
 
   絕對主張「這個策略本身賺不賺錢？」
-    三、Newey-West HAC t 檢定：H0 平均日報酬 = 0（自相關穩健）
-    四、Deflated Sharpe Ratio：校正網格搜尋的多重測試偏誤
+    三、block bootstrap：H0 平均日報酬 = 0，**15 格等權組合**口徑
+    四、Deflated Sharpe Ratio：校正選擇偏誤（附錄用，非正文主張）
 
 配對設計消去兩策略共同承受的市場風險，故相對檢定的檢定力遠高於絕對檢定；
 兩者結論不同並不矛盾，分別支撐論文的「方法比較」與「限制」兩節。
+
+絕對績效為何改用等權組合
+------------------------
+舊版檢定「網格最佳格」（`Sharpe_Raw.idxmax()`）的絕對績效。那個數字是 15 選 1
+挑出來的，本身就帶選擇偏誤，才需要 Deflated Sharpe 這類事後校正把它扣回去。
+
+改報 15 格等權組合就**沒有東西可挑**，選擇偏誤從源頭消失，也與相對檢定
+（`proposition2_daily_hac`，同樣是等權口徑）統一。DSR 因此降為附錄的穩健性
+註記：它回答的是「若真要報最佳格，該打多少折」，不是正文的主張。
 
 用法：python -m analysis.proposition2_stats
 """
@@ -25,6 +34,7 @@ import pandas as pd
 from scipy import stats
 from scipy.stats import norm
 
+from analysis.block_bootstrap import bootstrap_test
 from analysis.regime_cost_dsr_eval import (
     SPEC_MAIN, _trial_specs, deflated_sharpe, load_daily_returns,
 )
@@ -117,45 +127,62 @@ def _per_round(summ, runs):
 
 def _absolute_tests(summ, summ_all=None):
     """
-    三、四：網格最佳格的 Newey-West 與 Deflated Sharpe。
+    三、四：等權組合的 bootstrap 絕對檢定，與（附錄用的）最佳格 Deflated Sharpe。
 
-    summ      ：僅基準格，用來挑「網格最佳配置」並做檢定
+    summ      ：僅基準格。表三對其 15 格取等權組合；表四仍挑最佳格，因為
+                DSR 存在的意義就是校正「挑最佳格」這個動作
     summ_all  ：完整 strategy_summaries，僅供 DSR 計算試驗宇宙（含所有變體與
                 封存策略——那才是真實的 researcher degrees of freedom）
     """
     if summ_all is None:
         summ_all = summ
-    sel = {}
+
+    # 表三：等權組合。取該 METHOD 全部基準格的逐日損益後逐日平均
+    ew_paths, best = {}, {}
     for name, zs, drl in PAIRS:
         for tag, m in (("Z-Score", zs), ("DRL", drl)):
             g = summ[summ.METHOD == m]
             if len(g):
-                sel[(name, tag)] = (g.loc[g.Sharpe_Raw.idxmax()], g)
+                ew_paths[(name, tag)] = g._path.tolist()
+                best[(name, tag)] = (g.loc[g.Sharpe_Raw.idxmax()], g)
 
-    daily = load_daily_returns([b["_path"] for b, _ in sel.values()])
+    daily = load_daily_returns(
+        sorted({p for v in ew_paths.values() for p in v}
+               | {b["_path"] for b, _ in best.values()}))
 
-    nw, dsr = [], []
-    for (name, tag), (b, g) in sel.items():
+    abs_rows, dsr = [], []
+    for (name, tag), paths in ew_paths.items():
+        have = [p for p in paths if p in daily and len(daily[p])]
+        if not have:
+            continue
+        # 未持倉日在 trade_logs 沒有列 → concat 後為 NaN。必須補 0（「當天沒部位」
+        # 而非「當天資料遺漏」），否則 mean(axis=1) 會跳過該格，使等權組合在
+        # 稀疏日只由少數有部位的格子決定，年化被高估。
+        ew = pd.concat([daily[p] for p in have], axis=1).fillna(0.0).mean(axis=1)
+        # daily 來自 load_daily_returns，已除過 INITIAL_CAPITAL → 傳 capital=1.0
+        res = bootstrap_test(ew.values, capital=1.0)
+        _, p_nw, _ = newey_west_tstat(ew.values)     # 對照欄
+        abs_rows.append({"配對底": name, "交易端": tag, "格數": len(have),
+                         "交易日": res["n"], "年化%": res["年化Δ%"],
+                         "CI下界": res["CI下界"], "CI上界": res["CI上界"],
+                         "BB p": res["BB p"], "5%顯著": res["顯著"],
+                         "NW p（對照）": round(p_nw, 4)})
+
+    for (name, tag), (b, g) in best.items():
         r = daily.get(b["_path"], pd.Series(dtype=float))
-        t, p, lags = newey_west_tstat(r.values) if len(r) else (np.nan, np.nan, 0)
-        nw.append({"配對底": name, "交易端": tag,
-                   "年化": f"{b.Ann_Ret_Raw * 100:.2f}%", "Sharpe": round(b.Sharpe_Raw, 3),
-                   "交易日": len(r), "落後階": lags,
-                   "NW t": round(t, 3), "NW p": f"{p:.4f}",
-                   "5%顯著": "✔" if p < .05 else "✘"})
 
         # 2026-07-29：N 由 len(g)=15（該策略的參數格數）改為試驗宇宙口徑。
         # 15 格共用同一批配對、僅組合設定不同，不是 15 次獨立試驗；真正的
-        # researcher degrees of freedom 是 result.db 裡 87 個相異 METHOD
-        # （含試過後封存的負面結果）。N 與 var_sr 取自同一集合（見
-        # regime_cost_dsr_eval._trial_specs 的說明）。
+        # researcher degrees of freedom 是 result.db 裡的相異 METHOD 總數
+        # （含試過後封存的負面結果）——該數字隨回測累積而變動，故由
+        # _trial_specs 於執行時實地清點，不寫死。N 與 var_sr 取自同一集合。
         n_tr, var_sr = _trial_specs(summ_all, b["METHOD"])[SPEC_MAIN]
         d = deflated_sharpe(r, n_tr, var_sr)
         dsr.append({"配對底": name, "交易端": tag, "N試驗": n_tr,
                     "SR年化": round(d["SR_ann"], 3), "門檻SR0": round(d["SR0_ann"], 3),
                     "DSR": round(d["DSR"], 3),
                     "判定": "✔" if d["DSR"] >= .95 else "✘"})
-    return pd.DataFrame(nw), pd.DataFrame(dsr)
+    return pd.DataFrame(abs_rows), pd.DataFrame(dsr)
 
 
 def run():
@@ -186,10 +213,10 @@ def run():
          "H0：兩交易端績效相同。配對設計消去共同市場風險。", t1),
         ("二、逐輪穩健性：五輪獨立重訓各自檢定",
          "確認增益非單一訓練批次的隨機結果。", t2),
-        ("三、Newey-West HAC t 檢定（網格最佳格）",
-         "H0：平均日報酬 = 0。此為絕對主張，無對照組。", t3),
-        ("四、Deflated Sharpe Ratio（Bailey & López de Prado 2014）",
-         "校正網格搜尋的多重測試偏誤；門檻 SR0 為純靠運氣的期望最高 Sharpe。", t4),
+        ("三、block bootstrap 絕對檢定（15 格等權組合）",
+         "H0：平均日報酬 = 0。此為絕對主張，無對照組；等權口徑故無選擇偏誤。", t3),
+        ("四、Deflated Sharpe Ratio（Bailey & López de Prado 2014）〔附錄〕",
+         "僅在改報「網格最佳格」時才需要——正文採等權口徑，不引用此表作為主張。", t4),
     ]:
         print("\n" + "=" * 88)
         print(title)
@@ -198,9 +225,9 @@ def run():
         print(tbl.to_string(index=False))
 
     os.makedirs(OUT_DIR, exist_ok=True)
-    for nm, tbl in [("paired", t1), ("per_round", t2), ("newey_west", t3), ("dsr", t4)]:
+    for nm, tbl in [("paired", t1), ("per_round", t2), ("absolute", t3), ("dsr", t4)]:
         tbl.to_csv(f"{OUT_DIR}/prop2_{nm}.csv", index=False, encoding="utf-8-sig")
-    print(f"\n[已存] {OUT_DIR}/prop2_{{paired,per_round,newey_west,dsr}}.csv")
+    print(f"\n[已存] {OUT_DIR}/prop2_{{paired,per_round,absolute,dsr}}.csv")
 
 
 if __name__ == "__main__":

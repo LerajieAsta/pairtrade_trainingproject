@@ -1080,13 +1080,18 @@ margin-right: 0; }
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>證據</strong></td>
-<td style="text-align: left;">9 組對照 BH 後無一顯著（最小 <span class="math inline">p</span>=0.495），方向 8/9 偏 GICS</td>
-<td style="text-align: left;">五配對底全部顯著（<span class="math inline">p</span>=0.0002–0.0177）</td>
+<td style="text-align: left;">9 組對照 BH 後無一顯著（最小 <span class="math inline">p</span>=0.377），方向 8/9 偏 GICS</td>
+<td style="text-align: left;">五配對底全部顯著（<span class="math inline">p</span>=0.0000–0.0042）</td>
 </tr>
 <tr class="even">
+<td style="text-align: left;"><strong>信賴區間</strong></td>
+<td style="text-align: left;">9 組<strong>全部涵蓋 0</strong>，寬 1.2–1.9 pp</td>
+<td style="text-align: left;">五組<strong>全部落在零的右側</strong>，最保守下界 +0.22 pp</td>
+</tr>
+<tr class="odd">
 <td style="text-align: left;"><strong>穩健性</strong></td>
-<td style="text-align: left;">落後階、block bootstrap 一致</td>
-<td style="text-align: left;">落後階至 252、bootstrap <span class="math inline">L\in\{21,126,252\}</span> 全數一致</td>
+<td style="text-align: left;">HAC 對照一致</td>
+<td style="text-align: left;">HAC 對照一致</td>
 </tr>
 </tbody>
 </table>
@@ -1099,7 +1104,7 @@ margin-right: 0; }
 <p><strong>命題 1 是「未能拒絕虛無假設」，<strong>非</strong>「GICS 顯著較優」</strong></p>
 </div>
 <div class="callout-content">
-<p>非劣性檢定：<span class="math inline">\delta</span>=0.5 pp 時 <strong>0/9</strong> 可主張非劣， 單尾 95% 下界落在 <strong>−0.56 ~ −1.44 pp</strong>。</p>
+<p>9 組區間的寬度（1.2–1.9 pp）是 GICS 參照臂<strong>自身</strong>年化績效 （−0.11% ~ −0.40%）的<strong>數倍</strong>。</p>
 <p>→ <strong>本研究對此比較檢定力不足</strong>：既無法證明 ML 較優，亦無法主張兩者相當。</p>
 </div>
 </div>
@@ -1206,13 +1211,10 @@ margin-right: 0; }
 </div>
 </div>
 </div>
-<p><strong>絕對獲利能力不成立</strong></p>
-<ul>
-<li>Newey-West 絕對檢定：無一達 5% 顯著（最佳 <span class="math inline">p</span> = 0.088）</li>
-<li>Deflated Sharpe Ratio：共同門檻 <span class="math inline">SR_0</span> = <strong>0.433</strong>， 而全部策略中最高的 <span class="math inline">SR</span> 僅 <strong>0.343</strong></li>
-</ul>
+<p><strong>絕對獲利能力未獲證實</strong></p>
+<p>以可事前實施的<strong>全網格等權組合</strong>計，六組配置年化落在 <strong>−0.44% ~ +0.61%</strong>， bootstrap 檢定<strong>無一顯著</strong>，信賴區間寬達 <strong>2 ~ 3.5 pp</strong>。</p>
 <blockquote>
-<p>純靠運氣就該達到的水準，<strong>沒有任何一條策略達到</strong>。</p>
+<p>此非樣本不足而是<strong>結構性限制</strong>：等權組合年化 Sharpe 僅 <strong>0.05 ~ 0.18</strong>， 在此量級下欲達統計顯著約需 <strong>123 年以上</strong>樣本。</p>
 </blockquote>
 </section></section>
 <section>
@@ -1239,6 +1241,11 @@ margin-right: 0; }
 </div>
 <p>改以時間為抽樣單位後：</p>
 <table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;"></th>
@@ -1255,7 +1262,7 @@ margin-right: 0; }
 <tr class="even">
 <td style="text-align: left;">推論正當性</td>
 <td style="text-align: right;">✘ 獨立性假設不成立</td>
-<td style="text-align: right;">✔ HAC + bootstrap 雙軌</td>
+<td style="text-align: right;">✔ block bootstrap（<span class="math inline">p</span> 值 + 95% CI）</td>
 </tr>
 </tbody>
 </table>
@@ -1283,8 +1290,12 @@ margin-right: 0; }
 <section id="方法論貢獻四區分未獲支持與兩者相當" class="slide level2">
 <h2>方法論貢獻（四）：區分「未獲支持」與「兩者相當」</h2>
 <p>雙尾檢定不顯著時，文獻常逕行宣稱兩方法「表現相當」。</p>
-<p>本研究引入<strong>非劣性檢定</strong>，指出此推論需要： <strong>預先指定的容忍邊界</strong> + <strong>單尾信賴下界的證據</strong>。</p>
-<p>並示範：當參照臂自身績效接近零時，任何有意義的邊界都可能無法通過。</p>
+<p>本研究主張此判斷應交由<strong>信賴區間的寬度</strong>承擔：</p>
+<ul>
+<li>區間涵蓋 0 且<strong>兩端皆小</strong> → 方可討論「相當」</li>
+<li>區間涵蓋 0 但<strong>兩端皆大於參照臂自身的績效量級</strong> → 只能說<strong>檢定力不足</strong></li>
+</ul>
+<p>此作法不需預先指定容忍邊界，避免了非劣性檢定中 「<span class="math inline">\delta</span> 取多少」這一難以辯護的判斷。</p>
 </section>
 <section id="方法論貢獻三產業資訊的三條管道" class="slide level2">
 <h2>方法論貢獻（三）：產業資訊的三條管道</h2>
@@ -1345,7 +1356,7 @@ margin-right: 0; }
 <p><strong>其二：釐清 DRL 增益的來源與非來源</strong></p>
 <p>排除三項最直觀的替代解釋 → 「DRL 確有貢獻」建立在更窄、也更可信的基礎上。 特別指出：損益分解中的「SKIP 貢獻 31–52%」是<strong>會計恆等式而非技巧歸因</strong>。</p>
 <p><strong>其三：提出報酬來源的結構性觀察</strong></p>
-<p>「選哪些配對」在極大範圍內不影響報酬。配合三項風險發現 （獲利集中動盪期、成本餘裕 6.5–12.8 bps、無策略通過 DSR）， 對「配對交易在 2000 年代後的美股大型股是否仍具可提取報酬」提供<strong>偏否定的證據</strong>。</p>
+<p>「選哪些配對」在極大範圍內不影響報酬。配合三項風險發現 （獲利集中動盪期、成本餘裕 6.5–12.8 bps、等權組合絕對績效全數不顯著）， 對「配對交易在 2000 年代後的美股大型股是否仍具可提取報酬」提供<strong>偏否定的證據</strong>。</p>
 </section></section>
 <section>
 <section id="研究限制" class="title-slide slide level1 center">
@@ -1416,7 +1427,7 @@ margin-right: 0; }
 <p><strong>其一：優先擴大母體，而非增加特徵</strong> 本研究證據顯示，在 S&amp;P 500 範圍內無論如何調整特徵集、分組方法、插補方式或 排序準則，績效皆無顯著差異；而粒度掃描顯示<strong>候選池充足度與績效有明確關聯</strong>。 → 擴大至 Russell 3000 或全 CRSP 應較繼續擴充特徵維度更具邊際效益。</p>
 <p><strong>其二：直接驗證槽位週轉假說</strong> 建議實作「隨機 SKIP 且維持正常槽位配置」的交易模組並重跑回測 —— 本研究的事後重抽無法涵蓋再配置效應。</p>
 <p><strong>其三：重新檢視插補方式對既有研究的影響</strong> 產業中位數插補作為隱性管道，其影響在缺失率高時可達 <strong>42.8 pp</strong>。 → 任何使用基本面特徵且缺失率不低的分群研究，結論皆可能受此影響。</p>
-<p><strong>其四：將非劣性檢定納入標準做法</strong></p>
+<p><strong>其四：報告信賴區間而非僅報告顯著與否</strong> 方法比較若在雙尾不顯著後宣稱「表現相當」，應同時給出效果量的 CI， 並與參照臂自身的績效量級並列——區間寬度是區分「效果不存在」與 「檢定力不足」的最直接證據。</p>
 <p><strong>其五：報告效果量而非僅報告顯著性</strong> 形成期比較的效果量<strong>結構性地</strong>小於交易期比較（不同配對集合 vs 共用配對） → 僅報 <span class="math inline">p</span> 值將使讀者無法判斷「不顯著」是效果不存在還是檢定力不足。</p>
 </section>
 <section id="對實務應用的建議" class="slide level2">
@@ -1432,7 +1443,7 @@ margin-right: 0; }
 <div class="callout-content">
 <p><strong>其一：成本餘裕過薄</strong> 最佳策略往返 break-even 為 0.708%，較現行假設 0.58% 僅高 <strong>12.8 bps</strong>。 真實摩擦成本若較假設高出 4 bps（單邊），多數策略的正報酬結論即不成立。</p>
 <p><strong>其二：獲利高度集中於特定市場環境</strong> 所有策略在平靜期皆為<strong>負 Sharpe</strong>（−0.72 ~ −0.05）。 策略實質上在<strong>賣出波動率的均值回歸選擇權</strong>，低波動環境即為結構性不利環境。</p>
-<p><strong>其三：絕對績效未通過選擇偏誤校正</strong> DSR 共同門檻 0.433 &gt; 最高 <span class="math inline">SR</span> 0.343。</p>
+<p><strong>其三：絕對績效無法與零區分</strong> 以可事前實施的全網格等權組合計，年化 −0.44% ~ +0.61%，六組 CI 全部橫跨零。 附錄的 DSR 進一步顯示：即使改報最佳格，其 <span class="math inline">SR</span>（最高 0.343）仍低於 純靠運氣的期望門檻（0.415）。</p>
 </div>
 </div>
 </div>
@@ -2626,6 +2637,105 @@ window.QuartoSupport = function () {
         ]
       });
     </script>
+    <!-- deck-nav:start — 投影片頁首導覽（首頁／附錄／上一頁／下一頁）
+         由 notebooks/_quarto.yml 的 include-after-body 注入；
+         已渲染的舊 HTML 由 tools/inject_deck_nav.py 補上同一段。 -->
+    <style>
+.deck-nav {
+position: fixed;
+top: 0.55rem;
+right: 0.7rem;
+z-index: 60;
+display: flex;
+gap: 0.35rem;
+align-items: center;
+font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+font-size: 13px;
+opacity: 0.4;
+transition: opacity 0.15s;
+}
+.deck-nav:hover { opacity: 1; }
+.deck-nav a {
+display: inline-block;
+max-width: 15em;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+padding: 0.24em 0.7em;
+border: 1px solid rgba(120, 130, 140, 0.35);
+border-radius: 999px;
+background: rgba(255, 255, 255, 0.9);
+color: #2b3137 !important;
+text-decoration: none !important;
+line-height: 1.5;
+}
+.deck-nav a:hover {
+border-color: #0d6efd;
+color: #0d6efd !important;
+background: #fff;
+}
+.deck-nav a.home { font-weight: 600; }
+@media print { .deck-nav { display: none !important; } }
+@media (max-width: 700px) { .deck-nav a { max-width: 7em; } }
+</style>
+    <script>
+    (function () {
+      if (document.querySelector('.deck-nav')) return;              // 避免重複注入
+      if (window.location.search.indexOf('print-pdf') !== -1) return; // 匯出 PDF 時不顯示
+
+      var THESIS = [
+        ['slides/thesis/ch1_introduction.html', '第一章 緒論'],
+        ['slides/thesis/ch2_literature.html',   '第二章 文獻探討'],
+        ['slides/thesis/ch3_methodology.html',  '第三章 研究方法'],
+        ['slides/thesis/ch4_results.html',      '第四章 實證結果'],
+        ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
+        ['slides/main_results.html',            '主要結果總覽']
+      ];
+      var APPENDIX = [
+        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
+        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
+        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/comparison.html',                         '現役策略績效總比較'],
+        ['slides/performance_guide.html',                  '績效指標定義與公式']
+      ];
+
+      var here = decodeURIComponent(window.location.pathname).split('/').pop();
+      if (!here) return;
+
+      var track = null, idx = -1;
+      [['thesis', THESIS], ['appendix', APPENDIX]].forEach(function (t) {
+        t[1].forEach(function (row, i) {
+          if (row[0].split('/').pop() === here) { track = t[0]; idx = i; }
+        });
+      });
+      if (idx < 0) return;                                          // 不在清單內就不顯示
+
+      var list = track === 'thesis' ? THESIS : APPENDIX;
+      var root = new Array(list[idx][0].split('/').length).join('../');
+
+      function btn(href, text, cls) {
+        var a = document.createElement('a');
+        a.href = root + href;
+        a.textContent = text;
+        if (cls) a.className = cls;
+        return a;
+      }
+
+      var nav = document.createElement('nav');
+      nav.className = 'deck-nav';
+      nav.appendChild(btn('index.html', '⌂ 首頁', 'home'));
+      if (track === 'appendix') nav.appendChild(btn('appendix.html', '附錄'));
+      if (idx > 0) nav.appendChild(btn(list[idx - 1][0], '‹ ' + list[idx - 1][1]));
+      if (idx < list.length - 1) nav.appendChild(btn(list[idx + 1][0], list[idx + 1][1] + ' ›'));
+      document.body.appendChild(nav);
+    })();
+    </script>
+    <!-- deck-nav:end -->
     <script id="quarto-html-after-body" type="application/javascript">
       window.document.addEventListener("DOMContentLoaded", function (event) {
         const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")

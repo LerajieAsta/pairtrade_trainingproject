@@ -33,6 +33,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+from analysis.block_bootstrap import bh_adjust as _bh_adjust, bootstrap_test
 from analysis.proposition2_daily_hac import (
     INITIAL_CAPITAL, OUT_DIR, RESULT_DB, TRADING_DAYS,
     baseline_only, load_daily_sids, method_paths, newey_west,
@@ -129,7 +130,7 @@ def run():
         })
     t1_df = pd.DataFrame(rows)
 
-    # ── 表二：單因子對照（逐日差分 HAC）──
+    # ── 表二：單因子對照（逐日差分 block bootstrap）──
     crows = []
     for name, treat, base in CONTRASTS:
         for scope, top1 in (("全網格等權", False), ("Top1/SL0", True)):
@@ -137,11 +138,12 @@ def run():
             if a is None or b is None:
                 continue
             d = (a - b).values
-            t, p, _ = newey_west(d)
+            p = bootstrap_test(d)["BB p"]
+            _, p_nw, _ = newey_west(d)
             crows.append({
                 "對照": name, "口徑": scope,
                 "年化Δ%": round(float(d.mean()) * TRADING_DAYS / INITIAL_CAPITAL * 100, 3),
-                "NW t": round(t, 3), "NW p": round(p, 4),
+                "BB p": round(p, 4), "NW p（對照）": round(p_nw, 4),
                 "5%顯著": "✔" if p < 0.05 else "✘",
             })
     t2_df = pd.DataFrame(crows)
@@ -149,11 +151,10 @@ def run():
     # 多重檢定校正：本表為 10 個對照 × 2 種口徑 = 20 個檢定。α=0.05 下純靠運氣
     # 就約有 1 個假陽性（1 − 0.95^20 ≈ 64% 機率至少出現一個），故校正為必要。
     # 於各口徑內分別做 BH（兩口徑非獨立檢定，而是同一組對照的兩種聚合方式）。
-    from analysis.proposition1_daily_hac import _bh_adjust
     t2_df["BH校正p"] = np.nan
     for scope in t2_df["口徑"].unique():
         m = t2_df["口徑"] == scope
-        t2_df.loc[m, "BH校正p"] = _bh_adjust(t2_df.loc[m, "NW p"].values).round(4)
+        t2_df.loc[m, "BH校正p"] = _bh_adjust(t2_df.loc[m, "BB p"].values).round(4)
     t2_df["校正後顯著"] = np.where(t2_df["BH校正p"] < 0.05, "✔", "✘")
 
     pd.set_option("display.width", 220)
@@ -165,11 +166,11 @@ def run():
     print("  而非配對品質。Top1/SL0 只取排名第一的配對，不受名額影響，作為去混淆對照。")
 
     print("\n" + "=" * 96)
-    print("表二：單因子對照（逐日報酬差 + Newey-West HAC）")
+    print("表二：單因子對照（逐日報酬差 + block bootstrap）")
     print("=" * 96)
     print(t2_df.pivot(index="對照", columns="口徑",
-                      values=["年化Δ%", "NW p", "BH校正p"]).to_string())
-    n_raw = int((t2_df["NW p"] < 0.05).sum())
+                      values=["年化Δ%", "BB p", "BH校正p"]).to_string())
+    n_raw = int((t2_df["BB p"] < 0.05).sum())
     n_adj = int((t2_df["BH校正p"] < 0.05).sum())
     print(f"\n校正前 5% 顯著 {n_raw}/{len(t2_df)} 個；BH 校正後 {n_adj}/{len(t2_df)} 個。")
     print("（20 個檢定下，α=0.05 純靠運氣約有 64% 機率至少出現一個假陽性。）")

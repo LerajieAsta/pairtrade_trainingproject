@@ -43,6 +43,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from analysis.block_bootstrap import bootstrap_test  # noqa: E402
 from analysis.proposition2_daily_hac import (  # noqa: E402
     INITIAL_CAPITAL, OUT_DIR, baseline_only, load_daily_sids, method_paths,
     newey_west,
@@ -85,14 +86,18 @@ def _diff(a, b, start=None) -> np.ndarray:
 
 
 def _stats(d: np.ndarray) -> dict:
+    """主檢定同 4.1／4.2：block bootstrap 的 p 值與 95% CI；NW 僅作對照欄。"""
     mu, sd = d.mean(), d.std(ddof=1)
-    t, p, _ = newey_west(d)
+    res = bootstrap_test(d)
+    _, p_nw, _ = newey_west(d)
     return {
-        "年化Δ%": round(float(mu * TRADING_DAYS) / INITIAL_CAPITAL * 100, 3),
+        "年化Δ%": res["年化Δ%"],
         "IR": round(float(np.sqrt(TRADING_DAYS) * mu / sd), 3) if sd > 0 else np.nan,
         "勝日%": round(float((d > 0).mean() * 100), 1),
-        "NW t": round(t, 3),
-        "NW p": round(p, 4),
+        "CI下界": res["CI下界"],
+        "CI上界": res["CI上界"],
+        "BB p": res["BB p"],
+        "NW p（對照）": round(p_nw, 4),
     }
 
 
@@ -129,12 +134,12 @@ def _one_window(wlabel, start):
         decomp_rows.append({
             "期間": wlabel, "分群法": label,
             "總效果": round(float(d_total.mean() * TRADING_DAYS) / INITIAL_CAPITAL * 100, 3),
-            "DRL 成分": s_drl["年化Δ%"], "DRL p": s_drl["NW p"],
-            "分群成分": s_clu["年化Δ%"], "分群 p": s_clu["NW p"],
+            "DRL 成分": s_drl["年化Δ%"], "DRL p": s_drl["BB p"],
+            "分群成分": s_clu["年化Δ%"], "分群 p": s_clu["BB p"],
         })
 
     main = pd.DataFrame(main_rows)
-    main["BH校正p"] = np.round(_bh(main["NW p"].values), 4)
+    main["BH校正p"] = np.round(_bh(main["BB p"].values), 4)
     main["5%顯著"] = np.where(main["BH校正p"] < 0.05, "✔", "✘")
     decomp = pd.DataFrame(decomp_rows)
     # 恆等式自我檢查：兩成分相加須還原總效果（浮點誤差內）
