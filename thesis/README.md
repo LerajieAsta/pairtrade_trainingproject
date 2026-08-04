@@ -57,7 +57,13 @@ grep -c "李伯修" docs/slides/thesis/*.html    # 必須為 0
 
 ### 新增章節時要手動加入口
 
-`docs/index.html` 是**手寫**的著陸頁，不會自動列出新產生的頁面。
+著陸頁分兩層，皆為**手寫**、不會自動列出新產生的頁面：
+
+| 頁面 | 內容 |
+| :--- | :--- |
+| `docs/index.html` | 只放論文正文六項：第一～五章 + 主要結果總覽 |
+| `docs/appendix.html` | 其餘一切：研究架構、形成期／交易期各策略投影片、績效比較、指標定義、主要結論、現役策略清單 |
+
 新增投影片後須自行加卡片，否則該頁只能靠打路徑進入——
 論文五章從 2026-07-31 發佈到 08-04 都處於這個狀態，首頁完全沒有連結。
 
@@ -65,11 +71,27 @@ grep -c "李伯修" docs/slides/thesis/*.html    # 必須為 0
 
 ```python
 import io, os, re
-html = io.open("docs/index.html", encoding="utf-8").read()
-links = [l for l in set(re.findall(r'href="([^"]+)"', html))
-         if not l.startswith(("http", "#"))]
-print("斷鏈：", [l for l in links if not os.path.exists(os.path.join("docs", l))])
+links = set()
+for page in ("index.html", "appendix.html"):
+    html = io.open("docs/" + page, encoding="utf-8").read()
+    links |= {l for l in re.findall(r'href="([^"]+)"', html)
+              if not l.startswith(("http", "#"))}
+print("斷鏈：", [l for l in sorted(links) if not os.path.exists(os.path.join("docs", l))])
 have = {os.path.relpath(os.path.join(r, f), "docs").replace(os.sep, "/")
         for r, _, fs in os.walk("docs/slides") for f in fs if f.endswith(".html")}
-print("孤兒頁：", sorted(have - set(links)))
+print("孤兒頁：", sorted(have - links))
+```
+
+### 投影片內的導覽列
+
+每份投影片右上角有「⌂ 首頁／附錄／上一頁／下一頁」浮動列，來源是
+`notebooks/_deck_nav.html`（由 `_quarto.yml` 的 `include-after-body` 注入）。
+頁面順序寫死在該檔的 `THESIS`／`APPENDIX` 兩份清單裡，**新增投影片時要一併加進去**，
+否則該頁不會顯示導覽列（不在清單內就整條隱藏，不會壞掉、只是沒有出口）。
+
+改完 `_deck_nav.html` 後，已渲染的 3.5 MB HTML 不會自己更新。不想全部重跑 quarto 時：
+
+```bash
+python tools/inject_deck_nav.py            # 直接改寫 docs/slides/ 下所有 HTML（可重複執行）
+python tools/inject_deck_nav.py --check    # 只回報哪些頁面還沒有導覽列
 ```

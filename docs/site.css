@@ -1,0 +1,256 @@
+/* docs/ 著陸頁（index.html／appendix.html）共用樣式 */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+  background: #f8f9fa;
+  color: #212529;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.container {
+  max-width: 680px;
+  width: 100%;
+  padding: 3rem 2rem;
+}
+.breadcrumb {
+  font-size: 0.82rem;
+  margin-bottom: 1.25rem;
+}
+.breadcrumb a {
+  color: #0d6efd;
+  text-decoration: none;
+}
+.breadcrumb a:hover { text-decoration: underline; }
+.header { margin-bottom: 2.5rem; }
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #0d1117;
+  margin-bottom: 0.5rem;
+}
+.header p {
+  font-size: 0.95rem;
+  color: #6c757d;
+  line-height: 1.6;
+}
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  margin-top: 0.75rem;
+}
+.section-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6c757d;
+  margin: 1.8rem 0 0.6rem;
+}
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.card {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  display: block;
+}
+.card:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.12);
+}
+.card-icon {
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+.card h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: #0d1117;
+}
+.card p {
+  font-size: 0.82rem;
+  color: #6c757d;
+  line-height: 1.5;
+}
+
+/* 首頁底部的附錄入口 */
+.appendix-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  padding: 1.1rem 1.5rem;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.appendix-link:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.12);
+}
+.appendix-text h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0d1117;
+  margin-bottom: 0.3rem;
+}
+.appendix-text p {
+  font-size: 0.82rem;
+  color: #6c757d;
+  line-height: 1.5;
+}
+.appendix-arrow {
+  font-size: 1.1rem;
+  color: #adb5bd;
+  flex-shrink: 0;
+}
+
+/* 現役策略清單 */
+.strategies {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+}
+.strategies h3,
+.highlights h3 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6c757d;
+  margin-bottom: 0.75rem;
+}
+.strategy-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+.strategy-item:last-child { border-bottom: none; }
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #28a745;
+  flex-shrink: 0;
+}
+.dot.formation-only { background: #adb5bd; }
+.strategy-item.muted { color: #868e96; }
+
+/* 主要結論 */
+.highlights {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+}
+.highlight-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+.highlight-row:last-child { border-bottom: none; }
+.highlight-row .value { font-weight: 600; color: #0d1117; white-space: nowrap; }
+
+.footer {
+  margin-top: 2rem;
+  font-size: 0.78rem;
+  color: #adb5bd;
+  text-align: center;
+}
+
+/* 研究架構 */
+.arch {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 1.4rem 1.5rem;
+}
+.arch-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.arch-stage {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #eef0f2;
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+.arch-stage .num {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #0d6efd;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.arch-stage .body { flex: 1; }
+.arch-stage .title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #0d1117;
+  margin-bottom: 0.15rem;
+}
+.arch-stage .desc { font-size: 0.8rem; color: #6c757d; line-height: 1.5; }
+.arch-arrow { text-align: center; color: #ced4da; font-size: 0.85rem; line-height: 0.4; }
+.arch-props {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.arch-prop {
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+}
+.arch-prop .tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: #e7f1ff;
+  color: #0d6efd;
+  margin-bottom: 0.4rem;
+}
+.arch-prop p { font-size: 0.8rem; color: #495057; line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .cards { grid-template-columns: 1fr; }
+  .arch-props { grid-template-columns: 1fr; }
+}

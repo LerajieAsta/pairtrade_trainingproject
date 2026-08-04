@@ -5859,4 +5859,103 @@ window.QuartoSupport = function () {
       </script>
     
 
+<!-- deck-nav:start — 投影片頁首導覽（首頁／附錄／上一頁／下一頁）
+     由 notebooks/_quarto.yml 的 include-after-body 注入；
+     已渲染的舊 HTML 由 tools/inject_deck_nav.py 補上同一段。 -->
+<style>
+  .deck-nav {
+    position: fixed;
+    top: 0.55rem;
+    right: 0.7rem;
+    z-index: 60;
+    display: flex;
+    gap: 0.35rem;
+    align-items: center;
+    font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+    font-size: 13px;
+    opacity: 0.4;
+    transition: opacity 0.15s;
+  }
+  .deck-nav:hover { opacity: 1; }
+  .deck-nav a {
+    display: inline-block;
+    max-width: 15em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.24em 0.7em;
+    border: 1px solid rgba(120, 130, 140, 0.35);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #2b3137 !important;
+    text-decoration: none !important;
+    line-height: 1.5;
+  }
+  .deck-nav a:hover {
+    border-color: #0d6efd;
+    color: #0d6efd !important;
+    background: #fff;
+  }
+  .deck-nav a.home { font-weight: 600; }
+  @media print { .deck-nav { display: none !important; } }
+  @media (max-width: 700px) { .deck-nav a { max-width: 7em; } }
+</style>
+<script>
+(function () {
+  if (document.querySelector('.deck-nav')) return;              // 避免重複注入
+  if (window.location.search.indexOf('print-pdf') !== -1) return; // 匯出 PDF 時不顯示
+
+  var THESIS = [
+    ['slides/thesis/ch1_introduction.html', '第一章 緒論'],
+    ['slides/thesis/ch2_literature.html',   '第二章 文獻探討'],
+    ['slides/thesis/ch3_methodology.html',  '第三章 研究方法'],
+    ['slides/thesis/ch4_results.html',      '第四章 實證結果'],
+    ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
+    ['slides/main_results.html',            '主要結果總覽']
+  ];
+  var APPENDIX = [
+    ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
+    ['slides/formation/dtw_paper_fixed.html',          'DTW'],
+    ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
+    ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
+    ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
+    ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
+    ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
+    ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+    ['slides/comparison.html',                         '現役策略績效總比較'],
+    ['slides/performance_guide.html',                  '績效指標定義與公式']
+  ];
+
+  var here = decodeURIComponent(window.location.pathname).split('/').pop();
+  if (!here) return;
+
+  var track = null, idx = -1;
+  [['thesis', THESIS], ['appendix', APPENDIX]].forEach(function (t) {
+    t[1].forEach(function (row, i) {
+      if (row[0].split('/').pop() === here) { track = t[0]; idx = i; }
+    });
+  });
+  if (idx < 0) return;                                          // 不在清單內就不顯示
+
+  var list = track === 'thesis' ? THESIS : APPENDIX;
+  var root = new Array(list[idx][0].split('/').length).join('../');
+
+  function btn(href, text, cls) {
+    var a = document.createElement('a');
+    a.href = root + href;
+    a.textContent = text;
+    if (cls) a.className = cls;
+    return a;
+  }
+
+  var nav = document.createElement('nav');
+  nav.className = 'deck-nav';
+  nav.appendChild(btn('index.html', '⌂ 首頁', 'home'));
+  if (track === 'appendix') nav.appendChild(btn('appendix.html', '附錄'));
+  if (idx > 0) nav.appendChild(btn(list[idx - 1][0], '‹ ' + list[idx - 1][1]));
+  if (idx < list.length - 1) nav.appendChild(btn(list[idx + 1][0], list[idx + 1][1] + ' ›'));
+  document.body.appendChild(nav);
+})();
+</script>
+<!-- deck-nav:end -->
 </body></html>

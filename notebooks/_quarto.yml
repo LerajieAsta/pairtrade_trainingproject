@@ -29,6 +29,7 @@ format:
     preview-links: true
     link-external-newwindow: true
     embed-resources: true
+    include-after-body: _deck_nav.html
 
 execute:
   enabled: false
