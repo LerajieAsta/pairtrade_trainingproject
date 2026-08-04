@@ -1377,7 +1377,7 @@ margin-right: 0; }
 </tbody>
 </table>
 <p>同門檻對照下<strong>五種配對底仍全部顯著</strong>；門檻管道僅複製 <strong>4.2–20.9%</strong> 且無一顯著。</p>
-<p>⚠️ 須揭露：對照門檻拉至 2.5（已超出 DRL 實際行為範圍）時， 五支中四支退為邊緣顯著（<span class="math inline">p \approx 0.06</span>）。</p>
+<p>⚠️ 須揭露：對照門檻拉至 2.5（已超出 DRL 實際行為範圍）時， 五支中四支失去 5% 顯著性——HDBSCAN (<span class="math inline">p</span>=0.060)、Agglomerative (<span class="math inline">p</span>=0.063)、 GICS-SDP (<span class="math inline">p</span>=0.066) 落在邊緣，K-means 則退至 <span class="math inline">p</span>=0.104 明顯更遠； 僅 GICS-SSD (<span class="math inline">p</span>=0.025) 維持顯著。</p>
 </section>
 <section id="增益來源②不是篩掉劣質配對" class="slide level2">
 <h2>增益來源②：不是篩掉劣質配對</h2>
@@ -1509,8 +1509,113 @@ margin-right: 0; }
 </div>
 </section></section>
 <section>
+<section id="組合系統標題宣稱的那個檢定" class="title-slide slide level1 center">
+<h1>4.3 組合系統：標題宣稱的那個檢定</h1>
+<p>4.1 與 4.2 各測一個成分，<strong>都不是實務上要部署的系統</strong>。</p>
+<blockquote>
+<p><strong>組合系統</strong>　動態分群（252 日窗、21 日滾動、295 期）+ SSD/SDP 排序 + 共整合篩選 + <strong>DRL 交易端</strong></p>
+<p><strong>傳統基準</strong>　GICS 產業分組 + 同一排序 + 同一篩選 + <strong>固定門檻 Z-Score</strong></p>
+</blockquote>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分群法</th>
+<th style="text-align: left;">傳統基準</th>
+<th style="text-align: right;">年化Δ(pp)</th>
+<th style="text-align: right;">IR</th>
+<th style="text-align: right;">NW <span class="math inline">p</span></th>
+<th style="text-align: right;">BH 校正 <span class="math inline">p</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: left;">GICS-SSD</td>
+<td style="text-align: right;"><strong>+0.818</strong></td>
+<td style="text-align: right;">0.331</td>
+<td style="text-align: right;">0.082</td>
+<td style="text-align: right;">0.204</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: left;">GICS-SDP</td>
+<td style="text-align: right;">+0.715</td>
+<td style="text-align: right;">0.286</td>
+<td style="text-align: right;">0.136</td>
+<td style="text-align: right;">0.204</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: left;">GICS-SSD</td>
+<td style="text-align: right;">+0.483</td>
+<td style="text-align: right;">0.183</td>
+<td style="text-align: right;">0.359</td>
+<td style="text-align: right;">0.359</td>
+</tr>
+</tbody>
+</table>
+<p><strong>方向一致為正，但 BH 校正後無一達 5% 顯著。</strong> （排序準則已對齊，否則會混入分組與排序兩個變因。）</p>
+</section>
+<section id="成分分解改善來自哪一半" class="slide level2">
+<h2>成分分解：改善來自哪一半？</h2>
+<p><span class="math display">(\text{分群}+\text{DRL}) - (\text{GICS}+\text{ZS}) = \underbrace{(\text{分群}+\text{DRL}) - (\text{分群}+\text{ZS})}_{\text{DRL 成分}} + \underbrace{(\text{分群}+\text{ZS}) - (\text{GICS}+\text{ZS})}_{\text{分群成分}}</span></p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分群法</th>
+<th style="text-align: right;">總效果</th>
+<th style="text-align: right;">DRL 成分</th>
+<th style="text-align: right;">(<span class="math inline">p</span>)</th>
+<th style="text-align: right;">分群成分</th>
+<th style="text-align: right;">(<span class="math inline">p</span>)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">+0.818</td>
+<td style="text-align: right;"><strong>+0.719</strong></td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;">+0.099</td>
+<td style="text-align: right;">0.804</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">+0.715</td>
+<td style="text-align: right;"><strong>+0.896</strong></td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">−0.182</td>
+<td style="text-align: right;">0.646</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: right;">+0.483</td>
+<td style="text-align: right;"><strong>+0.589</strong></td>
+<td style="text-align: right;">0.018</td>
+<td style="text-align: right;">−0.106</td>
+<td style="text-align: right;">0.815</td>
+</tr>
+</tbody>
+</table>
+<p>分解殘差 0.001 pp；兩欄即 4.2.1 與 4.1.1 的原表。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>全部改善來自 DRL 成分</strong></p>
+</div>
+<div class="callout-content">
+<p>三種分群法的 <strong>DRL 成分皆大於總效果</strong>——分群成分實際上<strong>侵蝕</strong>了改善。</p>
+<p>→ 支持採用<strong>交易端</strong>改良；不支持以分群取代產業分類作為搜尋空間。</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
 <section id="命題-1-失敗原因的受控歸因" class="title-slide slide level1 center">
-<h1>4.3 命題 1 失敗原因的受控歸因</h1>
+<h1>4.4 命題 1 失敗原因的受控歸因</h1>
 
 </section>
 <section id="形成期實作差異222-因子設計" class="slide level2 scrollable">
@@ -1647,7 +1752,7 @@ margin-right: 0; }
 </section>
 <section id="特徵維度與插補管道" class="slide level2">
 <h2>特徵維度與插補管道</h2>
-<p><strong>特徵維度</strong>（初步）：自 SEC companyfacts 解出 40 個 Green et al. 特徵， <strong>僅 10 個</strong>覆蓋率 &gt;70%，連續維度 7 → 17。2012+ 逐步鏈：</p>
+<p><strong>特徵維度</strong>：自 SEC companyfacts 解出 40 個 Green et al. 特徵， <strong>12 個</strong>覆蓋率 &gt;70%，連續維度 7 → 19。2012+ 逐步鏈：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -1663,18 +1768,19 @@ margin-right: 0; }
 <td style="text-align: right;">0.602</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">產業插補 → <strong>全域插補</strong></td>
-<td style="text-align: right;"><strong>−0.716</strong></td>
-<td style="text-align: right;">0.349</td>
+<td style="text-align: left;">產業插補 → 全域插補</td>
+<td style="text-align: right;">+0.481</td>
+<td style="text-align: right;">0.602</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><strong>7 維 → 17 維</strong></td>
-<td style="text-align: right;"><strong>+0.685</strong></td>
-<td style="text-align: right;">0.349</td>
+<td style="text-align: left;"><strong>7 維 → 19 維</strong></td>
+<td style="text-align: right;">−0.482</td>
+<td style="text-align: right;">0.602</td>
 </tr>
 </tbody>
 </table>
-<p>兩大效果幾乎抵消（淨 −0.03 pp）。對 GICS 為 +0.253 pp，<strong>未優於</strong> 7 維版的 +0.455 pp。 → <strong>這些特徵替代了產業先驗，但未超越它。</strong></p>
+<p>兩大效果幾乎抵消（淨 −0.001 pp）。對 GICS 為 +0.283 pp，<strong>未優於</strong> 7 維版的 +0.455 pp。</p>
+<p>⚠️ 這兩個中間步驟的<strong>符號不穩定</strong>：補齊原始價快取前為 −0.716／+0.685， 補齊後皆反轉，而淨效果與「全部不顯著」不變——不顯著的點估計不宜作方向性解讀。 → <strong>這些特徵替代了產業先驗，但未超越它。</strong></p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1717,7 +1823,7 @@ margin-right: 0; }
 </section></section>
 <section>
 <section id="核心發現" class="title-slide slide level1 center">
-<h1>4.4 核心發現</h1>
+<h1>4.5 核心發現</h1>
 
 </section>
 <section id="選哪些配對不決定報酬" class="slide level2">
@@ -1728,43 +1834,50 @@ margin-right: 0; }
 <tr class="header">
 <th style="text-align: left;">設定</th>
 <th style="text-align: right;">跨產業配對比例</th>
+<th style="text-align: right;">2012+ 年化</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">GICS 產業分組</td>
 <td style="text-align: right;"><strong>0.0%</strong></td>
+<td style="text-align: right;">−1.43%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative + one-hot</td>
 <td style="text-align: right;">8.6%</td>
+<td style="text-align: right;">−0.97%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative − one-hot</td>
 <td style="text-align: right;">31.4%</td>
+<td style="text-align: right;">−1.14%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative + 全域插補</td>
-<td style="text-align: right;">56.1%</td>
+<td style="text-align: right;">54.5%</td>
+<td style="text-align: right;">−0.66%</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">Agglomerative + 10 公司特徵</td>
-<td style="text-align: right;">65.4%</td>
+<td style="text-align: left;">Agglomerative + 12 公司特徵</td>
+<td style="text-align: right;">62.8%</td>
+<td style="text-align: right;">−1.14%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>完全不分組</strong></td>
-<td style="text-align: right;"><strong>75.3%</strong></td>
+<td style="text-align: right;"><strong>69.4%</strong></td>
+<td style="text-align: right;">−1.84%</td>
 </tr>
 </tbody>
 </table>
-<p>涵蓋 <strong>one-hot 權重、插補方式、特徵集、分組方法</strong>四個維度， 跨產業比例自 <strong>0% 變動至 75%</strong>——</p>
+<p>涵蓋 <strong>one-hot 權重、插補方式、特徵集、分組方法</strong>四個維度， 跨產業比例自 <strong>0% 變動至 69%</strong>——</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>而 2012 年後的績效全部落在 −1.9% ~ −0.9%，彼此無顯著差異</strong></p>
+<p><strong>而 2012 年後的績效全部落在 −1.8% ~ −0.7%，彼此無顯著差異</strong></p>
 </div>
 <div class="callout-content">
 <blockquote>
@@ -1778,7 +1891,7 @@ margin-right: 0; }
 </section></section>
 <section>
 <section id="風險評估" class="title-slide slide level1 center">
-<h1>4.5 風險評估</h1>
+<h1>4.6 風險評估</h1>
 
 </section>
 <section id="regime-分層穩健性" class="slide level2">

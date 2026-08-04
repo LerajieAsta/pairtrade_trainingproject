@@ -264,13 +264,42 @@
       </div>
     </div>
 
+    <p class="section-label">📚 論文章節投影片（依序閱讀）</p>
+    <div class="cards">
+      <a class="card" href="slides/thesis/ch1_introduction.html">
+        <div class="card-icon">1️⃣</div>
+        <h2>第一章　緒論</h2>
+        <p>報酬衰減、兩個改良方向、兩大命題與三項方法論目標</p>
+      </a>
+      <a class="card" href="slides/thesis/ch2_literature.html">
+        <div class="card-icon">2️⃣</div>
+        <h2>第二章　文獻探討</h2>
+        <p>配對交易的起源與衰減、配對篩選方法演進、交易策略發展</p>
+      </a>
+      <a class="card" href="slides/thesis/ch3_methodology.html">
+        <div class="card-icon">3️⃣</div>
+        <h2>第三章　研究方法</h2>
+        <p>PIT 處理、形成期四層架構、動態分群界定（ARI 實測）、DRL 設計、統計檢定</p>
+      </a>
+      <a class="card" href="slides/thesis/ch4_results.html">
+        <div class="card-icon">4️⃣</div>
+        <h2>第四章　實證結果</h2>
+        <p>兩命題檢定、<strong>組合系統整體檢定</strong>、失敗歸因、核心發現、風險評估</p>
+      </a>
+      <a class="card" href="slides/thesis/ch5_conclusion.html">
+        <div class="card-icon">5️⃣</div>
+        <h2>第五章　結論</h2>
+        <p>發現綜整、方法論與實證貢獻、研究限制、後續研究與實務建議</p>
+      </a>
+      <a class="card" href="slides/main_results.html">
+        <div class="card-icon">📌</div>
+        <h2>主要結果總覽</h2>
+        <p>result.db 動態產生：兩命題主表、消融鏈、風險評估的彙整視圖</p>
+      </a>
+    </div>
+
     <p class="section-label">🔍 形成期策略投影片（一策略一份，Alt+點擊可縮放圖表）</p>
     <div class="cards">
-      <a class="card" href="slides/formation/ssd_basic.html">
-        <div class="card-icon">📐</div>
-        <h2>SSD Basic</h2>
-        <p>累積回報指數 SSD + 固定 β=1（Gatev 2006 基礎原型）</p>
-      </a>
       <a class="card" href="slides/formation/ssd_rolling.html">
         <div class="card-icon">📏</div>
         <h2>SSD Rolling</h2>
@@ -291,26 +320,21 @@
         <h2>HDBSCAN</h2>
         <p>5 維報酬 PCA 因子載荷聚類 ⊕ SSD-DTW-PCA 排序（分組消融對照組）</p>
       </a>
-      <a class="card" href="slides/formation/hdbscan_cluster_pca5_resid.html">
-        <div class="card-icon">🧮</div>
-        <h2>HDBSCAN (殘差)</h2>
-        <p>因子殘差化（去市場＋產業）→ PCA5 因子載荷聚類 + SSD-DTW-PCA 排序</p>
-      </a>
       <a class="card" href="slides/formation/agglomerative_fundamentals.html">
         <div class="card-icon">🧬</div>
         <h2>Agglomerative Fundamentals</h2>
         <p>價格 PCA ⊕ 基本面 ⊕ GICS one-hot 混合特徵分群（yF 快照 / FMP 逐點兩資料源）</p>
       </a>
+      <a class="card" href="slides/formation/kmeans_fundamentals.html">
+        <div class="card-icon">🎯</div>
+        <h2>K-means Fundamentals</h2>
+        <p>同一混合特徵、群數對齊 Agglomerative（分群層跨期 ARI 0.515，三者中最不穩定）</p>
+      </a>
     </div>
 
     <p class="section-label">📈 交易期策略投影片</p>
     <div class="cards">
-            <a class="card" href="slides/trading/distance_trading.html">
-        <div class="card-icon">📐</div>
-        <h2>距離基準交易（Distance）</h2>
-        <p>GGR 正規化價格距離 spread（回歸 vs 距離的單變因對照）</p>
-      </a>
-<a class="card" href="slides/trading/zscore_trading.html">
+      <a class="card" href="slides/trading/zscore_trading.html">
         <div class="card-icon">🧠</div>
         <h2>Z-Score 狀態機</h2>
         <p>Spread 重建路徑 B、進出場狀態機、六大風控（#1–#4、#7、#9）</p>

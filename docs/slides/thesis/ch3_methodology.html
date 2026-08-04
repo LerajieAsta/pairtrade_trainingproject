@@ -1302,9 +1302,137 @@ margin-right: 0; }
 </div>
 </section></section>
 <section>
-<section id="分群法命題-1" class="title-slide slide level1 center">
-<h1>3.3 分群法（命題 1）</h1>
-
+<section id="動態分群的界定" class="title-slide slide level1 center">
+<h1>3.3 「動態分群」的界定</h1>
+<p>標題所稱<strong>動態分群</strong>＝分群模型於<strong>每一形成期獨立重新配適</strong>， 而非全樣本分群一次後固定。</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">性質</th>
+<th style="text-align: left;">內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>逐期重估</strong></td>
+<td style="text-align: left;">每期以該期 252 日視窗重建特徵、重新配適；不保留跨期狀態</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>重估次數</strong></td>
+<td style="text-align: left;"><strong>295 期</strong>（2000-01-03 → 2024-07-01），三種分群法各配適 295 次</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>群數隨資料變動</strong></td>
+<td style="text-align: left;">HDBSCAN 由密度決定；Agglomerative 取當期距離 75 分位；K-means 對齊之</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>前視偏誤防範</strong></td>
+<td style="text-align: left;">全樣本分群會讓 2005 年的搜尋空間受 2020 年共變影響</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="動態性的實測①配對層級不具鑑別力" class="slide level2">
+<h2>動態性的實測①：配對層級不具鑑別力</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分組方法</th>
+<th style="text-align: right;">相鄰期配對重疊率</th>
+<th style="text-align: right;">配對存續期數（中位）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">9.8%</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">9.4%</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: right;">6.4%</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>GICS（靜態對照）</strong></td>
+<td style="text-align: right;"><strong>11.7%</strong></td>
+<td style="text-align: right;">1</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>靜態的 GICS 週轉率反而最高</strong></p>
+</div>
+<div class="callout-content">
+<p>配對週轉主要由<strong>排序層與篩選層</strong>驅動——即使分組固定， 每期的距離排序與共整合檢定結果本就不同。 <strong>此指標無法佐證分群層的動態性。</strong></p>
+</div>
+</div>
+</div>
+</section>
+<section id="動態性的實測②分群層級以-ari-量測" class="slide level2">
+<h2>動態性的實測②：分群層級以 ARI 量測</h2>
+<p>重跑形成期前兩層取出群標籤，計算相鄰期在<strong>共同標的</strong>上的 <strong>調整蘭德指數</strong>（群編號無意義，故比對「兩兩是否同群」；ARI 已對隨機一致校正）。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分組方法</th>
+<th style="text-align: right;">群數</th>
+<th style="text-align: right;">相隔 1 期（21 日）</th>
+<th style="text-align: right;">相隔 6 期（126 日）</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">104</td>
+<td style="text-align: right;"><strong>0.709</strong></td>
+<td style="text-align: right;">0.483</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;"><strong>0.685</strong></td>
+<td style="text-align: right;">0.498</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: right;">104</td>
+<td style="text-align: right;"><strong>0.515</strong></td>
+<td style="text-align: right;">0.350</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>GICS（靜態）</strong></td>
+<td style="text-align: right;">11</td>
+<td style="text-align: right;"><strong>1.000</strong></td>
+<td style="text-align: right;">1.000</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>結構確實逐期改變</strong>：相隔 21 日已有三至五成分群關係改變</li>
+<li><strong>改變隨時間累積</strong>：一個交易期走完，過半結構已不同</li>
+<li><strong>K-means 最不穩定</strong>（隨機初始化；Agglomerative 的階層合併較不敏感）</li>
+</ul>
+<blockquote>
+<p><strong>範圍聲明</strong>：確立分群<strong>確實在變</strong>，但<strong>未</strong>檢定這種改變是否<strong>有益</strong>—— 本研究無「靜態分群」對照組。逐期重估是前視偏誤防範的必要設計， 而非受檢定的處理。</p>
+</blockquote>
+</section>
+<section id="消融矩陣4-分組-3-排序" class="slide level2">
+<h2>消融矩陣：4 分組 × 3 排序</h2>
 </section>
 <section id="分組-3-排序消融矩陣" class="slide level2">
 <h2>4 分組 × 3 排序消融矩陣</h2>

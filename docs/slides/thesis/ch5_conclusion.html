@@ -1105,6 +1105,47 @@ margin-right: 0; }
 </div>
 </div>
 </section>
+<section id="組合系統未達顯著且改善只來自一半" class="slide level2">
+<h2>組合系統：未達顯著，且改善只來自一半</h2>
+<p>標題宣稱的比較——動態分群 + DRL <strong>vs</strong> GICS + Z-Score：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分群法</th>
+<th style="text-align: right;">總效果</th>
+<th style="text-align: right;">DRL 成分</th>
+<th style="text-align: right;">分群成分</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">+0.818</td>
+<td style="text-align: right;"><strong>+0.719</strong> ✔</td>
+<td style="text-align: right;">+0.099 ✘</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">+0.715</td>
+<td style="text-align: right;"><strong>+0.896</strong> ✔</td>
+<td style="text-align: right;">−0.182 ✘</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: right;">+0.483</td>
+<td style="text-align: right;"><strong>+0.589</strong> ✔</td>
+<td style="text-align: right;">−0.106 ✘</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>總效果方向一致為正，<strong>BH 校正後無一達 5% 顯著</strong></li>
+<li><strong>全部改善來自 DRL 成分</strong>；分群成分三者中兩者為負</li>
+</ul>
+<blockquote>
+<p>本研究所提策略的價值集中於<strong>交易端</strong>。 無監督動態分群在此資料條件下未對組合系統產生正向貢獻。</p>
+</blockquote>
+</section>
 <section id="命題-2-的增益機制已釐清" class="slide level2">
 <h2>命題 2 的增益機制已釐清</h2>
 <p><strong>三項替代解釋皆被排除</strong></p>
@@ -1147,7 +1188,7 @@ margin-right: 0; }
 <ol type="1">
 <li><strong>形成期設計</strong> —— 產業 one-hot、共整合篩選、缺「不分組」零點</li>
 <li><strong>交易機制</strong> —— Han et al. 四項差異逐步施加</li>
-<li><strong>特徵維度</strong> —— 連續特徵 7 → 17 維（初步）</li>
+<li><strong>特徵維度</strong> —— 連續特徵 7 → 19 維</li>
 </ol>
 </section>
 <section id="核心發現與絕對績效" class="slide level2">
@@ -1161,7 +1202,7 @@ margin-right: 0; }
 <p><strong>選哪些配對，不決定報酬</strong></p>
 </div>
 <div class="callout-content">
-<p>六種設定涵蓋 <strong>one-hot 權重、插補方式、特徵集、分組方法</strong>四個維度， 跨產業配對比例自 <strong>0%（GICS）變動至 75%（完全不分組）</strong>， 而 2012 年後績效全部落在 <strong>−1.9% ~ −0.9%、彼此無顯著差異</strong>。</p>
+<p>六種設定涵蓋 <strong>one-hot 權重、插補方式、特徵集、分組方法</strong>四個維度， 跨產業配對比例自 <strong>0%（GICS）變動至 69%（完全不分組）</strong>， 而 2012 年後績效全部落在 <strong>−1.8% ~ −0.7%、彼此無顯著差異</strong>。</p>
 </div>
 </div>
 </div>
