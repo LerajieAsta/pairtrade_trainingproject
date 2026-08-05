@@ -326,6 +326,43 @@ for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
         "params":           _pgd,
     })
 
+# ── RL-THR：部分回饋對照組（命題 2 的第四項受控對照，2026-08-05）────────────
+# 現役的 DL-THR（drl_threshold_trading）名為「DRL」，實際是全資訊監督回歸：
+# 每期把 9 個動作的報酬全部反事實回算後餵給網路，無探索問題。本組把它換成
+# 真正的部分回饋——只觀測選中動作的報酬 + ε-greedy——其餘（動作選單、12 維
+# 狀態、網路、walk-forward 切分）逐位元相同，構成單一變因對照：
+#     反事實標籤值多少錢？
+# 借用 Grid AGG-SSD 已算好的形成期配對，零重跑 formation，直接對接
+# Grid (AGG-SSD-DRL)。
+#
+# ε 掃三組並以「對 bandit 最有利者」與 DL-THR 對比——若在最有利條件下仍輸，
+# 「反事實標籤有價值」的結論才保守且站得住。三組各自持有網路與經驗
+# （見 rl_threshold_trading._get_shared 的 scope key），不互相餵食樣本。
+#
+# 形式歸屬（勿含糊）：這是 contextual bandit，沒有 γ、沒有序列信用分配——
+# 每期一次決策且狀態全由形成期視窗算出，選哪個門檻不改變下期狀態。
+# 逐日定位動作空間的真 RL（v1 DQN / v2 / v3 FQI，γ=0.99 + bootstrapped
+# target）已系統性證偽，見 archive/trading/ 與 archive/config_archived_strategies.py。
+for _eps0, _epsf, _etag in ((0.05, None, "E05"),
+                            (0.10, None, "E10"),
+                            (0.20, 0.02, "E20D")):
+    _prl = {**base_params, **_GRID_COMMON,
+            "feature_mode": "fundamentals_mix",
+            "cluster_method": "agglomerative", "ranking_backend": "ssd",
+            "drl_hidden_size": 64, "thr_train_epochs": 40, "thr_min_train_samples": 200,
+            "rl_epsilon": _eps0, "rl_epsilon_final": _epsf,
+            "rl_epsilon_decay_steps": 2000}
+    _grid_entries.append({
+        "name":             f"Grid AGG-SSD RLTHR {_etag}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "formation_strategy_id_base": "Grid AGG-SSD",
+        "trading_module":   "strategies.trading.rl_threshold_trading",
+        "sub_dir":          f"Grid_AGG_SSD_RLTHR_{_etag}",
+        "db_method":        f"Grid (AGG-SSD-RLTHR-{_etag})",
+        "trade_method":     "RLTHR",
+        "params":           _prl,
+    })
+
 
 # （特徵消融「多尺度動量」：2026-07-24 驗證為負面結果——三種分群全面劣化
 #   （HDB −0.94pp、AGG −2.43pp 至 −0.65%、KM −1.40pp）。根因：動量度量「過去

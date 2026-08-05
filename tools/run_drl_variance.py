@@ -50,15 +50,23 @@ SUMMARY_CSV = f"results/analysis/drl_variance_summary{_suffix}.csv"
 LOG_DIR = "results/logs"
 
 
-def drl_targets():
-    """回傳 (config 索引清單, db_method 清單)——現役且用 DRL-THR 交易端的策略。"""
+def drl_targets(module: str = "drl_threshold_trading"):
+    """
+    回傳 (config 索引清單, db_method 清單)——現役且用指定交易端的策略。
+
+    module 可換成 rl_threshold_trading，用於 RL-THR 部分回饋對照組。
+    後者的隨機性更大（除了權重初始化與 batch 洗牌，還多一層 ε-greedy 探索），
+    重跑輪數只會比 DL-THR 更必要，不會更不必要。
+    """
     from strategies.config import strategies_raw_all
+    target = f"strategies.trading.{module}"
     idx, methods = [], []
     for i, s in enumerate(strategies_raw_all):
-        if (s["trading_module"] == "strategies.trading.drl_threshold_trading"
-                and not s.get("formation_only")):
+        if s["trading_module"] == target and not s.get("formation_only"):
             idx.append(i)
             methods.append(s["db_method"])
+    if not idx:
+        sys.exit(f"config 中找不到使用 {target} 的現役策略")
     return idx, methods
 
 
@@ -124,13 +132,15 @@ def main():
     ap = argparse.ArgumentParser(description="DRL 策略重跑 N 次的變異數評估")
     ap.add_argument("--runs", type=int, default=5, help="總輪數（含既有結果的第 1 輪，預設 5）")
     ap.add_argument("--aggregate-only", action="store_true", help="只重算彙總，不跑回測")
+    ap.add_argument("--module", default="drl_threshold_trading",
+                    help="交易端模組名（drl_threshold_trading 或 rl_threshold_trading）")
     args = ap.parse_args()
 
     if args.aggregate_only:
         aggregate()
         return
 
-    idx, methods = drl_targets()
+    idx, methods = drl_targets(args.module)
     slice_str = ",".join(str(i) for i in idx)
     print(f"目標策略（STRATEGIES_SLICE={slice_str}）：")
     for m in methods:
@@ -148,7 +158,8 @@ def main():
     for run_id in range(done_runs + 1, args.runs + 1):
         print(f"\n── 第 {run_id}/{args.runs} 輪 ──────────────────────────────")
         clear_summaries(methods)
-        log_path = f"{LOG_DIR}/drl_variance_run{run_id}.log"
+        # 記檔名同樣帶 tag——否則 RL-THR 的輪次日誌會覆蓋掉既有的 DL-THR 紀錄
+        log_path = f"{LOG_DIR}/drl_variance{_suffix}_run{run_id}.log"
         t0 = time.time()
         with open(log_path, "w") as log:
             ret = subprocess.run(
