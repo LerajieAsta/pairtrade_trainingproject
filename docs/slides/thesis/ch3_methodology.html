@@ -1144,6 +1144,7 @@ margin-right: 0; }
 <p>本研究拆解為四個<strong>可獨立替換</strong>的層：</p>
 <pre><code>特徵萃取  →  分組  →  群內排序  →  統計篩選</code></pre>
 <p>各層以標準化介面銜接： 特徵層輸出 <span class="math inline">(N   imes d)</span> 矩陣 → 分組層輸出 <span class="math inline">\{股票   o 組標籤\}</span> → 排序層在組內選前 <span class="math inline">N</span> 組 → 篩選層對價差施加統計檢定。</p>
+<p>（上圖為<strong>介面</strong>的相依順序；排序與篩選在實作上的<strong>施行</strong>次序依後端而異，見 §3.2 排序層與篩選層。）</p>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1293,10 +1294,46 @@ margin-right: 0; }
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>重要</strong></p>
+<p><strong>排序與篩選的施行次序依後端而異</strong></p>
 </div>
 <div class="callout-content">
-<p>流程為「<strong>先按距離排序、再逐一檢定並填滿名額</strong>」—— 故<strong>候選池不足時，系統會被迫接受距離更遠的配對</strong>。 第四章將顯示此機制是理解本研究結果的關鍵。</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">後端</th>
+<th style="text-align: left;">實際流程</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>SSD</strong></td>
+<td style="text-align: left;">先按 SSD 排序 → 取前 <span class="math inline">\max(200,\  ext{Top}N   imes15)</span> 為候選 → <strong>依距離順序</strong>逐一檢定 → 湊滿 $ ext{Top}N imes5$ 即停 → 再排序取前 <span class="math inline">N</span></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>DTW／SSD-DTW-PCA</strong></td>
+<td style="text-align: left;">群內<strong>全配對</strong>逐一檢定（無候選上限）→ 才排序取前 <span class="math inline">N</span></td>
+</tr>
+</tbody>
+</table>
+<p>兩者的<strong>共同</strong>後果相同，且是理解第四章結果的關鍵： <strong>候選池不足時，系統會被迫接受距離更遠的配對</strong>——SSD 因候選上限與提前中止而更早觸發， DTW 則因通過篩選者不足 <span class="math inline">N</span> 組而觸發。</p>
+</div>
+</div>
+</div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>這是「可獨立替換」的一項例外，須明確揭露</strong></p>
+</div>
+<div class="callout-content">
+<p>四層架構使分組層的替換成為乾淨的單變因對照。但<strong>排序層的替換同時改變了 排序與篩選的施行次序</strong>（上表），故排序層之間的比較嚴格說並非單一變因。</p>
+<p>本研究的主命題落在<strong>分組層</strong>（命題 1）與<strong>交易端</strong>（命題 2）， 兩者皆固定排序後端，不受此影響；涉及排序層的比較僅作描述性報告。</p>
 </div>
 </div>
 </div>
@@ -1609,6 +1646,66 @@ margin-right: 0; }
 </div>
 </div>
 <p><strong>隨機性處理</strong>　網路未固定隨機種子 → 對三種 ML 配對底各執行<strong>五輪獨立重訓</strong>， 以中位數與全距報告，避免單次訓練的隨機性被誤讀為方法效果。</p>
+</section>
+<section id="受控對照把全資訊標籤換成部分回饋" class="slide level2">
+<h2>受控對照：把全資訊標籤換成部分回饋</h2>
+<p>上述設計有一個名實不符之處必須先講明：本研究的交易端<strong>不是強化學習</strong>。 9 個動作的報酬在每個歷史配對期上都能精確反事實回算，模型拿到的是完整答案卷， 學習形式為<strong>全資訊監督回歸</strong>（MLP + MSE，決策取 <span class="math inline">\arg\max</span>），既無探索問題、 亦無序列信用分配。沿用 <code>DRL</code> 一詞僅因其為 <code>result.db</code> 的既有欄位值。 以下稱主要交易端為 <strong>DL-THR</strong>。</p>
+<p>為分離「學習演算法」與「這個問題碰巧是全資訊的」兩件事，本研究另建 <strong>RL-THR</strong> 作為受控對照。它保持動作選單、12 維狀態、網路結構與 walk-forward 切分<strong>逐位元相同</strong> （特徵函式直接引用同一份實作），只改兩處：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">環節</th>
+<th style="text-align: left;">DL-THR</th>
+<th style="text-align: left;">RL-THR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">訓練標籤</td>
+<td style="text-align: left;">9 個動作全部反事實回算</td>
+<td style="text-align: left;"><strong>只有實際選中的那一個</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">損失</td>
+<td style="text-align: left;">全 9 維 MSE</td>
+<td style="text-align: left;"><strong>遮罩 MSE</strong>（僅選中動作的輸出單元收梯度）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">決策</td>
+<td style="text-align: left;">恆 <span class="math inline">\arg\max</span></td>
+<td style="text-align: left;"><strong><span class="math inline">\varepsilon</span>-greedy</strong></td>
+</tr>
+</tbody>
+</table>
+<p>於是 RL-THR 成為真正的部分回饋問題，兩者相減即為<strong>反事實標籤的價值</strong>。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>形式歸屬：contextual bandit，沒有 <span class="math inline">\gamma</span></strong></p>
+</div>
+<div class="callout-content">
+<p>RL-THR 是<strong>情境式拉霸機</strong>而非序貫 MDP。每組配對每期只做一次決策， 且 12 維狀態全部由形成期視窗算出——選哪個門檻<strong>不會改變下一期的狀態</strong>。 沒有狀態轉移就沒有東西可以 bootstrap，硬加折扣因子只是裝飾。 其「RL 性」來自部分回饋與探索／利用權衡（Sutton &amp; Barto, 2018, 第 2 章）， 而非 TD 學習。本研究不宣稱序貫決策。</p>
+<p>真正的序貫版本（逐日定位、<span class="math inline">\gamma</span>=0.99、bootstrapped target）已於三代實作中 系統性證偽，見 §3.4 註與封存紀錄。</p>
+</div>
+</div>
+</div>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>RL-THR 少一項結構性保證，且兩個效應無法分離</strong></p>
+</div>
+<div class="callout-content">
+<p>DL-THR 保證「樣本不足時退回基準 → 暖身期 <span class="math inline">\equiv</span> Z-Score」。RL-THR <strong>無法</strong>如此： 若暖身期一律選基準，其餘八個動作永遠沒有樣本。探索必須從第一期開始。</p>
+<p>因此兩臂的差距同時包含<strong>資訊量</strong>（每期 1 筆觀測 vs 9 筆）與<strong>探索成本</strong> （<span class="math inline">\varepsilon</span> 抽中時實際下單、虧損計入績效）。本設計無法拆解為兩個獨立數字—— 不探索就沒有樣本，這是部分回饋的定義。掃三組 <span class="math inline">\varepsilon</span> （<span class="math inline">0.05</span>、<span class="math inline">0.10</span>、<span class="math inline">0.20\!\to\!0.02</span> 衰減）以界定取捨曲線， 並以<strong>對 bandit 最有利者</strong>作結論，使推論保守。</p>
+</div>
+</div>
+</div>
 </section></section>
 <section>
 <section id="統計檢定方法" class="title-slide slide level1 center">
@@ -2958,15 +3055,18 @@ background: #fff;
         ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
         ['slides/main_results.html',            '主要結果總覽']
       ];
+      // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+      // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
       var APPENDIX = [
-        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+        ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+        ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+        ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+        ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
         ['slides/comparison.html',                         '現役策略績效總比較'],
         ['slides/performance_guide.html',                  '績效指標定義與公式']
       ];

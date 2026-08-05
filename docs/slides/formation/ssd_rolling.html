@@ -4145,6 +4145,8 @@ z-index: 1000;
   <h1 class="title">SSD Rolling</h1>
   <p class="subtitle">形成期策略：Z-Score 標準化對數價格之 SSD 距離配對選取</p>
 
+<div class="quarto-title-authors">
+</div>
 
 </section>
 <section id="策略概述" class="title-slide slide level1 center">
@@ -4222,12 +4224,12 @@ z-index: 1000;
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
-<li>第 2 節配對形成方法——以<strong>標準化價格序列間的距離平方和（SSD）最小</strong>作為配對選取準則</li>
+<li>第 2 節配對形成方法——以<strong>標準化價格序列間的距離平方和（SSD）最小</strong>作為配對排序準則</li>
 <li>形成期／交易期分離的雙階段回測架構（12 個月形成、6 個月交易）</li>
 </ul>
 <p><strong>為何參考</strong>：</p>
 <ul>
-<li>這是配對交易距離法的<strong>開山文獻</strong>，SSD 排序是本策略的核心選取準則，直接沿用其「距離越小 → 歷史走勢越相近 → 越可能存在均衡關係」的邏輯</li>
+<li>這是配對交易距離法的<strong>開山文獻</strong>，SSD 排序是本策略的核心排序準則，直接沿用其「距離越小 → 歷史走勢越相近 → 越可能存在均衡關係」的邏輯</li>
 <li>本策略的形成期 252 日／交易期 126 日視窗設計即對應其 12 個月／6 個月架構</li>
 </ul>
 </section>
@@ -4244,7 +4246,7 @@ z-index: 1000;
 <p><strong>為何參考</strong>：</p>
 <ul>
 <li>SSD 距離只保證「歷史走勢相近」，不保證價差會回歸——必須以共整合檢定確認兩股間存在<strong>統計上的長期均衡關係</strong></li>
-<li>本策略統計過濾第一道的 ADF 檢定（對 OLS 殘差 spread 檢定單根）即為其兩步驟程序的直接實作</li>
+<li>本策略統計篩選第一道的 ADF 檢定（對 OLS 殘差 spread 檢定單根）即為其兩步驟程序的直接實作</li>
 </ul>
 </section>
 <section id="文獻-3krauss-do-huck-2016" class="slide level2">
@@ -4254,12 +4256,12 @@ z-index: 1000;
 </blockquote>
 <p><strong>參考部分</strong>：</p>
 <ul>
-<li>對距離法的系統性檢視：純距離排序選出的配對，其價差<strong>均值回歸強度參差</strong>，需輔以額外統計過濾</li>
+<li>對距離法的系統性檢視：純距離排序選出的配對，其價差<strong>均值回歸強度參差</strong>，需輔以額外統計篩選</li>
 <li><strong>OU（Ornstein-Uhlenbeck）半衰期</strong>與 <strong>Hurst 指數</strong>作為均值回歸品質的量化指標</li>
 </ul>
 <p><strong>為何參考</strong>：</p>
 <ul>
-<li>本策略統計過濾第二道（半衰期範圍限制）與第三道（Hurst &lt; 0.5）的設計依據——確保選出的配對不僅共整合，且<strong>回歸速度落在交易期可實現的時間尺度內</strong></li>
+<li>本策略統計篩選第二道（半衰期範圍限制）與第三道（Hurst &lt; 0.5）的設計依據——確保選出的配對不僅共整合，且<strong>回歸速度落在交易期可實現的時間尺度內</strong></li>
 <li>半衰期上限設為交易期長度的 1/3（126/3 = 42 日），即出自「交易期內須有足夠回歸次數」的原則</li>
 </ul>
 </section>
@@ -4325,8 +4327,8 @@ z-index: 1000;
 <p>組進入統計檢定。</p>
 <p><strong>設計理由</strong>：ADF／半衰期／Hurst 屬於逐對的慢速計算；SSD 最小的候選對才有機會入選最終名單，對距離過遠的配對做完整檢定是無效計算。此初篩把統計檢定次數從 <span class="math inline">O(N^2)</span> 壓到常數規模。</p>
 </section>
-<section id="階段-5三道統計過濾" class="slide level2">
-<h2>階段 5：三道統計過濾</h2>
+<section id="階段-5三道統計篩選" class="slide level2">
+<h2>階段 5：三道統計篩選</h2>
 <p>候選對依 SSD 由小到大逐一檢定，任一道未通過即淘汰。</p>
 <h3 id="第一道adf-共整合檢定依據engle-granger-1987">第一道：ADF 共整合檢定（依據：Engle &amp; Granger 1987）</h3>
 <p>對 spread <span class="math inline">\epsilon_t</span> 做 ADF 單根檢定（<code>_utils._adf_stat</code>，<code>max_lags=1</code>，<code>regression=&quot;n&quot;</code> 無截距無趨勢——因 spread 由標準化序列構成，理論均值即為 0）：</p>
@@ -5633,6 +5635,108 @@ window.QuartoSupport = function () {
         ]
       });
     </script>
+    <!-- deck-nav:start — 投影片頁首導覽（首頁／附錄／上一頁／下一頁）
+         由 notebooks/_quarto.yml 的 include-after-body 注入；
+         已渲染的舊 HTML 由 tools/inject_deck_nav.py 補上同一段。 -->
+    <style>
+.deck-nav {
+position: fixed;
+top: 0.55rem;
+right: 0.7rem;
+z-index: 60;
+display: flex;
+gap: 0.35rem;
+align-items: center;
+font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+font-size: 13px;
+opacity: 0.4;
+transition: opacity 0.15s;
+}
+.deck-nav:hover { opacity: 1; }
+.deck-nav a {
+display: inline-block;
+max-width: 15em;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+padding: 0.24em 0.7em;
+border: 1px solid rgba(120, 130, 140, 0.35);
+border-radius: 999px;
+background: rgba(255, 255, 255, 0.9);
+color: #2b3137 !important;
+text-decoration: none !important;
+line-height: 1.5;
+}
+.deck-nav a:hover {
+border-color: #0d6efd;
+color: #0d6efd !important;
+background: #fff;
+}
+.deck-nav a.home { font-weight: 600; }
+@media print { .deck-nav { display: none !important; } }
+@media (max-width: 700px) { .deck-nav a { max-width: 7em; } }
+</style>
+    <script>
+    (function () {
+      if (document.querySelector('.deck-nav')) return;              // 避免重複注入
+      if (window.location.search.indexOf('print-pdf') !== -1) return; // 匯出 PDF 時不顯示
+
+      var THESIS = [
+        ['slides/thesis/ch1_introduction.html', '第一章 緒論'],
+        ['slides/thesis/ch2_literature.html',   '第二章 文獻探討'],
+        ['slides/thesis/ch3_methodology.html',  '第三章 研究方法'],
+        ['slides/thesis/ch4_results.html',      '第四章 實證結果'],
+        ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
+        ['slides/main_results.html',            '主要結果總覽']
+      ];
+      // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+      // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
+      var APPENDIX = [
+        ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+        ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+        ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+        ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+        ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
+        ['slides/comparison.html',                         '現役策略績效總比較'],
+        ['slides/performance_guide.html',                  '績效指標定義與公式']
+      ];
+
+      var here = decodeURIComponent(window.location.pathname).split('/').pop();
+      if (!here) return;
+
+      var track = null, idx = -1;
+      [['thesis', THESIS], ['appendix', APPENDIX]].forEach(function (t) {
+        t[1].forEach(function (row, i) {
+          if (row[0].split('/').pop() === here) { track = t[0]; idx = i; }
+        });
+      });
+      if (idx < 0) return;                                          // 不在清單內就不顯示
+
+      var list = track === 'thesis' ? THESIS : APPENDIX;
+      var root = new Array(list[idx][0].split('/').length).join('../');
+
+      function btn(href, text, cls) {
+        var a = document.createElement('a');
+        a.href = root + href;
+        a.textContent = text;
+        if (cls) a.className = cls;
+        return a;
+      }
+
+      var nav = document.createElement('nav');
+      nav.className = 'deck-nav';
+      nav.appendChild(btn('index.html', '⌂ 首頁', 'home'));
+      if (track === 'appendix') nav.appendChild(btn('appendix.html', '附錄'));
+      if (idx > 0) nav.appendChild(btn(list[idx - 1][0], '‹ ' + list[idx - 1][1]));
+      if (idx < list.length - 1) nav.appendChild(btn(list[idx + 1][0], list[idx + 1][1] + ' ›'));
+      document.body.appendChild(nav);
+    })();
+    </script>
+    <!-- deck-nav:end -->
     <script id="quarto-html-after-body" type="application/javascript">
       window.document.addEventListener("DOMContentLoaded", function (event) {
         const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
@@ -5808,103 +5912,4 @@ window.QuartoSupport = function () {
       </script>
     
 
-<!-- deck-nav:start — 投影片頁首導覽（首頁／附錄／上一頁／下一頁）
-     由 notebooks/_quarto.yml 的 include-after-body 注入；
-     已渲染的舊 HTML 由 tools/inject_deck_nav.py 補上同一段。 -->
-<style>
-  .deck-nav {
-    position: fixed;
-    top: 0.55rem;
-    right: 0.7rem;
-    z-index: 60;
-    display: flex;
-    gap: 0.35rem;
-    align-items: center;
-    font-family: "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
-    font-size: 13px;
-    opacity: 0.4;
-    transition: opacity 0.15s;
-  }
-  .deck-nav:hover { opacity: 1; }
-  .deck-nav a {
-    display: inline-block;
-    max-width: 15em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0.24em 0.7em;
-    border: 1px solid rgba(120, 130, 140, 0.35);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.9);
-    color: #2b3137 !important;
-    text-decoration: none !important;
-    line-height: 1.5;
-  }
-  .deck-nav a:hover {
-    border-color: #0d6efd;
-    color: #0d6efd !important;
-    background: #fff;
-  }
-  .deck-nav a.home { font-weight: 600; }
-  @media print { .deck-nav { display: none !important; } }
-  @media (max-width: 700px) { .deck-nav a { max-width: 7em; } }
-</style>
-<script>
-(function () {
-  if (document.querySelector('.deck-nav')) return;              // 避免重複注入
-  if (window.location.search.indexOf('print-pdf') !== -1) return; // 匯出 PDF 時不顯示
-
-  var THESIS = [
-    ['slides/thesis/ch1_introduction.html', '第一章 緒論'],
-    ['slides/thesis/ch2_literature.html',   '第二章 文獻探討'],
-    ['slides/thesis/ch3_methodology.html',  '第三章 研究方法'],
-    ['slides/thesis/ch4_results.html',      '第四章 實證結果'],
-    ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
-    ['slides/main_results.html',            '主要結果總覽']
-  ];
-  var APPENDIX = [
-    ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-    ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-    ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-    ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-    ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-    ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-    ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-    ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
-    ['slides/comparison.html',                         '現役策略績效總比較'],
-    ['slides/performance_guide.html',                  '績效指標定義與公式']
-  ];
-
-  var here = decodeURIComponent(window.location.pathname).split('/').pop();
-  if (!here) return;
-
-  var track = null, idx = -1;
-  [['thesis', THESIS], ['appendix', APPENDIX]].forEach(function (t) {
-    t[1].forEach(function (row, i) {
-      if (row[0].split('/').pop() === here) { track = t[0]; idx = i; }
-    });
-  });
-  if (idx < 0) return;                                          // 不在清單內就不顯示
-
-  var list = track === 'thesis' ? THESIS : APPENDIX;
-  var root = new Array(list[idx][0].split('/').length).join('../');
-
-  function btn(href, text, cls) {
-    var a = document.createElement('a');
-    a.href = root + href;
-    a.textContent = text;
-    if (cls) a.className = cls;
-    return a;
-  }
-
-  var nav = document.createElement('nav');
-  nav.className = 'deck-nav';
-  nav.appendChild(btn('index.html', '⌂ 首頁', 'home'));
-  if (track === 'appendix') nav.appendChild(btn('appendix.html', '附錄'));
-  if (idx > 0) nav.appendChild(btn(list[idx - 1][0], '‹ ' + list[idx - 1][1]));
-  if (idx < list.length - 1) nav.appendChild(btn(list[idx + 1][0], list[idx + 1][1] + ' ›'));
-  document.body.appendChild(nav);
-})();
-</script>
-<!-- deck-nav:end -->
 </body></html>

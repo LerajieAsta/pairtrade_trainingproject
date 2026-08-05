@@ -1041,7 +1041,7 @@ margin-right: 0; }
 
 <section id="title-slide" class="quarto-title-block center">
   <h1 class="title">第一章　緒論</h1>
-  <p class="subtitle">機器學習分群與深度強化學習於 S&amp;P 500 配對交易之實證</p>
+  <p class="subtitle">機器學習分群與深度學習於 S&amp;P 500 配對交易之實證</p>
 
 <div class="quarto-title-authors">
 </div>
@@ -1261,13 +1261,13 @@ margin-right: 0; }
 <p>以 S&amp;P 500 成分股 <strong>2000–2025 年</strong>資料檢驗兩個命題：</p>
 <blockquote>
 <p><strong>命題 1（形成期）</strong>　機器學習分群能建立優於傳統產業分類的配對搜尋空間。</p>
-<p><strong>命題 2（交易期）</strong>　深度強化學習交易端能取得優於傳統 Z-Score 規則的績效。</p>
+<p><strong>命題 2（交易期）</strong>　深度學習交易端能取得優於傳統 Z-Score 規則的績效。</p>
 </blockquote>
 <h3 id="單變因檢定設計">單變因檢定設計</h3>
 <p>採<strong>中性組裝器</strong>架構，將形成期拆解為四個可獨立替換的層 （特徵 → 分組 → 群內排序 → 統計篩選），使任兩策略之間僅存單一變因：</p>
 <ul>
 <li><strong>檢定命題 1</strong>：固定特徵、排序、篩選與交易端，僅變動<strong>分組方法</strong> （HDBSCAN／Agglomerative／K-means／<strong>GICS 產業分類</strong>）</li>
-<li><strong>檢定命題 2</strong>：固定形成期產出的<strong>同一批配對</strong>，僅變動<strong>交易端</strong> （Z-Score 規則／深度強化學習）</li>
+<li><strong>檢定命題 2</strong>：固定形成期產出的<strong>同一批配對</strong>，僅變動<strong>交易端</strong> （Z-Score 規則／深度學習門檻選擇）</li>
 </ul>
 </section>
 <section id="三項方法論目標" class="slide level2">
@@ -1310,7 +1310,7 @@ margin-right: 0; }
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>三　研究方法</strong></td>
-<td style="text-align: left;">資料與 PIT 處理、形成期四層架構、三種分群、DRL 設定、統計方法</td>
+<td style="text-align: left;">資料與 PIT 處理、形成期四層架構、三種分群、DL-THR 設定、統計方法</td>
 <td style="text-align: left;">建立可檢定的設計</td>
 </tr>
 <tr class="even">
@@ -2556,15 +2556,18 @@ background: #fff;
         ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
         ['slides/main_results.html',            '主要結果總覽']
       ];
+      // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+      // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
       var APPENDIX = [
-        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+        ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+        ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+        ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+        ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
         ['slides/comparison.html',                         '現役策略績效總比較'],
         ['slides/performance_guide.html',                  '績效指標定義與公式']
       ];

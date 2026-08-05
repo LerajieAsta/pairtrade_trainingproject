@@ -1308,6 +1308,21 @@ margin-right: 0; }
 <p>朱羿璁 (2025)：結合共整合避險比率與混合獎勵設計，於台灣市場驗證類似架構。</p>
 </blockquote>
 <p><strong>理論吸引力</strong>：不需預測價格，僅需在給定狀態下<strong>選擇門檻</strong>—— 問題結構與強化學習的「狀態—動作—報酬」框架天然契合（Sutton &amp; Barto, 2018）。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>「DRL」一詞在本研究中的兩種所指</strong></p>
+</div>
+<div class="callout-content">
+<p>上述文獻採用的是真正的強化學習：只觀測<strong>所選動作</strong>的報酬，須以探索換取資訊。</p>
+<p>本研究命題 2 的主要交易端 <strong>DL-THR</strong> 並非如此。9 個門檻在每個歷史配對期上的 報酬皆可<strong>精確反事實回算</strong>，學習形式因而是<strong>全資訊監督回歸</strong>（MLP + MSE， 決策取 argmax），既無探索問題、亦無序列信用分配。沿用 <code>DRL</code> 一詞僅因其為 <code>result.db</code> 的既有欄位值，不代表方法歸屬。</p>
+<p>真正的部分回饋版本以 <strong>RL-THR</strong> 另行實作——同一組動作選單、同一組狀態特徵， 僅改為「只觀測所選動作的報酬 + ε-greedy」——作為命題 2 的受控對照， 用以量化反事實標籤本身的價值。</p>
+</div>
+</div>
+</div>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1328,7 +1343,7 @@ margin-right: 0; }
 <p><strong>Do &amp; Faff (2012) 的方法論建議</strong> 估計美股配對交易單邊成本約 <strong>30 個基點</strong>（含佣金與市場衝擊）， 並主張報告 <strong>break-even 成本</strong>——使淨利歸零的成本水準—— 以使結論不依賴單一成本假設。</p>
 <h3 id="本研究與既有文獻的區隔">本研究與既有文獻的區隔</h3>
 <p><strong>一、同一批配對上的單變因對照</strong> 固定形成期產出，僅替換交易端。</p>
-<p><strong>二、增益來源的分解</strong> 既有文獻多僅報告 DRL 是否較優。本研究將 DRL 動作還原後， 分解為「<strong>拒絕交易</strong>」與「<strong>調整門檻</strong>」兩條管道，並對各管道設置對照。</p>
+<p><strong>二、增益來源的分解</strong> 既有文獻多僅報告 DRL 是否較優。本研究將 DL-THR 的動作還原後， 分解為「<strong>拒絕交易</strong>」與「<strong>調整門檻</strong>」兩條管道，並對各管道設置對照。</p>
 <p><strong>三、成本敏感度的量化</strong> 依 Do &amp; Faff (2012) 建議報告 break-even 成本，而非僅在單一假設下比較。</p>
 </section></section>
 <section>
@@ -2594,15 +2609,18 @@ background: #fff;
         ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
         ['slides/main_results.html',            '主要結果總覽']
       ];
+      // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+      // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
       var APPENDIX = [
-        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+        ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+        ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+        ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+        ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
         ['slides/comparison.html',                         '現役策略績效總比較'],
         ['slides/performance_guide.html',                  '績效指標定義與公式']
       ];

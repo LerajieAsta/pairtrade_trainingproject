@@ -1087,7 +1087,7 @@ margin-right: 0; }
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>命題 2</strong></td>
-<td style="text-align: left;"><strong>深度強化學習交易</strong>優於傳統 Z-Score 規則</td>
+<td style="text-align: left;"><strong>深度學習交易端</strong>優於傳統 Z-Score 規則</td>
 <td style="text-align: left;">5 種配對底 × 交易端（交易端為唯一變因）</td>
 <td style="text-align: left;"><strong>獲得支持</strong></td>
 </tr>
@@ -1150,7 +1150,7 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p>交易期則為 <strong>Z-Score 狀態機</strong>（規則型基準）或 <strong>DRL 門檻選擇式</strong>（Kim &amp; Kim 2019 風格）。</p>
+<p>交易期則為 <strong>Z-Score 狀態機</strong>（規則型基準）或 <strong>DL-THR 門檻選擇式</strong>（Kim &amp; Kim 2019 風格）。</p>
 <blockquote>
 <p>此架構使「分組」「排序」「交易端」皆可作為單變因替換，是兩大命題能乾淨對照的前提。 實作正確性以數值回歸測試保證：組裝器復現原生策略的結果為<strong>逐位元相同</strong>。</p>
 </blockquote>
@@ -1180,7 +1180,7 @@ margin-right: 0; }
 <blockquote>
 <p>Avellaneda &amp; Lee (2010). Statistical arbitrage in the U.S. equities market. <em>Quantitative Finance</em>, <strong>10</strong>(7).　📄 Hong &amp; Hwang (2021). In search of pairs using firm fundamentals. <em>EJF</em>, <strong>29</strong>(5).　📄 Kim &amp; Kim (2019). Optimizing the pairs-trading strategy using DRL with trading and stop-loss boundaries. <em>Complexity</em>.　📄</p>
 </blockquote>
-<p>報酬 PCA 因子載荷（Avellaneda &amp; Lee）、基本面配對（Hong &amp; Hwang）、 DRL 門檻選擇式交易（Kim &amp; Kim）。</p>
+<p>報酬 PCA 因子載荷（Avellaneda &amp; Lee）、基本面配對（Hong &amp; Hwang）、 DL-THR 門檻選擇式交易（Kim &amp; Kim）。</p>
 </section></section>
 <section>
 <section id="命題-1機器學習分群-vs-傳統產業分類" class="title-slide slide level1 center">
@@ -1699,9 +1699,9 @@ margin-right: 0; }
 </blockquote>
 </section></section>
 <section>
-<section id="命題-2深度強化學習交易-vs-z-score" class="title-slide slide level1 center">
-<h1>命題 2：深度強化學習交易 vs Z-Score</h1>
-<p><strong>設計</strong>：<strong>固定形成期配對</strong>，僅將交易端由 Z-Score 換成 DRL 門檻選擇式。 配對底涵蓋三種 ML 分群與<strong>傳統 GICS 分組</strong>，以檢驗增益是否依賴特定配對來源。</p>
+<section id="命題-2深度學習交易端-vs-z-score" class="title-slide slide level1 center">
+<h1>命題 2：深度學習交易端 vs Z-Score</h1>
+<p><strong>設計</strong>：<strong>固定形成期配對</strong>，僅將交易端由 Z-Score 換成 DL-THR 門檻選擇式。 配對底涵蓋三種 ML 分群與<strong>傳統 GICS 分組</strong>，以檢驗增益是否依賴特定配對來源。</p>
 <p>同參數網格逐格配對檢定（<span class="math inline">n = 15</span>）：</p>
 <table class="caption-top">
 <thead>
@@ -1710,7 +1710,7 @@ margin-right: 0; }
 <th style="text-align: center;">ΔSharpe</th>
 <th style="text-align: center;">勝格數</th>
 <th style="text-align: center;"><span class="math inline">p</span></th>
-<th style="text-align: center;">最佳年化（Z → DRL）</th>
+<th style="text-align: center;">最佳年化（Z → DL-THR）</th>
 </tr>
 </thead>
 <tbody>
@@ -1751,14 +1751,14 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p><strong>五種配對底全部顯著改善</strong>（<span class="math inline">p &lt; 0.01</span>）。 增益最大者為傳統 GICS 分組——<strong>DRL 的價值不依賴機器學習分群</strong>。</p>
+<p><strong>五種配對底全部顯著改善</strong>（<span class="math inline">p &lt; 0.01</span>）。 增益最大者為傳統 GICS 分組——<strong>DL-THR 的價值不依賴機器學習分群</strong>。</p>
 <p><strong>穩健性</strong>（15 格中 Sharpe 為正者）：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
 <th style="text-align: left;">配對底</th>
 <th style="text-align: center;">Z-Score</th>
-<th style="text-align: center;">→ DRL</th>
+<th style="text-align: center;">→ DL-THR</th>
 </tr>
 </thead>
 <tbody>
@@ -1785,18 +1785,103 @@ margin-right: 0; }
 </tbody>
 </table>
 </section>
-<section id="命題-2-的三個發現" class="slide level2">
-<h2>命題 2 的三個發現</h2>
-<p><strong>1. 增益普適於所有配對底，包含傳統分組</strong> 五種配對底（3 種 ML 分群 + 2 種 GICS 排序組合）疊加 DRL 後全部顯著改善， 逐日 bootstrap <span class="math inline">p</span> 值介於 0.0000 ~ 0.0042。<strong>傳統 GICS × SSD 底的增益最大 （年化 +1.066 pp，<span class="math inline">p</span> = 0.0014）</strong>，顯示 DRL 交易端是一個與配對來源正交的獨立改良—— 此普適性比僅在 ML 配對底上驗證更強。</p>
-<p><strong>2. DRL 大幅提升參數穩健性</strong> GICS × SSD 底的正 Sharpe 網格數自 5/15 增至 13/15。 DRL 為每組配對每期自選門檻，等同於將原本需人工調校的參數交由模型依情境決定， 因而降低對外生參數設定的敏感度。</p>
-<p><strong>3. 增益的來源：三項常見解釋皆已排除（見下節）</strong> DRL 的動作選單含 SKIP 與 8 組門檻，但受控對照顯示增益<strong>既非</strong>拉高進場門檻、 <strong>亦非</strong>篩掉劣質配對、<strong>更非</strong>減少曝險——DRL 的進場次數反而是 Z-Score 的 1.6–1.9 倍。 殘差與「槽位週轉」一致，惟本研究無法直接驗證，列為後續研究。</p>
+<section id="命題-2-的四個發現" class="slide level2">
+<h2>命題 2 的四個發現</h2>
+<p><strong>1. 增益普適於所有配對底，包含傳統分組</strong> 五種配對底（3 種 ML 分群 + 2 種 GICS 排序組合）疊加 DL-THR 後全部顯著改善， 逐日 bootstrap <span class="math inline">p</span> 值介於 0.0000 ~ 0.0042。<strong>傳統 GICS × SSD 底的增益最大 （年化 +1.066 pp，<span class="math inline">p</span> = 0.0014）</strong>，顯示 DL-THR 交易端是一個與配對來源正交的獨立改良—— 此普適性比僅在 ML 配對底上驗證更強。</p>
+<p><strong>2. DL-THR 大幅提升參數穩健性</strong> GICS × SSD 底的正 Sharpe 網格數自 5/15 增至 13/15。 DL-THR 為每組配對每期自選門檻，等同於將原本需人工調校的參數交由模型依情境決定， 因而降低對外生參數設定的敏感度。</p>
+<p><strong>3. 增益的來源：三項行為面解釋皆已排除（見下節）</strong> DL-THR 的動作選單含 SKIP 與 8 組門檻，但受控對照顯示增益<strong>既非</strong>拉高進場門檻、 <strong>亦非</strong>篩掉劣質配對、<strong>更非</strong>減少曝險——DL-THR 的進場次數反而是 Z-Score 的 1.6–1.9 倍。 殘差與「槽位週轉」一致，惟本研究無法直接驗證，列為後續研究。</p>
+<p><strong>4. 增益也不來自「全資訊」這個運氣</strong> 本研究另建 <strong>RL-THR</strong>：同一動作選單、同一 12 維狀態、同一網路與 walk-forward 切分， 僅把訓練標籤縮成「實際選中的那一個」並改採 <span class="math inline">\varepsilon</span>-greedy，使其成為真正的 部分回饋（contextual bandit）。等權口徑下兩臂<strong>無法區分</strong>—— <span class="math inline">\varepsilon</span>=0.10 時 <strong>−0.056 pp、95% CI [−0.42, +0.35]、<span class="math inline">p</span>=0.77</strong>， 三組 <span class="math inline">\varepsilon</span> 一致（−0.06 ~ −0.12 pp）。區間兩端皆遠小於總增益 +0.719 pp， 故為「相當」而非檢定力不足。</p>
 <blockquote>
-<p><strong>DRL 未固定隨機種子</strong>，上表為單次訓練值。三種 ML 配對底的五輪重訓結果見下節。</p>
+<p>配合已證偽的逐日定位動作空間（三代真強化學習，中位 Sharpe −1.1 ~ −2.3）， 失敗與成功兩個方向指向同一結論：<strong>關鍵是動作空間設計，不是訓練方法。</strong></p>
 </blockquote>
+<blockquote>
+<p><strong>DL-THR 未固定隨機種子</strong>，上表為單次訓練值。三種 ML 配對底的五輪重訓結果見下節。</p>
+</blockquote>
+</section>
+<section id="反事實標籤值多少錢dl-thr-vs-rl-thr" class="slide level2">
+<h2>反事實標籤值多少錢：DL-THR vs RL-THR</h2>
+<p>配對底 <code>Grid (AGG-SSD)</code>，15 格等權、逐日、循環 block bootstrap（<span class="math inline">n</span>=6,287）。</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 23%">
+<col style="width: 29%">
+<col style="width: 23%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">對照</th>
+<th style="text-align: right;">年化Δ</th>
+<th style="text-align: center;">95% CI (pp)</th>
+<th style="text-align: right;"><span class="math inline">p</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>DL-THR − Z-Score</strong>（參照）</td>
+<td style="text-align: right;"><strong>+0.719 pp</strong></td>
+<td style="text-align: center;">[+0.31, +1.17]</td>
+<td style="text-align: right;"><strong>0.0020</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">RL-THR (<span class="math inline">\varepsilon</span>=0.05) − Z-Score</td>
+<td style="text-align: right;">+0.600 pp</td>
+<td style="text-align: center;">[+0.02, +1.33]</td>
+<td style="text-align: right;">0.0684</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>RL-THR (<span class="math inline">\varepsilon</span>=0.10) − Z-Score</strong></td>
+<td style="text-align: right;"><strong>+0.662 pp</strong></td>
+<td style="text-align: center;">[+0.11, +1.37]</td>
+<td style="text-align: right;"><strong>0.0369</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">RL-THR (<span class="math inline">\varepsilon</span>=0.20→0.02) − Z-Score</td>
+<td style="text-align: right;">+0.629 pp</td>
+<td style="text-align: center;">[+0.05, +1.35]</td>
+<td style="text-align: right;">0.0579</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">RL-THR (<span class="math inline">\varepsilon</span>=0.05) − DL-THR</td>
+<td style="text-align: right;">−0.118 pp</td>
+<td style="text-align: center;">[−0.54, +0.32]</td>
+<td style="text-align: right;">0.5816</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>RL-THR (<span class="math inline">\varepsilon</span>=0.10) − DL-THR</strong></td>
+<td style="text-align: right;"><strong>−0.056 pp</strong></td>
+<td style="text-align: center;"><strong>[−0.42, +0.35]</strong></td>
+<td style="text-align: right;"><strong>0.7736</strong></td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">RL-THR (<span class="math inline">\varepsilon</span>=0.20→0.02) − DL-THR</td>
+<td style="text-align: right;">−0.089 pp</td>
+<td style="text-align: center;">[−0.52, +0.34]</td>
+<td style="text-align: right;">0.6902</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>兩個報告口徑給出相反的答案</strong></p>
+</div>
+<div class="callout-content">
+<p>改報<strong>最佳格</strong>（五輪獨立重跑）：DL-THR 中位年化 <strong>2.387%</strong>［2.341, 2.649］ vs RL-THR <span class="math inline">\varepsilon</span>=0.10 的 <strong>2.107%</strong>［1.985, 2.192］—— <strong>五輪全勝且全距完全不重疊</strong>。</p>
+<p>不矛盾：best-of-15 放大微小而系統性的優勢（資訊量九倍的一臂更<strong>可靠地</strong>產出好的 極大值），等權組合把這個選擇效應平均掉。本研究一律以等權為口徑，故結論取「相當」。</p>
+<p><strong>這是報告口徑重要性的具體實例：同一份資料在最佳格口徑下會支持相反的結論。</strong></p>
+</div>
+</div>
+</div>
+<p><strong>限制</strong>　RL-THR 對 Z-Score 的顯著性較脆弱（另兩組 <span class="math inline">\varepsilon</span> 僅 0.058 / 0.068）； 且差距同時含「資訊量僅 1/9」與「探索成本」，本設計無法分離——不探索就沒有樣本。</p>
+<p>腳本：<code>python -m analysis.prop2_label_information</code></p>
 </section>
 <section id="命題-2-的重訓穩健性五輪獨立訓練" class="slide level2">
 <h2>命題 2 的重訓穩健性（五輪獨立訓練）</h2>
-<p>DRL 網路未固定隨機種子，每輪重新訓練。下表為五輪各自取網格最佳後的跨輪統計。</p>
+<p>DL-THR 網路未固定隨機種子，每輪重新訓練。下表為五輪各自取網格最佳後的跨輪統計。</p>
 <table class="caption-top">
 <colgroup>
 <col style="width: 21%">
@@ -1842,14 +1927,14 @@ margin-right: 0; }
 <p><strong>為何必須報告變異數</strong></p>
 </div>
 <div class="callout-content">
-<p>Agglomerative 底的單次訓練值為 <strong>2.65%</strong>，恰為其五輪範圍的<strong>上界</strong>； 其中位數 2.39% 低於 HDBSCAN 底的 2.46%。 若僅報告單次結果，將得出「Agglomerative 底的 DRL 表現最佳」之結論， 而該結論<strong>無法在重訓下複現</strong>。</p>
+<p>Agglomerative 底的單次訓練值為 <strong>2.65%</strong>，恰為其五輪範圍的<strong>上界</strong>； 其中位數 2.39% 低於 HDBSCAN 底的 2.46%。 若僅報告單次結果，將得出「Agglomerative 底的 DL-THR 表現最佳」之結論， 而該結論<strong>無法在重訓下複現</strong>。</p>
 <p>跨策略比較一律以中位數為準；範圍寬度本身亦為一項結果指標 （反映該配對底提供的學習訊號穩定性）。</p>
 </div>
 </div>
 </div>
 </section>
-<section id="drl-學到了什麼決策行為解析" class="slide level2">
-<h2>DRL 學到了什麼：決策行為解析</h2>
+<section id="dl-thr-學到了什麼決策行為解析" class="slide level2">
+<h2>DL-THR 學到了什麼：決策行為解析</h2>
 <p>動作選擇未落庫，但可由 <code>trade_logs</code> 完整還原 （SKIP → 全期 <code>HOLD_CASH (SKIP)</code>；entry_z → 進場列的 <span class="math inline">\min|Z|</span>）。 下表取每策略 TOP N 最大之網格（樣本最充足）。</p>
 <p><strong>決策分布</strong>（動作選單 <span class="math inline">entry_z \in \{1.5, 2.0, 2.5, 3.0\}</span>，靜態基準 2.0）：</p>
 <table class="caption-top">
@@ -1898,7 +1983,7 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p><strong>增益來源分解</strong>（DRL − Z-Score 總損益差，逐配對拆解）：</p>
+<p><strong>增益來源分解</strong>（DL-THR − Z-Score 總損益差，逐配對拆解）：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -1938,17 +2023,17 @@ margin-right: 0; }
 <p><strong>SKIP 並非選擇性技巧</strong></p>
 </div>
 <div class="callout-content">
-<p>被 DRL 跳過的配對，其在 Z-Score 端的虧損比例與留下者<strong>幾乎相同</strong> （Agglomerative 60% vs 60%；HDBSCAN 48% vs 51%；K-means 50% vs 48%）， Mann-Whitney 檢定 <span class="math inline">p</span> = 0.35 ~ 0.93，無一顯著。</p>
+<p>被 DL-THR 跳過的配對，其在 Z-Score 端的虧損比例與留下者<strong>幾乎相同</strong> （Agglomerative 60% vs 60%；HDBSCAN 48% vs 51%；K-means 50% vs 48%）， Mann-Whitney 檢定 <span class="math inline">p</span> = 0.35 ~ 0.93，無一顯著。</p>
 <p>「被跳過者損益為負」不足以證明技巧——配對平均損益本就為負， <strong>隨機棄權同樣會「避開虧損」</strong>。判準須為其損益是否顯著低於留下者。</p>
 </div>
 </div>
 </div>
-<p><strong>結論</strong>：DRL 的價值在於<strong>為每組配對挑選適當的進出場門檻</strong>（62% 的決策偏離靜態基準）， 而非拒絕交易。此結果在獨立資料上支持 Kim &amp; Kim (2019) 的門檻最適化主張， 並量化了該機制的貢獻比重。</p>
+<p><strong>結論</strong>：DL-THR 的價值在於<strong>為每組配對挑選適當的進出場門檻</strong>（62% 的決策偏離靜態基準）， 而非拒絕交易。此結果在獨立資料上支持 Kim &amp; Kim (2019) 的門檻最適化主張， 並量化了該機制的貢獻比重。</p>
 <p><strong>可解釋性的邊界</strong>：門檻選擇與排序名次的 Spearman <span class="math inline">\rho</span> 僅 −0.03 ~ +0.07， 模型並非依循「名次差則提高門檻」之類的簡單規則， 其決策為 12 維形成期特徵的非線性組合，本研究未能進一步歸因。</p>
 </section>
 <section id="命題-2-的假設檢定一相對主張" class="slide level2">
 <h2>命題 2 的假設檢定（一）：相對主張</h2>
-<p><strong><span class="math inline">H_0</span></strong>：DRL 交易端與 Z-Score 交易端的績效相同。</p>
+<p><strong><span class="math inline">H_0</span></strong>：DL-THR 交易端與 Z-Score 交易端的績效相同。</p>
 <p>檢定採<strong>配對設計</strong>——兩者跑在完全相同的配對、期間與參數格上，唯一差異為交易端。 市場崩盤、配對失效、成本衝擊等共同風險在相減後消去， 留下的差異序列僅含「交易端決策」一項變異。此即命題 2 檢定力遠高於絕對檢定的原因。 （附帶效果：無風險利率於兩臂相減時對消，本檢定不受 Sharpe 口徑未扣 rf 的影響。）</p>
 <p><strong>主檢定</strong>：逐日報酬差 + 循環 block bootstrap（<span class="math inline">L</span>=126，10,000 次），6,287 交易日。</p>
 <table class="caption-top">
@@ -2038,7 +2123,7 @@ margin-right: 0; }
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: left;">DRL</td>
+<td style="text-align: left;">DL-THR</td>
 <td style="text-align: right;">+0.48%</td>
 <td style="text-align: center;">[−0.84, +2.16]</td>
 <td style="text-align: right;">0.531</td>
@@ -2052,7 +2137,7 @@ margin-right: 0; }
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: left;">DRL</td>
+<td style="text-align: left;">DL-THR</td>
 <td style="text-align: right;">+0.61%</td>
 <td style="text-align: center;">[−0.90, +2.57]</td>
 <td style="text-align: right;">0.498</td>
@@ -2066,14 +2151,14 @@ margin-right: 0; }
 </tr>
 <tr class="even">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: left;">DRL</td>
+<td style="text-align: left;">DL-THR</td>
 <td style="text-align: right;">+0.15%</td>
 <td style="text-align: center;">[−0.99, +1.48]</td>
 <td style="text-align: right;">0.817</td>
 </tr>
 </tbody>
 </table>
-<p><strong>六個區間全部橫跨零，無一顯著。</strong> 三個 Z-Score 臂點估計皆負、三個 DRL 臂皆正， 且兩臂相減恰為上一節的 Δ 值（Agglomerative：0.484 − (−0.234) = 0.718 ≈ 0.719） → 兩節數字<strong>彼此自洽</strong>。</p>
+<p><strong>六個區間全部橫跨零，無一顯著。</strong> 三個 Z-Score 臂點估計皆負、三個 DL-THR 臂皆正， 且兩臂相減恰為上一節的 Δ 值（Agglomerative：0.484 − (−0.234) = 0.718 ≈ 0.719） → 兩節數字<strong>彼此自洽</strong>。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -2087,7 +2172,7 @@ margin-right: 0; }
 <table class="caption-top">
 <thead>
 <tr class="header">
-<th style="text-align: left;">配對底（DRL 臂）</th>
+<th style="text-align: left;">配對底（DL-THR 臂）</th>
 <th style="text-align: right;">年化 Sharpe</th>
 <th style="text-align: right;">實測 <span class="math inline">t</span></th>
 <th style="text-align: right;">達 <span class="math inline">p&lt;0.05</span> 所需年數</th>
@@ -2119,7 +2204,8 @@ margin-right: 0; }
 </div>
 </div>
 <blockquote>
-<p><strong>附錄的 Deflated Sharpe</strong>：若改報「網格最佳格」，數字較高但內含 15 選 1 的偏誤。 DSR 顯示其縮水幅度——門檻 <span class="math inline">SR_0</span> = 0.415，全部策略最高 <span class="math inline">SR</span> 僅 0.343， DSR 落在 0.10 ~ 0.36，無一通過 0.95。<strong>此表不構成正文的主張。</strong></p>
+<p><strong>附錄的 Deflated Sharpe</strong>：若改報「網格最佳格」，數字較高但內含 15 選 1 的偏誤。 DSR 校正選擇偏誤後<strong>無一通過 0.95</strong>（0/92 個策略族，<span class="math inline">N</span>=104 的試驗宇宙）。 最高者 Grid (GICS-SDP) 的 <span class="math inline">SR</span> = 0.437、<span class="math inline">DSR</span> = 0.609。</p>
+<p>⚠ 注意論證方向：門檻 <span class="math inline">SR_0</span> = 0.384 <strong>低於</strong>最高 <span class="math inline">SR</span> 0.437， 故<strong>不能</strong>以「門檻高於最高 SR」作論據——結論由 DSR 檢定本身承擔。 <strong>此表不構成正文的主張。</strong></p>
 </blockquote>
 </section>
 <section id="兩項檢定為何結論相反" class="slide level2">
@@ -2207,7 +2293,7 @@ margin-right: 0; }
 <td style="text-align: center;">0.35</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">GICS × SSD <strong>+ DRL</strong></td>
+<td style="text-align: left;">GICS × SSD <strong>+ DL-THR</strong></td>
 <td style="text-align: center;"><strong>−0.47</strong></td>
 <td style="text-align: center;"><strong>0.14</strong></td>
 <td style="text-align: center;">0.51</td>
@@ -2223,7 +2309,7 @@ margin-right: 0; }
 <td style="text-align: center;">0.30</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">Agglomerative <strong>+ DRL</strong></td>
+<td style="text-align: left;">Agglomerative <strong>+ DL-THR</strong></td>
 <td style="text-align: center;"><strong>−0.07</strong></td>
 <td style="text-align: center;"><strong>−0.06</strong></td>
 <td style="text-align: center;"><strong>0.77</strong></td>
@@ -2239,7 +2325,7 @@ margin-right: 0; }
 <td style="text-align: center;">0.38</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">HDBSCAN <strong>+ DRL</strong></td>
+<td style="text-align: left;">HDBSCAN <strong>+ DL-THR</strong></td>
 <td style="text-align: center;"><strong>−0.18</strong></td>
 <td style="text-align: center;"><strong>0.10</strong></td>
 <td style="text-align: center;"><strong>0.64</strong></td>
@@ -2255,7 +2341,7 @@ margin-right: 0; }
 <td style="text-align: center;">0.32</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">K-means <strong>+ DRL</strong></td>
+<td style="text-align: left;">K-means <strong>+ DL-THR</strong></td>
 <td style="text-align: center;"><strong>−0.05</strong></td>
 <td style="text-align: center;"><strong>−0.05</strong></td>
 <td style="text-align: center;"><strong>0.47</strong></td>
@@ -2264,8 +2350,8 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p><strong>DRL 在 20 個 regime 格中改善 19 格、持平 1 格、劣化 0 格。</strong> 命題 2 的增益不依賴特定市場環境。</p>
-<p><strong>同時揭露一項策略層面的限制</strong>：配對交易的獲利完全集中於 <strong>高波動（0.43 ~ 0.77）與空頭（0.30 ~ 0.53）</strong> 環境； <strong>平靜期所有策略皆為負 Sharpe</strong>（−0.72 ~ −0.05），DRL 只能減輕虧損而無法反轉。 此與本研究另一項發現一致：損益集中於高分散度期間（附錄 D 的 regime 閘門依據）。</p>
+<p><strong>DL-THR 在 20 個 regime 格中改善 19 格、持平 1 格、劣化 0 格。</strong> 命題 2 的增益不依賴特定市場環境。</p>
+<p><strong>同時揭露一項策略層面的限制</strong>：配對交易的獲利完全集中於 <strong>高波動（0.43 ~ 0.77）與空頭（0.30 ~ 0.53）</strong> 環境； <strong>平靜期所有策略皆為負 Sharpe</strong>（−0.72 ~ −0.05），DL-THR 只能減輕虧損而無法反轉。 此與本研究另一項發現一致：損益集中於高分散度期間（附錄 D 的 regime 閘門依據）。</p>
 </section>
 <section id="成本敏感度break-even-分析" class="slide level2">
 <h2>成本敏感度：Break-even 分析</h2>
@@ -2275,8 +2361,8 @@ margin-right: 0; }
 <tr class="header">
 <th style="text-align: left;">配對底</th>
 <th style="text-align: center;">Z-Score</th>
-<th style="text-align: center;">→ DRL</th>
-<th style="text-align: center;">DRL 提升</th>
+<th style="text-align: center;">→ DL-THR</th>
+<th style="text-align: center;">DL-THR 提升</th>
 </tr>
 </thead>
 <tbody>
@@ -2307,7 +2393,7 @@ margin-right: 0; }
 </tbody>
 </table>
 <p><em>往返 break-even 成本；現行假設為 0.58%（單邊 0.29%，Do &amp; Faff 2012）</em></p>
-<p><strong>DRL 在四種配對底上皆提高成本承受度。</strong> 機制為 SKIP 與較高的進場門檻 共同減少了交易次數，使同樣的毛利分攤在更少的名目額上。</p>
+<p><strong>DL-THR 在四種配對底上皆提高成本承受度。</strong> 機制為 SKIP 與較高的進場門檻 共同減少了交易次數，使同樣的毛利分攤在更少的名目額上。</p>
 <div class="callout callout-warning callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -2348,12 +2434,12 @@ margin-right: 0; }
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>B</strong></td>
-<td style="text-align: left;">篩選消融（有/無三道統計過濾）</td>
+<td style="text-align: left;">篩選消融（有/無三道統計篩選）</td>
 <td style="text-align: left;">篩選貢獻 +0.25 ~ +0.87pp，三種排序下皆為正</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>C</strong></td>
-<td style="text-align: left;">特徵工程消融</td>
+<td style="text-align: left;">特徵層消融</td>
 <td style="text-align: left;">多尺度動量（−0.94 ~ −2.43pp）、SEC 結構性財報比率（±0.22pp 噪音範圍）皆無助益</td>
 </tr>
 <tr class="even">
@@ -2386,6 +2472,11 @@ margin-right: 0; }
 <td style="text-align: left;">參數敏感性</td>
 <td style="text-align: left;">ADF 門檻 0.01 / 0.05 / 0.1 對照，說明本研究採 0.05 的實證依據</td>
 </tr>
+<tr class="even">
+<td style="text-align: left;"><strong>J</strong></td>
+<td style="text-align: left;">反事實標籤的價值</td>
+<td style="text-align: left;"><code>analysis/prop2_label_information.py</code>：RL-THR（部分回饋 + ε-greedy）vs DL-THR（全資訊監督），等權口徑下相當</td>
+</tr>
 </tbody>
 </table>
 </section>
@@ -2407,24 +2498,25 @@ margin-right: 0; }
 <p>1b. <strong>貫穿命題 1 的核心發現：「選哪些配對」在極大範圍內不影響報酬。</strong> 跨產業配對比例在六種設定下自 <strong>0%（GICS）到 75%（不分組）</strong>，涵蓋 one-hot 權重、 插補方式、特徵集、分組方式四個維度，而 2012+ 績效全部落在 <strong>−1.9% ~ −0.9%、 彼此無顯著差異</strong>。此結論比「ML 分群無效」更強——它指向報酬由配對選擇以外的 因素決定（交易成本、市場效率、或此策略類別自 2000 年代起的報酬衰減）。</p>
 <p>1c. <strong>方法論發現：產業中位數插補是先前未被計入的第三條產業資訊管道。</strong> <code>impute_by_group</code> 對缺失值填產業中位數；結構性特徵在 2012+ 缺失 30–50%， 故等同為缺資料的股票加上產業標籤。固定特徵、僅改插補方式，AGG-STRUCT 的 跨產業配對比例即自 15.7% 升至 59.3%（+42.8pp），而 BASE 臂僅 +7.0pp。 已封存的 F09 結構性特徵消融因此是在「處理幾乎未施加」下執行；經全域插補重驗， 其「無貢獻」結論<strong>仍成立</strong>，並由弱 null 升級為強 null（3 分群 × BASE/STRUCT 共 6 組，BH 校正後 0/6 顯著）。</p>
 <ol start="2" type="1">
-<li><p><strong>命題 2 獲得支持</strong>：DRL 交易端在<strong>五種配對底</strong>上皆顯著優於 Z-Score （逐日 HAC <span class="math inline">p</span> = 0.0002 ~ 0.0177，block bootstrap 一致）， 且增益最大者為傳統 GICS 分組——此改良與配對來源正交，不依賴機器學習分群。</p></li>
-<li><p><strong>增益具 regime 穩健性與成本穩健性</strong>：DRL 在 20 個市場環境分層中改善 19 格、 劣化 0 格；並在四種配對底上皆提高往返 break-even 成本（最高 0.708%）。</p></li>
-<li><p><strong>增益機制：三項替代解釋已排除</strong>。受控對照顯示增益非源自拉高門檻 （同門檻 2.2 對照下五支仍顯著，門檻管道僅複製 4.2–20.9% 且不顯著）、 非源自篩掉劣質配對（SKIP 置換檢定 75 格僅 7 格顯著，隨機期望 3.75 格）、 非源自減少曝險（DRL 進場次數為 Z-Score 的 1.6–1.9 倍）。 殘差與槽位週轉一致，惟無法直接驗證。</p></li>
+<li><p><strong>命題 2 獲得支持</strong>：DL-THR 交易端在<strong>五種配對底</strong>上皆顯著優於 Z-Score （逐日 HAC <span class="math inline">p</span> = 0.0002 ~ 0.0177，block bootstrap 一致）， 且增益最大者為傳統 GICS 分組——此改良與配對來源正交，不依賴機器學習分群。</p></li>
+<li><p><strong>增益具 regime 穩健性與成本穩健性</strong>：DL-THR 在 20 個市場環境分層中改善 19 格、 劣化 0 格；並在四種配對底上皆提高往返 break-even 成本（最高 0.708%）。</p></li>
+<li><p><strong>增益機制：四項替代解釋已排除</strong>。受控對照顯示增益非源自拉高門檻 （同門檻 2.2 對照下五支仍顯著，門檻管道僅複製 4.2–20.9% 且不顯著）、 非源自篩掉劣質配對（SKIP 置換檢定 75 格僅 7 格顯著，隨機期望 3.75 格）、 非源自減少曝險（DL-THR 進場次數為 Z-Score 的 1.6–1.9 倍）。 殘差與槽位週轉一致，惟無法直接驗證。 第四項為問題性質而非行為：把全資訊反事實標籤換成真正的部分回饋 （RL-THR，同動作空間、同狀態、<span class="math inline">\varepsilon</span>-greedy），等權口徑下兩臂<strong>相當</strong> （−0.06 pp，95% CI [−0.42, +0.35]，<span class="math inline">p</span>=0.77）→ 增益不來自「這個問題碰巧是全資訊的」。 結合已證偽的逐日定位動作空間，<strong>關鍵是動作空間設計，不是訓練方法</strong>。</p></li>
 <li><p><strong>方法論觀察</strong>：抽樣單位的選擇會改變推論結論。以「參數網格」為觀測單位 構成 pseudo-replication（15 格共用同一條回測路徑），改以時間為單位後， 命題 2 的效果量幾乎不變而顯著性獲得正當基礎，命題 1 的「顯著較差」則消失。</p></li>
 </ol>
 </section>
 <section id="限制" class="slide level2">
 <h2>限制</h2>
 <ul>
-<li><strong>策略之絕對獲利能力未達統計顯著</strong>：Newey-West 檢定最佳 <span class="math inline">p</span> = 0.088、 Deflated Sharpe 最高 0.320（共同門檻 <span class="math inline">SR_0</span> = 0.433 &gt; 最高 <span class="math inline">SR</span> 0.343）。 本研究之結論限於方法間的相對比較，不宣稱策略具可實現之超額報酬</li>
+<li><strong>策略之絕對獲利能力未達統計顯著</strong>：Newey-West 檢定最佳 <span class="math inline">p</span> = 0.088； Deflated Sharpe 在 <span class="math inline">N</span>=104 的試驗宇宙下 <strong>0/92 通過 0.95</strong>，最高者 0.609 （Grid (GICS-SDP)，<span class="math inline">SR</span> = 0.437，共同門檻 <span class="math inline">SR_0</span> = 0.384）。 結論由 DSR 檢定本身承擔，<strong>非</strong>「門檻高於最高 SR」——後者並不成立。 本研究之結論限於方法間的相對比較，不宣稱策略具可實現之超額報酬</li>
 <li><strong>公司特徵僅取得可得子集</strong>：Han et al. 使用 48 動量因子 + 78 公司特徵； 本研究自 SEC XBRL 建出 40 個，僅 10 個通過 70% 覆蓋率門檻（連續維度 7 → 17）。 估值比率（<span class="math inline">bm</span>/<span class="math inline">ep</span>/<span class="math inline">cfp</span>/<span class="math inline">sp</span>/<span class="math inline">dy</span>/<span class="math inline">lev</span>）尚未納入——需市值、市值需未調整股價， 而 Tiingo 免費方案每月上限 500 個代號（774 檔中已取得 495 檔）。 另有 11 個特徵<strong>永遠無法取得</strong>（員工數、Compustat 上市年資、sin 股分類、 可轉債／擔保債旗標、財報公布日 EPS 意外），因 XBRL 未標記或需 Compustat</li>
-<li><strong>命題 1 的檢定力不足</strong>：既無法證明 ML 較優，亦無法主張兩者相當 （單尾 95% 下界 −0.56 ~ −1.44 pp）。結論限於本設定 （混合特徵、S&amp;P 500 大型股）。特徵工程消融（動量、結構性財報比率） 皆為負面結果，但不排除其他特徵設計能表達產業以外的相似性維度而改變結論</li>
+<li><strong>命題 1 的檢定力不足</strong>：既無法證明 ML 較優，亦無法主張兩者相當 （單尾 95% 下界 −0.56 ~ −1.44 pp）。結論限於本設定 （混合特徵、S&amp;P 500 大型股）。特徵層消融（動量、結構性財報比率） 皆為負面結果，但不排除其他特徵設計能表達產業以外的相似性維度而改變結論</li>
 <li><strong>命題 2 的單一設定檢定力不足</strong>：等權組合顯著，但 ML 配對底 15 格中僅 4–5 格能單獨達顯著；面對更保守的固定門檻基準（<span class="math inline">entry_z</span>=2.5）時， 五支中四支退為邊緣顯著（<span class="math inline">p \approx</span> 0.06）</li>
 <li><strong>存活者偏誤未完全消除</strong>：170 檔已下市成分股中 49 檔（29%）無價格資料， 且缺失與下市狀態相關（無價格者 43% 已下市 vs 有價格者 17%）。 方向上使絕對績效被高估（故絕對結論偏保守）、對相對比較則同向抵銷</li>
-<li>DRL 未固定隨機種子（已改以五輪中位數±範圍報告）； 五輪對估計中位數尚屬有限，變異數本身的信賴區間未予量化</li>
-<li>DRL 的門檻選擇無法歸因至可解釋的簡單規則，模型內部決策依據仍為黑箱</li>
+<li>DL-THR 未固定隨機種子（已改以五輪中位數±範圍報告）； 五輪對估計中位數尚屬有限，變異數本身的信賴區間未予量化</li>
+<li>DL-THR 的門檻選擇無法歸因至可解釋的簡單規則，模型內部決策依據仍為黑箱</li>
+<li><strong>RL-THR 對照的兩項限制</strong>：其自身對 Z-Score 的顯著性較脆弱 （<span class="math inline">\varepsilon</span>=0.10 達 <span class="math inline">p</span>=0.037，另兩組僅 0.058 / 0.068 為邊緣）， 故可主張「兩臂相當」而非「bandit 同樣顯著優於基準」；且兩臂差距同時含 「資訊量僅 1/9」與「探索成本」，本設計無法分離——不探索就沒有樣本。 對照僅在單一配對底、單一訓練輪的逐日序列上執行</li>
 <li><strong>成本餘裕極薄</strong>：最佳策略往返 break-even 僅 0.708%，較現行假設 0.58% 高出 22%； 且該假設取自 Do &amp; Faff (2012) 對 1962–2009 的估計，套用於 2000–2025</li>
-<li><strong>獲利集中於特定市場環境</strong>：平靜期所有策略皆為負 Sharpe（−0.72 ~ −0.05）， 獲利完全來自高波動與空頭環境；DRL 可減輕平靜期虧損但無法反轉</li>
+<li><strong>獲利集中於特定市場環境</strong>：平靜期所有策略皆為負 Sharpe（−0.72 ~ −0.05）， 獲利完全來自高波動與空頭環境；DL-THR 可減輕平靜期虧損但無法反轉</li>
 <li>樣本限於 S&amp;P 500 大型股，結論未必外推至中小型股或其他市場</li>
 </ul>
 
@@ -3639,15 +3731,18 @@ background: #fff;
         ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
         ['slides/main_results.html',            '主要結果總覽']
       ];
+      // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+      // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
       var APPENDIX = [
-        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+        ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+        ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+        ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+        ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
         ['slides/comparison.html',                         '現役策略績效總比較'],
         ['slides/performance_guide.html',                  '績效指標定義與公式']
       ];

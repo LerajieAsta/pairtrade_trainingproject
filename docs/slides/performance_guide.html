@@ -1041,7 +1041,7 @@ margin-right: 0; }
 
 <section id="title-slide" class="quarto-title-block center">
   <h1 class="title">績效指標與評估方法說明</h1>
-  <p class="subtitle">Dashboard 所有績效指標的定義、基準與統計檢定；ML/DL 特徵與訓練資料</p>
+  <p class="subtitle">本研究所有指標與統計檢定的單一權威定義來源；含 ML/DL 特徵與訓練資料</p>
 
 <div class="quarto-title-authors">
 </div>
@@ -1049,7 +1049,8 @@ margin-right: 0; }
 </section>
 <section id="導言" class="title-slide slide level1 center">
 <h1>導言</h1>
-<p>本文件說明 Streamlit 績效比對儀表板與 回測結果資料庫 中 所有績效指標的<strong>定義、計算口徑與判讀基準</strong>，並記載機器學習／深度學習策略所使用的 <strong>特徵與訓練資料</strong>及完整執行步驟。所有文獻依據以 APA 第 7 版格式列於文末。</p>
+<p>本文件是本研究<strong>所有績效指標與統計檢定的單一權威定義來源</strong>—— 儀表板、<code>comparison.ipynb</code>、論文第四章引用的每一個數字，其定義都在這裡。 凡本文件與他處敘述不一致者，以本文件為準。</p>
+<p>每項檢定一律以五欄說明：<strong>公式 │ 虛無假設 │ 為何選它 │ 判讀門檻 │ 限制</strong>。</p>
 <p><strong>回測共同設定</strong>：S&amp;P 500 歷史成分股（Tiingo，2000–2025，動態成分股名冊避免存活者偏差）； 形成期 252 交易日、交易期 126 交易日、滾動步長 21 日；初始資本 $10,000； 單邊交易成本 <strong>0.29%</strong>（進場、出場各按部位名目額扣一次，故每配對一完整往返 ≈ 0.58%）， 依 Do 與 Faff（2012）對美股配對交易單邊成本約 30 bps 之估計。</p>
 </section>
 
@@ -1116,41 +1117,83 @@ margin-right: 0; }
 </section></section>
 <section id="風險調整後指標" class="title-slide slide level1 center">
 <h1>風險調整後指標</h1>
-<p>以每日報酬 <span class="math inline">r_t = \Delta_t / E_{t-1}</span> 計算（<span class="math inline">E_{t-1}</span> 為前一日權益）。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>報酬口徑：一律複利（除以<strong>前一日權益</strong>）</strong></p>
+</div>
+<div class="callout-content">
+<p><span class="math display">r_t = \frac{\Delta_t}{E_{t-1}}, \qquad E_t = C_0 + \sum_{s \le t}\Delta_s</span></p>
+<p>分母是<strong>前一日權益</strong>而非固定的初始資本 <span class="math inline">C_0</span>。這是引擎實際的行為—— <code>portfolio_manager.allocate_capital</code> 以 <code>current_equity / max_pairs</code> 決定部位規模， 承擔風險的資本本來就隨權益走。</p>
+<p>此口徑由 <code>strategies/returns.py</code> 單一提供，全部下游分析共用； 另有兩項規則一併由該模組負責：</p>
+<ul>
+<li><strong>生命期</strong>：序列的起訖由該策略自己的首末交易日界定，<strong>上線前不補零</strong> （晚上線的策略族若被補零，<span class="math inline">|</span>Sharpe<span class="math inline">|</span> 會被稀釋約 <span class="math inline">\sqrt{\text{生命期}/\text{全期}}</span>）</li>
+<li><strong>跨策略對齊</strong>：預設取生命期<strong>交集</strong>；重疊不足時拋錯，不靜默補零</li>
+</ul>
+</div>
+</div>
+</div>
 <table class="caption-top">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>指標</th>
 <th>公式</th>
-<th>判讀基準</th>
+<th>為何選它</th>
+<th>判讀門檻</th>
+<th>限制</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>Sharpe</strong></td>
-<td><span class="math inline">\sqrt{252}\cdot \bar r / \sigma_r</span></td>
-<td>&gt;1 佳、&gt;0.5 可、&lt;0 劣（年化，<span class="math inline">r_f</span> 已於權益法內含）</td>
+<td><span class="math inline">\sqrt{252}\,\bar r / \sigma_r</span></td>
+<td>風險調整報酬的通用尺度；<strong>尺度不變</strong>，故不受資金規模影響</td>
+<td>&gt;1 佳、&gt;0.5 具實務意義、&lt;0 劣</td>
+<td>以全部波動為風險，對稱看待上下行；閒置現金日會稀釋</td>
 </tr>
 <tr class="even">
-<td><strong>Calmar</strong></td>
-<td>年化報酬 / |MDD|</td>
-<td>&gt;0.5 佳；衡量報酬相對最大回撤</td>
+<td><strong>Sortino</strong></td>
+<td><span class="math inline">\sqrt{252}\,\bar r / \sigma_r^{-}</span>，其中 <span class="math inline">\sigma_r^{-} = \sqrt{\frac{1}{n}\sum_t \min(r_t, 0)^2}</span>（下行標準差）</td>
+<td>只以<strong>下行</strong>波動為風險——上漲的波動不該被罰</td>
+<td>通常高於同策略 Sharpe；&gt;1 佳</td>
+<td>下行樣本較少故估計較不穩；跨策略比較需同樣本長度</td>
 </tr>
 <tr class="odd">
+<td><strong>Calmar</strong></td>
+<td>年化報酬 / |MDD|</td>
+<td>以「最壞情況」而非平均波動衡量風險，貼近實務可承受度</td>
+<td>&gt;0.5 佳</td>
+<td>由<strong>單一</strong>極端事件決定，樣本外極不穩定</td>
+</tr>
+<tr class="even">
 <td><strong>Max Drawdown（MDD）</strong></td>
-<td><span class="math inline">\min_t (E_t - \max_{s\le t}E_s)/\max_{s\le t}E_s</span></td>
+<td><span class="math inline">\min_t \dfrac{E_t - \max_{s\le t}E_s}{\max_{s\le t}E_s}</span></td>
+<td>直接回答「最多虧過多少」</td>
 <td>越接近 0 越好（負值）</td>
+<td>與樣本長度正相關，長樣本天然更差</td>
+</tr>
+<tr class="odd">
+<td><strong>Information Ratio</strong></td>
+<td><span class="math inline">\sqrt{252}\,\bar d / \sigma_d</span>，<span class="math inline">d_t</span> 為對基準的逐日報酬差</td>
+<td>衡量<strong>相對</strong>基準的增益效率；同樣尺度不變</td>
+<td>&gt;0.5 具意義</td>
+<td>需與基準同期間、同配對底才可解讀</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Sharpe（Active Days Only）</strong>：儀表板提供切換，僅計入「有持倉日」的報酬， 排除閒置現金日對波動的稀釋，與 buy-and-hold 的可比性較低但更反映策略活躍期的品質。</p>
 <blockquote>
-<p>Sharpe 判讀沿用 Sharpe（1994）之慣例；配對交易文獻（如 Do 與 Faff, 2010） 於扣費後多落於 0–0.5 區間，故本研究以 <strong>&gt;0.5 為具實務意義</strong>、<strong>顯著 &gt; 基準</strong>為主要目標。</p>
+<p>Sharpe 判讀沿用 Sharpe（1994）；Sortino 依 Sortino 與 Price（1994）。 配對交易文獻（如 Do 與 Faff, 2010）於扣費後多落於 0–0.5 區間， 故本研究以 <strong>&gt;0.5 為具實務意義</strong>、<strong>顯著 &gt; 基準</strong>為主要目標。</p>
 </blockquote>
 </section>
 
@@ -1204,6 +1247,77 @@ margin-right: 0; }
 </blockquote>
 </section>
 
+<section id="形成期篩選的三道檢定" class="title-slide slide level1 center">
+<h1>形成期篩選的三道檢定</h1>
+<p>篩選層對每組候選配對的價差（spread）依序施加，<strong>任一未過即淘汰</strong>。</p>
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>檢定</th>
+<th>公式</th>
+<th>虛無假設</th>
+<th>為何選它</th>
+<th>判讀門檻</th>
+<th>限制</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>ADF 共整合</strong></td>
+<td>對殘差 <span class="math inline">\epsilon_t</span> 估 <span class="math inline">\Delta\epsilon_t = \lambda\epsilon_{t-1} + \dots</span>，檢定 <span class="math inline">\lambda = 0</span></td>
+<td><span class="math inline">H_0</span>：殘差<strong>含單根</strong>（不共整合）</td>
+<td>Engle 與 Granger（1987）兩步驟法的第二步；價差若非定態，「會回歸」的前提就不成立</td>
+<td><span class="math inline">p &lt; 0.05</span>（本研究基準；敏感度另試 0.01/0.10）</td>
+<td>對短樣本檢定力低；避險比率 <span class="math inline">\beta</span> 是估出來的，未計入其估計誤差</td>
+</tr>
+<tr class="even">
+<td><strong>OU 半衰期</strong></td>
+<td><span class="math inline">HL = -\ln 2 / \lambda</span>，<span class="math inline">\lambda</span> 取自上式的 AR(1) 係數</td>
+<td>—（非檢定，為篩選條件）</td>
+<td>共整合只說「終會回歸」，沒說<strong>多快</strong>；回歸太慢的配對在 126 日交易期內無法變現</td>
+<td><span class="math inline">1 \le HL \le 42</span> 日（上限 = 交易期 126 日的 <span class="math inline">1/3</span>）</td>
+<td>AR(1) 為 OU 過程的離散近似；<span class="math inline">HL</span> 估計對樣本區間敏感</td>
+</tr>
+<tr class="odd">
+<td><strong>Hurst 指數</strong></td>
+<td><span class="math inline">H</span> 取自 R/S 統計量對尺度的對數斜率</td>
+<td>—（非檢定，為篩選條件）</td>
+<td>與 ADF 互補：ADF 看定態與否，<span class="math inline">H</span> 看<strong>趨勢 vs 均值回歸傾向</strong></td>
+<td><span class="math inline">H &lt; 0.5</span>（<span class="math inline">0.5</span> = 隨機漫步、<span class="math inline">&gt;0.5</span> = 趨勢）</td>
+<td>估計法眾多、結果不一致；短序列偏誤大</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>依據：Engle 與 Granger（1987）；OU 半衰期與 Hurst 的門檻設計依 Krauss 等人（2016）。</p>
+</blockquote>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>排序與篩選的施行次序依後端而異</strong></p>
+</div>
+<div class="callout-content">
+<ul>
+<li><strong>SSD 後端</strong>（<code>ssd_rolling.py</code>）：先按 SSD 排序 → 取前 <span class="math inline">\max(200,\ \text{Top}N\times15)</span> 為候選 → <strong>依距離順序</strong>逐一檢定 → 湊滿 <span class="math inline">\text{Top}N\times5</span> 即停 → 再排序取前 <span class="math inline">N</span></li>
+<li><strong>DTW／SSD-DTW-PCA 後端</strong>（<code>DTW_Cointegration_Paper.py</code>）：群內<strong>全配對</strong>逐一檢定 （無候選上限）→ 才排序取前 <span class="math inline">N</span></li>
+</ul>
+<p>兩者的<strong>共同</strong>後果是：候選池不足時，系統會被迫接受距離更遠的配對。 但 SSD 路徑另有候選上限與提前中止，兩者不可互相引用其細節。</p>
+</div>
+</div>
+</div>
+</section>
+
 <section>
 <section id="統計檢定基準t-檢定" class="title-slide slide level1 center">
 <h1>統計檢定基準（T 檢定）</h1>
@@ -1247,7 +1361,7 @@ margin-right: 0; }
 </tbody>
 </table>
 <blockquote>
-<p><strong>基準策略的選定</strong>：命題 1（形成法）以 <strong>SSD Rolling</strong>（距離／共整合家族基準）為對照； 命題 2（交易法）以<strong>同一組配對的 Z-Score 回歸基準</strong>為對照（DRL／距離策略借用相同形成期 配對，構成單變因對照）。因此正的且顯著的 t 值代表「該創新相對基準的淨增量貢獻」。 逐月配對檢定與 Newey-West 修正為資產定價實證的標準做法（Newey &amp; West, 1987）。</p>
+<p><strong>基準策略的選定</strong>：命題 1（形成法）以 <strong>SSD Rolling</strong>（距離／共整合家族基準）為對照； 命題 2（交易法）以<strong>同一組配對的 Z-Score 回歸基準</strong>為對照（DL-THR／距離策略借用相同形成期 配對，構成單變因對照）。因此正的且顯著的 t 值代表「該創新相對基準的淨增量貢獻」。 逐月配對檢定與 Newey-West 修正為資產定價實證的標準做法（Newey &amp; West, 1987）。</p>
 </blockquote>
 <div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
@@ -1264,12 +1378,253 @@ margin-right: 0; }
 </div>
 </section></section>
 <section>
+<section id="論文正文的推論工具" class="title-slide slide level1 center">
+<h1>論文正文的推論工具</h1>
+<p>上一節是<strong>儀表板</strong>的逐月 t 檢定。論文第四章的主檢定另成一套，定義如下。</p>
+</section>
+<section id="主檢定逐日報酬差-循環-block-bootstrap" class="slide level2">
+<h2>主檢定：逐日報酬差 + 循環 block bootstrap</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>公式</strong></td>
+<td>對策略 A、B 在共同交易日上取 <span class="math inline">d_t = r^A_t - r^B_t</span>；以區塊長度 <span class="math inline">L = 126</span> 對 <span class="math inline">d_t</span> <strong>循環</strong>重抽 10,000 次，得 <span class="math inline">\bar d</span> 的經驗分布</td>
+</tr>
+<tr class="even">
+<td><strong>虛無假設</strong></td>
+<td><span class="math inline">H_0:\ \mathbb{E}[d_t] = 0</span></td>
+</tr>
+<tr class="odd">
+<td><strong>為何選它</strong></td>
+<td>逐日報酬有序列自相關與異質變異，i.i.d. 假設不成立。區塊重抽保留區塊內的相依結構；<strong>循環</strong>版本使每個觀測被抽中的機率相等，消除端點偏誤（Politis &amp; Romano, 1992）。無母數，不需常態假設</td>
+</tr>
+<tr class="even">
+<td><strong>判讀門檻</strong></td>
+<td>雙尾 <span class="math inline">p &lt; 0.05</span>；同時報告 95% 信賴區間</td>
+</tr>
+<tr class="odd">
+<td><strong>限制</strong></td>
+<td><span class="math inline">L</span> 的選擇是判斷而非事實（本研究取 <span class="math inline">L</span> = 交易期長度）；區塊過短會低估相依、過長則有效樣本數銳減</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="對照newey-west-hac" class="slide level2">
+<h2>對照：Newey-West HAC</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>公式</strong></td>
+<td><span class="math inline">t = \bar d\,/\,\mathrm{SE}_{\text{HAC}}</span>，<span class="math inline">\mathrm{SE}_{\text{HAC}}</span> 依 Newey 與 West（1987）以 Bartlett 核加權自相關項</td>
+</tr>
+<tr class="even">
+<td><strong>虛無假設</strong></td>
+<td>同上</td>
+</tr>
+<tr class="odd">
+<td><strong>為何選它</strong></td>
+<td>資產定價實證的標準做法，與 block bootstrap 互為佐證；兩者結論一致時推論更可信</td>
+</tr>
+<tr class="even">
+<td><strong>判讀門檻</strong></td>
+<td>落後階數取 <span class="math inline">\lfloor 4(n/100)^{2/9}\rfloor</span> 或固定 3（儀表板）</td>
+</tr>
+<tr class="odd">
+<td><strong>限制</strong></td>
+<td>仍依賴漸近常態；小樣本下標準誤偏低、t 值偏大</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="多重檢定校正benjamini-hochberg-fdr" class="slide level2">
+<h2>多重檢定校正：Benjamini-Hochberg FDR</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>公式</strong></td>
+<td>將 <span class="math inline">m</span> 個 <span class="math inline">p</span> 值升冪排序，取最大的 <span class="math inline">k</span> 使 <span class="math inline">p_{(k)} \le \frac{k}{m}q</span>；校正後 <span class="math inline">p^{adj}_{(i)} = \min_{j \ge i}\left(\frac{m}{j}p_{(j)}\right)</span></td>
+</tr>
+<tr class="even">
+<td><strong>虛無假設</strong></td>
+<td>各對照的 <span class="math inline">H_0</span> 同時檢定</td>
+</tr>
+<tr class="odd">
+<td><strong>為何選它</strong></td>
+<td>命題 1 涉及 9 組對照。Bonferroni 控制 FWER 過於保守、在探索性研究中檢定力太低；BH 控制<strong>偽發現率</strong>，是此情境的慣例（Benjamini &amp; Hochberg, 1995）</td>
+</tr>
+<tr class="even">
+<td><strong>判讀門檻</strong></td>
+<td><span class="math inline">q = 0.05</span>；一律同時報告原始與校正後 <span class="math inline">p</span></td>
+</tr>
+<tr class="odd">
+<td><strong>限制</strong></td>
+<td>假設檢定間為獨立或正相關；本研究的對照共用同一批價格資料，相依性未經驗證</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="選擇偏誤校正deflated-sharpe-ratio" class="slide level2">
+<h2>選擇偏誤校正：Deflated Sharpe Ratio</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>公式</strong></td>
+<td><span class="math inline">\widehat{SR}_0 = \sqrt{V[\widehat{SR}]}\left[(1-\gamma)\Phi^{-1}\!\left(1-\tfrac{1}{N}\right) + \gamma\,\Phi^{-1}\!\left(1-\tfrac{1}{Ne}\right)\right]</span>（<span class="math inline">\gamma</span> = Euler–Mascheroni 常數）<br><span class="math inline">\widehat{DSR} = \Phi\!\left(\dfrac{(\widehat{SR}-\widehat{SR}_0)\sqrt{T-1}}{\sqrt{1-\hat\gamma_3\widehat{SR}+\frac{\hat\gamma_4-1}{4}\widehat{SR}^2}}\right)</span></td>
+</tr>
+<tr class="even">
+<td><strong>虛無假設</strong></td>
+<td><span class="math inline">H_0</span>：真實 Sharpe <span class="math inline">\le 0</span>，觀察到的高 Sharpe 純由「在 <span class="math inline">N</span> 次試驗中取最大」造成</td>
+</tr>
+<tr class="odd">
+<td><strong>為何選它</strong></td>
+<td>在 <span class="math inline">N</span> 個配置中挑最佳者會系統性高估 Sharpe。DSR 依 <span class="math inline">N</span>、試驗間 Sharpe 變異、報酬偏態與峰態、樣本長度，給出「真實 Sharpe &gt; 0」的機率（Bailey &amp; López de Prado, 2014）</td>
+</tr>
+<tr class="even">
+<td><strong>判讀門檻</strong></td>
+<td><span class="math inline">DSR \ge 0.95</span> 方可宣稱顯著為正</td>
+</tr>
+<tr class="odd">
+<td><strong>限制</strong></td>
+<td>⚠ <strong><span class="math inline">N</span> 是判斷而非事實</strong>——試驗宇宙該涵蓋哪些封存實驗，沒有客觀答案。本研究因此以<strong>全網格等權組合</strong>為主要報告口徑（沒有東西可挑，選擇偏誤自源頭消失），DSR 僅列於附錄。<span class="math inline">N</span> 與試驗間變異在 <code>analysis/regime_cost_dsr_eval.py</code> 中<strong>釘死為常數</strong>並記錄清點日期，否則數字會隨資料庫累積而漂移、論文表無法重現</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="分群穩定度調整蘭德指數ari" class="slide level2">
+<h2>分群穩定度：調整蘭德指數（ARI）</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>公式</strong></td>
+<td><span class="math inline">ARI = \dfrac{RI - \mathbb{E}[RI]}{\max(RI) - \mathbb{E}[RI]}</span>，<span class="math inline">RI</span> 為兩組分群在所有「兩兩配對是否同群」上的一致比例</td>
+</tr>
+<tr class="even">
+<td><strong>虛無假設</strong></td>
+<td>—（非檢定，為相似度量測）</td>
+</tr>
+<tr class="odd">
+<td><strong>為何選它</strong></td>
+<td>群編號本身沒有意義（同一組分群換個編號仍是同一組），故比對「兩兩是否同群」而非標籤本身；ARI 已對隨機一致校正（Hubert &amp; Arabie, 1985）</td>
+</tr>
+<tr class="even">
+<td><strong>判讀門檻</strong></td>
+<td><span class="math inline">1</span> = 完全相同、<span class="math inline">0</span> = 與隨機分派無異</td>
+</tr>
+<tr class="odd">
+<td><strong>限制</strong></td>
+<td>只量測<strong>是否改變</strong>，不量測改變<strong>是否有益</strong>；本研究無「靜態分群」對照組</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="成本穩健性break-even-往返成本" class="slide level2">
+<h2>成本穩健性：Break-even 往返成本</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>公式</strong></td>
+<td>進出場費 <span class="math inline">= \text{friction} \times</span> 名目額，且 <span class="math inline">v_A + v_B = C_{\text{每配對}}</span>，故總費用 <span class="math inline">F_0 = \text{friction}\times C_{\text{每配對}}\times(\text{進場}+\text{出場次數})</span>。單邊 <span class="math inline">c^* = 0.29\% + \dfrac{\text{淨利}}{\sum\text{名目額}}</span>；往返 <span class="math inline">= 2c^*</span></td>
+</tr>
+<tr class="even">
+<td><strong>虛無假設</strong></td>
+<td>—（非檢定，為敏感度分析）</td>
+</tr>
+<tr class="odd">
+<td><strong>為何選它</strong></td>
+<td>Do 與 Faff（2012）的建議：報告「使淨利歸零的成本水準」，使結論不依賴單一成本假設</td>
+</tr>
+<tr class="even">
+<td><strong>判讀門檻</strong></td>
+<td><span class="math inline">c^*_{\text{往返}}</span> 越高於現行假設 0.58% 越穩健</td>
+</tr>
+<tr class="odd">
+<td><strong>限制</strong></td>
+<td>精確可解但假設費用與名目額成固定比例，未計入市場衝擊隨部位規模的非線性</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>報告口徑：一律全網格等權組合</strong></p>
+</div>
+<div class="callout-content">
+<p>一切績效主張與統計檢定，皆以該策略 <strong>15 個參數配置的等權組合</strong>為口徑。 改報「網格最佳格」會內含 15 選 1 的選擇偏誤，必須再以 DSR 之類的程序扣回去—— 而該程序的關鍵參數（試驗數 <span class="math inline">N</span>）是判斷而非事實。 <strong>等權組合沒有東西可挑，選擇偏誤自源頭消失。</strong></p>
+<p><em>例外</em>：regime 分層與 break-even 成本表以最佳格計算—— 二者刻畫風險的<strong>形狀</strong>而非主張績效水準，且最佳格對其論證方向是保守的。</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
 <section id="機器學習與深度學習特徵與訓練資料" class="title-slide slide level1 center">
 <h1>機器學習與深度學習：特徵與訓練資料</h1>
-<p>本研究兩處使用學習方法：<strong>形成期的非監督聚類</strong>（命題 1）與<strong>交易期的門檻選擇</strong>（命題 2）。 以下完整說明各自的特徵、訓練資料與執行步驟。</p>
+<p>本研究兩處使用學習方法：<strong>形成期的非監督式分群</strong>（命題 1）與<strong>交易期的門檻選擇</strong>（命題 2）。 以下完整說明各自的特徵、訓練資料與執行步驟。</p>
 </section>
-<section id="形成期聚類非監督式" class="slide level2 scrollable">
-<h2>形成期聚類（非監督式）</h2>
+<section id="形成期分群非監督式" class="slide level2 scrollable">
+<h2>形成期分群（非監督式）</h2>
 <p><strong>目的</strong>：以資料驅動方式將行為相似的股票分群，縮小配對搜尋空間，取代靜態 GICS 產業分組。</p>
 <h3 id="特徵">特徵</h3>
 <ol type="1">
@@ -1280,15 +1635,15 @@ margin-right: 0; }
 <h3 id="演算法與執行步驟">演算法與執行步驟</h3>
 <ol type="1">
 <li>建構特徵矩陣（上述 1–3，各區塊標準化後加權串接）。</li>
-<li><strong>HDBSCAN</strong>（Campello 等人, 2013）或 <strong>Agglomerative</strong>（Ward linkage）聚類； HDBSCAN 以密度自動決定群數並辨識雜訊點，Agglomerative 以距離門檻（分位數）切群。</li>
+<li><strong>HDBSCAN</strong>（Campello 等人, 2013）或 <strong>Agglomerative</strong>（Ward linkage）分群； HDBSCAN 以密度自動決定群數並辨識雜訊點，Agglomerative 以距離門檻（分位數）切群。</li>
 <li>群內全配對做共整合／距離篩選（ADF、OU 半衰期、Hurst、零穿越），依 SSD／DTW／ PCA 融合分數排序取 Top N。</li>
 </ol>
 <blockquote>
-<p><strong>無監督、無標籤</strong>：聚類不使用未來報酬，純以形成期資料分群，故無前視風險。</p>
+<p><strong>非監督式、無標籤</strong>：分群不使用未來報酬，純以形成期資料分群，故無前視風險。</p>
 </blockquote>
 </section>
-<section id="交易期門檻選擇drl-門檻選擇式-v4" class="slide level2 scrollable">
-<h2>交易期門檻選擇（DRL 門檻選擇式 v4）</h2>
+<section id="交易期門檻選擇dl-thr-門檻選擇式-v4" class="slide level2 scrollable">
+<h2>交易期門檻選擇（DL-THR 門檻選擇式 v4）</h2>
 <p><strong>目的</strong>：每配對每期自適應選擇進出場門檻，取代固定的 Z-Score 門檻（entry_z=2, exit_z=0）。 設計依 Kim 與 Kim（2019）之門檻選擇框架，動作選單<strong>包含靜態基準</strong>，故策略空間為 Z-Score 基準之超集。</p>
 <h3 id="輸入特徵12-維形成期計算標準化至約--33">輸入特徵（12 維，形成期計算，標準化至約 <span class="math inline">[-3,3]</span>）</h3>
 <p>以形成期 spread 的 Z 序列與兩檔股票的 log 價格計算：期末 z、<span class="math inline">|</span>期末 z<span class="math inline">|</span>、零穿越頻率、 OU 半衰期（對數）、近期 z 波動 regime、近期 z 趨勢、log 價格相關係數、報酬波動比、 對沖比率、spread 振幅、形成期 <span class="math inline">|z|&gt;2</span> 佔比、<span class="math inline">\max|z|</span>。這些特徵刻畫配對在交易期 <strong>是否／如何</strong>均值回歸，用以預測各門檻組合的報酬。</p>
@@ -1306,22 +1661,44 @@ margin-right: 0; }
 <li>以選定門檻交由標準 Z-Score 狀態機執行整個交易期，落地交易紀錄。</li>
 </ol>
 <blockquote>
-<p><strong>可證偽的比較框架</strong>：因動作選單含基準，DRL 若學得當則 <span class="math inline">\ge</span> 基準、學不好至多退化為基準； 任何顯著正的 t 值即為「自適應門檻相對固定門檻」的淨貢獻。</p>
+<p><strong>可證偽的比較框架</strong>：因動作選單含基準，DL-THR 若學得當則 <span class="math inline">\ge</span> 基準、學不好至多退化為基準； 任何顯著正的 t 值即為「自適應門檻相對固定門檻」的淨貢獻。</p>
 </blockquote>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>這不是強化學習，另有真正的部分回饋對照</strong></p>
+</div>
+<div class="callout-content">
+<p>因 9 個動作的報酬全部可反事實回算，本策略是<strong>全資訊監督回歸</strong>—— 無探索、無價值迭代、無序列信用分配。<code>result.db</code> 的 <code>DRL</code> 欄位值為歷史代號。</p>
+<p><strong>RL-THR</strong>（<code>strategies/trading/rl_threshold_trading.py</code>）為其受控對照： 同一動作選單、同一 12 維狀態、同一網路與 walk-forward 切分，僅改兩處—— 訓練標籤只保留<strong>實際選中的那一個</strong>動作（遮罩 MSE），決策改為 <span class="math inline">\varepsilon</span>-greedy （掃 <span class="math inline">0.05</span>／<span class="math inline">0.10</span>／<span class="math inline">0.20\!\to\!0.02</span> 三組）。用以量化<strong>反事實標籤本身的價值</strong>。</p>
+<p>它是 contextual bandit，沒有 <span class="math inline">\gamma</span>：每期一次決策，且 12 維狀態全由形成期視窗算出， 選哪個門檻不改變下一期狀態，沒有東西可以 bootstrap。</p>
+</div>
+</div>
+</div>
 </section></section>
 <section id="參考文獻" class="title-slide slide level1 center">
 <h1>參考文獻</h1>
 <p><em>（APA 第 7 版）</em></p>
 <p>Avellaneda, M., &amp; Lee, J.-H. (2010). Statistical arbitrage in the US equities market. <em>Quantitative Finance, 10</em>(7), 761–782. https://doi.org/10.1080/14697680903124632</p>
+<p>Bailey, D. H., &amp; López de Prado, M. (2014). The deflated Sharpe ratio: Correcting for selection bias, backtest overfitting, and non-normality. <em>The Journal of Portfolio Management, 40</em>(5), 94–107. https://doi.org/10.3905/jpm.2014.40.5.094</p>
+<p>Benjamini, Y., &amp; Hochberg, Y. (1995). Controlling the false discovery rate: A practical and powerful approach to multiple testing. <em>Journal of the Royal Statistical Society: Series B, 57</em>(1), 289–300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x</p>
 <p>Campello, R. J. G. B., Moulavi, D., &amp; Sander, J. (2013). Density-based clustering based on hierarchical density estimates. In <em>Advances in Knowledge Discovery and Data Mining (PAKDD 2013)</em> (pp. 160–172). Springer. https://doi.org/10.1007/978-3-642-37456-2_14</p>
 <p>Do, B., &amp; Faff, R. (2010). Does simple pairs trading still work? <em>Financial Analysts Journal, 66</em>(4), 83–95. https://doi.org/10.2469/faj.v66.n4.1</p>
 <p>Do, B., &amp; Faff, R. (2012). Are pairs trading profits robust to trading costs? <em>Journal of Financial Research, 35</em>(2), 261–287. https://doi.org/10.1111/j.1475-6803.2012.01317.x</p>
+<p>Engle, R. F., &amp; Granger, C. W. J. (1987). Co-integration and error correction: Representation, estimation, and testing. <em>Econometrica, 55</em>(2), 251–276. https://doi.org/10.2307/1913236</p>
 <p>Gatev, E., Goetzmann, W. N., &amp; Rouwenhorst, K. G. (2006). Pairs trading: Performance of a relative-value arbitrage rule. <em>The Review of Financial Studies, 19</em>(3), 797–827. https://doi.org/10.1093/rfs/hhj020</p>
-<p>Künsch, H. R. (1989). The jackknife and the bootstrap for general stationary observations. <em>The Annals of Statistics, 17</em>(3), 1217–1241. https://doi.org/10.1214/aos/1176347265</p>
+<p>Hubert, L., &amp; Arabie, P. (1985). Comparing partitions. <em>Journal of Classification, 2</em>(1), 193–218. https://doi.org/10.1007/BF01908075</p>
 <p>Kim, T., &amp; Kim, H. Y. (2019). Optimizing the pairs-trading strategy using deep reinforcement learning with trading and stop-loss boundaries. <em>Complexity, 2019</em>, 3582516. https://doi.org/10.1155/2019/3582516</p>
+<p>Krauss, C., Do, X. A., &amp; Huck, N. (2016). Deep neural networks, gradient-boosted trees, random forests: Statistical arbitrage on the S&amp;P 500. <em>European Journal of Operational Research, 259</em>(2), 689–702. https://doi.org/10.1016/j.ejor.2016.10.031</p>
+<p>Künsch, H. R. (1989). The jackknife and the bootstrap for general stationary observations. <em>The Annals of Statistics, 17</em>(3), 1217–1241. https://doi.org/10.1214/aos/1176347265</p>
 <p>Newey, W. K., &amp; West, K. D. (1987). A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix. <em>Econometrica, 55</em>(3), 703–708. https://doi.org/10.2307/1913610</p>
 <p>Politis, D. N., &amp; Romano, J. P. (1992). A circular block-resampling procedure for stationary data. In R. LePage &amp; L. Billard (Eds.), <em>Exploring the limits of bootstrap</em> (pp. 263–270). Wiley.</p>
 <p>Sharpe, W. F. (1994). The Sharpe ratio. <em>The Journal of Portfolio Management, 21</em>(1), 49–58. https://doi.org/10.3905/jpm.1994.409501</p>
+<p>Sortino, F. A., &amp; Price, L. N. (1994). Performance measurement in a downside risk framework. <em>The Journal of Investing, 3</em>(3), 59–64. https://doi.org/10.3905/joi.3.3.59</p>
+<p>Sutton, R. S., &amp; Barto, A. G. (2018). <em>Reinforcement learning: An introduction</em> (2nd ed.). MIT Press.</p>
 
 </section>
     </div>
@@ -2534,15 +2911,18 @@ background: #fff;
         ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
         ['slides/main_results.html',            '主要結果總覽']
       ];
+      // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+      // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
       var APPENDIX = [
-        ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-        ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-        ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-        ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-        ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-        ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-        ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+        ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+        ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+        ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+        ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+        ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+        ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+        ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+        ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+        ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
         ['slides/comparison.html',                         '現役策略績效總比較'],
         ['slides/performance_guide.html',                  '績效指標定義與公式']
       ];
