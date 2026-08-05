@@ -200,6 +200,13 @@ strategies_raw_all = [    # （2026-07-25 主軸收斂：原生傳統基準 4 �
 # 2026-07-06 調整：SSD Basic（基礎原型）自封存拉回現役；HDBSCAN 系列僅保留
 # PCA5 Z-Score 版作為分組消融對照組（15 維版、15 維 DRL THR、PCA5 DRL THR 封存）。
 # 歷史結果均在 results/result.db；復活方式見封存檔 docstring。
+#
+# 2026-08-05 更正：上一段的「僅保留 PCA5 Z-Score 版」已不成立。現役 36 條全部走
+# cluster_formation，HDBSCAN 臂為 Grid (HDB-SSD/DTW/SDP) 且一律使用
+# feature_mode="fundamentals_mix"（19 維：5 報酬 PCA ⊕ 2 基本面 ⊕ 12 GICS one-hot）——
+# 三種分群法必須共用同一份特徵，分組才是命題 1 的唯一變因。PCA5（5 維純報酬載荷）
+# 已無現役條目，結果僅存於 result.db。
+# notebooks/formation/hdbscan_cluster_pca5.ipynb 曾依上一段描述 PCA5，已一併改寫。
 
 # 共 8 個交易策略（#1 SSD Basic、#2 SSD Rolling、#3 DTW Paper Fixed、
 # #4 SSD-DTW-PCA Paper Fixed、#6 HDBSCAN PCA5、#7 Agglomerative Z-Score；
