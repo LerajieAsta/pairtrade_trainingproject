@@ -52,15 +52,18 @@
     ['slides/thesis/ch5_conclusion.html',   '第五章 結論'],
     ['slides/main_results.html',            '主要結果總覽']
   ];
+  // 順序 = 形成期四層管線的執行順序（分組 → 排序），再接交易端。
+  // 與 _quarto.yml、docs/appendix.html、README.md 一致，改動請五處同步。
   var APPENDIX = [
-    ['slides/formation/ssd_rolling.html',              'SSD Rolling'],
-    ['slides/formation/dtw_paper_fixed.html',          'DTW'],
-    ['slides/formation/ssd_dtw_pca_paper_fixed.html',  'SSD-DTW-PCA'],
-    ['slides/formation/hdbscan_cluster_pca5.html',     'HDBSCAN'],
-    ['slides/formation/agglomerative_fundamentals.html', 'Agglomerative Fundamentals'],
-    ['slides/formation/kmeans_fundamentals.html',      'K-means Fundamentals'],
-    ['slides/trading/zscore_trading.html',             'Z-Score 狀態機'],
-    ['slides/trading/drl_threshold_trading.html',      'DRL 門檻選擇式'],
+    ['slides/formation/hdbscan_cluster_pca5.html',     '分組：HDBSCAN'],
+    ['slides/formation/agglomerative_fundamentals.html', '分組：Agglomerative'],
+    ['slides/formation/kmeans_fundamentals.html',      '分組：K-means'],
+    ['slides/formation/ssd_rolling.html',              '排序：SSD Rolling'],
+    ['slides/formation/dtw_paper_fixed.html',          '排序：DTW'],
+    ['slides/formation/ssd_dtw_pca_paper_fixed.html',  '排序：SSD-DTW-PCA'],
+    ['slides/trading/zscore_trading.html',             '交易：Z-Score 狀態機'],
+    ['slides/trading/drl_threshold_trading.html',      '交易：DL-THR 門檻選擇式'],
+    ['slides/trading/rl_threshold_trading.html',       '交易：RL-THR 部分回饋對照'],
     ['slides/comparison.html',                         '現役策略績效總比較'],
     ['slides/performance_guide.html',                  '績效指標定義與公式']
   ];

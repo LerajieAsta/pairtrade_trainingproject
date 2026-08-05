@@ -1,11 +1,26 @@
 project:
   type: default
   output-dir: ../docs/slides
+  # 明列而非 glob：glob 走字母序，會把「分組」與「排序」兩層交錯
+  # （agglomerative→dtw→hdbscan→kmeans→…）。此處的順序即四層管線的執行順序，
+  # 與 _deck_nav.html、docs/appendix.html、README.md 一致，改動請五處同步。
   render:
-    - formation/*.ipynb
-    - trading/*.ipynb
-    - thesis/*.ipynb
+    - thesis/ch1_introduction.ipynb
+    - thesis/ch2_literature.ipynb
+    - thesis/ch3_methodology.ipynb
+    - thesis/ch4_results.ipynb
+    - thesis/ch5_conclusion.ipynb
     - main_results.ipynb
+    # 附錄：分組三本 → 排序三本 → 交易端三本 → 總比較 → 指標定義
+    - formation/hdbscan_cluster_pca5.ipynb
+    - formation/agglomerative_fundamentals.ipynb
+    - formation/kmeans_fundamentals.ipynb
+    - formation/ssd_rolling.ipynb
+    - formation/dtw_paper_fixed.ipynb
+    - formation/ssd_dtw_pca_paper_fixed.ipynb
+    - trading/zscore_trading.ipynb
+    - trading/drl_threshold_trading.ipynb
+    - trading/rl_threshold_trading.ipynb
     - comparison.ipynb
     - performance_guide.ipynb
 

@@ -3,13 +3,22 @@
 收斂至論文主軸「**機器學習分群 + 深度學習交易**」。
 形成期一層一本、交易期一端一本，跨策略成果集中於 `main_results.ipynb`。
 
+下列順序即 deck 的呈現順序，與 `_quarto.yml`、`_deck_nav.html`、
+`docs/appendix.html` 一致（附錄依形成期四層管線排：分組 → 排序 → 交易端）。
+**改動順序請四處同步。**
+
 ```
 notebooks/
-├── main_results.ipynb                      # ★ 兩大命題的實證結果與統計檢定
-├── comparison.ipynb                        # 現役 15 策略績效總比較（讀 results/result.db）
-├── performance_guide.ipynb                 # 績效指標定義、基準與統計檢定說明
+├── thesis/                                 # ★ 論文正文五章
+│   ├── ch1_introduction.ipynb              # 緒論：兩個命題與三項方法論目標
+│   ├── ch2_literature.ipynb                # 文獻探討
+│   ├── ch3_methodology.ipynb               # 研究方法：四層架構、學習法、統計檢定
+│   ├── ch4_results.ipynb                   # 實證結果
+│   └── ch5_conclusion.ipynb                # 結論：三項方法論貢獻 + 實證貢獻
 │
-├── formation/                              # 形成期（分組 3 本 + 排序 3 本）
+├── main_results.ipynb                      # 兩大命題的實證結果與統計檢定（總覽）
+│
+├── formation/                              # 附錄・形成期（分組 3 本 + 排序 3 本）
 │   ├── hdbscan_cluster_pca5.ipynb          # 分組：HDBSCAN（密度式）
 │   ├── agglomerative_fundamentals.ipynb    # 分組：Agglomerative（階層式）
 │   ├── kmeans_fundamentals.ipynb           # 分組：K-means（分割式，k 對齊 Agglomerative）
@@ -17,13 +26,33 @@ notebooks/
 │   ├── dtw_paper_fixed.ipynb               # 排序：DTW（Sakoe-Chiba）
 │   └── ssd_dtw_pca_paper_fixed.ipynb       # 排序：SSD-DTW-PCA 融合
 │
-├── trading/                                # 交易期（命題 2 的兩個對照端）
+├── trading/                                # 附錄・交易期（命題 2 的三個端）
 │   ├── zscore_trading.ipynb                # Z-Score 狀態機（規則型基準）
-│   └── drl_threshold_trading.ipynb         # DRL 門檻選擇式（深度學習端）
+│   ├── drl_threshold_trading.ipynb         # DL-THR：全資訊監督回歸（命題 2 主力）
+│   └── rl_threshold_trading.ipynb          # RL-THR：部分回饋 + ε-greedy（受控對照）
 │
-├── _quarto.yml                             # revealjs 設定（大字型、zoom、KaTeX）
+├── comparison.ipynb                        # 現役策略績效總比較（讀 results/result.db）
+├── performance_guide.ipynb                 # 指標與檢定的單一權威定義來源
+│
+├── _quarto.yml                             # revealjs 設定 + render 順序（明列，非 glob）
+├── _deck_nav.html                          # 投影片頁首導覽（含同一套順序）
 └── slides.scss                             # 主題（34px root、中文字型、表格縮放）
 ```
+
+## 用詞約定
+
+| 標準詞 | 指涉 |
+| :--- | :--- |
+| **分組** | 四層架構的第二層，含 GICS 產業對照組 |
+| **分群** | 三種 ML 分群演算法本身（HDBSCAN／Agglomerative／K-means） |
+| **群** | cluster 這個物件（群內、群數、過小群） |
+| **排序層／排序準則** | 第三層：SSD／DTW／SSD-DTW-PCA |
+| **統計篩選層** | 第四層：ADF／OU 半衰期／Hurst 三道檢定 |
+| **DL-THR** | 現役交易端。全資訊監督回歸——9 個動作的報酬全部反事實回算，MLP + MSE，決策取 argmax。**不是強化學習** |
+| **RL-THR** | 受控對照。同選單同狀態，改為只觀測所選動作 + ε-greedy（contextual bandit） |
+
+`result.db` 的 `METHOD` 欄位沿用歷史字串 `Grid (AGG-SSD-DRL)`、`SSD (DRL)`，
+其中 `DRL` 指的是 **DL-THR**；表格為求可追溯不改寫，敘述一律用 DL-THR。
 
 主軸之外的筆記本已移至 `archive/notebooks/`，成果仍保留於 `results/result.db`，
 並在 `main_results.ipynb` 的附錄表中列示：

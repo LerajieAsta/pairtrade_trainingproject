@@ -13,7 +13,7 @@
     <div class="header">
       <h1>附錄</h1>
       <p>研究架構、各策略技術投影片、績效比較與指標定義</p>
-      <span class="badge">現役 12 個交易策略 + 2 個 formation-only 條目</span>
+      <span class="badge">現役 15 個交易策略 + 2 個 formation-only 條目</span>
     </div>
 
     <p class="section-label">🏛️ 研究架構</p>
@@ -30,8 +30,8 @@
         <div class="arch-stage">
           <div class="num">2</div>
           <div class="body">
-            <div class="title">形成期（252 日）— 配對搜尋 · 三階段</div>
-            <div class="desc"><b>分組</b>：距離／共整合／HDBSCAN·Agglomerative 聚類（價格 PCA 因子載荷 ⊕ 基本面 ⊕ 產業）；<b>篩選</b>：共整合 ADF、OU 半衰期、Hurst、零穿越；<b>排序</b>：SSD／DTW／PCA 融合或品質分數，選 Top N 配對。</div>
+            <div class="title">形成期（252 日）— 配對搜尋 · 四層</div>
+            <div class="desc"><b>特徵</b>：價格 PCA 因子載荷 ⊕ PIT 基本面 ⊕ GICS one-hot；<b>分組</b>：HDBSCAN／Agglomerative／K-means 分群，或 GICS 產業對照組；<b>排序</b>：SSD／DTW／SSD-DTW-PCA 融合距離；<b>篩選</b>：共整合 ADF、OU 半衰期、Hurst 三道檢定，任一未過即淘汰。（排序與篩選的施行次序依後端而異，見各策略投影片）</div>
           </div>
         </div>
         <div class="arch-arrow">▼</div>
@@ -47,7 +47,7 @@
           <div class="num">4</div>
           <div class="body">
             <div class="title">交易期（126 日）— 訊號執行 · 三種基準</div>
-            <div class="desc"><b>回歸基準</b>（Z-Score）：OLS 共整合殘差；<b>距離基準</b>（GGR 2006）：正規化價格距離、等權；<b>DRL 門檻選擇式</b>（Kim &amp; Kim 2019）：每配對每期由監督式網路自選 (entry_z, exit_z)。進出場狀態機 + 六大風控。交易成本 0.29%／單邊（Do &amp; Faff 2012）。</div>
+            <div class="desc"><b>回歸基準</b>（Z-Score）：OLS 共整合殘差；<b>距離基準</b>（GGR 2006）：正規化價格距離、等權；<b>DL-THR 門檻選擇式</b>（Kim &amp; Kim 2019 風格）：每配對每期由監督式網路自選 (entry_z, exit_z)。進出場狀態機 + 六大風控。交易成本 0.29%／單邊（Do &amp; Faff 2012）。</div>
           </div>
         </div>
         <div class="arch-arrow">▼</div>
@@ -62,16 +62,35 @@
       <div class="arch-props">
         <div class="arch-prop">
           <span class="tag">命題 1 · 形成法</span>
-          <p>以資料驅動的聚類（HDBSCAN／Agglomerative）搜尋配對，相對於靜態 GICS 產業分組與距離／共整合法，能否提升配對品質與績效。</p>
+          <p>以資料驅動的分群（HDBSCAN／Agglomerative／K-means）搜尋配對，相對於靜態 GICS 產業分組與距離／共整合法，能否提升配對品質與績效。</p>
         </div>
         <div class="arch-prop">
           <span class="tag">命題 2 · 交易法</span>
-          <p>以強化／監督式學習自適應選擇交易門檻（DRL 門檻選擇式），相對於固定門檻的 Z-Score 回歸基準，能否提升風險調整後報酬。</p>
+          <p>以深度學習自適應選擇交易門檻（DL-THR 門檻選擇式；另設 RL-THR 部分回饋對照），相對於固定門檻的 Z-Score 回歸基準，能否提升風險調整後報酬。</p>
         </div>
       </div>
     </div>
 
-    <p class="section-label">🔍 形成期策略投影片（一策略一份，Alt+點擊可縮放圖表）</p>
+    <p class="section-label">🔍 形成期 · 分組層（一策略一份，Alt+點擊可縮放圖表）</p>
+    <div class="cards">
+      <a class="card" href="slides/formation/hdbscan_cluster_pca5.html">
+        <div class="card-icon">📉</div>
+        <h2>HDBSCAN</h2>
+        <p>5 維報酬 PCA 因子載荷密度式分群 ⊕ SSD-DTW-PCA 排序（分組消融對照組）</p>
+      </a>
+      <a class="card" href="slides/formation/agglomerative_fundamentals.html">
+        <div class="card-icon">🧬</div>
+        <h2>Agglomerative Fundamentals</h2>
+        <p>價格 PCA ⊕ 基本面 ⊕ GICS one-hot 混合特徵階層式分群（yF 快照 / FMP 逐點兩資料源）</p>
+      </a>
+      <a class="card" href="slides/formation/kmeans_fundamentals.html">
+        <div class="card-icon">🎯</div>
+        <h2>K-means Fundamentals</h2>
+        <p>同一混合特徵、群數對齊 Agglomerative（分群層跨期 ARI 0.515，三者中最不穩定）</p>
+      </a>
+    </div>
+
+    <p class="section-label">📐 形成期 · 排序層</p>
     <div class="cards">
       <a class="card" href="slides/formation/ssd_rolling.html">
         <div class="card-icon">📏</div>
@@ -88,21 +107,6 @@
         <h2>SSD-DTW-PCA</h2>
         <p>SSD⊕DTW PCA 融合排序（全組最佳 Sharpe 基準 0.56）</p>
       </a>
-      <a class="card" href="slides/formation/hdbscan_cluster_pca5.html">
-        <div class="card-icon">📉</div>
-        <h2>HDBSCAN</h2>
-        <p>5 維報酬 PCA 因子載荷聚類 ⊕ SSD-DTW-PCA 排序（分組消融對照組）</p>
-      </a>
-      <a class="card" href="slides/formation/agglomerative_fundamentals.html">
-        <div class="card-icon">🧬</div>
-        <h2>Agglomerative Fundamentals</h2>
-        <p>價格 PCA ⊕ 基本面 ⊕ GICS one-hot 混合特徵分群（yF 快照 / FMP 逐點兩資料源）</p>
-      </a>
-      <a class="card" href="slides/formation/kmeans_fundamentals.html">
-        <div class="card-icon">🎯</div>
-        <h2>K-means Fundamentals</h2>
-        <p>同一混合特徵、群數對齊 Agglomerative（分群層跨期 ARI 0.515，三者中最不穩定）</p>
-      </a>
     </div>
 
     <p class="section-label">📈 交易期策略投影片</p>
@@ -114,8 +118,13 @@
       </a>
       <a class="card" href="slides/trading/drl_threshold_trading.html">
         <div class="card-icon">🤖</div>
-        <h2>DRL 門檻選擇式</h2>
-        <p>Kim &amp; Kim (2019) 門檻選單 + 反事實監督回歸（#5、#6、#8、#10）</p>
+        <h2>DL-THR 門檻選擇式</h2>
+        <p>Kim &amp; Kim (2019) 門檻選單 + 全資訊反事實監督回歸（#5、#6、#8、#10）</p>
+      </a>
+      <a class="card" href="slides/trading/rl_threshold_trading.html">
+        <div class="card-icon">🎲</div>
+        <h2>RL-THR 部分回饋對照</h2>
+        <p>同選單同狀態，改為只觀測所選動作 + ε-greedy——量化反事實標籤的價值</p>
       </a>
     </div>
 
@@ -124,7 +133,7 @@
       <a class="card" href="slides/comparison.html">
         <div class="card-icon">📊</div>
         <h2>現役策略績效總比較</h2>
-        <p>result.db 動態產生：最佳 Sharpe／年化排行、全網格散佈、Z-Score vs DRL 疊加</p>
+        <p>result.db 動態產生：最佳 Sharpe／年化排行、全網格散佈、Z-Score vs DL-THR 疊加</p>
       </a>
       <a class="card" href="slides/performance_guide.html">
         <div class="card-icon">📖</div>
@@ -148,19 +157,19 @@
       <div class="strategy-item"><span class="dot"></span><span>#3 SSD (Distance) — 距離基準交易（回歸 vs 距離對照）</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#4 DTW — 共整合篩選 + Sakoe-Chiba DTW 排序</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#5 SSD-DTW-PCA — SSD⊕DTW PCA 融合排序</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#6 SSD (DRL) — #2 配對 + DRL 門檻選擇式</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#7 HDBSCAN — 5 維因子載荷聚類（分組消融對照組）</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#8 HDBSCAN (殘差) — 因子殘差化後聚類（命題1 主力）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#6 SSD (DRL) — #2 配對 + DL-THR 門檻選擇式（<code>DRL</code> 為資料庫欄位值）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#7 HDBSCAN — 5 維因子載荷密度式分群（分組消融對照組）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#8 HDBSCAN (殘差) — 因子殘差化後分群（命題1 主力）</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#9 Agglomerative (yF) — 基本面快照分群（命題1 主力）</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#10 Agglomerative (yF·DRL) — #9 配對 + DRL（命題2）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#10 Agglomerative (yF·DRL) — #9 配對 + DL-THR（命題2）</span></div>
       <div class="strategy-item"><span class="dot"></span><span>#11 Agglomerative (FMP) — 基本面逐點(PIT)分群（命題1 主力）</span></div>
-      <div class="strategy-item"><span class="dot"></span><span>#12 Agglomerative (FMP·DRL) — #11 配對 + DRL（命題2）</span></div>
+      <div class="strategy-item"><span class="dot"></span><span>#12 Agglomerative (FMP·DRL) — #11 配對 + DL-THR（命題2）</span></div>
       <div class="strategy-item muted"><span class="dot formation-only"></span><span>DTW Paper (DTW)／(SSD-DTW-PCA) — formation-only：只產生 #4/#5 借用的配對，不參與回測</span></div>
       <div class="strategy-item muted"><span class="dot formation-only"></span><span>負面結果 ResidFDR／MST／SEC-PIT Beta 已封存（archive/），程式碼與回測數據保留</span></div>
     </div>
 
     <div class="footer">
-      <a href="index.html">← 回首頁</a>　·　LerajieAsta / pairtrade_trainingproject ・ 最後更新 2026-08-04
+      <a href="index.html">← 回首頁</a>　·　LerajieAsta / pairtrade_trainingproject ・ 最後更新 2026-08-05
     </div>
   </div>
 </body>
