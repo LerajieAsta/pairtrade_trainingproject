@@ -173,12 +173,18 @@ INCOMPLETE_RUNS = {
 # 與寫作當下不同，DSR 表就對不上，而且不會有任何錯誤訊息。
 # 故此處釘死為常數並記錄清點日期；_trial_specs 仍會實地清點作交叉比對，
 # 發現漂移時警告（代表你加了新策略，該重新清點並更新論文的 N）。
-TRIAL_CENSUS_DATE = "2026-08-04"
+TRIAL_CENSUS_DATE = "2026-08-06"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (101,   9.13511197067e-05),
-    "config": (1869,  0.000525501711502),
+    "method": (104,   9.0345420714e-05),
+    "config": (1914,  0.000520779377581),
 }
+# 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-08-04  method 101 / config 1869
+#   2026-08-06  method 104 / config 1914 —— 新增 RL-THR 部分回饋對照三條
+#               （Grid (AGG-SSD-RLTHR-E05/E10/E20D)，各 15 格）。
+#               三組 ε 是三次獨立的建模決策，依 Bailey & López de Prado
+#               必須計入試驗宇宙，不因其為「對照組」而豁免。
 
 
 def _trial_specs(summ: pd.DataFrame, method: str) -> dict:

@@ -316,7 +316,11 @@ for _rb, _rs in _GRID_RANKINGS.items():
 #     命題 2 因涵蓋傳統配對底而普適性更強。
 #   三項替代解釋已排除（prop2_exposure_control / prop2_skip_permutation）：
 #     非拉高門檻、非篩掉爛配對、非減少曝險（DRL 進場次數反為 1.6–1.9 倍）。
-#   絕對績效仍不成立：DSR 於 N=87 試驗宇宙下全數不通過（SR0=0.433 > 最高 SR 0.343）。
+#   絕對績效仍不成立：DSR 於 N=104 的試驗宇宙下 0/92 個策略族通過 0.95，
+#   最高者 Grid (GICS-SDP) 為 0.609。注意論證方向——門檻 SR0=0.384 低於最高 SR 0.437，
+#   故不可寫成「門檻高於最高 SR」，結論由 DSR 檢定本身承擔。
+#   （舊註記的 N=87 / SR0=0.433 / 最高 SR 0.343 三個數字皆已失效，見
+#    analysis/regime_cost_dsr_eval.py 的 TRIAL_CENSUS 清點沿革。）
 # 借用 Grid GICS-{SSD,SDP} 已算好的形成期配對，零重跑 formation。
 for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
     _pgd = {**base_params, **_GRID_COMMON,
