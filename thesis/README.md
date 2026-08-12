@@ -21,6 +21,11 @@
 2026-08-04 就發生過只改①②、網站仍顯示七月舊版的情況（舊特徵數、無組合系統一節）。
 Git 上是新的，網頁上是舊的，兩邊都「沒錯」。
 
+**③ 其實有兩道關卡**，兩道都會靜默失效：渲染（`.ipynb` → `docs/`）
+與**發佈**（`docs/` → 網站，來源是 **`main`**）。在功能分支上渲染完並 commit，
+第一道過了、第二道沒過，網站照樣是舊的——2026-08-12 就這樣落後了 12 個提交。
+驗證方式見下方「但檔案時間查不出『網站落後』」。
+
 ## 章節對照
 
 | 章 | ① 散文稿 | ② 投影片原始檔 | ③ 已發佈頁面 |
@@ -61,6 +66,56 @@ ls -la docs/slides/thesis/           # 檔案時間應為剛才
 grep -c "某個新加的關鍵詞" docs/slides/thesis/ch4_results.html
 grep -c "李伯修" docs/slides/thesis/*.html    # 必須為 0
 ```
+
+### 但檔案時間查不出「網站落後」——要抓線上頁面
+
+上面那三行只證明**本地**產物是新的。Pages 的來源是 **`main` + `/docs`**
+（repo 設定的 Deploy from a branch，倉庫裡沒有 `.github/workflows/`），
+所以在功能分支上渲染完、甚至 commit 並 push 了分支，**網站仍然不會動**。
+
+2026-08-12 實測：`main` 落後 12 個提交，公開頁面掛著三條當時已被推翻的宣稱
+（「選哪些配對，不決定報酬」、regime「改善 19 格」、成本餘裕「6.5–12.8 bps」），
+而本地 `ls -la` 一切正常、git 也乾淨。**兩邊都「沒錯」，只是不同步。**
+同次還發現 `docs/slides/trading/rl_threshold_trading.html` 線上根本不存在，
+而第四章 §4.2.3「增益來源④」整節都靠它。
+
+所以驗證的最後一步是**抓線上頁面**，而不是看本地檔案：
+
+```bash
+# 1. 確認遠端 main 真的含新內容（合併前後都可查，不需切分支）
+git fetch origin
+git show origin/main:docs/slides/thesis/ch4_results.html | grep -c "某個新加的關鍵詞"
+
+# 2. 確認 Pages 已重建（?cb= 是為了繞開 CDN 與工具的快取）
+curl -sL "https://lerajieasta.github.io/pairtrade_trainingproject/index.html?cb=$RANDOM" \
+  | grep -o "最後更新 [0-9-]*"
+curl -sL "https://lerajieasta.github.io/pairtrade_trainingproject/slides/thesis/ch4_results.html?cb=$RANDOM" \
+  | grep -c "某個新加的關鍵詞"
+
+# 3. 新增的投影片要確認真的取得到（不是 404）
+curl -sLo /dev/null -w "%{http_code} %{size_download}\n" \
+  "https://lerajieasta.github.io/pairtrade_trainingproject/slides/trading/rl_threshold_trading.html?cb=$RANDOM"
+```
+
+推 `main` 後 Pages 約一分鐘內重建。查的時候記得**同時 grep 一個新加的關鍵詞
+和一個已刪除的舊字串**——只查新的，會漏掉「新舊並存」這種渲染不完全的情況。
+
+> ⚠️ 帶快取的抓取工具（含本專案常用的 WebFetch）對同一 URL 有數分鐘快取，
+> 剛推完去查很可能拿到舊版而誤判為「Pages 沒更新」。加 `?cb=` 隨機參數即可。
+
+### 合併到 main 時，別為了切分支動到 `.db`
+
+`formation_data/*.db` 有追蹤但**長期帶著未提交的修改**（見專案慣例：不 stage、
+更**絕不可** `git checkout --` 還原，git 版本是舊快照）。要把功能分支併進 `main`，
+最安全的是**先推遠端 ref、再移動本地指標**，全程不碰工作區：
+
+```bash
+git push origin <branch>:main        # 遠端快進，working tree 完全沒被觸碰
+git fetch origin && git branch -f main origin/main
+git checkout main                    # 此時兩者同樹，checkout 不會更新任何檔案
+```
+
+事後用 `md5sum` 對一次 `.db` 確認沒被動到。
 
 ### 新增章節時要手動加入口
 
