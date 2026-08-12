@@ -72,6 +72,17 @@ class Trading:
 
         self.period_pnl: float = 0.0
 
+    def _entry_triggered(self, z: float, z_prev: float) -> bool:
+        """
+        進場觸發條件。抽成方法只為了讓子類別能替換「何時進場」而不必複製
+        _simulate_pair 的 310 行迴圈——本身的邏輯與抽出前完全相同。
+
+        現行（突破式，Gatev 2006）：價差發散到帶外即進場，z_prev 不使用。
+        子類別可改寫，例如 zscore_reversion_entry_trading 的
+        「發散後收斂回帶內才進場」需要前一日的 z 才判得出穿越方向。
+        """
+        return abs(z) > self.entry_z
+
     def _execute_entry(self, state: PairState, z: float, p_a: float, p_b: float, hedge_ratio: float) -> tuple[bool, float]:
         """處理進場邏輯與資金分配"""
         total_weight = 1.0 + abs(hedge_ratio)
@@ -268,6 +279,9 @@ class Trading:
         for i in range(len(dates_arr)):
             date = dates_arr[i]
             z = 0.0 if np.isnan(zscore_arr[i]) else zscore_arr[i]
+            # 前一日 z，僅供 _entry_triggered 的子類別判斷穿越方向；本類別不使用。
+            # 首日與 NaN 一律視為 0.0，與 z 本身的處理一致。
+            z_prev = 0.0 if i == 0 or np.isnan(zscore_arr[i - 1]) else zscore_arr[i - 1]
             p_a, p_b = pa_arr[i], pb_arr[i]
 
             c_beta = beta_arr[i] if not np.isnan(beta_arr[i]) else hedge_ratio
@@ -335,7 +349,7 @@ class Trading:
                     self.entry_gate is not None
                     and not self.entry_gate.get(date, True)
                 )
-                if not in_high_vol and not gate_blocked and abs(z) > self.entry_z:
+                if not in_high_vol and not gate_blocked and self._entry_triggered(z, z_prev):
                     entered, unrealized_pnl = self._execute_entry(state, z, p_a, p_b, c_beta)
                     if entered:
                         current_status = "ENTER_SHORT_A" if state.position == -1 else "ENTER_LONG_A"
@@ -343,7 +357,7 @@ class Trading:
                         current_status = "HOLD_CASH (COOLDOWN)"
                 elif in_high_vol:
                     current_status = "HOLD_CASH (HIGH_VOL_REGIME)"
-                elif gate_blocked and abs(z) > self.entry_z:
+                elif gate_blocked and self._entry_triggered(z, z_prev):
                     current_status = "HOLD_CASH (LOW_DISP_GATE)"
                 else:
                     current_status = "HOLD_CASH"

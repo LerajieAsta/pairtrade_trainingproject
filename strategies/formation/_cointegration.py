@@ -19,7 +19,13 @@
 """
 import numpy as np
 
-from strategies.formation._utils import _adf_stat, _compute_hurst
+import os
+
+from strategies.formation._utils import _adf_stat, _compute_hurst, _compute_hurst_rs
+
+# 決策用哪一版 Hurst：legacy（預設，維持既有結果可重現）| rs（標準多尺度 R/S）。
+# 無論選哪一版，兩個值都會計算並記錄於 stats，供事後對照無需重跑。
+_HURST_METHOD = os.environ.get("HURST_METHOD", "legacy").strip().lower()
 
 
 def compute_halflife(spread: np.ndarray) -> float:
@@ -58,6 +64,7 @@ def screen_pair(
     adf_max_lags: int = 1,
     precomputed_adf: tuple = None,
     enabled: bool = True,
+    adf_only: bool = False,        # True → 只做 ADF（復現許鈞翔 2025 的篩選層）
 ) -> tuple[bool, dict]:
     """
     對單一配對的 spread 施加三道統計過濾。
@@ -69,7 +76,8 @@ def screen_pair(
     （未計算者為 None）。三道順序與現行策略一致：ADF → 半衰期 → Hurst，
     任一未過即淘汰（短路，省下後續慢速計算）。
     """
-    stats = {"adf_stat": None, "adf_p": None, "halflife": None, "hurst": None}
+    stats = {"adf_stat": None, "adf_p": None,
+             "halflife": None, "hurst": None, "hurst_rs": None}
 
     if not enabled:
         return True, stats
@@ -82,6 +90,14 @@ def screen_pair(
     if pval >= adf_pvalue_threshold:
         return False, stats
 
+    # adf_only：復現許鈞翔 (2025) 的篩選層——只做 Engle-Granger 兩步的 ADF，
+    # 不施加半衰期與 Hurst。兩者仍計算並記錄，供「多這兩道差多少」的對照。
+    if adf_only:
+        stats["halflife"] = compute_halflife(spread)
+        stats["hurst"] = _compute_hurst(spread, already_stationary=True)
+        stats["hurst_rs"] = _compute_hurst_rs(spread, already_stationary=True)
+        return True, stats
+
     # 步驟 2：OU 半衰期
     hl = compute_halflife(spread)
     stats["halflife"] = hl
@@ -89,9 +105,15 @@ def screen_pair(
         return False, stats
 
     # 步驟 3：Hurst 指數（均值回歸傾向）
-    hurst = _compute_hurst(spread, already_stationary=True)
-    stats["hurst"] = hurst
-    if hurst >= hurst_threshold:
+    # 兩版都算、都記錄：舊版（3 尺度巢狀前綴）與標準 R/S（多尺度不重疊區塊）。
+    # 合成序列實測（n=252，500 次）：真值 H=0.3 時舊版標準差 0.168、誤判率 22.6%，
+    # 新版 0.060 / 7.6%。中位數兩版皆略微上偏，差別在**離散度**而非偏誤。
+    # 決策用哪一版由 HURST_METHOD 控制（預設 legacy＝維持既有結果可重現）。
+    stats["hurst"] = _compute_hurst(spread, already_stationary=True)
+    stats["hurst_rs"] = _compute_hurst_rs(spread, already_stationary=True)
+
+    h = stats["hurst_rs"] if _HURST_METHOD == "rs" else stats["hurst"]
+    if h is None or not np.isfinite(h) or h >= hurst_threshold:
         return False, stats
 
     return True, stats

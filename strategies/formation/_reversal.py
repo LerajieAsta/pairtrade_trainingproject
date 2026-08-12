@@ -54,6 +54,8 @@ def rank_by_reversal(
     adf_pvalue_threshold: float = 0.05,
     trading_window: int = 126,
     enable_filters: bool = False,    # Han et al. 不施加統計篩選 → 預設關閉
+    trace: list = None,              # 非 None 時記錄逐候選的排序分數與檢定統計量
+    adf_only: bool = False,
     **_ignored,
 ) -> pd.DataFrame:
     """群內短期反轉排序，回傳與其他排序 backend 同構的 DataFrame。"""
@@ -102,16 +104,28 @@ def rank_by_reversal(
 
     # 可選的統計篩選（Han et al. 不做；保留供消融）
     out, halflife_max = [], max(2.0, trading_window / 3.0)
-    for _, r in df.iterrows():
+    for _cand_rank, (_, r) in enumerate(df.iterrows(), start=1):
         ta, tb = r.Ticker_A, r.Ticker_B
         # spread 與交易端一致：標準化 log price 之差，hedge = 1
         sa = (log_px[ta].values - mean_p[ta]) / (std_p[ta] or 1.0)
         sb = (log_px[tb].values - mean_p[tb]) / (std_p[tb] or 1.0)
         spread = sa - sb
-        passed, _ = screen_pair(
+        passed, _stats = screen_pair(
             spread, adf_pvalue_threshold=adf_pvalue_threshold,
             halflife_min=1.0, halflife_max=halflife_max,
-            hurst_threshold=0.50, adf_max_lags=1, enabled=enable_filters)
+            hurst_threshold=0.50, adf_max_lags=1, enabled=enable_filters,
+            adf_only=adf_only)
+        if trace is not None:
+            # 本後端的排序分數是「發散度」（越大越優先），與 ssd/dtw 的距離
+            # （越小越優先）方向相反——稽核時看 Cand_Rank 而非分數本身。
+            trace.append({
+                "Ticker_A": ta, "Ticker_B": tb, "Group": r.Sector,
+                "Rank_Backend": "reversal", "Rank_Score": float(r.Divergence),
+                "Cand_Rank": _cand_rank,
+                "adf_stat": _stats["adf_stat"], "adf_p": _stats["adf_p"],
+                "halflife": _stats["halflife"], "hurst": _stats["hurst"],
+                "hurst_rs": _stats["hurst_rs"], "Passed": int(passed),
+            })
         if not passed:
             continue
         out.append({

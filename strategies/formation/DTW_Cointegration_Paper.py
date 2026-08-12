@@ -65,6 +65,10 @@ class Formation:
         self.halflife_max = trading_window / 3.0
         # 篩選消融開關（預設 True＝現行行為）：False 時跳過 ADF/半衰期/Hurst
         self.enable_filters = kwargs.get("enable_filters", True)
+        # 分階段稽核軌跡（預設 None＝不記錄）。見 ssd_rolling 同名欄位說明。
+        # 註：本後端「先檢定、後排序」，故未通過者沒有距離分數（記 None）。
+        self.trace = kwargs.get("trace", None)
+        self.adf_only = kwargs.get("adf_only", False)
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -140,8 +144,19 @@ class Formation:
                         hurst_threshold=0.50,
                         precomputed_adf=(best_stat, best_pval),
                         enabled=self.enable_filters,
+                        adf_only=self.adf_only,
                     )
                     if not passed:
+                        if self.trace is not None:
+                            self.trace.append({
+                                "Ticker_A": best_a, "Ticker_B": best_b,
+                                "Group": sector, "Rank_Backend": self.method,
+                                "Rank_Score": None, "Cand_Rank": None,
+                                "adf_stat": _stats["adf_stat"], "adf_p": _stats["adf_p"],
+                                "halflife": _stats["halflife"], "hurst": _stats["hurst"],
+                                "hurst_rs": _stats["hurst_rs"],
+                                "Passed": 0,
+                            })
                         continue
 
 
@@ -153,7 +168,18 @@ class Formation:
                     
                     spread_mean = np.mean(best_resid)
                     spread_std = np.std(best_resid, ddof=1) if len(best_resid) > 1 else 0.0
-                    
+
+                    if self.trace is not None:
+                        self.trace.append({
+                            "Ticker_A": best_a, "Ticker_B": best_b,
+                            "Group": sector, "Rank_Backend": self.method,
+                            "Rank_Score": float(dtw_dist), "Cand_Rank": None,
+                            "adf_stat": _stats["adf_stat"], "adf_p": _stats["adf_p"],
+                            "halflife": _stats["halflife"], "hurst": _stats["hurst"],
+                                "hurst_rs": _stats["hurst_rs"],
+                            "Passed": 1,
+                        })
+
                     records.append({
                         "Form_Start": self.form_start, "Form_End": self.form_end,
                         "Sector": sector, "Ticker_A": best_a, "Ticker_B": best_b,

@@ -157,7 +157,7 @@ def load_daily_sids(sids: list[str], use_cache: bool = True) -> pd.DataFrame:
     return cached[have]
 
 
-def invalidate_cached_sids(prefixes: list[str]) -> int:
+def invalidate_cached_sids(prefixes: list[str], force: bool = False) -> int:
     """
     刪掉快取中符合任一前綴的 strategy_id 欄，回傳刪除欄數。
 
@@ -165,11 +165,33 @@ def invalidate_cached_sids(prefixes: list[str]) -> int:
     不會讓它失效——load_daily_sids 看到欄位已存在就直接回傳舊序列，分析結果
     會與重跑前逐位元相同而不報任何錯。凡是重跑過 run_trading 的策略，都必須
     先呼叫本函式再做分析。
+
+    ⚠ 守衛：拒絕刪掉「trade_logs 已無明細」的欄。
+    2026-08-06 起封存策略的明細已清除（tools/archive_trade_logs.py），逐日序列
+    只存在於這份快取裡——刪掉就再也重建不回來。前綴比對很容易誤傷（例如
+    "tiingo/Grid_AGG_SSD" 會同時命中 Grid_AGG_SSD_DRL、_NOSEC、_NF…），故本
+    函式逐欄確認 trade_logs 仍有列才刪；確定要刪無明細者請傳 force=True。
     """
     if not os.path.exists(CACHE):
         return 0
     cached = pd.read_parquet(CACHE)
-    drop = [c for c in cached.columns if any(c.startswith(p) for p in prefixes)]
+    hit = [c for c in cached.columns if any(c.startswith(p) for p in prefixes)]
+    if not hit:
+        return 0
+
+    if force:
+        drop, keep = hit, []
+    else:
+        con = sqlite3.connect(f"file:{RESULT_DB}?mode=ro", uri=True)
+        drop, keep = [], []
+        for c in hit:
+            has = con.execute(
+                "SELECT 1 FROM trade_logs WHERE strategy_id=? LIMIT 1", (c,)).fetchone()
+            (drop if has else keep).append(c)
+        con.close()
+    if keep:
+        print(f"  ⚠ {len(keep)} 欄命中前綴但 trade_logs 已無明細，保留不刪"
+              f"（刪了無法重建）：{keep[:3]}{' …' if len(keep) > 3 else ''}")
     if drop:
         cached.drop(columns=drop).to_parquet(CACHE)
     return len(drop)

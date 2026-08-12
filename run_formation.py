@@ -168,6 +168,8 @@ def worker_task(
         cursor = conn.cursor()  # type: ignore
         cursor.execute("DELETE FROM formation_pairs")
         cursor.execute("DELETE FROM formation_progress")
+        cursor.execute("DELETE FROM formation_groups")
+        cursor.execute("DELETE FROM formation_ranked")
         conn.commit()  # type: ignore
 
         # 2. 載入形成期模組
@@ -261,6 +263,30 @@ def worker_task(
                 "INSERT OR REPLACE INTO formation_progress (strategy_id, Period_Start) VALUES (?, ?)",
                 (name, form_start_dt),
             )
+
+            # ── 分階段稽核落地（FORMATION_TRACE=1 時）──────────────────────
+            # 即使本期選不出配對也要寫：分組結果與「哪些候選被哪一道刷掉」正是
+            # 空窗口最需要解釋的東西。
+            _labels = getattr(formation_instance, "cluster_labels_", None) or {}
+            if _labels:
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO formation_groups "
+                    "(strategy_id, Period_Start, Ticker, Cluster_Label) VALUES (?,?,?,?)",
+                    [(name, form_start_dt, t, str(l)) for t, l in _labels.items()],
+                )
+            _trace = getattr(formation_instance, "stage_trace_", None)
+            if _trace:
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO formation_ranked "
+                    "(strategy_id, Period_Start, Ticker_A, Ticker_B, Group_Label, Rank_Backend,"
+                    " Rank_Score, Cand_Rank, adf_stat, adf_p, halflife, hurst, hurst_rs, Passed)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    [(name, form_start_dt, r["Ticker_A"], r["Ticker_B"], str(r["Group"]),
+                      r["Rank_Backend"], r["Rank_Score"], r["Cand_Rank"],
+                      r["adf_stat"], r["adf_p"], r["halflife"], r["hurst"],
+                      r.get("hurst_rs"), r["Passed"])
+                     for r in _trace],
+                )
 
             if pairs_df.empty:
                 conn.commit()  # type: ignore
@@ -359,6 +385,7 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
     from strategies.db_utils import init_formation_db
     conn = init_formation_db(main_db_path)
     cursor = conn.cursor()  # type: ignore
+    merge_failures: list[tuple[str, str]] = []
 
     for temp_db in temp_db_paths:
         if not os.path.exists(temp_db):
@@ -373,6 +400,18 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
                 prog_rows = temp_cursor.fetchall()
             except Exception:
                 prog_rows = list({(r[0], r[1]) for r in rows})   # 相容無 progress 表的舊暫存
+            # 分階段稽核表（FORMATION_TRACE 未開時為空；舊暫存庫無此表則略過）
+            try:
+                temp_cursor.execute(
+                    "SELECT strategy_id, Period_Start, Ticker, Cluster_Label FROM formation_groups")
+                grp_rows = temp_cursor.fetchall()
+                temp_cursor.execute(
+                    "SELECT strategy_id, Period_Start, Ticker_A, Ticker_B, Group_Label, Rank_Backend,"
+                    " Rank_Score, Cand_Rank, adf_stat, adf_p, halflife, hurst, hurst_rs, Passed"
+                    " FROM formation_ranked")
+                rank_rows = temp_cursor.fetchall()
+            except Exception:
+                grp_rows, rank_rows = [], []
             temp_conn.close()  # type: ignore
 
             # 逐（strategy_id, Period_Start）窗口刪除再插入：只覆寫本次實際計算過的
@@ -385,6 +424,16 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
                     "DELETE FROM formation_pairs WHERE strategy_id = ? AND Period_Start = ?",
                     (sid, pstart),
                 )
+                # 稽核表同樣逐窗口先刪後插，否則重跑會殘留 stale 候選
+                if grp_rows or rank_rows:
+                    cursor.execute(
+                        "DELETE FROM formation_groups WHERE strategy_id = ? AND Period_Start = ?",
+                        (sid, pstart),
+                    )
+                    cursor.execute(
+                        "DELETE FROM formation_ranked WHERE strategy_id = ? AND Period_Start = ?",
+                        (sid, pstart),
+                    )
 
             cursor.executemany("""
                 INSERT OR REPLACE INTO formation_pairs
@@ -395,17 +444,46 @@ def merge_databases(main_db_path: str, temp_db_paths: list):
                 "INSERT OR REPLACE INTO formation_progress (strategy_id, Period_Start) VALUES (?, ?)",
                 prog_rows,
             )
+            if grp_rows:
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO formation_groups"
+                    " (strategy_id, Period_Start, Ticker, Cluster_Label) VALUES (?,?,?,?)",
+                    grp_rows,
+                )
+            if rank_rows:
+                cursor.executemany(
+                    "INSERT OR REPLACE INTO formation_ranked"
+                    " (strategy_id, Period_Start, Ticker_A, Ticker_B, Group_Label, Rank_Backend,"
+                    " Rank_Score, Cand_Rank, adf_stat, adf_p, halflife, hurst, hurst_rs, Passed)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    rank_rows,
+                )
             conn.commit()  # type: ignore
         except Exception as e:
-            print(f"⚠️ [DB Merge] 整合暫存資料庫 {temp_db} 失敗: {e}", flush=True)
+            # 必須 rollback：conn 是整個迴圈共用的，失敗批次的 INSERT 若留在
+            # 未提交交易裡，會被「下一條成功策略」的 commit 一起送出去，
+            # 造成半套資料悄悄落地（2026-08-06 的 hurst_rs 事故即為此）。
+            try:
+                conn.rollback()  # type: ignore
+            except Exception:
+                pass
+            merge_failures.append((temp_db, str(e)))
+            print(f"⚠️ [DB Merge] 整合暫存資料庫 {temp_db} 失敗（已回滾）: {e}", flush=True)
 
-        # 清除暫存檔
-        try:
-            os.remove(temp_db)
-        except Exception:
-            pass
+        # 清除暫存檔——僅在合併成功時。失敗的留著，否則資料就真的沒了。
+        if not any(tp == temp_db for tp, _ in merge_failures):
+            try:
+                os.remove(temp_db)
+            except Exception:
+                pass
 
     conn.close()  # type: ignore
+    if merge_failures:
+        print(f"\n❌ [DB Merge] {len(merge_failures)} 個暫存庫合併失敗"
+              f"（暫存檔已保留待補救）：", flush=True)
+        for tp, err in merge_failures:
+            print(f"    {os.path.basename(tp)}: {err}", flush=True)
+        raise RuntimeError(f"形成期合併有 {len(merge_failures)} 個失敗，詳見上方清單")
     print("✅ [DB Merge] 所有配對數據整合與清理完畢！", flush=True)
 
 

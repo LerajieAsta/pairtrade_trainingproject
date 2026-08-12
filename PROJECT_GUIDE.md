@@ -29,12 +29,12 @@ pairtrade_trainingproject/
 │   │   └── __init__.py
 │   └── trading/
 │       ├── zscore_trading.py      # Z-Score 狀態機（基礎類，三條 Spread 路徑；現役僅走路徑 B）
-│       ├── drl_threshold_trading.py # DRL 門檻選擇模組（#9–11、#15–16 使用）
+│       ├── drl_threshold_trading.py # DL-THR 門檻選擇模組（#9–11、#15–16 使用）
 │       └── distance_trading.py    # ⚠️ GGR 2006 距離基準——config 端已封存（隨 #2 一併移除），檔案仍留在此目錄未搬移
 ├── analysis/                      # 評估層（讀 result.db，不重跑）
 │   ├── regime_cost_dsr_eval.py    # regime 分層 Sharpe + break-even 成本表 + Deflated Sharpe
-│   ├── proposition2_stats.py      # 命題2 配對檢定（DRL vs Z-Score，五種配對底）
-│   ├── drl_behavior.py            # 從 trade_logs 還原 DRL agent 決策，解構增益來源（門檻選擇 vs SKIP）
+│   ├── proposition2_stats.py      # 命題2 配對檢定（DL-THR vs 固定門檻，五種配對底）
+│   ├── drl_behavior.py            # 從 trade_logs 還原 DL-THR 決策，解構增益來源（門檻選擇 vs SKIP）
 │   ├── granularity_sweep.py       # （2026-07-28 新增，尚未整理進本指南）
 │   └── sensitivity_report.py      # OFAT 參數敏感性報表（formation 變體曲線 + 交易端 top_n）
 ├── fetch/
@@ -76,7 +76,7 @@ pairtrade_trainingproject/
 ├── tools/                         # 輔助工具（皆從專案根執行）
 │   ├── status.py                  #   pt status：資料/形成期/交易期/投影片 狀態總覽 + 建議動作
 │   ├── snapshot_run.py            #   全量重跑前歸檔 result.db（原根目錄，2026-07 移入）
-│   └── run_drl_variance.py        #   DRL 訓練變異數多輪評估（原根目錄，2026-07 移入）
+│   └── run_drl_variance.py        #   DL-THR 訓練變異數多輪評估（原根目錄，2026-07 移入）
 ├── dashboard.py                   # Streamlit 績效比對儀表板
 ├── run_formation.py               # 形成期主程式
 ├── run_trading.py                 # 交易期主程式
@@ -117,7 +117,7 @@ run.bat                     ← Streamlit Dashboard（http://localhost:8501）
 - 輸出：`results/tiingo/` 下的 Trade Log CSV + `dataset/audit_report.csv` + `results/result.db` 的 `strategy_summaries`/`trade_logs`/`strategy_pairs`
 - 網格搜尋：Top N / Stop Loss / MSR 等參數組合
 - 所有交易全部失敗時拋出 `RuntimeError`（fail-loud），不會靜默回傳空結果
-- 逐滾動期續傳（Z-Score 策略）：每期算完即以 pickle 落地至 `results/<dataset>/.ckpt/<策略>/<期>.pkl`；中斷重跑僅補算缺漏期，並自 checkpoint 重建 PortfolioManager 權益。summary 於全部期完成後定稿並清除 checkpoint。DRL 策略因 walk-forward 訓練狀態暫不套用（維持整策略重跑）
+- 逐滾動期續傳（Z-Score 策略）：每期算完即以 pickle 落地至 `results/<dataset>/.ckpt/<策略>/<期>.pkl`；中斷重跑僅補算缺漏期，並自 checkpoint 重建 PortfolioManager 權益。summary 於全部期完成後定稿並清除 checkpoint。DL-THR 策略因 walk-forward 訓練狀態暫不套用（維持整策略重跑）
 - **完成判定純以 result.db 為準**（`check_trading_completed` 查 `strategy_summaries` 有無該 config 列，不再要求 CSV 存在）
 - **Trade Log CSV 為可選產物**：`config.WRITE_TRADE_CSV`（預設 True）。設 False 可省 ~14GB，不影響回測／續傳／儀表板（皆讀 result.db）
 
@@ -163,24 +163,44 @@ STRATEGIES_SLICE="0:9" python run_trading.py   # 只跑 3×3 分群×排序矩�
 | 0–2 | Grid HDB-{SSD,DTW,SDP} | `hdbscan` | ssd／dtw／ssd_dtw_pca | `zscore_trading.py` | **命題1** 3×3 矩陣：HDBSCAN 行 |
 | 3–5 | Grid AGG-{SSD,DTW,SDP} | `agglomerative` | 同上 | `zscore_trading.py` | **命題1** 3×3 矩陣：Agglomerative 行 |
 | 6–8 | Grid KM-{SSD,DTW,SDP} | `kmeans` | 同上 | `zscore_trading.py` | **命題1** 3×3 矩陣：K-means 行 |
-| 9 | Grid AGG-SSD DRL | 借用 #3 配對 | ssd | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（AGG 底） |
-| 10 | Grid HDB-SDP DRL | 借用 #2 配對 | ssd_dtw_pca | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（HDB 底） |
-| 11 | Grid KM-SSD DRL | 借用 #6 配對 | ssd | `drl_threshold_trading.py` | **命題2** DRL vs Z-Score（KM 底） |
+| 9 | Grid AGG-SSD DRL | 借用 #3 配對 | ssd | `drl_threshold_trading.py` | **命題2** 門檻選擇 vs 固定門檻（AGG 底） |
+| 10 | Grid HDB-SDP DRL | 借用 #2 配對 | ssd_dtw_pca | `drl_threshold_trading.py` | **命題2** 門檻選擇 vs 固定門檻（HDB 底） |
+| 11 | Grid KM-SSD DRL | 借用 #6 配對 | ssd | `drl_threshold_trading.py` | **命題2** 門檻選擇 vs 固定門檻（KM 底） |
 | 12–14 | Grid GICS-{SSD,DTW,SDP} | `gics`（不跑分群） | ssd／dtw／ssd_dtw_pca | `zscore_trading.py` | **命題1 對照組**：傳統產業分組基準 |
-| 15 | Grid GICS-SSD DRL | 借用 #12 配對 | ssd | `drl_threshold_trading.py` | **命題2 對照組**：傳統配對底 + DRL |
-| 16 | Grid GICS-SDP DRL | 借用 #14 配對 | ssd_dtw_pca | `drl_threshold_trading.py` | **命題2 對照組**：傳統配對底 + DRL |
+| 15 | Grid GICS-SSD DRL | 借用 #12 配對 | ssd | `drl_threshold_trading.py` | **命題2 對照組**：傳統配對底 + DL-THR |
+| 16 | Grid GICS-SDP DRL | 借用 #14 配對 | ssd_dtw_pca | `drl_threshold_trading.py` | **命題2 對照組**：傳統配對底 + DL-THR |
 
 實際清單以執行 `Project/Scripts/python.exe -c "import strategies.config as c; [print(i,s['name']) for i,s in enumerate(c.strategies_raw_all)]"` 為準（敏感性分析等環境變數會附加額外條目到尾端，見本節末段）。
 
 **兩大命題**：**命題1（形成期）** 機器學習分組（#0–#8）能找到比傳統 GICS 產業分組（#12–14）
-更高品質的配對；**命題2（交易期）** DRL（#9–11、#15–16）能比傳統 Z-Score 有更好的交易績效（同配對對照）。
+更高品質的配對；**命題2（交易期）** 以學習法選擇門檻（#9–11、#15–16）能比固定門檻 Z-Score
+有更好的交易績效（同配對對照）。
 
-**2026-07-28 命題檢定結果**（`analysis/`，配對檢定 n=15，非新回測；細節見 `config.py` 第 291–300 行）：
-- **命題1不成立**：9 組 ML vs GICS 比較中 5 組顯著更差、無一組顯著更優，最佳案例（AGG-SSD）僅為無顯著差異。
-  機制：ML 分群會跨產業配對（11–25% 股票對），且壓縮候選池（K-means 每期僅填滿 8.7/20 名額）。
-- **命題2更強**：追加 GICS 底 DRL（#15/#16）後，DRL 增益在傳統配對底反而最大（+0.402 Sharpe，p=0.0013），
-  現於五種配對底皆成立，證明增益與配對來源正交。`analysis/drl_behavior.py` 進一步解構出增益來自
+> **命名說明。** `result.db` 的 strategy id 與模組檔名沿用 `DRL`，但該交易端的學習問題為
+> **全資訊監督回歸**（9 個動作報酬皆可反事實回算），並非強化學習。論文一律稱 **DL-THR**；
+> 真正的部分回饋版本另實作為 **RL-THR** 作為受控對照。**識別碼不改**，以維持可對照性。
+
+**2026-08-11 命題檢定結果**（`analysis/`，抽樣單位為**時間**、循環 block bootstrap L=126；
+Newey-West HAC 為對照欄。細節見 `config.py` 第 291–300 行）：
+
+- **命題1 未獲支持**（**非**「顯著更差」）：9 組 ML vs GICS 經 BH-FDR 校正後**無一顯著**
+  （校正後最小 p = 0.455），方向 **ML 優 5 組／GICS 優 4 組**。
+  ⚠️ 舊版「5 組顯著更差」建立在已被否定的 n=15 偽重複基礎上，**不應再引用**。
+  9 組 CI 全部涵蓋 0、寬 1.2–1.9pp（是 GICS 參照臂自身績效的數倍）→ **檢定力不足**，
+  既不能說 ML 較優、也不能說兩者相當。MDE 中位 **1.14pp**；對 0.3pp 的真實效果檢定力僅 **11%**。
+  機制（獨立於顯著性）：ML 分群會跨產業配對（11–25% 股票對），且壓縮候選池
+  （K-means 每期僅填滿 8.7/20 名額）。
+- **命題2 獲得支持**：五種配對底逐日差分 bootstrap 全部顯著（p = 0.0000–0.0060），
+  五個 95% CI 完全落在零的右側（最保守下界 +0.20pp）。增益在**傳統 GICS 配對底最大**
+  （年化 +1.105pp），證明增益與配對來源正交。`analysis/drl_behavior.py` 解構出增益來自
   門檻選擇（62% 決策偏離靜態基準），而非選擇性 SKIP。
+  ⚠️ 門檻管道**並非毫無貢獻**：HDBSCAN 底複製 28.4%（p=0.014），五組介於 −8.9% ~ 28.4%。
+- **組合系統**（動態分群 + DL-THR vs GICS + 固定門檻，排序已對齊）：六組中**五組 BH 後顯著**
+  （+0.63 ~ +1.51pp）。成分分解：**DL-THR 成分 6/6 顯著、分群成分 0/6 顯著**。
+  → **完整系統顯著優於傳統基準，但功勞歸屬未定。**
+- **絕對績效**：等權組合六組全部不顯著（CI 寬 2.4–2.9pp，Sharpe 0.09–0.21）；
+  DSR 在 N=110 下 SR0=0.408 而六族最高 SR 僅 0.392，無一通過 0.95。
+  **所有宣稱皆為相對宣稱，不主張策略本身可獲利。**
 
 **已封存的負面結果**：舊版研究框架消融 ResidFDR、MST 偏相關圖候選、SEC-PIT Beta、
 GICS 分組×排序×篩選 NF 消融、多尺度動量特徵消融，經回測皆為負面／劣於骨幹，已隨其宿主策略移至
@@ -195,7 +215,8 @@ regime 分層、break-even、Deflated Sharpe、`drl_behavior.py` 決策分解為
 
 **已封存策略**：`archive/config_archived_strategies.py`
 （HDBSCAN 舊特徵系×4、Ensemble×2、DRL v1×3、Kalman×2、CONV×2、
-DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Loadings DRL×2、ML Pair Quality×1 等），
+DRL FQI 系×3〔逐日定位動作空間已證偽〕、HDBSCAN PCA-Loadings DRL×2、ML Pair Quality×1 等；
+此處 `DRL v1/FQI` 為**真正的**強化學習實作，與現役 DL-THR 不同），
 封存理由與完整診斷數據見該檔 docstring，歷史回測結果保留於 `results/result.db`。
 ⚠️ HDBSCAN PCA-Loadings 的形成期配對仍被借用，formation DB 資料列不可刪。
 
@@ -272,7 +293,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 現役策略全數強制或原生走此路徑（路徑 A 原始 log-price OLS 殘差空間、路徑 B1 累積回報比值空間
 僅供已封存策略使用，程式碼保留於 `zscore_trading.py._compute_spread()`）。
 
-### DRL 門檻選擇式 v4（`drl_threshold_trading.py`）
+### DL-THR 門檻選擇式 v4（`drl_threshold_trading.py`，db id 仍為 `…-DRL`）
 
 - **動作空間**：SKIP + 8 組 `(entry_z, exit_z)` 門檻 ∈ `{1.5,2.0,2.5,3.0} × {0.0,0.5}`，每配對每期只選 1 個
 - **學習範式**：Walk-forward 反事實監督回歸（12 維形成期特徵 → 9 動作預期報酬），非探索型 RL——
@@ -294,7 +315,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 6. **VOL ADJ**：波動率自適應（`use_vol_adjust`，動態放大 σ）
 
 兩個交易模組（`zscore_trading.py`、`drl_threshold_trading.py`）共用完全相同的部位配置公式與六大風控設計原則，
-確保「Z-Score 基準 vs DRL 疊加」比較時唯一變因是交易決策邏輯。詳見 `notebooks/trading/drl_threshold_trading.ipynb`。
+確保「固定門檻 Z-Score 基準 vs DL-THR 疊加」比較時唯一變因是交易決策邏輯。詳見 `notebooks/trading/drl_threshold_trading.ipynb`。
 
 ---
 

@@ -375,6 +375,60 @@ for _eps0, _epsf, _etag in ((0.05, None, "E05"),
     })
 
 
+# ── 許鈞翔 (2025) 設定復現：對照組差異的定位實驗（2026-08-06）──────────────
+# 指導教授質疑本研究的回測結果與前一屆學生（許鈞翔 2025，ref/ 內）差異過大。
+# 逐項比對其論文第三章後，兩份研究只有「單邊交易成本 0.29%」是相同的，
+# 其餘五項全不同。本組以本引擎重現他的設定，用來判定差異是「口徑」還是「方法」：
+#
+#   項目        許鈞翔 (2025)                    本研究主線
+#   ─────────────────────────────────────────────────────────────
+#   樣本期間    2008-01 ~ 2024-12（16 年）        2000-01 ~ 2025-12（25 年）
+#   分組        無（全市場 112,101 對）           GICS 或 ML 分群，群內配對
+#   篩選        只有 ADF，p < 0.01                ADF p<0.05 + 半衰期 + Hurst
+#   排序        SSD / DTW / SSD⊕DTW 的 PCA PC1    同（但 SSD 後端先排序後檢定）
+#   取幾對      前 5 對                           網格 1/3/5/10/20，主口徑全網格等權
+#   報酬口徑    R^EC 動用資本                      承諾資本為主
+#   交易期      6 或 12 個月                       126 交易日 ≈ 6 個月
+#
+# 期間以環境變數控制（BACKTEST_START=2008-01 BACKTEST_END=2024-12），
+# 不寫死於此，使同一組條目也能在全期上跑作為對照。
+# 交易期 12 個月需另設 trading_window=252，屬第二階段實驗，此處先做 6 個月。
+for _hs_rb, _hs_tag in (("ssd", "SSD"), ("dtw", "DTW"), ("ssd_dtw_pca", "SDP")):
+    _p_hsu = {**base_params, **_GRID_COMMON,
+              "cluster_method": "none",          # 不分組：全市場配對
+              "ranking_backend": _hs_rb,
+              "filter_mode": "adf_only",         # 只做 ADF，無半衰期、無 Hurst
+              "adf_pvalue_threshold": 0.01,      # 他用 0.01（本研究主線用 0.05）
+              "top_n_list": [5],                 # 他只取前 5 對
+              "stop_loss_list": [0.0, 0.05, 0.10, 0.15],   # 他的四檔止損
+              "top_n": 5}
+    if _hs_rb != "ssd":
+        _p_hsu["ignore_ols_alpha"] = True
+    _grid_entries.append({
+        "name":             f"HSU25 {_hs_tag}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          f"HSU25_{_hs_tag}",
+        "db_method":        f"HSU25 ({_hs_tag})",
+        "trade_method":     "Z-Score",
+        "params":           _p_hsu,
+    })
+    # 差異第五項：進場時點（2026-08-11）。上面三條沿用本研究的突破式進場
+    # （|z| > entry_z 即進場）；許鈞翔的程式是「價差先發散到帶外、再收斂回帶內」
+    # 才進場。借用上面三條已算好的形成期配對，只換交易端，故差異可完全歸因於
+    # 進場時點。成本、止損網格、篩選、取幾對一律不動。
+    _grid_entries.append({
+        "name":             f"HSU25 {_hs_tag} REV",
+        "formation_module": "strategies.formation.cluster_formation",
+        "formation_strategy_id_base": f"HSU25 {_hs_tag}",
+        "trading_module":   "strategies.trading.zscore_reversion_entry_trading",
+        "sub_dir":          f"HSU25_{_hs_tag}_REV",
+        "db_method":        f"HSU25 ({_hs_tag}-REV)",
+        "trade_method":     "Z-Score",
+        "params":           {**_p_hsu},
+    })
+
+
 # （特徵消融「多尺度動量」：2026-07-24 驗證為負面結果——三種分群全面劣化
 #   （HDB −0.94pp、AGG −2.43pp 至 −0.65%、KM −1.40pp）。根因：動量度量「過去
 #   漲跌幅」而非「走勢同步性」，且橫斷面變異大於 PCA 載荷，在歐氏距離中主導

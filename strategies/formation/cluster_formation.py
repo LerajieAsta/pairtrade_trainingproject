@@ -18,6 +18,8 @@ K-means 特例：K-means 需預先指定群數。本組裝器以「同期 Agglom
 作為 k（資料驅動、與其他分群量級可比），先跑一次 Agglomerative 取群數再餵給
 K-means。
 """
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -50,7 +52,8 @@ class Formation:
         reversal_lookback: int = 21,
         reversal_sd_mult: float = 1.0,
         reversal_sd_scope: str = "pooled",
-        filter_mode: str = "coint",              # "coint"（三道統計過濾）| "none"（純排序消融）
+        # "coint"（三道）| "adf_only"（僅 ADF，復現許鈞翔 2025）| "none"（零道，純排序消融）
+        filter_mode: str = "coint",
         # ── 特徵組 ─────────────────────────────────────────────────
         pca_n_components: int = 5,
         factor_residual: bool = False,
@@ -124,8 +127,18 @@ class Formation:
         self.trading_window = trading_window
         self.dtw_window = dtw_window
 
+        # {ticker: 群標籤}。ML 分群時為原始整數標籤（−1 = HDBSCAN 雜訊）；
+        # cluster_method="gics" 時為產業名、"none" 時為 "All_Market"——
+        # 三者都記錄，稽核時分組層的每一個臂才對稱可查。
         self.cluster_labels_: dict = {}
         self.selected_pairs: pd.DataFrame = pd.DataFrame()
+
+        # 分階段存檔（指導教授建議：分組／排序／篩選各自可稽核）。
+        # 環境變數 FORMATION_TRACE=1 開啟；預設關閉以維持既有行為與資料量。
+        # 開啟後 run_formation 會把 cluster_labels_ 與 stage_trace_ 落地成
+        # formation_groups / formation_ranked 兩張表。
+        self.collect_trace = os.environ.get("FORMATION_TRACE", "").strip() in ("1", "true", "yes")
+        self.stage_trace_: list | None = None
 
     def _lookup_sector(self, ticker: str) -> str:
         return self.real_sector_mapping.get(
@@ -231,7 +244,9 @@ class Formation:
                 self.selected_pairs = pd.DataFrame()
                 return self.selected_pairs
             cluster_map = {t: "All_Market" for t in valid_tickers}
-            self.cluster_labels_ = {}
+            # 分組層的零點也要留紀錄：稽核時「對照組沒有分組紀錄」會讓
+            # 命題 1 的核心比較（ML 分群 vs GICS vs 不分組）少一邊可查。
+            self.cluster_labels_ = dict(cluster_map)
             print(f"  [Formation] 不分組（全市場單一組）：{len(valid_tickers)} 檔 | "
                   f"候選對數 {len(valid_tickers) * (len(valid_tickers) - 1) // 2:,}")
         elif self.cluster_method == "gics":
@@ -241,7 +256,7 @@ class Formation:
                 self.selected_pairs = pd.DataFrame()
                 return self.selected_pairs
             cluster_map = {t: self._lookup_sector(t) for t in valid_tickers}
-            self.cluster_labels_ = {}
+            self.cluster_labels_ = dict(cluster_map)
             n_groups = len({v for v in cluster_map.values() if v != "Unknown"})
             n_unknown = sum(1 for v in cluster_map.values() if v == "Unknown")
             print(f"  [Formation] GICS 產業分組：{n_groups} 產業 | "
@@ -268,8 +283,14 @@ class Formation:
                 f"過小群/噪音併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）"
             )
 
+        # 分階段稽核：排序層與篩選層的逐候選軌跡（cluster_labels_ 已在上方備妥）。
+        # 統計量本來就會算，這裡只是不再丟棄；trace=None 時行為與既往完全相同。
+        self.stage_trace_ = [] if self.collect_trace else None
+
         # 群內共整合篩選 + 距離排序（經中性排序層）
         selected = rank_within_groups(
+            trace=self.stage_trace_,
+            adf_only=(self.filter_mode == "adf_only"),
             method=self.ranking_backend,
             price_df=self.price_df[valid_tickers],
             form_start=self.form_start,

@@ -48,6 +48,63 @@ def _compute_hurst(series: np.ndarray, already_stationary: bool = False) -> floa
         h = 0.5
     return np.clip(h, 0.0, 1.0)
 
+def _compute_hurst_rs(series: np.ndarray, already_stationary: bool = False,
+                      n_scales: int = 12, min_scale: int = 16) -> float:
+    """
+    標準 R/S 分析估計 Hurst 指數（多尺度 + 不重疊區塊平均）。
+
+    與 `_compute_hurst` 的差異，以及為何需要這一版
+    ------------------------------------------------------------------
+    `_compute_hurst` 只取 3 個尺度（n//4, n//2, n），且三者是**巢狀前綴**
+    （都從序列開頭取），彼此高度相依；再用 3 個點 polyfit 求斜率、最後
+    clip 到 [0, 1]。在已知答案的合成序列上實測（n=252）：
+
+        白噪音（真實 H=0.5）          → 0.292
+        隨機漫步的差分（真實 H=0.5）  → 0.671
+
+    同一個真值給出 0.29 與 0.67，且真實資料中約 21% 的輸出恰好等於 1.0
+    （clip 邊界，即估計飽和）。本版改為 Mandelbrot 的標準作法：
+
+      · 多個尺度（預設 12 個，log 均勻分佈於 [min_scale, n/2]）
+      · 每個尺度把序列切成 ⌊n/m⌋ 個**不重疊**區塊，各算 R/S 後取平均
+      · 對 (log m, log R/S) 回歸取斜率
+
+    回傳未 clip 的原始斜率（NaN 表示尺度不足），使飽和情形可被看見而非
+    被邊界吸收。呼叫端若需要 [0,1] 請自行 clip。
+    """
+    x = np.asarray(series, dtype=float)
+    x = x if already_stationary else np.diff(x)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < min_scale * 2:
+        return np.nan
+
+    scales = np.unique(
+        np.logspace(np.log10(min_scale), np.log10(n // 2), n_scales).astype(int))
+    scales = scales[scales >= min_scale]
+    xs, ys = [], []
+    for m in scales:
+        k = n // m
+        if k < 1:
+            continue
+        # 向量化：把前 k*m 點 reshape 成 (k, m) 的不重疊區塊，逐列一次算完。
+        # 逐區塊 Python 迴圈在全量回測上會多花數小時，此處省掉。
+        blocks = x[:k * m].reshape(k, m)
+        s = blocks.std(axis=1, ddof=1)
+        dev = np.cumsum(blocks - blocks.mean(axis=1, keepdims=True), axis=1)
+        rs = (dev.max(axis=1) - dev.min(axis=1)) / np.where(s < 1e-12, np.nan, s)
+        rs = rs[np.isfinite(rs)]
+        if rs.size:
+            xs.append(np.log(m))
+            ys.append(np.log(float(rs.mean())))
+    if len(xs) < 3:
+        return np.nan
+    try:
+        return float(np.polyfit(xs, ys, 1)[0])
+    except Exception:
+        return np.nan
+
+
 def _ols(y: np.ndarray, x: np.ndarray) -> tuple[float, float, np.ndarray]:
     """簡易 OLS：y = alpha + beta * x + resid，回傳 (alpha, beta, residuals)"""
     n = len(y)

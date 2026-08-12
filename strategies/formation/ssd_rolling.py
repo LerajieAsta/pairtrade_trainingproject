@@ -37,6 +37,13 @@ class Formation:
         self.halflife_max = kwargs.get("trading_window", 126) / 3.0
         # 篩選消融開關（預設 True＝現行行為）：False 時跳過 ADF/半衰期/Hurst
         self.enable_filters = kwargs.get("enable_filters", True)
+        # 分階段稽核軌跡（預設 None＝不記錄，行為與既往完全相同）。
+        # 給一個 list 時，每個被評估的候選對會附上排序分數與三道檢定的統計量，
+        # 供 run_formation 落地成 formation_ranked / formation_filtered。
+        # 這些統計量本來就會算，只是過去被丟棄；記錄不增加任何計算。
+        self.trace = kwargs.get("trace", None)
+        # filter_mode="adf_only"：只做 ADF（復現許鈞翔 2025 的篩選層）
+        self.adf_only = kwargs.get("adf_only", False)
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -109,7 +116,7 @@ class Formation:
         candidates = all_pairs_df.head(candidates_limit)
         
         filtered_records = []
-        for _, row in candidates.iterrows():
+        for _cand_rank, (_, row) in enumerate(candidates.iterrows(), start=1):
             x_val = self.normalized_df[row["Ticker_B"]].values
             y_val = self.normalized_df[row["Ticker_A"]].values
             beta = row["Hedge_Ratio"]
@@ -123,7 +130,18 @@ class Formation:
                 halflife_min=1.0, halflife_max=self.halflife_max,
                 hurst_threshold=0.50, adf_max_lags=1,
                 enabled=self.enable_filters,
+                adf_only=self.adf_only,
             )
+            if self.trace is not None:
+                self.trace.append({
+                    "Ticker_A": row["Ticker_A"], "Ticker_B": row["Ticker_B"],
+                    "Group": row["Sector"], "Rank_Backend": "ssd",
+                    "Rank_Score": float(row["SSD"]), "Cand_Rank": _cand_rank,
+                    "adf_stat": _stats["adf_stat"], "adf_p": _stats["adf_p"],
+                    "halflife": _stats["halflife"], "hurst": _stats["hurst"],
+                    "hurst_rs": _stats["hurst_rs"],
+                    "Passed": int(passed),
+                })
             if not passed:
                 continue
 

@@ -1548,8 +1548,8 @@ margin-right: 0; }
 </blockquote>
 </section></section>
 <section>
-<section id="深度學習法命題-2" class="title-slide slide level1 center">
-<h1>3.4 深度學習法（命題 2）</h1>
+<section id="門檻選擇的深度學習實作命題-2" class="title-slide slide level1 center">
+<h1>3.4 門檻選擇的深度學習實作（命題 2）</h1>
 
 </section>
 <section id="動作空間門檻選擇式而非逐日定位" class="slide level2 scrollable">
@@ -1626,6 +1626,23 @@ margin-right: 0; }
 </div>
 </div>
 </div>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>命名說明</strong></p>
+</div>
+<div class="callout-content">
+<p>本研究早期版本及程式碼中稱此交易端為「<strong>DRL</strong>」（deep reinforcement learning）。 依上述，其學習問題為<strong>全資訊監督回歸</strong>而非強化學習——動作報酬可完整反事實回算， 不存在探索與利用的取捨。為避免與真正的部分回饋設定混淆， 本文一律稱其為 <strong>DL-THR</strong>（deep-learning threshold selection）。</p>
+<p>此區分具實質意義：下一張的受控對照刻意實作了一個<strong>真正的</strong> contextual bandit 版本（<strong>RL-THR</strong>），若主臂仍沿用「DRL」之名，該節將無法閱讀。</p>
+<blockquote>
+<p><code>result.db</code> 的 strategy id（如 <code>Grid (AGG-SSD-DRL)</code>）為<strong>歷史命名</strong>， 未隨本文更動，以維持與既有回測輸出的可對照性。</p>
+</blockquote>
+</div>
+</div>
+</div>
 </section>
 <section id="前視偏誤的防範與隨機性處理" class="slide level2">
 <h2>前視偏誤的防範與隨機性處理</h2>
@@ -1649,7 +1666,7 @@ margin-right: 0; }
 </section>
 <section id="受控對照把全資訊標籤換成部分回饋" class="slide level2">
 <h2>受控對照：把全資訊標籤換成部分回饋</h2>
-<p>上述設計有一個名實不符之處必須先講明：本研究的交易端<strong>不是強化學習</strong>。 9 個動作的報酬在每個歷史配對期上都能精確反事實回算，模型拿到的是完整答案卷， 學習形式為<strong>全資訊監督回歸</strong>（MLP + MSE，決策取 <span class="math inline">\arg\max</span>），既無探索問題、 亦無序列信用分配。沿用 <code>DRL</code> 一詞僅因其為 <code>result.db</code> 的既有欄位值。 以下稱主要交易端為 <strong>DL-THR</strong>。</p>
+<p>如前所述，<strong>DL-THR 不是強化學習</strong>：9 個動作的報酬在每個歷史配對期上都能精確 反事實回算，模型拿到的是完整答案卷，學習形式為全資訊監督回歸 （MLP + MSE，決策取 <span class="math inline">\arg\max</span>），既無探索問題、亦無序列信用分配。</p>
 <p>為分離「學習演算法」與「這個問題碰巧是全資訊的」兩件事，本研究另建 <strong>RL-THR</strong> 作為受控對照。它保持動作選單、12 維狀態、網路結構與 walk-forward 切分<strong>逐位元相同</strong> （特徵函式直接引用同一份實作），只改兩處：</p>
 <table class="caption-top">
 <thead>

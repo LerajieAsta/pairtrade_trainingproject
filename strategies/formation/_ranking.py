@@ -33,6 +33,8 @@ def rank_within_groups(
     trading_window: int = 126,
     dtw_window: int = 15,
     enable_filters: bool = True,   # False → 跳過三道統計過濾（純排序消融）
+    trace: list = None,            # 非 None 時，各後端附上排序分數與三道檢定統計量
+    adf_only: bool = False,        # True → 篩選層只做 ADF
     **_ignored,
 ) -> pd.DataFrame:
     """
@@ -54,6 +56,8 @@ def rank_within_groups(
             min_tickers_for_pairing=min_tickers_for_pairing,
             trading_window=trading_window,
             enable_filters=enable_filters,
+            trace=trace,
+            adf_only=adf_only,
         )
         if adf_pvalue_threshold is not None:
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
@@ -72,6 +76,8 @@ def rank_within_groups(
             method=method,
             trading_window=trading_window,
             enable_filters=enable_filters,
+            trace=trace,
+            adf_only=adf_only,
         )
         if adf_pvalue_threshold is not None:
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
@@ -93,6 +99,8 @@ def rank_within_groups(
                                   if adf_pvalue_threshold is not None else 0.05),
             trading_window=trading_window,
             enable_filters=enable_filters,
+            trace=trace,
+            adf_only=adf_only,
             **{k: v for k, v in _ignored.items()
                if k in ("lookback", "sd_mult", "sd_scope")},
         )

@@ -1295,14 +1295,14 @@ margin-right: 0; }
 <h1>2.3 交易策略</h1>
 
 </section>
-<section id="自固定門檻至深度強化學習" class="slide level2">
-<h2>自固定門檻至深度強化學習</h2>
+<section id="自固定門檻至學習式門檻選擇" class="slide level2">
+<h2>自固定門檻至學習式門檻選擇</h2>
 <p><strong>固定門檻</strong>（GGR, 2006） 偏離 <span class="math inline">2\sigma</span> 進場、回歸至零平倉、期末強平。 優點：無參數估計、門檻具統計意涵。 <strong>限制：門檻為外生給定且固定</strong>——低波動期過於保守，高波動期過於激進。</p>
 <p><strong>隨機控制與動態估計</strong> Elliott, van der Hoek &amp; Malcolm (2005) 將價差建模為 <strong>OU 過程</strong>， 以 Kalman 濾波估計隱含狀態，推導最適邊界。 優勢：具明確最適性定義。代價：<strong>真實動態偏離假設時最適性不成立</strong>。 Do, Faff &amp; Hamza (2006) 則主張對沖比例本身應隨時間變動。</p>
 <p><strong>監督式學習</strong> Krauss, Do &amp; Huck (2017) 以 DNN／GBT／隨機森林預測相對報酬—— 惟其架構已近於<strong>橫斷面選股</strong>，而非傳統配對交易。</p>
 </section>
-<section id="深度強化學習drl" class="slide level2">
-<h2>深度強化學習（DRL）</h2>
+<section id="深度強化學習drl路線" class="slide level2">
+<h2>深度強化學習（DRL）路線</h2>
 <blockquote>
 <p>Kim &amp; Kim (2019)：以 DRL <strong>同時最適化進場門檻與停損邊界</strong>， 動作空間為門檻組合的離散集合，報酬函數為交易損益， 報告優於固定門檻的傳統規則。</p>
 <p>朱羿璁 (2025)：結合共整合避險比率與混合獎勵設計，於台灣市場驗證類似架構。</p>
@@ -1314,12 +1314,25 @@ margin-right: 0; }
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>「DRL」一詞在本研究中的兩種所指</strong></p>
+<p><strong>本研究於此路線上的位置</strong></p>
 </div>
 <div class="callout-content">
-<p>上述文獻採用的是真正的強化學習：只觀測<strong>所選動作</strong>的報酬，須以探索換取資訊。</p>
-<p>本研究命題 2 的主要交易端 <strong>DL-THR</strong> 並非如此。9 個門檻在每個歷史配對期上的 報酬皆可<strong>精確反事實回算</strong>，學習形式因而是<strong>全資訊監督回歸</strong>（MLP + MSE， 決策取 argmax），既無探索問題、亦無序列信用分配。沿用 <code>DRL</code> 一詞僅因其為 <code>result.db</code> 的既有欄位值，不代表方法歸屬。</p>
-<p>真正的部分回饋版本以 <strong>RL-THR</strong> 另行實作——同一組動作選單、同一組狀態特徵， 僅改為「只觀測所選動作的報酬 + ε-greedy」——作為命題 2 的受控對照， 用以量化反事實標籤本身的價值。</p>
+<p>本研究沿用 Kim &amp; Kim (2019) 的<strong>動作空間設計</strong>（自離散的門檻組合中擇一）， 但<strong>不</strong>沿用其學習範式。</p>
+<p>在本研究的設定下，歷史配對期中全部 <strong>9 個動作的報酬皆可精確反事實回算</strong>， 故該學習問題為<strong>全資訊監督回歸</strong>而非部分回饋的強化學習（詳見 §3.4.4）。 本研究因此稱此交易端為 <strong>DL-THR</strong>，並另實作一個真正的部分回饋版本 （<strong>RL-THR</strong>：同一動作選單、同一狀態，僅改為只觀測所選動作的報酬 + ε-greedy） 作為受控對照，用以估計反事實標籤本身的價值。</p>
+</div>
+</div>
+</div>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>此一區分具文獻上的意義</strong></p>
+</div>
+<div class="callout-content">
+<p>既有研究在同類設定下沿用「深度強化學習」之名時， <strong>未必檢視其問題結構是否真的具有探索與利用的取捨</strong>。</p>
+<p>若動作報酬可完整回算，強化學習的機制優勢即不成立—— 觀察到的增益應歸因於<strong>門檻選擇這個決策形式</strong>，而非強化學習演算法。</p>
 </div>
 </div>
 </div>
@@ -1333,7 +1346,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>可在<strong>同一批配對</strong>上施行 → 兩臂承受完全相同的市場風險、配對品質與期間 → 構成天然的單變因對照。</p>
-<p>此性質使命題 2 的檢定力遠高於命題 1。</p>
+<p>此性質使命題 2 的檢定力遠高於命題 1（標準誤相差 1.89 倍，見 §4.1.3）。</p>
 </div>
 </div>
 </div>
@@ -1343,7 +1356,7 @@ margin-right: 0; }
 <p><strong>Do &amp; Faff (2012) 的方法論建議</strong> 估計美股配對交易單邊成本約 <strong>30 個基點</strong>（含佣金與市場衝擊）， 並主張報告 <strong>break-even 成本</strong>——使淨利歸零的成本水準—— 以使結論不依賴單一成本假設。</p>
 <h3 id="本研究與既有文獻的區隔">本研究與既有文獻的區隔</h3>
 <p><strong>一、同一批配對上的單變因對照</strong> 固定形成期產出，僅替換交易端。</p>
-<p><strong>二、增益來源的分解</strong> 既有文獻多僅報告 DRL 是否較優。本研究將 DL-THR 的動作還原後， 分解為「<strong>拒絕交易</strong>」與「<strong>調整門檻</strong>」兩條管道，並對各管道設置對照。</p>
+<p><strong>二、增益來源的分解</strong> 既有文獻多僅報告學習式交易端是否較優。本研究將 DL-THR 的動作還原後， 分解為「<strong>拒絕交易</strong>」與「<strong>調整門檻</strong>」兩條管道，並對各管道設置對照。</p>
 <p><strong>三、成本敏感度的量化</strong> 依 Do &amp; Faff (2012) 建議報告 break-even 成本，而非僅在單一假設下比較。</p>
 </section></section>
 <section>

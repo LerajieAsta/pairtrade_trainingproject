@@ -1041,7 +1041,7 @@ margin-right: 0; }
 
 <section id="title-slide" class="quarto-title-block center">
   <h1 class="title">第一章　緒論</h1>
-  <p class="subtitle">機器學習分群與深度學習於 S&amp;P 500 配對交易之實證</p>
+  <p class="subtitle">配對交易改良的分層歸因：機器學習分群與門檻選擇的受控實證</p>
 
 <div class="quarto-title-authors">
 </div>
@@ -1190,11 +1190,12 @@ margin-right: 0; }
 <p><strong>Han et al. 明確指出</strong>：獲利部分來自<strong>跨產業</strong>價差發散，且<strong>非</strong>由小型股驅動 （剔除 NYSE 規模後 20% 分位僅小幅降低獲利）。</p>
 <p><strong>Sarmento &amp; Horta 的三臂比較</strong>：分群 3.79 &gt; 不分群 3.58 &gt; <strong>依類別分組 2.59</strong></p>
 </section>
-<section id="深度強化學習的核心主張" class="slide level2">
-<h2>深度強化學習的核心主張</h2>
+<section id="門檻選擇的核心主張" class="slide level2">
+<h2>門檻選擇的核心主張</h2>
 <p><strong>主張</strong>：最適進出場門檻本應<strong>隨市場狀態變化</strong>，而固定參數無法適應。</p>
 <blockquote>
-<p>Kim &amp; Kim (2019)：以深度強化學習同時最適化<strong>進場門檻</strong>與<strong>停損邊界</strong>， 報告表現優於固定門檻的傳統規則。</p>
+<p>Kim &amp; Kim (2019)：以深度強化學習（DRL）同時最適化<strong>進場門檻</strong>與<strong>停損邊界</strong>， 報告表現優於固定門檻的傳統規則。</p>
+<p>本研究採用其<strong>動作空間</strong>（逐期選擇門檻），但不採用其學習典範—— 本研究的問題為全資訊監督回歸，故稱 <strong>DL-THR</strong>（§3.4.4）。</p>
 </blockquote>
 <h3 id="與形成期改良的關鍵差異">與形成期改良的關鍵差異</h3>
 <p>交易期改良可在<strong>同一批配對</strong>上施行 —— 這使得單變因對照成為可能： 固定形成期產出，僅替換交易端，兩臂承受完全相同的市場風險、配對品質與期間。</p>
@@ -1261,13 +1262,13 @@ margin-right: 0; }
 <p>以 S&amp;P 500 成分股 <strong>2000–2025 年</strong>資料檢驗兩個命題：</p>
 <blockquote>
 <p><strong>命題 1（形成期）</strong>　機器學習分群能建立優於傳統產業分類的配對搜尋空間。</p>
-<p><strong>命題 2（交易期）</strong>　深度學習交易端能取得優於傳統 Z-Score 規則的績效。</p>
+<p><strong>命題 2（交易期）</strong>　以學習法選擇交易門檻，能取得優於固定門檻規則的績效。</p>
 </blockquote>
 <h3 id="單變因檢定設計">單變因檢定設計</h3>
 <p>採<strong>中性組裝器</strong>架構，將形成期拆解為四個可獨立替換的層 （特徵 → 分組 → 群內排序 → 統計篩選），使任兩策略之間僅存單一變因：</p>
 <ul>
 <li><strong>檢定命題 1</strong>：固定特徵、排序、篩選與交易端，僅變動<strong>分組方法</strong> （HDBSCAN／Agglomerative／K-means／<strong>GICS 產業分類</strong>）</li>
-<li><strong>檢定命題 2</strong>：固定形成期產出的<strong>同一批配對</strong>，僅變動<strong>交易端</strong> （Z-Score 規則／深度學習門檻選擇）</li>
+<li><strong>檢定命題 2</strong>：固定形成期產出的<strong>同一批配對</strong>，僅變動<strong>交易端</strong> （固定門檻 Z-Score 規則／<strong>DL-THR</strong> 門檻選擇）</li>
 </ul>
 </section>
 <section id="三項方法論目標" class="slide level2">
@@ -1339,7 +1340,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>配對交易的學術獲利證據建立於 2000 年代之前的樣本， 而後續研究一致指出其報酬正在衰減。</p>
-<p>機器學習與深度學習被提出作為兩階段的改良方案， 並在特定研究環境下報告了顯著的績效優勢。</p>
+<p>機器學習分群與學習式門檻選擇被提出作為兩階段的改良方案， 並在特定研究環境下報告了顯著的績效優勢。</p>
 <p><strong>本研究的核心工作</strong>：在<strong>受控的單變因設計</strong>與<strong>正確的統計推論基礎</strong>上， 檢驗這兩項改良能否於公開可得的資料條件下複製其宣稱的優勢； 並在未能複製時，將失敗原因歸因至<strong>可辨識的具體來源</strong>。</p>
 </div>
 </div>

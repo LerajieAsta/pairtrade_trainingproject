@@ -31,6 +31,15 @@ if hasattr(sys.stdout, "reconfigure"):
 from strategies.config import INITIAL_CAPITAL, CONCURRENT_PERIODS, RF_ANNUAL
 
 
+# SQLite 的 busy_timeout（秒）。WAL 下寫入者互相排隊，每個 worker 要 executemany
+# 三萬多列再 commit（約 10 秒），worker 一多就有人等超過門檻而拿到 "database is
+# locked"。舊值 60 秒在 CPU_LIMIT_PCT=0.5（約 8 個 worker）下仍會失敗——2026-08-10
+# 的全量重跑因此丟了 14 格、EZ 重跑又丟 3 格。
+# 提高到 600 秒等於「排隊而非放棄」：最壞情況是所有 worker 依序寫，遠低於此值。
+# 這比調低 CPU_LIMIT_PCT 好——後者是拿全程速度換寫入那一瞬間的爭用。
+_DB_BUSY_TIMEOUT = float(os.environ.get("DB_BUSY_TIMEOUT", "600"))
+
+
 def get_db_connection(db_path="results/result.db", max_retries=5, retry_delay=0.5):
     """
     建立並取得 SQLite 資料庫連線，並配置效能優化參數。
@@ -51,8 +60,8 @@ def get_db_connection(db_path="results/result.db", max_retries=5, retry_delay=0.
 
     for attempt in range(max_retries):
         try:
-            # timeout=60.0 本身就會讓 SQLite 內部自動等待解鎖
-            conn = sqlite3.connect(db_path, timeout=60.0)
+            # timeout 即 busy_timeout：SQLite 內部自動等待解鎖而非立刻拋錯
+            conn = sqlite3.connect(db_path, timeout=_DB_BUSY_TIMEOUT)
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=OFF;")
             conn.execute("PRAGMA cache_size=-2000000;")
@@ -585,5 +594,64 @@ def init_formation_db(db_path="formation_data/formation_pairs.db"):
         PRIMARY KEY ("strategy_id", "Period_Start")
     );
     """)
+
+    # ── 分階段稽核表（FORMATION_TRACE=1 時才寫入）────────────────────────────
+    # formation_pairs 只留下「最後選出的 top_n」，看不到分組怎麼分、哪些候選被
+    # 排在前面、又是哪一道檢定把誰刷掉。下面兩張表把四層管線的中間產物留下來，
+    # 使每一層各自可稽核（指導教授要求）。
+    #
+    # formation_groups：分組層的輸出。每檔股票在該期被分到哪一群。
+    #   GICS 分組時 Cluster_Label 即產業名；cluster_method="none" 時為 All_Market。
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS formation_groups (
+        "strategy_id" TEXT,
+        "Period_Start" TEXT,
+        "Ticker" TEXT,
+        "Cluster_Label" TEXT,
+        PRIMARY KEY ("strategy_id", "Period_Start", "Ticker")
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_formation_groups_strat "
+                   "ON formation_groups (strategy_id, Period_Start);")
+
+    # formation_ranked：排序層與篩選層的逐候選軌跡。
+    #   Rank_Score  排序準則的分數（SSD 距離或 DTW 距離；DTW 後端未通過者為 NULL，
+    #               因其先檢定後排序，被刷掉的配對根本沒算距離）
+    #   Cand_Rank   SSD 後端的候選名次（先排序後檢定，故有名次）；DTW 後端為 NULL
+    #   adf_p / halflife / hurst  三道檢定的實際統計量（短路後未算者為 NULL）
+#   hurst_rs    標準多尺度 R/S 版的 Hurst；與 hurst 並存以便事後對照兩種
+#               估計式對配對取捨的影響，無需重跑（決策用哪版看 HURST_METHOD）
+    #   Passed      1=三道全過並進入候選池；0=被刷掉
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS formation_ranked (
+        "strategy_id" TEXT,
+        "Period_Start" TEXT,
+        "Ticker_A" TEXT,
+        "Ticker_B" TEXT,
+        "Group_Label" TEXT,
+        "Rank_Backend" TEXT,
+        "Rank_Score" REAL,
+        "Cand_Rank" INTEGER,
+        "adf_stat" REAL,
+        "adf_p" REAL,
+        "halflife" REAL,
+        "hurst" REAL,
+        "hurst_rs" REAL,
+        "Passed" INTEGER,
+        PRIMARY KEY ("strategy_id", "Period_Start", "Ticker_A", "Ticker_B")
+    );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_formation_ranked_strat "
+                   "ON formation_ranked (strategy_id, Period_Start);")
+
+    # 欄位遷移：CREATE TABLE IF NOT EXISTS 對「已存在但欄位較舊」的表毫無作用，
+    # 於是新欄位只會在 INSERT 時炸掉，而合併迴圈的 except 會把它吞掉。
+    # 這裡逐欄補齊，讓舊的 formation DB 也能接上新 schema。
+    for _tbl, _col, _typ in (("formation_ranked", "hurst_rs", "REAL"),):
+        try:
+            cursor.execute(f'ALTER TABLE {_tbl} ADD COLUMN "{_col}" {_typ};')
+        except Exception:
+            pass   # 已存在
+
     conn.commit()
     return conn

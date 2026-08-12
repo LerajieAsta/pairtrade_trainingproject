@@ -30,6 +30,13 @@ Git 上是新的，網頁上是舊的，兩邊都「沒錯」。
 | 三　研究方法 | `03_研究方法.md` | `…/ch3_methodology.ipynb` | `…/ch3_methodology.html` |
 | 四　實證結果 | `04_實證結果.md` | `…/ch4_results.ipynb` | `…/ch4_results.html` |
 | 五　結論 | `05_結論.md` | `…/ch5_conclusion.ipynb` | `…/ch5_conclusion.html` |
+| 附錄 A　前行研究差異定位 | `06_附錄A_前行研究差異定位.md` | — | — |
+
+> 附錄 A **只有散文稿**，未做投影片。它是 §5.3 其九的展開（與許鈞翔 2025 的
+> 八項差異、其中進場時點一項的受控隔離結果），BH 校正後 0/3 顯著，
+> 強度不足以進主軸；但其三條策略已計入第四章 DSR 的試驗宇宙（$N$ = 110），
+> 故**必須揭露**。若日後補做投影片，記得同時加 `docs/index.html`／`docs/appendix.html`
+> 的卡片與 `notebooks/_deck_nav.html` 的清單。
 
 ## 渲染到已發佈網站
 
