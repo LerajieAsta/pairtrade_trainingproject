@@ -27,3 +27,33 @@ $code-block-font-size: 0.62em;
 .reveal .katex { font-size: 1.06em; }
 
 .reveal .callout { font-size: 0.75em; }
+
+// Quarto 預設把 callout 標題設為 opacity 85%／75%，配上淡色標題帶後
+// 文字會呈現褪色的「浮水印」感，緊貼下方表格時尤其明顯。改為全不透明。
+.reveal div.callout.callout-style-default div.callout-title,
+.reveal div.callout.callout-style-simple div.callout-title {
+  opacity: 1;
+}
+
+// Quarto 把 aside 絕對定位釘在投影片底部（position:absolute; bottom:20px），
+// 使其脫離文件流。內容較長的投影片，正文會直接壓到 aside 上，
+// 灰色小字疊在表格與段落之上，看起來像浮水印。
+// Quarto 僅對 .slide.scrollable 還原為 relative，但該 class 不一定會加上，
+// 故此處一律強制回到正常流。
+.reveal .slide aside,
+.reveal .slide div.aside,
+.reveal.center .slide aside,
+.reveal.center .slide div.aside {
+  position: relative !important;
+  bottom: auto !important;
+  margin-top: 1.2em;
+  display: block;
+}
+
+// callout 內的表格給不透明底，避免標題色帶／邊框色透出儲存格
+.reveal .callout table,
+.reveal .callout table th,
+.reveal .callout table td {
+  background-color: var(--r-background-color, #fff);
+}
+.reveal .callout table { position: relative; z-index: 1; }
