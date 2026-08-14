@@ -271,16 +271,27 @@ class Formation:
             self.cluster_labels_ = {t: int(l) for t, l in zip(valid_tickers, labels)}
 
             # 群標籤 → 分組 map（過小群 / 噪音 併入 Unknown，排序端自動跳過）
+            #
+            # label = -1 是 HDBSCAN 的**噪音標記**（密度不足、無法歸入任何群），
+            # 必須無條件排除。舊實作只看群大小，而噪音點每期中位有 90 檔
+            # （佔 21.9%），遠超過 min_cluster_size=5，於是被映射成 "Cluster_-1"
+            # 當作一個合法群——92.2% 的期數裡它還是**最大**的一群，光這一桶就
+            # 貢獻 C(90,2)=4,005 組候選（該臂全部候選的 46%）。噪音桶依定義是
+            # 異質混合物，這使 HDBSCAN 臂有近半在做的事其實是「不分組」。
             cluster_sizes = pd.Series(labels).value_counts()
             cluster_map = {
-                t: (f"Cluster_{l}" if cluster_sizes[l] >= self.min_cluster_size else "Unknown")
+                t: (f"Cluster_{l}"
+                    if int(l) != -1 and cluster_sizes[l] >= self.min_cluster_size
+                    else "Unknown")
                 for t, l in zip(valid_tickers, labels)
             }
             n_clusters = len({v for v in cluster_map.values() if v != "Unknown"})
             n_unknown = sum(1 for v in cluster_map.values() if v == "Unknown")
+            n_noise = sum(1 for l in labels if int(l) == -1)
             print(
                 f"  [Formation] {self.cluster_method} 分組：{n_clusters} 群 | "
-                f"過小群/噪音併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）"
+                f"過小群/噪音併入 Unknown {n_unknown}/{len(valid_tickers)} 檔（排除，"
+                f"其中噪音 {n_noise} 檔）"
             )
 
         # 分階段稽核：排序層與篩選層的逐候選軌跡（cluster_labels_ 已在上方備妥）。

@@ -21,7 +21,20 @@
 ARI = 0 代表與隨機分群無異。這是分群穩定度的標準指標，
 且已對「隨機一致」作期望值校正，故不受群數變動影響。
 
-同時報告群數、標的數，以及**共同標的中改變群歸屬的比例**（較直觀但未校正）。
+同時報告群數、標的數、被排除比例，以及**共同標的中改變群歸屬的比例**
+（較直觀但未校正）。
+
+**量測對象為實際進入配對的分群結構**：HDBSCAN 的噪音點（標籤 −1）與
+成員數低於 `min_cluster_size` 的過小群，依 `cluster_formation.run()` 的規則
+併入 Unknown 後排除，不參與 ARI 計算。
+
+排除的理由是定義而非方向：噪音標記的語意是「無法歸入任何群」，把它當成
+一個群，量到的會是「無法歸類此一狀態的持續性」，而非分群結構的穩定度；
+且該桶不進入配對，其穩定與否與配對品質無關。
+
+至於納入噪音會使 ARI 偏高或偏低，取決於兩股相反力量的相對大小——
+兩期皆為噪音者被算作「持續同群」而推高，在噪音與實群之間移動者則推低——
+方向為實證問題，本工具不對其作假設。
 
 GICS 對照的 ARI 恆為 1.0（產業分類不隨期間改變），故不必實跑；
 本工具的意義在於量出三種動態分群距離那個上界有多遠。
@@ -52,7 +65,7 @@ from sklearn.metrics import adjusted_rand_score  # noqa: E402
 
 from strategies.config import (  # noqa: E402
     BACKTEST_END, BACKTEST_START, DB_PATH, FORMATION_WINDOW, FORWARD_DAYS,
-    INFO_TABLE, SECTOR_COL, TABLE_NAME, TICKER_COL, base_params,
+    INFO_TABLE, SECTOR_COL, TABLE_NAME, TICKER_COL, base_params, _GRID_COMMON,
 )
 from strategies.preprocess_equity import DataProcessor  # noqa: E402
 from strategies.formation.cluster_formation import Formation  # noqa: E402
@@ -94,23 +107,42 @@ def churn_for(method, price_pivot, all_dates, total_days, first_idx,
             prev = None
             continue
         try:
+            # 直接沿用主矩陣的 _GRID_COMMON，不逐鍵挑選。
+            # 舊寫法從 base_params 撈 pca_n_components 等三個鍵，但那三個鍵位於
+            # _GRID_COMMON，故該 dict 恆為空、全部落回 Formation 的預設值——
+            # 其中 impute_scope 的預設為 "group"，與主管線的 "global" 不符，
+            # 量到的會是另一組特徵上的分群。Formation 以 **kwargs 吸收多餘鍵，
+            # 故排序/篩選相關的鍵一併傳入無妨（本工具不呼叫 run()）。
             fm = Formation(price_df=prices, form_start=f_start, form_end=f_end,
                            sector_mapping=sector_mapping, cluster_method=method,
-                           **{k: v for k, v in base_params.items()
-                              if k in ("pca_n_components", "sector_onehot_weight",
-                                       "fundamentals_parquet_path")})
+                           **_GRID_COMMON)
             X, tickers = fm._build_feature_matrix()
             if len(tickers) < 10:
                 prev = None
                 continue
-            labels = dict(zip(tickers, [int(x) for x in fm._cluster(X)]))
+            raw = [int(x) for x in fm._cluster(X)]
         except Exception as e:
             print(f"  ⚠ {f_end} 失敗：{type(e).__name__}: {e}")
             prev = None
             continue
 
+        # 套用與 cluster_formation.run() 相同的排除規則：HDBSCAN 噪音（−1）與
+        # 過小群併入 Unknown、不進入配對。本工具繞過 run() 直接呼叫 _cluster()，
+        # 若不在此重現該規則，噪音點會被當成一個合法群：n_clusters 多算一個，
+        # 且約兩成標的被視為「彼此同群」——量到的會是噪音狀態的持續性而非
+        # 分群結構的穩定度（偏誤方向見模組 docstring）。
+        sizes = pd.Series(raw).value_counts()
+        min_cs = int(_GRID_COMMON.get("min_cluster_size", 5))
+        labels = {t: l for t, l in zip(tickers, raw)
+                  if l != -1 and sizes[l] >= min_cs}
+        if len(labels) < 10:
+            prev = None
+            continue
+
         row = {"method": method, "form_end": f_end,
-               "n_tickers": len(labels), "n_clusters": len(set(labels.values()))}
+               "n_tickers": len(labels), "n_clusters": len(set(labels.values())),
+               "n_excluded": len(tickers) - len(labels),
+               "excluded_pct": round(100 * (len(tickers) - len(labels)) / len(tickers), 2)}
         if prev is not None:
             common = sorted(set(prev) & set(labels))
             if len(common) >= 10:
@@ -167,6 +199,7 @@ def main():
         "期數": g.size(),
         "群數(中位)": g["n_clusters"].median(),
         "標的數(中位)": g["n_tickers"].median(),
+        "排除%(中位)": g["excluded_pct"].median().round(2),
         "ARI(中位)": g["ARI"].median().round(4),
         "ARI(平均)": g["ARI"].mean().round(4),
         "ARI(10-90分位)": g["ARI"].quantile(.1).round(3).astype(str)

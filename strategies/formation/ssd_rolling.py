@@ -44,6 +44,15 @@ class Formation:
         self.trace = kwargs.get("trace", None)
         # filter_mode="adf_only"：只做 ADF（復現許鈞翔 2025 的篩選層）
         self.adf_only = kwargs.get("adf_only", False)
+        # 候選池上限：None＝不截斷，對群內全部配對施加篩選後才排序（現行預設）。
+        #
+        # 舊行為為 max(200, top_n*15)：先全域按 SSD 排序、只對最近的那些候選做統計
+        # 檢定。該截斷是**全域**而非逐群，故 SSD 分布整體偏大的群可能一組配對都
+        # 輪不到被檢定——此即「排序先於篩選」，與四層架構所宣告的順序不一致，
+        # 且使截斷與分組方法產生交互作用。
+        #
+        # 保留此參數僅為可重現舊結果；正式設定一律 None。
+        self.candidate_limit = kwargs.get("candidate_limit", None)
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -111,10 +120,13 @@ class Formation:
             return pd.DataFrame()
 
         all_pairs_df = pd.DataFrame(ssd_records).sort_values("SSD").reset_index(drop=True)
-        # 先按 SSD 初篩，只對最近鄰候選對做共整合/Hurst，大幅減少慢速統計計算次數
-        candidates_limit = max(200, self.top_n * 15)
-        candidates = all_pairs_df.head(candidates_limit)
-        
+        # 四層架構的順序：分組 → 篩選 → 排序。
+        # 群內**全部**配對都要經過三道統計檢定，通過者才進入距離排序。
+        # 此處先依 SSD 排序僅為使 trace 的 Cand_Rank 有意義、並讓後續 head(top_n)
+        # 免去再排序；沒有任何配對因排序而被排除在檢定之外。
+        candidates = (all_pairs_df if self.candidate_limit is None
+                      else all_pairs_df.head(int(self.candidate_limit)))
+
         filtered_records = []
         for _cand_rank, (_, row) in enumerate(candidates.iterrows(), start=1):
             x_val = self.normalized_df[row["Ticker_B"]].values
@@ -156,7 +168,16 @@ class Formation:
                 "Spread_Std": round(spread_std, 6)
             })
             
-            if len(filtered_records) >= self.top_n * 5:
+            # 精確等價的提前中止（非近似）：
+            #
+            # 最終選取為「通過者中 SSD 最小的前 top_n 組」。候選依 SSD 遞增順序
+            # 處理，故一旦湊滿 top_n 個通過者，尚未檢定者的 SSD 皆大於已收集者，
+            # 不可能擠進前 top_n。此時停止與掃完群內全部配對**輸出完全相同**。
+            #
+            # 與舊實作的差別在於：舊版另有 max(200, top_n*15) 的**候選截斷**，
+            # 會在湊滿 top_n 之前就被迫停手，導致選不滿名額（實測 11.5/20）。
+            # 移除截斷後，掃描長度由「湊滿 top_n 所需」決定，而非固定上限。
+            if len(filtered_records) >= self.top_n:
                 break
 
         if not filtered_records:

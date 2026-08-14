@@ -124,6 +124,26 @@ base_params = {
     # 預設 0 = 停用，維持全部既有策略行為不變；啟用見 FMP TS 系列 A/B 條目。
     # （舊值 30 從未被引擎使用，改為 0 以免接線後意外改變所有策略。）
     "max_holding_days":             0,
+    # ── 資金配置：維持靜態槽位 ──────────────────────────────────────────
+    # capital_per_pair = equity / (top_n × 重疊期數)，與該期實際有幾組配對無關。
+    #
+    # 2026-08-13 曾改為 dynamic_slots=True，理由是各臂供應量差異造成曝險不等：
+    # 舊管線每期配對數為 GICS-SSD 19.81、AGG-SSD 16.98、KM-SSD 11.08，
+    # K-means 臂因此只部署 GICS 臂 56% 的資本；而命題 1 的檢定量是逐日報酬差，
+    # 與部署資本成正比，該不等會使「配對品質」的比較混入「部署規模」。
+    #
+    # 2026-08-14 撤回：移除 Hurst 關卡（filter_mode="adf_only"）後填滿率問題自行
+    # 消失——新管線的每期配對數為 GICS 20.00、AGG 20.00、KM 19.79，差異由 44%
+    # 縮為 1%。原本要修的混淆已不存在，而 dynamic_slots 需額外辯護三個無先例的
+    # 參數（slot_percentile / pair_cap_frac / slot_warmup_obs），代價不再划算。
+    #
+    # 保留判斷空間：實際部署資本取決於**同時持倉數**而非選出幾組配對，各臂的
+    # 進場訊號頻率仍可能不同。待交易期跑完後自 trade_logs 量測各臂的同時持倉數；
+    # 若確有跨臂差異再啟用（run_trading 會加 _DYN75 後綴，兩版可並存比較）。
+    "dynamic_slots":                False,
+    "slot_percentile":              75.0,
+    "pair_cap_frac":                0.15,
+    "slot_warmup_obs":              8,
     "top_n_list":                   [1, 3, 5, 10, 20],
     "stop_loss_list":               [0.0, 0.05, 0.15],
     "max_sector_ratio_list":        [0.0],
@@ -232,6 +252,29 @@ _GRID_COMMON = {
     "hdbscan_min_samples":         2,
     "adf_pvalue_threshold":        0.05,
     "dtw_window":                  15,
+    # 篩選層：只做 ADF（臨界值已於 _utils._adf_stat 改為 Engle-Granger 校準）。
+    #
+    # 原為 "coint"（ADF → OU 半衰期 → Hurst 三道）。以 formation_ranked 的全部
+    # 候選對逐層拆解後，三道實際上是一道：
+    #     ADF(舊 DF 臨界值) 淘汰 22.6% ／ 半衰期[1,42] 淘汰 0.2% ／ Hurst 淘汰 96.8%
+    # 半衰期關卡幾乎不作用（通過 ADF 的殘差本就半衰期短）；而承擔 96.8% 淘汰
+    # 工作的 Hurst，兩個實作都以 already_stationary=True 對 spread 的**水準值**
+    # 做 R/S，但標準 R/S 的估計量定義在**增量**上。對半衰期 ≤42 天的均值回歸
+    # 序列，在 R/S 使用的尺度（16 至 n/2=126）上序列尚未回歸完成 → 看起來像
+    # 隨機漫步 → H→1（標準版實測均值 0.980、H<0.5 通過率 0.0%）。legacy 版只
+    # 因採 3 個巢狀前綴尺度 + clip 到 [0,1]（21.6% 飽和於 1.0）數值才散得開，
+    # 「篩出」左尾 3.2%。該左尾對應什麼經濟性質，沒有依據可說。
+    # → 保留唯一有正確虛無分布的那一道。
+    "filter_mode":                 "adf_only",
+    # 缺失值插補範圍：改用全域中位數。
+    #
+    # 產業中位數插補會把 GICS 資訊寫進特徵向量（見 _fundamentals.impute_by_group
+    # 的 docstring）。基本面實測覆蓋率：2000–2008 兩欄皆 0%、2010 年市值 40.7%／
+    # PE 21.8%、全樣本兩欄同時有值 31.9%。缺失者填產業中位數 → 那 2 維在同產業
+    # 內完全相同，成為 GICS 的確定性函數；而該區塊佔特徵距離約 25%，是 one-hot
+    # 區塊（11%）的兩倍多。此時 sector_onehot_weight ∈ {1,0} 的消融移除不了產業
+    # 先驗——只關掉 11%，留下 25% 的後門。命題 1 必須關閉群組插補。
+    "impute_scope":                "global",
 }
 _GRID_CLUSTERS = {"hdbscan": "HDB", "agglomerative": "AGG", "kmeans": "KM"}
 _GRID_RANKINGS = {"ssd": "SSD", "dtw": "DTW", "ssd_dtw_pca": "SDP"}
@@ -285,7 +328,9 @@ _fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_
 #   (b) filter_mode 可關閉三道統計過濾（ADF/半衰期/Hurst）
 # 三項實驗：① GICS+排序（NF，無篩選）② GICS+排序+篩選 ③ 分群+排序+篩選（= 3×3 Grid）
 for _rb, _rs in _GRID_RANKINGS.items():
-    for _fm, _fs_tag in (("coint", ""),):   # NF（無篩選）消融已移附錄
+    # filter_mode 與 _GRID_COMMON 對齊為 "adf_only"（見該處說明）；
+    # NF（無篩選）消融已移附錄
+    for _fm, _fs_tag in (("adf_only", ""),):
         _pg = {**base_params, **_GRID_COMMON,
                "cluster_method": "gics", "ranking_backend": _rb,
                "filter_mode": _fm}
@@ -324,7 +369,7 @@ for _rb, _rs in _GRID_RANKINGS.items():
 # 借用 Grid GICS-{SSD,SDP} 已算好的形成期配對，零重跑 formation。
 for _rk_m, _rk_s in (("ssd", "SSD"), ("ssd_dtw_pca", "SDP")):
     _pgd = {**base_params, **_GRID_COMMON,
-            "cluster_method": "gics", "ranking_backend": _rk_m, "filter_mode": "coint",
+            "cluster_method": "gics", "ranking_backend": _rk_m, "filter_mode": "adf_only",
             "drl_hidden_size": 64, "thr_train_epochs": 40, "thr_min_train_samples": 200}
     _grid_entries.append({
         "name":             f"Grid GICS-{_rk_s} DRL",
@@ -463,11 +508,13 @@ for _hs_rb, _hs_tag in (("ssd", "SSD"), ("dtw", "DTW"), ("ssd_dtw_pca", "SDP")):
 # 設計：排序固定 ssd（主軸且最省算力），2×2×2 中缺的 5 格。GICS 兩格與
 # AGG 基準格已存在，故不重複建立。
 for _cm_g, _fm_g, _ohw, _tag in (
-    ("agglomerative", "coint", 0.0, "AGG-SSD-NOSEC"),      # 拿掉產業先驗
-    ("agglomerative", "none",  1.0, "AGG-SSD-NF"),         # 拿掉共整合篩選
-    ("agglomerative", "none",  0.0, "AGG-SSD-NF-NOSEC"),   # 兩者都拿掉（最接近 Han et al.）
-    ("none",          "coint", 1.0, "NOGRP-SSD"),          # 不分組 + 篩選
-    ("none",          "none",  1.0, "NOGRP-SSD-NF"),       # 不分組 + 無篩選
+    # 「有篩選」諸格一律用 adf_only，與主矩陣的篩選層對齊（見 _GRID_COMMON）；
+    # 「無篩選」諸格維持 none —— filter_mode 在本組本身就是被消融的那一維。
+    ("agglomerative", "adf_only", 0.0, "AGG-SSD-NOSEC"),   # 拿掉產業先驗
+    ("agglomerative", "none",     1.0, "AGG-SSD-NF"),      # 拿掉共整合篩選
+    ("agglomerative", "none",     0.0, "AGG-SSD-NF-NOSEC"),# 兩者都拿掉（最接近 Han et al.）
+    ("none",          "adf_only", 1.0, "NOGRP-SSD"),       # 不分組 + 篩選
+    ("none",          "none",     1.0, "NOGRP-SSD-NF"),    # 不分組 + 無篩選
 ):
     _pf = {**base_params, **_GRID_COMMON,
            "feature_mode": "fundamentals_mix",
@@ -557,7 +604,7 @@ _CHARS = ("agr", "egr", "bm", "chtx", "cash_ratio", "roa", "roe", "ep",
 _chars_common = {**base_params, **_GRID_COMMON,
                  "feature_mode": "fundamentals_mix",
                  "cluster_method": "agglomerative", "ranking_backend": "ssd",
-                 "filter_mode": "coint",
+                 "filter_mode": "adf_only",   # 與主矩陣對齊（見 _GRID_COMMON）
                  "fundamentals_parquet_path":
                      "dataset/fundamental/sp500_pit_characteristics_monthly.parquet",
                  "sector_onehot_weight": 0.0,
@@ -603,7 +650,7 @@ for _cm_f, _cs_f in (("hdbscan", "HDB"), ("agglomerative", "AGG"), ("kmeans", "K
             "params": {**base_params, **_GRID_COMMON,
                        "feature_mode": "fundamentals_mix",
                        "cluster_method": _cm_f, "ranking_backend": "ssd",
-                       "filter_mode": "coint",
+                       "filter_mode": "adf_only",   # 與主矩陣對齊（見 _GRID_COMMON）
                        "structural_features": _feats,
                        "structural_weight": 1.0,
                        # 唯一相對原始 F09 的改動

@@ -1,5 +1,6 @@
 import numpy as np
 from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.adfvalues import mackinnonp
 
 
 def _johansen_test(y: np.ndarray, x: np.ndarray) -> tuple[bool, float]:
@@ -116,15 +117,55 @@ def _ols(y: np.ndarray, x: np.ndarray) -> tuple[float, float, np.ndarray]:
     alpha, beta = float(coeffs[0]), float(coeffs[1])
     return alpha, beta, y - alpha - beta * x
 
-def _adf_stat(resid: np.ndarray, max_lags: int = 1) -> tuple[float, float]:
-    """ADF 檢定（no constant），同時回傳 (統計量, p 值)"""
+def _adf_stat(resid: np.ndarray, max_lags: int = 1,
+              eg_nvars: int = 2) -> tuple[float, float]:
+    """
+    Engle-Granger 第二步的殘差 ADF 檢定，回傳 (統計量, p 值)。
+
+    為何 p 值不能用 `adfuller` 直接回傳的那一個
+    ------------------------------------------------------------------
+    `adfuller` 的 p 值出自 **Dickey-Fuller 分布**——那是「對一條**觀測到的**
+    序列檢定單根」的虛無分布。但這裡送進來的是**估計出來的**共整合迴歸殘差：
+    OLS 已經先把殘差的變異最小化過，其 ADF 統計量的虛無分布不是 DF 分布，
+    而是依共整合迴歸中變數個數而定的 Phillips-Ouliaris／MacKinnon 分布，
+    位置明顯更負。用 DF 臨界值檢定 EG 殘差 → 系統性過度拒絕。
+
+    本專案實測（`formation_ranked` 全部候選對，n=1.5M–20M）：
+        Grid GICS-DTW   舊 p<0.05 通過 77.4%   → EG 臨界值下 9.5%
+        Grid HDB-DTW    舊 p<0.05 通過 77.7%   → EG 臨界值下 10.0%
+    名目 5% 的檢定不可能拒絕 77% 的虛無假設；9.5% 才是合理數字
+    （略高於 5%，代表確實存在真共整合）。
+
+    作法與 `statsmodels.tsa.stattools.coint()` 一致：統計量仍以
+    `regression="n"` 對殘差計算（殘差依建構已去均值），但 p 值改由
+    `mackinnonp(stat, regression="c", N=eg_nvars)` 換算——`"c"` 對應**共整合
+    迴歸**含截距，N 為該迴歸的變數個數。
+
+    參數:
+        max_lags:  ADF 的落後階（固定，不做 autolag 選擇）
+        eg_nvars:  共整合迴歸的變數個數。配對交易為 2（一應變數 + 一解釋變數）；
+                   設 1 可還原成一般單根檢定的 DF 校準（僅供對非殘差序列使用）。
+
+    校準對照（N=2）：stat=-3.337 → p=0.0498；stat=-3.899 → p=0.0100，
+    與 MacKinnon (2010) 響應曲面的 5%／1% 臨界值相符。
+
+    文獻：Engle & Granger (1987), Econometrica 55(2):251-276；
+          Phillips & Ouliaris (1990), Econometrica 58(1):165-193；
+          MacKinnon (2010), Queen's Economics Dept. WP 1227。
+    """
     if len(resid) < max_lags + 5:
         return 0.0, 1.0
     try:
         result = adfuller(resid, maxlag=max_lags, regression="n", autolag=None)
-        return float(result[0]), float(result[1])
+        stat = float(result[0])
     except Exception:
         return 0.0, 1.0
+    try:
+        pval = float(mackinnonp(stat, regression="c", N=eg_nvars))
+    except Exception:
+        # 換算失敗時退回不拒絕，避免以錯誤的 DF p 值放行
+        return stat, 1.0
+    return stat, pval
 
 
 def _residualize_returns(R: np.ndarray, sector_labels=None) -> np.ndarray:
