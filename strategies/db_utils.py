@@ -341,15 +341,36 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
             excess_ret_rf = float(ann_ret_arith - RF_ANNUAL * avg_utilization)
 
     # 計算交易統計
+    #
+    # 分組鍵必須含 Period_Start
+    # ------------------------------------------------------------------
+    # 交易期有 CONCURRENT_PERIODS 期重疊，同一組配對可在多個形成期被選中、
+    # 於不同視窗同時交易。若只以 (Ticker_A, Ticker_B) 分組，不同期的列會被
+    # 串成同一條序列：
+    #   · shift(1) 跨期比較 → 期界處產生不存在的部位變化 → Entries/Exits 高估
+    #   · tail(1) 每組配對只取最後一期 → 其餘期的期末持倉漏計 → Forced_Closes 低估
+    # 實測（Grid GICS-SSD / Top20 / SL0）：修正前報告 Entries 32,245、
+    # Forced_Closes 1,425、Win_Rate 37.4%；自 trade_logs 直接統計的真值為
+    # 進場 9,557、期末強平 4,744、逐筆勝率 58.3%。
+    #
+    # 本區塊僅影響交易統計欄位（Entries/Exits/Stop_Losses/Forced_Closes/
+    # Win_Rate/Profit_Factor/n_traded→REC_Raw）。報酬類指標（Final_Equity、
+    # Ann_Ret_Raw、Sharpe、MDD、RCC_Raw、Avg_Utilization、Ann_Ret_Employed）
+    # 由 portfolio_daily 的權益序列算出，不經此處，故不受影響。
     if 'Position' in df.columns and 'Ticker_A' in df.columns:
-        n_traded = len(df[df['Position'] != 0].drop_duplicates(subset=['Ticker_A', 'Ticker_B']))
-        df['Prev_Pos'] = df.groupby(['Ticker_A', 'Ticker_B'])['Position'].shift(1).fillna(0)
+        _pair_keys = ['Ticker_A', 'Ticker_B']
+        if 'Period_Start' in df.columns:
+            _pair_keys = _pair_keys + ['Period_Start']
+
+        # n_traded 應為「實際開過倉的配對-期」數（REC 的分母＝投入過資金的槽位）
+        n_traded = len(df[df['Position'] != 0].drop_duplicates(subset=_pair_keys))
+        df['Prev_Pos'] = df.groupby(_pair_keys)['Position'].shift(1).fillna(0)
 
         direction_change = df['Position'] != df['Prev_Pos']
         exit_mask = direction_change & (df['Prev_Pos'] != 0)
         n_exits_total = exit_mask.sum()
 
-        last_rows = df.groupby(['Ticker_A', 'Ticker_B']).tail(1)
+        last_rows = df.groupby(_pair_keys).tail(1)
         n_forced_close = (last_rows['Position'] != 0).sum()
         n_entries = n_exits_total + n_forced_close
 
@@ -360,21 +381,23 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
             n_stop_loss = -1
             n_normal_exits = n_exits_total
 
-        if 'Daily_Delta' in df.columns:
-            state_change = df['Position'] != df['Prev_Pos']
-            df['State_ID'] = state_change.groupby([df['Ticker_A'], df['Ticker_B']]).cumsum()
-            df['Prev_State_ID'] = df.groupby(['Ticker_A', 'Ticker_B'])['State_ID'].shift(1).fillna(0)
-            active_mask = (df['Prev_Pos'] != 0) | (df['Daily_Delta'] != 0)
-
-            if active_mask.any():
-                trade_pnls = df[active_mask].groupby(['Ticker_A', 'Ticker_B', 'Prev_State_ID'])['Daily_Delta'].sum()
-                gross_profit = float(trade_pnls[trade_pnls > 0].sum())
-                gross_loss = float(trade_pnls[trade_pnls < 0].sum())
-                win_rate = float((trade_pnls > 0).mean()) if len(trade_pnls) > 0 else 0.0
-                profit_factor = gross_profit / abs(gross_loss) if gross_loss != 0 else 0.0
-            else:
-                gross_profit = gross_loss = 0.0
-                win_rate = profit_factor = 0.0
+        # 逐筆損益直接取引擎在平倉時記錄的 Trade_PnL。
+        #
+        # 舊作法是把 Daily_Delta 依「部位狀態區段」加總，有一個結構性錯誤：
+        # 進場日的 Position 由 0 變為 ±1，該列的 Prev_Pos 為 0，於是進場手續費
+        # 被歸進**前一段空手區間**，形成一筆只有負手續費的假交易。交易筆數因此
+        # 約為真實值的兩倍，勝率被腰斬（實測 Grid GICS-SSD/Top20/SL0：
+        # 區段法 30.5%，逐筆真值 58.3%）。
+        #
+        # Trade_PnL 由 _execute_close 於平倉時寫入，已含進出場兩端費用
+        # （手算核對：UNH/CI 2001 期，−172.15 部位損益 −4.833 進場費
+        #   −4.808 出場費 = −181.79，與 log 記錄的 −181.807 相符）。
+        if 'Trade_PnL' in df.columns:
+            trade_pnls = df.loc[df['Trade_PnL'] != 0, 'Trade_PnL']
+            gross_profit = float(trade_pnls[trade_pnls > 0].sum())
+            gross_loss = float(trade_pnls[trade_pnls < 0].sum())
+            win_rate = float((trade_pnls > 0).mean()) if len(trade_pnls) > 0 else 0.0
+            profit_factor = gross_profit / abs(gross_loss) if gross_loss != 0 else 0.0
         else:
             gross_profit = gross_loss = 0.0
             win_rate = profit_factor = 0.0
