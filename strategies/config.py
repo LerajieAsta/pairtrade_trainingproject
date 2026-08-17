@@ -276,14 +276,43 @@ _GRID_COMMON = {
     # 先驗——只關掉 11%，留下 25% 的後門。命題 1 必須關閉群組插補。
     "impute_scope":                "global",
 }
-_GRID_CLUSTERS = {"hdbscan": "HDB", "agglomerative": "AGG", "kmeans": "KM"}
+# 分組層是一條**有序**的處理維度，不是「ML vs 傳統」的二分
+# ----------------------------------------------------------------------
+# 2026-08-17 重整。原設計把主軸宣告為「3 種 ML 分群 vs GICS 產業分組」的二分
+# 對照，另把「不分組」列為 §3.3.4 的補充消融。實測後三項理由推翻該框架：
+#
+#   1. 表現最好的臂是「不分組」，卻被歸類為消融——主軸比較的兩造反而是這條
+#      軸上的第二至第五名。
+#   2. 三種 ML 分群的內部差異大於「ML vs GICS」的組間差異（排除標的比例
+#      26.4%～42.0%，等權年化 +0.004%～−0.558%），二分框架在測一個並不存在
+#      的類別界線。
+#   3. 已找到的機制（期末強平率）沿「限制強度」成立，而非沿「ML vs 傳統」：
+#      控制參數配置後，強平率與 Sharpe 的相關在 15 個配置中 15 個為負，
+#      中位 r = −0.841。
+#
+# 故改以「分組層對候選池的限制強度」為單一有序維度，依實測排除比例排列：
+#
+#   不分組 0%  →  GICS 15.1%  →  HDBSCAN 26.4%  →  Agglomerative 35.3%
+#                                                →  K-means 42.0%
+#
+# ⚠️ 該序並非嚴格單調：Agglomerative 排除較 HDBSCAN 多卻表現較好
+#    （+0.004% vs −0.162%），此為已知反例，不可宣稱單調律。
+_GRID_CLUSTERS = {
+    "none":          "NOGRP",   # 全市場單一組——限制強度的零點
+    "gics":          "GICS",    # 產業分類——靜態先驗
+    "hdbscan":       "HDB",     # 以下三者為資料驅動分群
+    "agglomerative": "AGG",
+    "kmeans":        "KM",
+}
 _GRID_RANKINGS = {"ssd": "SSD", "dtw": "DTW", "ssd_dtw_pca": "SDP"}
 _grid_entries = []
 for _cm, _cs in _GRID_CLUSTERS.items():
     for _rb, _rs in _GRID_RANKINGS.items():
         _p = {**base_params, **_GRID_COMMON,
-              "feature_mode": "fundamentals_mix",
               "cluster_method": _cm, "ranking_backend": _rb}
+        # gics／none 不建特徵矩陣，feature_mode 對其無作用
+        if _cm not in ("gics", "none"):
+            _p["feature_mode"] = "fundamentals_mix"
         if _rb != "ssd":     # DTW 排序端輸出 OLS_Alpha → 交易端走標準化空間
             _p["ignore_ols_alpha"] = True
         _grid_entries.append({
@@ -322,29 +351,9 @@ for _cl_m, _cl_s, _rk_m, _rk_s in [("agglomerative", "AGG", "ssd", "SSD"),
 _fo_idx = next((i for i, s in enumerate(strategies_raw_all) if s.get("formation_only")),
                len(strategies_raw_all))
 
-# ── 同產業（GICS）分組 × 排序 × 篩選 消融（形成期第三維度：篩選開關）──────
-# 對照組設計：與 3×3 Grid 共用同一組排序準則與交易端，唯二差異＝
-#   (a) 分組改用真實 GICS 產業（不跑分群、不需特徵矩陣）
-#   (b) filter_mode 可關閉三道統計過濾（ADF/半衰期/Hurst）
-# 三項實驗：① GICS+排序（NF，無篩選）② GICS+排序+篩選 ③ 分群+排序+篩選（= 3×3 Grid）
-for _rb, _rs in _GRID_RANKINGS.items():
-    # filter_mode 與 _GRID_COMMON 對齊為 "adf_only"（見該處說明）；
-    # NF（無篩選）消融已移附錄
-    for _fm, _fs_tag in (("adf_only", ""),):
-        _pg = {**base_params, **_GRID_COMMON,
-               "cluster_method": "gics", "ranking_backend": _rb,
-               "filter_mode": _fm}
-        if _rb != "ssd":
-            _pg["ignore_ols_alpha"] = True
-        _grid_entries.append({
-            "name":             f"Grid GICS-{_rs}{_fs_tag}",
-            "formation_module": "strategies.formation.cluster_formation",
-            "trading_module":   "strategies.trading.zscore_trading",
-            "sub_dir":          f"Grid_GICS_{_rs}{_fs_tag.replace('-','_')}",
-            "db_method":        f"Grid (GICS-{_rs}{_fs_tag})",
-            "trade_method":     "Z-Score",
-            "params":           _pg,
-        })
+# 註：GICS 分組原本在此另建 3 條條目，2026-08-17 併入上方 _GRID_CLUSTERS
+# 的有序維度（"gics" 為其中一級），條目名稱與 db_method 不變，既有形成期與
+# 回測資料照舊沿用。
 
 # ── 傳統分組底 × DRL：命題 1 與命題 2 的交叉對照 ────────────────────────────
 # 命題 1 未獲支持：9 組直接對照經逐日 HAC + BH-FDR 校正後無一顯著（方向 8/9 偏 GICS）。
@@ -513,7 +522,7 @@ for _cm_g, _fm_g, _ohw, _tag in (
     ("agglomerative", "adf_only", 0.0, "AGG-SSD-NOSEC"),   # 拿掉產業先驗
     ("agglomerative", "none",     1.0, "AGG-SSD-NF"),      # 拿掉共整合篩選
     ("agglomerative", "none",     0.0, "AGG-SSD-NF-NOSEC"),# 兩者都拿掉（最接近 Han et al.）
-    ("none",          "adf_only", 1.0, "NOGRP-SSD"),       # 不分組 + 篩選
+    # NOGRP-SSD 已升格為 _GRID_CLUSTERS 的一級（限制強度零點），不在此重複建立
     ("none",          "none",     1.0, "NOGRP-SSD-NF"),    # 不分組 + 無篩選
 ):
     _pf = {**base_params, **_GRID_COMMON,
@@ -609,7 +618,10 @@ _chars_common = {**base_params, **_GRID_COMMON,
                      "dataset/fundamental/sp500_pit_characteristics_monthly.parquet",
                  "sector_onehot_weight": 0.0,
                  "impute_scope": "global"}
-for _tag, _feats in (("AGG-SSD-NOSEC-GI", ()), ("AGG-SSD-CHARS", _CHARS)):
+# 2026-08-17 移除 AGG-SSD-NOSEC-GI：其設計差異僅為 impute_scope="global"，
+# 而該設定自本次管線修正起已成為 _GRID_COMMON 的基線，故與 Grid AGG-SSD-NOSEC
+# 的形成期參數完全相同（逐鍵比對無差異，回測結果亦逐位元相同）。
+for _tag, _feats in (("AGG-SSD-CHARS", _CHARS),):
     _grid_entries.append({
         "name":             f"Grid {_tag}",
         "formation_module": "strategies.formation.cluster_formation",
@@ -638,8 +650,11 @@ for _tag, _feats in (("AGG-SSD-NOSEC-GI", ()), ("AGG-SSD-CHARS", _CHARS)):
 _F09_FEATS = ("book_to_market", "roe", "roa", "gross_margin", "op_margin",
               "leverage", "cash_ratio", "capital_intensity",
               "asset_turnover", "accruals")
+# 2026-08-17 移除 BASE 臂：impute_scope="global" 成為基線後，F09GI *-BASE 的
+# 形成期參數與 Grid {HDB,AGG,KM}-SSD 完全相同（逐鍵比對無差異，回測結果亦
+# 逐位元相同）。差分的對照臂改直接取主矩陣的對應格，不另建重複條目。
 for _cm_f, _cs_f in (("hdbscan", "HDB"), ("agglomerative", "AGG"), ("kmeans", "KM")):
-    for _arm, _feats in (("BASE", ()), ("STRUCT", _F09_FEATS)):
+    for _arm, _feats in (("STRUCT", _F09_FEATS),):
         _grid_entries.append({
             "name":             f"F09GI {_cs_f}-{_arm}",
             "formation_module": "strategies.formation.cluster_formation",
