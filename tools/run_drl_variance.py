@@ -78,10 +78,21 @@ def fetch_summaries(methods):
             conn, params=methods)
 
 
-def harvest(run_id, methods):
+def harvest(run_id, methods, expect=None):
     df = fetch_summaries(methods)
     if len(df) == 0:
         sys.exit(f"第 {run_id} 輪結束後 result.db 查無 DRL 結果，中止")
+    got = set(df["METHOD"].unique())
+    missing = set(methods) - got
+    if missing:
+        # 2026-08-17 的事故：STRATEGIES_SLICE 在開跑時解析一次，config 若於執行
+        # 期間變動（策略增刪造成索引位移），後續輪次會跑到別的策略。當時第 4、5
+        # 輪只收成 30 列（應為 75）卻未報錯，錯誤延遲兩輪才被發現。
+        sys.exit(f"第 {run_id} 輪缺少策略：{sorted(missing)}\n"
+                 f"  已收成 {len(df)} 列，預期 {expect or '?'} 列。\n"
+                 f"  最可能原因：config 於執行期間變動使索引位移。中止以免污染統計。")
+    if expect is not None and len(df) != expect:
+        sys.exit(f"第 {run_id} 輪收成 {len(df)} 列，預期 {expect} 列，中止")
     df.insert(0, "run_id", run_id)
     df.to_csv(RUNS_CSV, mode="a", header=not os.path.exists(RUNS_CSV), index=False)
     print(f"  第 {run_id} 輪收成 {len(df)} 列 → {RUNS_CSV}")
@@ -155,8 +166,18 @@ def main():
         harvest(1, methods)   # result.db 既有結果列為第 1 輪
         done_runs = 1
 
+    expect = None
+    if os.path.exists(RUNS_CSV):
+        _c = pd.read_csv(RUNS_CSV).groupby("run_id").size()
+        expect = int(_c.max()) if len(_c) else None
+
     for run_id in range(done_runs + 1, args.runs + 1):
         print(f"\n── 第 {run_id}/{args.runs} 輪 ──────────────────────────────")
+        # 每輪重新以 db_method 解析索引，不沿用開跑時的那一份。
+        # config 若於執行期間變動（策略增刪），舊索引會指到別的策略——
+        # 2026-08-17 即因此使第 4、5 輪跑錯對象。
+        idx, methods = drl_targets(args.module)
+        slice_str = ",".join(str(i) for i in idx)
         clear_summaries(methods)
         # 記檔名同樣帶 tag——否則 RL-THR 的輪次日誌會覆蓋掉既有的 DL-THR 紀錄
         log_path = f"{LOG_DIR}/drl_variance{_suffix}_run{run_id}.log"
@@ -170,7 +191,7 @@ def main():
         if ret != 0:
             sys.exit(f"run_trading.py 第 {run_id} 輪失敗（exit {ret}），詳見 {log_path}")
         print(f"  回測完成（{(time.time() - t0) / 60:.1f} 分鐘）")
-        harvest(run_id, methods)
+        harvest(run_id, methods, expect=expect)
 
     aggregate()
 
