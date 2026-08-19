@@ -7,17 +7,17 @@
 ```text
 pairtrade_trainingproject/
 ├── strategies/
-│   ├── config.py                  # 3×3 分群×排序 Grid 宣告式展開（17 條現役策略）、網格參數、全域設定、敏感性 OFAT 產生器
+│   ├── config.py                  # 5×3 分組×排序 Grid 宣告式展開（40 條現役策略）、網格參數、全域設定、敏感性 OFAT 產生器
 │   ├── db_utils.py                # SQLite 合併、讀寫工具
 │   ├── portfolio_manager.py       # 組合層級資金管理（MSR 產業上限）
 │   ├── preprocess_equity.py       # 權益曲線前處理
 │   ├── formation/
-│   │   ├── cluster_formation.py   # ★ 中性組裝器：feature_mode × cluster_method × ranking_backend 參數驅動，17 條現役策略共用
+│   │   ├── cluster_formation.py   # ★ 中性組裝器：feature_mode × cluster_method × ranking_backend 參數驅動，40 條現役策略共用
 │   │   ├── _clustering.py         # 分群 dispatcher：hdbscan／agglomerative／kmeans backend（GICS 分組不經此層）
 │   │   ├── _ranking.py            # 排序 dispatcher：委派 ssd_rolling.Formation（ssd）／DTW_Cointegration_Paper.Formation（dtw、ssd_dtw_pca）
 │   │   ├── _features.py           # 報酬 PCA 因子載荷 + 基本面混合特徵萃取（供任何分群 backend 共用）
 │   │   ├── _fundamentals.py       # FMP PIT 基本面讀取（從 agglomerative_FMP 抽出中性化）
-│   │   ├── _cointegration.py      # ADF + OU 半衰期 + Hurst 三道統計過濾，篩選開關本身為消融維度
+│   │   ├── _cointegration.py      # 共整合篩選（現行僅 ADF 一道，EG 臨界值）；半衰期／Hurst 已停用，見論文附錄 B
 │   │   ├── _utils.py              # 共用統計工具（_ols、_adf_stat、_compute_hurst、_residualize_returns、_bh_fdr_threshold、_cost_viable）
 │   │   ├── ssd_rolling.py         # ⚠️ 非獨立策略入口，但 `_ranking.py` 仍動態 import 其 Formation 作為 "ssd" 排序引擎（現役、不可封存）
 │   │   ├── DTW_Cointegration_Paper.py  # ⚠️ 同上，供 "dtw"／"ssd_dtw_pca" 排序引擎（現役、不可封存）
@@ -33,7 +33,7 @@ pairtrade_trainingproject/
 │       └── distance_trading.py    # ⚠️ GGR 2006 距離基準——config 端已封存（隨 #2 一併移除），檔案仍留在此目錄未搬移
 ├── analysis/                      # 評估層（讀 result.db，不重跑）
 │   ├── regime_cost_dsr_eval.py    # regime 分層 Sharpe + break-even 成本表 + Deflated Sharpe
-│   ├── proposition2_stats.py      # 命題2 配對檢定（DL-THR vs 固定門檻，五種配對底）
+│   ├── proposition2_stats.py      # 交易層配對檢定（DL-THR vs 固定門檻，五種配對底）
 │   ├── drl_behavior.py            # 從 trade_logs 還原 DL-THR 決策，解構增益來源（門檻選擇 vs SKIP）
 │   ├── granularity_sweep.py       # （2026-07-28 新增，尚未整理進本指南）
 │   └── sensitivity_report.py      # OFAT 參數敏感性報表（formation 變體曲線 + 交易端 top_n）
@@ -59,7 +59,7 @@ pairtrade_trainingproject/
 │   ├── formation/                 # 形成期 ×6：agglomerative_fundamentals、dtw_paper_fixed、hdbscan_cluster_pca5、kmeans_fundamentals、ssd_dtw_pca_paper_fixed、ssd_rolling
 │   ├── trading/                   # 交易期 ×2：zscore_trading、drl_threshold_trading（distance_trading 已隨其策略封存移除）
 │   ├── comparison.ipynb           # 現役策略績效總比較（讀 config.strategies_raw_all + result.db 動態產生）
-│   ├── main_results.ipynb         # 命題1/2 主軸結果彙整（新增，取代舊版逐策略比較的部分角色）
+│   ├── main_results.ipynb         # 主軸結果彙整（分組層／交易層／兩層組合）
 │   ├── performance_guide.ipynb    # 績效指標說明
 │   ├── _quarto.yml / slides.scss  # revealjs 投影片設定（大字型、Alt+點擊縮放、KaTeX）
 ├── docs/                          # GitHub Pages 輸出
@@ -140,67 +140,75 @@ results/
 
 ## 3. 策略清單（`config.py`）
 
-**2026-07 中性化重構**：策略不再是「一策略一支獨立形成期模組」，改由單一組裝器
-`strategies.formation.cluster_formation` 依 `cluster_method`（`hdbscan`/`agglomerative`/`kmeans`/`gics`）×
-`ranking_backend`（`ssd`/`dtw`/`ssd_dtw_pca`）宣告式展開成 17 條策略（`config.py` 第 204 行起）。
-舊版一策略一模組的獨立策略入口（`HDBSCAN_Cluster_SSD_DTW.py`、`agglomerative_yF.py`、
-`agglomerative_FMP.py`、`ssd_basic.py`、`distance_trading.py`）已於 2026-07-24（commit `2fb47b6`）
-封存，見 `archive/README.md`。
-⚠️ 例外：`ssd_rolling.py`／`DTW_Cointegration_Paper.py` 不再是獨立策略入口，但其 `Formation`
-類別被 `_ranking.py` 動態 import 作為現役排序引擎（`"ssd"` → `ssd_rolling`；`"dtw"`／
-`"ssd_dtw_pca"` → `DTW_Cointegration_Paper`），**每次跑 formation 都會用到，並未真正封存**。
+**2026-08 主軸重整**：策略由單一組裝器 `strategies.formation.cluster_formation`
+依 `cluster_method` × `ranking_backend` 宣告式展開。2026-08-17 起主軸改以
+**分組層對候選池的限制強度**為有序維度（不再是「ML vs 傳統」的二分對照），
+`_GRID_CLUSTERS` 擴為五級，主軸成為 **5 分組 × 3 排序 = 15 格**。
 
-`strategies_raw_all` 為現役策略池（17 條，皆為交易策略，無 formation-only 條目，0-based 索引），
+`strategies_raw_all` 為現役策略池（**40 條**，0-based 索引），
 `strategies_raw = strategies_raw_all[:]` 決定實際執行範圍
-（或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片；0-based Python 切片語意）：
+（或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片）：
 
 ```bash
-STRATEGIES_SLICE="0:9" python run_trading.py   # 只跑 3×3 分群×排序矩陣（#0–#8）
+STRATEGIES_SLICE="0:15" python run_trading.py   # 只跑主軸 15 格
 ```
 
-| # | 策略名稱 | `cluster_method` | `ranking_backend` | 交易期 | 角色 |
-| :---: | :--- | :--- | :--- | :--- | :--- |
-| 0–2 | Grid HDB-{SSD,DTW,SDP} | `hdbscan` | ssd／dtw／ssd_dtw_pca | `zscore_trading.py` | **命題1** 3×3 矩陣：HDBSCAN 行 |
-| 3–5 | Grid AGG-{SSD,DTW,SDP} | `agglomerative` | 同上 | `zscore_trading.py` | **命題1** 3×3 矩陣：Agglomerative 行 |
-| 6–8 | Grid KM-{SSD,DTW,SDP} | `kmeans` | 同上 | `zscore_trading.py` | **命題1** 3×3 矩陣：K-means 行 |
-| 9 | Grid AGG-SSD DRL | 借用 #3 配對 | ssd | `drl_threshold_trading.py` | **命題2** 門檻選擇 vs 固定門檻（AGG 底） |
-| 10 | Grid HDB-SDP DRL | 借用 #2 配對 | ssd_dtw_pca | `drl_threshold_trading.py` | **命題2** 門檻選擇 vs 固定門檻（HDB 底） |
-| 11 | Grid KM-SSD DRL | 借用 #6 配對 | ssd | `drl_threshold_trading.py` | **命題2** 門檻選擇 vs 固定門檻（KM 底） |
-| 12–14 | Grid GICS-{SSD,DTW,SDP} | `gics`（不跑分群） | ssd／dtw／ssd_dtw_pca | `zscore_trading.py` | **命題1 對照組**：傳統產業分組基準 |
-| 15 | Grid GICS-SSD DRL | 借用 #12 配對 | ssd | `drl_threshold_trading.py` | **命題2 對照組**：傳統配對底 + DL-THR |
-| 16 | Grid GICS-SDP DRL | 借用 #14 配對 | ssd_dtw_pca | `drl_threshold_trading.py` | **命題2 對照組**：傳統配對底 + DL-THR |
+⚠️ **`STRATEGIES_SLICE` 用的是索引，不是名稱。** 2026-08-17 曾因在
+`run_drl_variance` 執行期間重整 config 造成索引位移，使第 4、5 輪跑到別的策略
+且未報錯。該工具已改為每輪重新以 `db_method` 解析索引並檢查收成筆數；
+但**任何長時間背景任務執行期間都不應修改 config 的策略清單**。
 
-實際清單以執行 `Project/Scripts/python.exe -c "import strategies.config as c; [print(i,s['name']) for i,s in enumerate(c.strategies_raw_all)]"` 為準（敏感性分析等環境變數會附加額外條目到尾端，見本節末段）。
+| # | 策略名稱 | `cluster_method` | 排除標的 | 角色 |
+| :---: | :--- | :--- | ---: | :--- |
+| 0–2 | Grid NOGRP-{SSD,DTW,SDP} | `none` | 0% | 主軸：限制強度零點 |
+| 3–5 | Grid GICS-{SSD,DTW,SDP} | `gics` | 15.1% | 主軸：靜態產業先驗 |
+| 6–8 | Grid HDB-{SSD,DTW,SDP} | `hdbscan` | 26.4% | 主軸：資料驅動分群 |
+| 9–11 | Grid AGG-{SSD,DTW,SDP} | `agglomerative` | 35.3% | 主軸：資料驅動分群 |
+| 12–14 | Grid KM-{SSD,DTW,SDP} | `kmeans` | 42.0% | 主軸：資料驅動分群 |
+| 15–19 | Grid {AGG-SSD,HDB-SDP,KM-SSD,GICS-SSD,GICS-SDP} DRL | 借用對應格 | — | 交易層：DL-THR 疊加 |
+| 20–22 | Grid AGG-SSD RLTHR E{05,10,20D} | 借用 #9 | — | 交易層：RL-THR 受控對照 |
+| 23–28 | HSU25 {SSD,DTW,SDP}{,-REV} | `none` | 0% | 許鈞翔 (2025) 復現 |
+| 29–33 | AGG-SSD-{NOSEC,NF,NF-NOSEC}、NOGRP-SSD-NF 等 | — | — | 分組×篩選×產業先驗消融 |
+| 34–36 | Grid HAN{2-B1,3-REV,4-MONTHLY} | — | — | Han et al. (2021) 交易機制歸因鏈 |
+| 37–39 | F09GI {HDB,AGG,KM}-STRUCT | — | — | 結構性財報特徵消融 |
 
-**兩大命題**：**命題1（形成期）** 機器學習分組（#0–#8）能找到比傳統 GICS 產業分組（#12–14）
-更高品質的配對；**命題2（交易期）** 以學習法選擇門檻（#9–11、#15–16）能比固定門檻 Z-Score
-有更好的交易績效（同配對對照）。
+實際清單以執行
+`Project/Scripts/python.exe -c "import strategies.config as c; [print(i,s['name']) for i,s in enumerate(c.strategies_raw_all)]"`
+為準。
 
-> **命名說明。** `result.db` 的 strategy id 與模組檔名沿用 `DRL`，但該交易端的學習問題為
-> **全資訊監督回歸**（9 個動作報酬皆可反事實回算），並非強化學習。論文一律稱 **DL-THR**；
-> 真正的部分回饋版本另實作為 **RL-THR** 作為受控對照。**識別碼不改**，以維持可對照性。
+**三項檢定**（論文第四章；不再使用「命題」的分類）：
+**分組層**（#0–14）限制強度是否影響配對品質；
+**交易層**（#15–19 對其配對底）學習式門檻選擇是否優於固定門檻；
+**兩層組合**（資料驅動分群 + DL-THR vs GICS + 固定門檻）。
 
-**2026-08-11 命題檢定結果**（`analysis/`，抽樣單位為**時間**、循環 block bootstrap L=126；
-Newey-West HAC 為對照欄。細節見 `config.py` 第 291–300 行）：
+**2026-08-20 檢定結果**（`analysis/`，抽樣單位為時間、循環 block bootstrap L=126）：
 
-- **命題1 未獲支持**（**非**「顯著更差」）：9 組 ML vs GICS 經 BH-FDR 校正後**無一顯著**
-  （校正後最小 p = 0.455），方向 **ML 優 5 組／GICS 優 4 組**。
-  ⚠️ 舊版「5 組顯著更差」建立在已被否定的 n=15 偽重複基礎上，**不應再引用**。
-  9 組 CI 全部涵蓋 0、寬 1.2–1.9pp（是 GICS 參照臂自身績效的數倍）→ **檢定力不足**，
-  既不能說 ML 較優、也不能說兩者相當。MDE 中位 **1.14pp**；對 0.3pp 的真實效果檢定力僅 **11%**。
-  機制（獨立於顯著性）：ML 分群會跨產業配對（11–25% 股票對），且壓縮候選池
-  （K-means 每期僅填滿 8.7/20 名額）。
-- **命題2 獲得支持**：五種配對底逐日差分 bootstrap 全部顯著（p = 0.0000–0.0060），
-  五個 95% CI 完全落在零的右側（最保守下界 +0.20pp）。增益在**傳統 GICS 配對底最大**
-  （年化 +1.105pp），證明增益與配對來源正交。`analysis/drl_behavior.py` 解構出增益來自
-  門檻選擇（62% 決策偏離靜態基準），而非選擇性 SKIP。
-  ⚠️ 門檻管道**並非毫無貢獻**：HDBSCAN 底複製 28.4%（p=0.014），五組介於 −8.9% ~ 28.4%。
-- **組合系統**（動態分群 + DL-THR vs GICS + 固定門檻，排序已對齊）：六組中**五組 BH 後顯著**
-  （+0.63 ~ +1.51pp）。成分分解：**DL-THR 成分 6/6 顯著、分群成分 0/6 顯著**。
-  → **完整系統顯著優於傳統基準，但功勞歸屬未定。**
-- **絕對績效**：等權組合六組全部不顯著（CI 寬 2.4–2.9pp，Sharpe 0.09–0.21）；
-  DSR 在 N=110 下 SR0=0.408 而六族最高 SR 僅 0.392，無一通過 0.95。
-  **所有宣稱皆為相對宣稱，不主張策略本身可獲利。**
+- **三項檢定經 BH-FDR 校正後皆 0 顯著**，方向則一致：
+  分組層 9/9 偏向 GICS、交易層 5/5 為正、兩層組合全期 3/3 為負。
+- **分組層**：限制愈強績效愈差。逐格觀之，不分組三格全部優於同排序的 GICS，
+  GICS 三格又全部優於任一資料驅動分群格。列平均 Sharpe 為
+  不分組 +0.081、GICS +0.024、AGG −0.065、HDB −0.116、KM −0.249。
+  ⚠️ 非嚴格單調：AGG 排除標的多於 HDB 卻表現較好。
+- **機制**：期末強制平倉。強平率隨限制強度自 36.8% 單調升至 43.1%，
+  與績效的相關在 15 個參數配置中一致為負（中位 r = −0.801）。
+  逐筆勝率 0.578、獲利因子 0.969——多數交易收斂獲利但被少數大額虧損吃光。
+  強平的配對再追 126 日僅 39.1% 回歸，其餘 |z| 自 4.88 擴大至 6.61。
+  ⚠️ 全樣本混合的相關為 **+0.201**（符號相反，停損維度造成的 Simpson 悖論），
+  **不可引用**。
+- **交易層**：五底方向全正（+0.112 ~ +0.573pp），增益最大者為兩條 GICS 底。
+  三項機械性替代解釋（SKIP 選股、門檻水準、總曝險）在 GICS 兩底皆排除；
+  K-means 底的增益屬機械效應，Agglomerative 底無增益。
+  五輪重訓的跨輪全距 0.010–0.047 個 Sharpe 單位。
+- **絕對績效**：最佳為 GICS-SDP + DL-THR，25 年 10,000 → 12,548（年化 0.914%）；
+  最佳固定門檻配置為不分組 × DTW（12,236）。
+  同期無風險（2%）約 16,400——**任何配置皆未達此水準**。
+  DSR 於 N=44 下無一通過 0.95（最高 0.769）。
+
+**⚠️ 2026-08 管線修正**：形成期有六項實作與宣告不符（ADF 誤用 DF 臨界值、
+Hurst 測錯對象、HDBSCAN 噪音被當成群、產業中位數插補、候選截斷、
+交易統計計數器兩項錯誤），已全部修正。修正後主軸 13 格中 12 格績效改善，
+ΔSharpe 中位 +0.236。**修正前的一切數字不可引用**；
+完整記錄見 `thesis/07_附錄B_管線修正記錄.md`。
 
 **已封存的負面結果**：舊版研究框架消融 ResidFDR、MST 偏相關圖候選、SEC-PIT Beta、
 GICS 分組×排序×篩選 NF 消融、多尺度動量特徵消融，經回測皆為負面／劣於骨幹，已隨其宿主策略移至
@@ -255,19 +263,24 @@ _features.py            _clustering.py              _ranking.py
 
 ### 統計過濾（`_cointegration.screen_pair`，`filter_mode` 控制開關）
 
-三道過濾依序執行、任一未過即淘汰（短路）：
+**現行僅一道**（`filter_mode="adf_only"`，2026-08-14 起）：
 
-| 指標 | 預設門檻（`screen_pair` 函式簽章預設值） |
+| 指標 | 設定 |
 | :--- | :--- |
-| ADF p-value | < `adf_pvalue_threshold`（現役 Grid 條目統一 0.05，見 `_GRID_COMMON`） |
-| OU 半衰期 | 1 ≤ halflife ≤ 42 天 |
-| Hurst 指數 | < 0.50（均值回歸） |
+| ADF（Engle-Granger 殘差） | $p <$ `adf_pvalue_threshold`（現役統一 0.05） |
 
-`filter_mode="none"` 可整段跳過（`enabled=False`，用於「排序準則本身貢獻」的消融，現行 17 策略
-皆用 `filter_mode="coint"` 即全套用）。⚠️ 舊版 HDBSCAN 系列使用的零穿越次數過濾、
-`_HDBSCAN_UMAP_FILTERS` 的較寬鬆門檻（halflife ≤ 63 天、Hurst < 0.55）、以及 BH-FDR／成本過濾層
-（舊 #8/#9）**已隨其宿主策略一併封存**，現行架構不再套用，若要復活見
-`archive/config_archived_strategies.py`。
+⚠️ **p 值取自 MacKinnon 響應曲面（`regression="c"`, `N=2`），不是 `adfuller` 直接回傳的值。**
+後者是 Dickey-Fuller 分布，用於估計殘差會系統性過度拒絕——實測通過率 77.4%，
+改用 EG 臨界值後為 9.5%。見 `_utils._adf_stat` 的 docstring。
+
+**半衰期與 Hurst 已停用**（原為三道過濾）。逐層拆解顯示三道實為一道：
+ADF 淘汰 22.6%、半衰期 **0.2%**、Hurst **96.8%**；而承擔 96.8% 的 Hurst
+兩個實作都對價差的**水準值**做 R/S，標準估計量定義在**增量**上，
+標準版的 `H<0.5` 通過率為 0%。完整診斷見 `thesis/07_附錄B_管線修正記錄.md` B.1.2。
+
+`filter_mode` 三值：`adf_only`（現役）／`coint`（三道，僅供復現舊結果）／
+`none`（零道，消融用）。現役 40 條中 34 條為 `adf_only`、6 條為 `none`
+（刻意的無篩選消融）。
 
 ### 「組合優於重寫」架構模式（已從模組層下沉到函式層）
 
@@ -277,9 +290,9 @@ _features.py            _clustering.py              _ranking.py
 加一個 backend、新增排序準則只需在 `_ranking.py` 加一個 backend，不必碰任何既有策略程式碼，
 也不會產生模組間的隱藏依賴（見 `archive/README.md` 的耦合說明）。
 
-**命題 1 對照設計**（同排序準則、同篩選、同交易端，唯一變因 = 分組方式）：
-GICS 產業（`cluster_method="gics"`，#12–14）↔ HDBSCAN／Agglomerative／K-means 聚類
-（#0–8）。2026-07-28 命題檢定（見第 3 節）顯示這個對照不支持命題 1。
+**分組層對照設計**（同排序準則、同篩選、同交易端，唯一變因 = 分組方式）：
+不分組（#0–2）↔ GICS 產業（#3–5）↔ HDBSCAN／Agglomerative／K-means（#6–14）。
+五級依對候選池的限制強度排列，見第 3 節的檢定結果。
 
 ---
 
@@ -318,6 +331,33 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
 確保「固定門檻 Z-Score 基準 vs DL-THR 疊加」比較時唯一變因是交易決策邏輯。詳見 `notebooks/trading/drl_threshold_trading.ipynb`。
 
 ---
+
+## 5.5 論文章節與產出對照
+
+`thesis/` 的八份檔案與 `analysis/`／`tools/` 的對應關係：
+
+| 論文 | 內容 | 主要來源 |
+| :--- | :--- | :--- |
+| 第三章 | 研究方法（四層架構、統計檢定、敏感性） | `strategies/`、`tools/thesis_numbers.py` |
+| 4.1 | 分組層：限制強度與配對品質 | `proposition1_daily_hac.py` |
+| 4.2 | 交易層：門檻選擇 | `proposition2_daily_hac.py`、`prop2_*.py`、`drl_behavior.py` |
+| 4.3 | 兩層組合 | `prop3_combined_system.py` |
+| 4.4 | 強制平倉機制 | `trade_logs` 直查、`forced_close_by_config.csv` |
+| 4.5 | 檢定力不對等 | 自 4.1／4.2 的 CI 反推 |
+| 4.6 | 風險評估 | `regime_cost_ew.py`、`regime_cost_dsr_eval.py` |
+| 附錄 A | 前行研究差異定位 | `hsu25_entry_timing.py` |
+| 附錄 B | 管線修正記錄 | `git 62554de`、`54c8856`；備份庫 |
+| 附錄 C | 交易端三項否證 | `regime_cost_dsr_eval.build_market_regimes` + 逐筆反事實 |
+
+**數字真相表**：`python -m tools.thesis_numbers --all` 自三個資料庫重算論文
+引用的全部數字，輸出 `results/analysis/thesis_numbers.{json,md}`，
+依章節分組並標註新鮮度（`formation_groups` 有列 = 已被最近一次重跑覆寫）。
+論文中的任何數字都應與該表一致。
+
+**交易統計欄位若有疑義**：`Entries`／`Exits`／`Stop_Losses`／`Forced_Closes`／
+`Win_Rate`／`Profit_Factor` 曾有兩項計數錯誤（見附錄 B.2），
+已於 2026-08-17 修正並以 `tools/recompute_trade_stats.py` 重算全部配置。
+該工具以 SQL 視窗函式重算，不必重跑回測。
 
 ## 6. 資料庫規範
 
@@ -363,7 +403,7 @@ $$P'_{i,t} = \frac{\ln P_{i,t} - \mu^{form}_{\ln P_i}}{\sigma^{form}_{\ln P_i}},
    `formation_strategy_id_base` 指向該策略名稱
 5. 依序執行 `run_formation.py` → `run_trading.py`
 6. 用 `results/result.db` 的 `strategy_summaries` 與現有基準（Grid GICS-SSD／Grid GICS-SDP，
-   即命題1的傳統分組對照組）做同條件對照；驗證無效則移入 `archive/config_archived_strategies.py`
+   即分組層的傳統對照）做同條件對照；驗證無效則移入 `archive/config_archived_strategies.py`
    並記錄診斷結論（不刪除歷史數據）
 
 ---
