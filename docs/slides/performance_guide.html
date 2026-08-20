@@ -1247,77 +1247,93 @@ margin-right: 0; }
 </blockquote>
 </section>
 
-<section id="形成期篩選的三道檢定" class="title-slide slide level1 center">
-<h1>形成期篩選的三道檢定</h1>
-<p>篩選層對每組候選配對的價差（spread）依序施加，<strong>任一未過即淘汰</strong>。</p>
-<table class="caption-top" style="width:100%;">
+<section>
+<section id="形成期的篩選層單道共整合檢定" class="title-slide slide level1 center">
+<h1>形成期的篩選層：單道共整合檢定</h1>
+<p>篩選層對每組候選配對的價差（spread）施加 Engle-Granger（1987）兩步檢定。</p>
+<table class="caption-top">
 <colgroup>
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
+<col style="width: 50%">
+<col style="width: 50%">
 </colgroup>
 <thead>
 <tr class="header">
-<th>檢定</th>
-<th>公式</th>
-<th>虛無假設</th>
-<th>為何選它</th>
-<th>判讀門檻</th>
-<th>限制</th>
+<th style="text-align: left;">項目</th>
+<th style="text-align: left;">內容</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>ADF 共整合</strong></td>
-<td>對殘差 <span class="math inline">\epsilon_t</span> 估 <span class="math inline">\Delta\epsilon_t = \lambda\epsilon_{t-1} + \dots</span>，檢定 <span class="math inline">\lambda = 0</span></td>
-<td><span class="math inline">H_0</span>：殘差<strong>含單根</strong>（不共整合）</td>
-<td>Engle 與 Granger（1987）兩步驟法的第二步；價差若非定態，「會回歸」的前提就不成立</td>
-<td><span class="math inline">p &lt; 0.05</span>（本研究基準；敏感度另試 0.01/0.10）</td>
-<td>對短樣本檢定力低；避險比率 <span class="math inline">\beta</span> 是估出來的，未計入其估計誤差</td>
+<td style="text-align: left;"><strong>公式</strong></td>
+<td style="text-align: left;">對殘差 <span class="math inline">\hat{s}_t</span> 估 <span class="math inline">\Delta\hat{s}_t = \gamma\hat{s}_{t-1} + \sum\phi_m\Delta\hat{s}_{t-m} + u_t</span>，檢定 <span class="math inline">\gamma = 0</span></td>
 </tr>
 <tr class="even">
-<td><strong>OU 半衰期</strong></td>
-<td><span class="math inline">HL = -\ln 2 / \lambda</span>，<span class="math inline">\lambda</span> 取自上式的 AR(1) 係數</td>
-<td>—（非檢定，為篩選條件）</td>
-<td>共整合只說「終會回歸」，沒說<strong>多快</strong>；回歸太慢的配對在 126 日交易期內無法變現</td>
-<td><span class="math inline">1 \le HL \le 42</span> 日（上限 = 交易期 126 日的 <span class="math inline">1/3</span>）</td>
-<td>AR(1) 為 OU 過程的離散近似；<span class="math inline">HL</span> 估計對樣本區間敏感</td>
+<td style="text-align: left;"><strong>虛無假設</strong></td>
+<td style="text-align: left;"><span class="math inline">H_0</span>：殘差<strong>含單根</strong>（不共整合）</td>
 </tr>
 <tr class="odd">
-<td><strong>Hurst 指數</strong></td>
-<td><span class="math inline">H</span> 取自 R/S 統計量對尺度的對數斜率</td>
-<td>—（非檢定，為篩選條件）</td>
-<td>與 ADF 互補：ADF 看定態與否，<span class="math inline">H</span> 看<strong>趨勢 vs 均值回歸傾向</strong></td>
-<td><span class="math inline">H &lt; 0.5</span>（<span class="math inline">0.5</span> = 隨機漫步、<span class="math inline">&gt;0.5</span> = 趨勢）</td>
-<td>估計法眾多、結果不一致；短序列偏誤大</td>
+<td style="text-align: left;"><strong>為何選它</strong></td>
+<td style="text-align: left;">價差若非定態，「會回歸」的前提就不成立</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>判讀門檻</strong></td>
+<td style="text-align: left;"><span class="math inline">p &lt; 0.05</span>（敏感度另試 0.01／0.10）</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong><span class="math inline">p</span> 值來源</strong></td>
+<td style="text-align: left;"><strong>MacKinnon 響應曲面</strong>（<code>regression=&quot;c&quot;</code>, <span class="math inline">N</span>=2），非 <code>adfuller</code> 直接回傳值</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>限制</strong></td>
+<td style="text-align: left;">對短樣本檢定力低；避險比率 <span class="math inline">\beta</span> 是估出來的，未計入其估計誤差</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p>依據：Engle 與 Granger（1987）；OU 半衰期與 Hurst 的門檻設計依 Krauss 等人（2016）。</p>
-</blockquote>
-<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>排序與篩選的施行次序依後端而異</strong></p>
+<p><strong>為何不能用 <code>adfuller</code> 的 <span class="math inline">p</span> 值</strong></p>
 </div>
 <div class="callout-content">
-<ul>
-<li><strong>SSD 後端</strong>（<code>ssd_rolling.py</code>）：先按 SSD 排序 → 取前 <span class="math inline">\max(200,\ \text{Top}N\times15)</span> 為候選 → <strong>依距離順序</strong>逐一檢定 → 湊滿 <span class="math inline">\text{Top}N\times5</span> 即停 → 再排序取前 <span class="math inline">N</span></li>
-<li><strong>DTW／SSD-DTW-PCA 後端</strong>（<code>DTW_Cointegration_Paper.py</code>）：群內<strong>全配對</strong>逐一檢定 （無候選上限）→ 才排序取前 <span class="math inline">N</span></li>
-</ul>
-<p>兩者的<strong>共同</strong>後果是：候選池不足時，系統會被迫接受距離更遠的配對。 但 SSD 路徑另有候選上限與提前中止，兩者不可互相引用其細節。</p>
+<p>DF 分布描述的是對一條<strong>觀測到的</strong>序列檢定單根；此處受檢的是<strong>估計出來的</strong> 共整合迴歸殘差，OLS 已先將其變異最小化，虛無分布位置明顯更負。</p>
+<p><strong>實測</strong>：沿用 DF 臨界值時通過率 <strong>77.4%</strong>，改用 EG 臨界值後為 <strong>9.5%</strong>。</p>
 </div>
 </div>
 </div>
 </section>
-
+<h3 id="半衰期與-hurst-為何停用">半衰期與 Hurst 為何停用</h3>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">關卡</th>
+<th style="text-align: right;">淘汰率</th>
+<th style="text-align: left;">停用理由</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">OU 半衰期 <span class="math inline">\in[1,42]</span></td>
+<td style="text-align: right;"><strong>0.2%</strong></td>
+<td style="text-align: left;">通過 ADF 的殘差 99.8% 本就落在區間內，不具鑑別力</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Hurst <span class="math inline">&lt;0.5</span></td>
+<td style="text-align: right;"><strong>96.8%</strong></td>
+<td style="text-align: left;">對價差的<strong>水準值</strong>做 R/S，而標準估計量定義在<strong>增量</strong>上；標準版通過率 0%</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>完整診斷見論文附錄 B.1.2。</p>
+</blockquote></section>
 <section>
 <section id="統計檢定基準t-檢定" class="title-slide slide level1 center">
 <h1>統計檢定基準（T 檢定）</h1>
@@ -1361,7 +1377,7 @@ margin-right: 0; }
 </tbody>
 </table>
 <blockquote>
-<p><strong>基準策略的選定</strong>：命題 1（形成法）以 <strong>SSD Rolling</strong>（距離／共整合家族基準）為對照； 命題 2（交易法）以<strong>同一組配對的 Z-Score 回歸基準</strong>為對照（DL-THR／距離策略借用相同形成期 配對，構成單變因對照）。因此正的且顯著的 t 值代表「該創新相對基準的淨增量貢獻」。 逐月配對檢定與 Newey-West 修正為資產定價實證的標準做法（Newey &amp; West, 1987）。</p>
+<p><strong>基準策略的選定</strong>：分組層（形成法）以 <strong>SSD Rolling</strong>（距離／共整合家族基準）為對照； 交易層（交易法）以<strong>同一組配對的 Z-Score 回歸基準</strong>為對照（DL-THR／距離策略借用相同形成期 配對，構成單變因對照）。因此正的且顯著的 t 值代表「該創新相對基準的淨增量貢獻」。 逐月配對檢定與 Newey-West 修正為資產定價實證的標準做法（Newey &amp; West, 1987）。</p>
 </blockquote>
 <div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
@@ -1480,7 +1496,7 @@ margin-right: 0; }
 </tr>
 <tr class="odd">
 <td><strong>為何選它</strong></td>
-<td>命題 1 涉及 9 組對照。Bonferroni 控制 FWER 過於保守、在探索性研究中檢定力太低；BH 控制<strong>偽發現率</strong>，是此情境的慣例（Benjamini &amp; Hochberg, 1995）</td>
+<td>分組層 涉及 9 組對照。Bonferroni 控制 FWER 過於保守、在探索性研究中檢定力太低；BH 控制<strong>偽發現率</strong>，是此情境的慣例（Benjamini &amp; Hochberg, 1995）</td>
 </tr>
 <tr class="even">
 <td><strong>判讀門檻</strong></td>
@@ -1621,7 +1637,7 @@ margin-right: 0; }
 <section>
 <section id="機器學習與深度學習特徵與訓練資料" class="title-slide slide level1 center">
 <h1>機器學習與深度學習：特徵與訓練資料</h1>
-<p>本研究兩處使用學習方法：<strong>形成期的非監督式分群</strong>（命題 1）與<strong>交易期的門檻選擇</strong>（命題 2）。 以下完整說明各自的特徵、訓練資料與執行步驟。</p>
+<p>本研究兩處使用學習方法：<strong>形成期的非監督式分群</strong>（分組層）與<strong>交易期的門檻選擇</strong>（交易層）。 以下完整說明各自的特徵、訓練資料與執行步驟。</p>
 </section>
 <section id="形成期分群非監督式" class="slide level2 scrollable">
 <h2>形成期分群（非監督式）</h2>

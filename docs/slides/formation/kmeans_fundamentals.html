@@ -1049,7 +1049,7 @@ margin-right: 0; }
 </section>
 <section id="策略概述" class="title-slide slide level1 center">
 <h1>策略概述</h1>
-<p><strong>K-means</strong> 是命題 1 中第三種機器學習分群方法，與 HDBSCAN（密度式）、 Agglomerative（階層式）構成三種<strong>分群典範</strong>的對照。</p>
+<p><strong>K-means</strong> 是分組層 中第三種機器學習分群方法，與 HDBSCAN（密度式）、 Agglomerative（階層式）構成三種<strong>分群典範</strong>的對照。</p>
 <p>三者使用<strong>完全相同的混合特徵矩陣</strong>（價格因子 ⊕ PIT 基本面 ⊕ 產業）， 差異僅在如何從該特徵空間切出配對搜尋空間：</p>
 <table class="caption-top">
 <thead>
@@ -1081,7 +1081,7 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p>K-means 的加入使命題 1 的分群維度涵蓋三大典範，而非僅比較兩種相似方法。</p>
+<p>K-means 的加入使分組層 的分群維度涵蓋三大典範，而非僅比較兩種相似方法。</p>
 </section>
 
 <section id="輸入值卡" class="title-slide slide level1 center">
@@ -1223,40 +1223,50 @@ margin-right: 0; }
 </ul>
 <p><strong>方法特性</strong>：K-means 隱含假設群為<strong>等向且大小相近的球狀結構</strong>。 本策略的特徵空間含 12 維 one-hot 產業區塊，其幾何為離散頂點而非連續球狀—— 此假設不匹配是 K-means 在矩陣中表現落後的預期原因。</p>
 </section>
-<section id="階段-4群內-ssd-排序與共整合篩選依據gatev-2006engle-granger-1987" class="slide level2">
-<h2>階段 4：群內 SSD 排序與共整合篩選（依據：Gatev 2006／Engle-Granger 1987）</h2>
-<p><strong>排序</strong>：於每個群內列舉所有配對，計算正規化對數價格的最小平方距離</p>
-<p><span class="math display">SSD_{ij} = \sum_{t=1}^{T} \left( P&#39;_{i,t} - P&#39;_{j,t} \right)^2,
-\qquad P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
-<p>依 <span class="math inline">SSD</span> 升序排列，逐一送入篩選層，填滿 <code>top_n</code> 為止。</p>
-<p><strong>篩選</strong>（三道，全數通過才納入）：</p>
+<section id="階段-4群內共整合篩選與-ssd-排序依據gatev-2006engle-granger-1987" class="slide level2">
+<h2>階段 4：群內共整合篩選與 SSD 排序（依據：Gatev 2006／Engle-Granger 1987）</h2>
+<p><strong>篩選</strong>（單道）：對每組候選配對的價差施加 Engle-Granger 兩步檢定</p>
 <table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">檢定</th>
 <th style="text-align: left;">條件</th>
-<th style="text-align: left;">意義</th>
+<th style="text-align: left;">說明</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">ADF（<code>regression=&quot;n&quot;</code>）</td>
 <td style="text-align: left;"><span class="math inline">p &lt; 0.05</span></td>
-<td style="text-align: left;">價差序列定態，存在均衡關係</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">OU 半衰期</td>
-<td style="text-align: left;"><span class="math inline">1 \le -\ln 2 / \lambda \le 42</span></td>
-<td style="text-align: left;">回歸速度落在可交易區間</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">Hurst 指數（R/S）</td>
-<td style="text-align: left;"><span class="math inline">H &lt; 0.5</span></td>
-<td style="text-align: left;">序列具均值回歸而非趨勢特性</td>
+<td style="text-align: left;"><span class="math inline">p</span> 值取自 <strong>MacKinnon 響應曲面</strong>（<code>regression=&quot;c&quot;</code>, <span class="math inline">N</span>=2），非 <code>adfuller</code> 直接回傳的 DF 值</td>
 </tr>
 </tbody>
 </table>
+<p><strong>排序</strong>：通過篩選者計算正規化對數價格的最小平方距離</p>
+<p><span class="math display">SSD_{ij} = \sum_{t=1}^{T} \left( P&#39;_{i,t} - P&#39;_{j,t} \right)^2,
+\qquad P&#39;_{i,t} = \frac{\ln P_{i,t} - \mu_i^{form}}{\sigma_i^{form}}</span></p>
+<p>依 <span class="math inline">SSD</span> 升序取前 <code>top_n</code>。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>重要</strong></p>
+</div>
+<div class="callout-content">
+<p>沿用 DF 臨界值時通過率 <strong>77.4%</strong>——名目 5% 的檢定不可能拒絕 77% 的虛無假設； 改用 EG 臨界值後為 <strong>9.5%</strong>。詳見論文附錄 B.1.1。</p>
+</div>
+</div>
+</div>
+<blockquote>
 <p>排序與篩選的所有參數與 HDBSCAN、Agglomerative <strong>完全一致</strong>。</p>
+</blockquote>
 </section>
 <section id="階段-56輸出與交易期銜接" class="slide level2">
 <h2>階段 5–6：輸出與交易期銜接</h2>

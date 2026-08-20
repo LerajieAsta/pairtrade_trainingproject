@@ -4231,7 +4231,7 @@ z-index: 1000;
 <div>
 <pre class="mermaid mermaid-js">flowchart LR
   P[&quot;形成期日價格&lt;br/&gt;標準化&quot;] --&gt; G[&quot;分組&lt;br/&gt;GICS 產業&quot;]
-  G --&gt; F[&quot;篩選&lt;br/&gt;共整合 + 半衰期 + Hurst&quot;]
+  G --&gt; F[&quot;篩選&lt;br/&gt;共整合檢定&lt;br/&gt;ADF（EG 臨界值）&quot;]
   F --&gt; R[&quot;排序&lt;br/&gt;SSD ＋ DTW → PCA 融合分數&quot;]
   R --&gt; T[&quot;Top N 配對&lt;br/&gt;→ 交易期&quot;]
 </pre>
@@ -4261,7 +4261,7 @@ z-index: 1000;
 </tr>
 <tr class="even">
 <td style="text-align: left;">篩選</td>
-<td style="text-align: left;">共整合 + 半衰期 + Hurst</td>
+<td style="text-align: left;">共整合檢定<br>ADF（EG 臨界值）</td>
 <td style="text-align: left;">確認價差均值回歸</td>
 </tr>
 <tr class="odd">
@@ -4367,45 +4367,54 @@ z-index: 1000;
 P&#39;_{v,t} = \alpha_2 + \beta_2 P&#39;_{u,t} + \epsilon^{(2)}_t</span></p>
 <p>分別對殘差做 ADF 檢定（<code>max_lags=1</code>），取 p 值較小的方向決定 <span class="math inline">(\text{Ticker\_A},\ \text{Ticker\_B})</span>， 並保留該方向的 <span class="math inline">\alpha</span>（<code>OLS_Alpha</code>）、<span class="math inline">\beta</span>（<code>Hedge_Ratio</code>）與殘差序列。</p>
 </section>
-<section id="階段-4三道統計篩選" class="slide level2">
-<h2>階段 4：三道統計篩選</h2>
+<section id="統計篩選單道共整合檢定" class="slide level2">
+<h2>統計篩選：單道共整合檢定</h2>
+<p>候選對逐一施加 Engle-Granger（1987）兩步檢定。第一步以 OLS 估計共整合關係並取殘差 <span class="math inline">\hat{s}_t</span>，第二步對殘差作 ADF：</p>
+<p><span class="math display">\Delta \hat{s}_t = \gamma\,\hat{s}_{t-1} + \sum_{m=1}^{q}\phi_m \Delta \hat{s}_{t-m} + u_t,
+\qquad H_0:\ \gamma = 0</span></p>
+<p>落後階固定 <span class="math inline">q=1</span>，迴歸式不含常數項（殘差依建構已去均值）。門檻 <span class="math inline">p &lt; 0.05</span>。</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong><span class="math inline">p</span> 值取自 MacKinnon 響應曲面，不是 <code>adfuller</code> 直接回傳值</strong></p>
+</div>
+<div class="callout-content">
+<p><code>adfuller</code> 的 <span class="math inline">p</span> 值出自 <strong>Dickey-Fuller 分布</strong>——那是對一條<strong>觀測到的</strong>序列 檢定單根的虛無分布。此處受檢的是<strong>估計出來的</strong>共整合迴歸殘差， OLS 已先將其變異最小化，其虛無分布位置明顯更負（Phillips &amp; Ouliaris, 1990）。</p>
+<p><strong>實測：沿用 DF 臨界值時通過率 77.4%</strong>——名目 5% 的檢定不可能拒絕 77% 的虛無假設。 改用 <code>mackinnonp(stat, regression=&quot;c&quot;, N=2)</code> 換算後為 <strong>9.5%</strong>。</p>
+</div>
+</div>
+</div>
+<h3 id="半衰期與-hurst-已停用">半衰期與 Hurst 已停用</h3>
+<p>早期版本另設兩道過濾（OU 半衰期 <span class="math inline">\in[1,42]</span>、Hurst <span class="math inline">&lt;0.5</span>）。逐層拆解顯示三道實為一道：</p>
 <table class="caption-top">
-<colgroup>
-<col style="width: 29%">
-<col style="width: 23%">
-<col style="width: 23%">
-<col style="width: 23%">
-</colgroup>
 <thead>
 <tr class="header">
-<th style="text-align: center;">道次</th>
-<th style="text-align: left;">檢定</th>
-<th style="text-align: left;">門檻</th>
-<th style="text-align: left;">依據</th>
+<th style="text-align: left;">關卡</th>
+<th style="text-align: right;">淘汰率</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: center;">1</td>
-<td style="text-align: left;">ADF 共整合</td>
-<td style="text-align: left;"><span class="math inline">p &lt; 0.01</span></td>
-<td style="text-align: left;">Engle &amp; Granger (1987)；許鈞翔 (2025) 採同一顯著水準</td>
+<td style="text-align: left;">ADF（舊 DF 臨界值）</td>
+<td style="text-align: right;">22.6%</td>
 </tr>
 <tr class="even">
-<td style="text-align: center;">2</td>
 <td style="text-align: left;">OU 半衰期</td>
-<td style="text-align: left;"><span class="math inline">\lambda &lt; 0</span> 且 <span class="math inline">1 \le HL \le 42</span> 日</td>
-<td style="text-align: left;">Krauss et al. (2016)</td>
+<td style="text-align: right;"><strong>0.2%</strong></td>
 </tr>
 <tr class="odd">
-<td style="text-align: center;">3</td>
-<td style="text-align: left;">Hurst 指數</td>
-<td style="text-align: left;"><span class="math inline">H &lt; 0.50</span>（R/S 分析，<code>already_stationary=True</code>）</td>
-<td style="text-align: left;">Krauss et al. (2016)</td>
+<td style="text-align: left;">Hurst</td>
+<td style="text-align: right;"><strong>96.8%</strong></td>
 </tr>
 </tbody>
 </table>
-<p>半衰期：對 <span class="math inline">\Delta \epsilon_t = c + \lambda\, \epsilon_{t-1} + u_t</span> 最小平方估計，<span class="math inline">HL = -\ln 2 / \lambda</span>。 任一道未通過即淘汰；距離計算只對通過者執行。</p>
+<p>半衰期幾乎不作用（通過 ADF 的殘差有 99.8% 落在區間內，此為必然）。 而承擔 96.8% 淘汰工作的 Hurst，兩個實作都以 <code>already_stationary=True</code> 對價差的<strong>水準值</strong>做 R/S，但標準 R/S 的估計量定義在<strong>增量</strong>上—— 標準多尺度版實測均值 0.980、<span class="math inline">H&lt;0.5</span> 通過率 <strong>0%</strong>。</p>
+<blockquote>
+<p>完整診斷見論文附錄 B.1.2。修正後主軸 13 格中 12 格績效改善（<span class="math inline">\Delta</span>Sharpe 中位 +0.236）。</p>
+</blockquote>
 </section>
 <section id="階段-5ssd-與-dtw-距離計算" class="slide level2">
 <h2>階段 5：SSD 與 DTW 距離計算</h2>

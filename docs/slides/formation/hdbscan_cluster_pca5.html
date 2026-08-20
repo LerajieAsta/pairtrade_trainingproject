@@ -4143,7 +4143,7 @@ z-index: 1000;
 
 <section id="title-slide" class="quarto-title-block center">
   <h1 class="title">HDBSCAN</h1>
-  <p class="subtitle">形成期策略：19 維混合特徵之 HDBSCAN 密度式分群 + SSD-DTW-PCA 融合排序（命題 1 的 HDBSCAN 臂）</p>
+  <p class="subtitle">形成期策略：19 維混合特徵之 HDBSCAN 密度式分群 + SSD-DTW-PCA 融合排序（分組層 的 HDBSCAN 臂）</p>
 
 <div class="quarto-title-authors">
 </div>
@@ -4151,7 +4151,7 @@ z-index: 1000;
 </section>
 <section id="策略概述" class="title-slide slide level1 center">
 <h1>策略概述</h1>
-<p><strong>HDBSCAN</strong> 是命題 1 的分組層之一：以<strong>機器學習密度式分群取代 GICS 靜態產業分類</strong> 來建立配對搜尋空間。</p>
+<p><strong>HDBSCAN</strong> 是分組層 的分組層之一：以<strong>機器學習密度式分群取代 GICS 靜態產業分類</strong> 來建立配對搜尋空間。</p>
 <p>作法是把每檔股票定位在一個 <strong>19 維混合特徵空間</strong>——它對共同風險因子的暴露（5 維報酬 PCA 因子載荷）、它的公司性質（2 維 PIT 基本面）、以及它的產業歸屬（12 維 GICS one-hot）——讓演算法依<strong>密度</strong>自動把相近的股票分成一群，群內再找配對。</p>
 <p>檢驗的問題是：<strong>資料驅動的分群，能不能找到比靜態產業分類更高品質的配對？</strong></p>
 <div class="callout callout-note callout-titled callout-style-default">
@@ -4163,7 +4163,7 @@ z-index: 1000;
 <p><strong>特徵矩陣為何與 Agglomerative、K-means 完全相同</strong></p>
 </div>
 <div class="callout-content">
-<p>命題 1 是 4 分組 × 3 排序的消融矩陣，<strong>分組方法是唯一變因</strong>。 三種分群法若各用各的特徵，量到的就是「特徵 × 演算法」的混合效果。 故 HDBSCAN、Agglomerative、K-means 共用同一份 19 維混合特徵矩陣 （<code>feature_mode=&quot;fundamentals_mix&quot;</code>），差別只在分群演算法本身。</p>
+<p>分組層 是 4 分組 × 3 排序的消融矩陣，<strong>分組方法是唯一變因</strong>。 三種分群法若各用各的特徵，量到的就是「特徵 × 演算法」的混合效果。 故 HDBSCAN、Agglomerative、K-means 共用同一份 19 維混合特徵矩陣 （<code>feature_mode=&quot;fundamentals_mix&quot;</code>），差別只在分群演算法本身。</p>
 </div>
 </div>
 </div>
@@ -4262,7 +4262,7 @@ z-index: 1000;
 <div>
 <pre class="mermaid mermaid-js">flowchart LR
   P[&quot;特徵&lt;br/&gt;19 維混合（報酬 PCA ⊕ 基本面 ⊕ 產業）&quot;] --&gt; G[&quot;分組&lt;br/&gt;HDBSCAN 密度式分群（取代 GICS）&quot;]
-  G --&gt; F[&quot;篩選&lt;br/&gt;群內共整合 + 半衰期 + Hurst&quot;]
+  G --&gt; F[&quot;篩選&lt;br/&gt;群內共整合檢定&lt;br/&gt;ADF（EG 臨界值）&quot;]
   F --&gt; R[&quot;排序&lt;br/&gt;SSD ＋ DTW 主成分融合&quot;]
   R --&gt; T[&quot;Top N 配對&lt;br/&gt;→ 交易期&quot;]
 </pre>
@@ -4302,7 +4302,7 @@ z-index: 1000;
 </tr>
 <tr class="even">
 <td style="text-align: left;">篩選</td>
-<td style="text-align: left;">群內共整合 + 半衰期 + Hurst</td>
+<td style="text-align: left;">群內共整合檢定<br>ADF（EG 臨界值）</td>
 <td style="text-align: left;">確認價差均值回歸</td>
 </tr>
 <tr class="odd">
@@ -4469,15 +4469,29 @@ z-index: 1000;
 <li>群數由密度自動決定，不需事先指定——這是 HDBSCAN 與 Agglomerative／K-means 的主要差異（後兩者的粒度由切割門檻或 <span class="math inline">k</span> 決定）</li>
 </ul>
 </section>
-<section id="階段-3群內雙向-ols-與統計篩選" class="slide level2 scrollable">
-<h2>階段 3：群內雙向 OLS 與統計篩選</h2>
+<section id="階段-3群內雙向-ols-與共整合篩選" class="slide level2 scrollable">
+<h2>階段 3：群內雙向 OLS 與共整合篩選</h2>
 <p>以群標籤（<code>Cluster_0</code>, <code>Cluster_1</code>, …）作為分組，執行：</p>
 <ol type="1">
 <li><strong>雙向 OLS + ADF 方向決定</strong>：兩個回歸方向各檢定一次，取 <span class="math inline">p</span> 值較小者</li>
-<li><strong>三道統計篩選</strong>：ADF <span class="math inline">p &lt; 0.05</span> → OU 半衰期 <span class="math inline">1 \le HL \le 42</span> 日（<span class="math inline">\lambda &lt; 0</span>） → Hurst <span class="math inline">H &lt; 0.50</span></li>
+<li><strong>共整合篩選</strong>：ADF <span class="math inline">p &lt; 0.05</span>（單道，<strong>EG 臨界值</strong>）</li>
 </ol>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>警告</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>雙向取較小 <span class="math inline">p</span> 值是一次選擇。</strong> 取兩個高度相依之檢定的最小值再與 <span class="math inline">\alpha</span> 比較， 實際型一誤差高於名目水準。此為許鈞翔（2025）的設定，本研究保留以維持復現性； SSD 後端無此步驟，故兩欄的關卡鬆緊本就不同（不影響欄內對照）。</p>
+</div>
+</div>
+</div>
 <blockquote>
-<p><strong>門檻為 0.05 而非 0.01</strong>：<code>_GRID_COMMON</code> 的 <code>adf_pvalue_threshold</code> = 0.05， 為消融矩陣全格共用值（0.01 是已封存 PCA5 設定的舊值）。 0.01／0.05／0.10 的敏感度對照見附錄 E。</p>
+<p><strong>門檻為 0.05 而非 0.01</strong>：<code>_GRID_COMMON</code> 的 <code>adf_pvalue_threshold</code> = 0.05， 為消融矩陣全格共用值。</p>
+<p><strong>半衰期與 Hurst 已停用</strong>——逐層拆解顯示三道實為一道 （淘汰率 22.6% / 0.2% / 96.8%），而 Hurst 對價差的<strong>水準值</strong>做 R/S， 標準估計量定義在<strong>增量</strong>上。見論文附錄 B.1.2。</p>
 </blockquote>
 </section>
 <section id="階段-4ssd-與-dtw-距離計算" class="slide level2">
