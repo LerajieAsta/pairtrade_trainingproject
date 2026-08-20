@@ -1734,74 +1734,74 @@ margin-right: 0; }
 <aside><div>
 <p>三項檢定共同侷限：皆為事後重抽，不含槽位再配置效應。</p>
 </div></aside></section>
-<section id="受控對照反事實標籤值多少錢" class="slide level2">
-<h2>受控對照：反事實標籤值多少錢？</h2>
-<p>DL-THR 的一項結構性優勢是<strong>全資訊</strong>——9 個動作的報酬皆可精確反事實回算。 RL-THR 保持動作選單、狀態、網路與 walk-forward 切分完全相同， 只把訓練標籤縮成「實際選中的那一個」並改採 <span class="math inline">\varepsilon</span>-greedy（設計見 §3.4）。</p>
-<p>配對底 <code>Grid (AGG-SSD)</code>，15 格等權：</p>
+<section id="反事實標籤的價值被自身資料否證的預期" class="slide level2">
+<h2>4.2.4 反事實標籤的價值：被自身資料否證的預期</h2>
+<p>§3.4.4 指出本交易端的<strong>全資訊</strong>性質——9 個動作的報酬皆可精確反事實回算。 該性質原被<strong>預期</strong>為其樣本效率之來源。</p>
+<p><strong>RL-THR</strong> 保持動作選單、狀態、網路與 walk-forward 切分<strong>逐位元相同</strong>， 僅將訓練標籤縮成「實際選中的那一個」並改採 <span class="math inline">\varepsilon</span>-greedy 探索。 配對底 <code>Grid (AGG-SSD)</code>，15 格等權、逐日差分、循環 block bootstrap。</p>
 <table class="caption-top">
 <colgroup>
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
-<col style="width: 25%">
+<col style="width: 23%">
+<col style="width: 23%">
+<col style="width: 29%">
+<col style="width: 23%">
 </colgroup>
 <thead>
 <tr class="header">
-<th style="text-align: left;">交易端</th>
-<th style="text-align: right;">平均 Sharpe</th>
-<th style="text-align: right;">等權年化</th>
-<th style="text-align: right;">vs Z-Score</th>
+<th style="text-align: left;">對照</th>
+<th style="text-align: right;">年化Δ(pp)</th>
+<th style="text-align: center;">95% CI (pp)</th>
+<th style="text-align: right;"><span class="math inline">p</span></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">Z-Score（固定門檻）</td>
-<td style="text-align: right;">−0.092</td>
-<td style="text-align: right;">−0.112%</td>
-<td style="text-align: right;">—</td>
+<td style="text-align: left;">DL-THR − Z-Score</td>
+<td style="text-align: right;">+0.112</td>
+<td style="text-align: center;">[−0.20, +0.44]</td>
+<td style="text-align: right;">0.488</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>DL-THR</strong>（全資訊）</td>
-<td style="text-align: right;">−0.015</td>
-<td style="text-align: right;">−0.055%</td>
-<td style="text-align: right;">+0.057 pp</td>
+<td style="text-align: left;"><strong>RL-THR(<span class="math inline">\varepsilon</span>=0.05) − Z-Score</strong></td>
+<td style="text-align: right;"><strong>+0.329</strong></td>
+<td style="text-align: center;">[−0.09, +0.93]</td>
+<td style="text-align: right;">0.203</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><strong>RL-THR</strong> (<span class="math inline">\varepsilon</span>=0.05)</td>
-<td style="text-align: right;"><strong>+0.076</strong></td>
-<td style="text-align: right;"><strong>+0.215%</strong></td>
-<td style="text-align: right;"><strong>+0.326 pp</strong></td>
+<td style="text-align: left;"><strong>RL-THR(<span class="math inline">\varepsilon</span>=0.10) − Z-Score</strong></td>
+<td style="text-align: right;"><strong>+0.299</strong></td>
+<td style="text-align: center;">[−0.10, +0.88]</td>
+<td style="text-align: right;">0.223</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">RL-THR (<span class="math inline">\varepsilon</span>=0.10)</td>
-<td style="text-align: right;">+0.073</td>
-<td style="text-align: right;">+0.185%</td>
-<td style="text-align: right;">+0.297 pp</td>
+<td style="text-align: left;">RL-THR(<span class="math inline">\varepsilon</span>=0.05) − DL-THR</td>
+<td style="text-align: right;">+0.217</td>
+<td style="text-align: center;">[−0.16, +0.68]</td>
+<td style="text-align: right;">0.312</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">RL-THR (<span class="math inline">\varepsilon</span>=0.20→0.02)</td>
-<td style="text-align: right;">+0.063</td>
-<td style="text-align: right;">+0.162%</td>
-<td style="text-align: right;">+0.274 pp</td>
+<td style="text-align: left;">RL-THR(<span class="math inline">\varepsilon</span>=0.10) − DL-THR</td>
+<td style="text-align: right;">+0.187</td>
+<td style="text-align: center;">[−0.16, +0.62]</td>
+<td style="text-align: right;">0.355</td>
 </tr>
 </tbody>
 </table>
-<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>警告</strong></p>
+<p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>三個 RL-THR 變體全部優於 DL-THR。</strong></p>
-<p>反事實標籤的價值在此配對底上<strong>為負</strong>——全資訊不僅沒有幫助， 還可能使模型過度擬合到那些從未被選中的動作之報酬估計上。</p>
+<p><strong>三個部分回饋變體的點估計全部優於全資訊版本</strong>，但差異<strong>不顯著</strong>。</p>
+<p>可陳述者僅為否定的一半： <strong>資料不支持「全資訊標籤是本交易端效果之來源」這一預期。</strong></p>
 </div>
 </div>
 </div>
 <blockquote>
-<p>此結果限於 Agglomerative 配對底（唯一設有 RL-THR 對照者）， 且未施加統計檢定。但方向足以推翻「全資訊是 DL-THR 有效之來源」的推測—— 該推測原是本研究命名 DL-THR 而非 DRL 的理由之一。</p>
+<p><strong>命名不因此改變</strong>——依據是學習問題的<strong>性質</strong>（動作報酬可完整反事實回算）， 該性質為事實；受否證者是「該性質帶來優勢」這一<strong>預期</strong>。</p>
 </blockquote>
 </section></section>
 <section>
