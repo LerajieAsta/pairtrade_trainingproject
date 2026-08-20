@@ -1150,12 +1150,12 @@ margin-right: 0; }
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>本研究由這兩條路線各取一個命題</strong></p>
+<p><strong>本研究對這兩條路線各設一項檢定</strong></p>
 </div>
 <div class="callout-content">
 <blockquote>
-<p><strong>命題 1（形成期）</strong> <strong>機器學習分群能建立優於傳統產業分類的配對搜尋空間。</strong> 對照組為 GICS 十一大產業分組；待檢定者為 HDBSCAN／Agglomerative／K-means。</p>
-<p><strong>命題 2（交易期）</strong> <strong>以學習法選擇交易門檻，能取得優於固定門檻規則的績效。</strong> 對照組為固定門檻 Z-Score（<span class="math inline">\lvert z
+<p><strong>形成期分組層</strong> <strong>機器學習分群能建立優於傳統產業分類的配對搜尋空間。</strong> 對照組為 GICS 十一大產業分組；待檢定者為 HDBSCAN／Agglomerative／K-means。</p>
+<p><strong>交易期門檻選擇</strong> <strong>以學習法選擇交易門檻，能取得優於固定門檻規則的績效。</strong> 對照組為固定門檻 Z-Score（<span class="math inline">\lvert z
 vert &gt; 2.0</span> 進場）； 待檢定者為逐期由模型選擇門檻的交易端。</p>
 </blockquote>
 <p>兩者皆為<strong>方法間的相對比較</strong>，不主張策略本身可獲利。</p>
@@ -1168,7 +1168,7 @@ vert &gt; 2.0</span> 進場）； 待檢定者為逐期由模型選擇門檻的�
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>命題 2 的用詞</strong></p>
+<p><strong>交易層的用詞</strong></p>
 </div>
 <div class="callout-content">
 <p>Kim &amp; Kim (2019) 以<strong>深度強化學習</strong>實作門檻選擇，本研究沿用其<strong>動作空間</strong> （逐期自離散的門檻組合中擇一）但<strong>不</strong>沿用其學習範式，故全文以中性的 <strong>「門檻選擇」</strong>指稱這條路線，以本研究的實作 <strong>DL-THR</strong> 指稱待檢定的交易端。 理由見 §3.4.4。</p>
@@ -1341,24 +1341,39 @@ vert &gt; 2.0</span> 進場）； 待檢定者為逐期由模型選擇門檻的�
 </section>
 <section id="研究目的" class="slide level2">
 <h2>研究目的</h2>
-<p>以 S&amp;P 500 成分股 <strong>2000–2025 年</strong>資料檢驗兩個命題：</p>
+<p>以 S&amp;P 500 成分股 <strong>2000–2025 年</strong>資料，依兩階段結構分別檢驗：</p>
 <blockquote>
-<p><strong>命題 1（形成期）</strong>　機器學習分群能建立優於傳統產業分類的配對搜尋空間。</p>
-<p><strong>命題 2（交易期）</strong>　以學習法選擇交易門檻，能取得優於固定門檻規則的績效。</p>
+<p><strong>形成期</strong>　分組層對候選配對池施加的限制，是否提升所選配對的品質？</p>
+<p><strong>交易期</strong>　以學習法逐配對、逐期選擇門檻，是否優於全期固定的門檻規則？</p>
 </blockquote>
+<p>形成期的檢定<strong>不採二分對照</strong>，而將分組層視為一條<strong>有序的維度</strong>—— 自「不分組」（零限制）經 GICS 產業分類，至三種資料驅動分群（限制最強）。</p>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>註釋</strong></p>
+</div>
+<div class="callout-content">
+<p>納入不分組零點的理由：分組層在本管線中只做一件事——<strong>限制候選池</strong>。 若無「不限制」的對照，所比較的僅是不同的限制方式，而非限制本身的價值。</p>
+</div>
+</div>
+</div>
 <h3 id="單變因檢定設計">單變因檢定設計</h3>
-<p>採<strong>中性組裝器</strong>架構，將形成期拆解為四個可獨立替換的層 （特徵 → 分組 → 群內排序 → 統計篩選），使任兩策略之間僅存單一變因：</p>
+<p>採<strong>中性組裝器</strong>架構，將形成期拆解為四個可獨立替換的層 （特徵 → 分組 → <strong>統計篩選</strong> → <strong>群內排序</strong>），使任兩策略之間僅存單一變因：</p>
 <ul>
-<li><strong>檢定命題 1</strong>：固定特徵、排序、篩選與交易端，僅變動<strong>分組方法</strong> （HDBSCAN／Agglomerative／K-means／<strong>GICS 產業分類</strong>）</li>
-<li><strong>檢定命題 2</strong>：固定形成期產出的<strong>同一批配對</strong>，僅變動<strong>交易端</strong> （固定門檻 Z-Score 規則／<strong>DL-THR</strong> 門檻選擇）</li>
+<li><strong>檢定分組層</strong>：固定特徵、排序、篩選與交易端，僅變動<strong>分組方法</strong> （不分組／GICS／HDBSCAN／Agglomerative／K-means）</li>
+<li><strong>檢定交易層</strong>：固定形成期產出的<strong>同一批配對</strong>，僅變動<strong>交易端</strong></li>
 </ul>
+<p>另檢驗<strong>兩者組合</strong>——實務上要部署的那個系統，相對於傳統基準的整體效果。</p>
 </section>
 <section id="三項方法論目標" class="slide level2">
 <h2>三項方法論目標</h2>
-<p>除主命題外，本研究設定三項方法論目標—— 它們構成第四、五章相當篇幅的內容來源。</p>
+<p>除上述檢定外，本研究設定三項方法論目標—— 它們構成第四、五章相當篇幅的內容來源。</p>
 <p><strong>一、推論基礎的正確性</strong> 跨策略比較不得以各自參數網格的<strong>最佳值</strong>進行——該做法系統性納入選擇偏誤， 故本研究一律以<strong>全網格等權組合</strong>為報告口徑。 檢定則以<strong>逐日報酬差 + 循環 block bootstrap</strong>進行，同時報告 <span class="math inline">p</span> 值與<strong>信賴區間</strong>， 使「不顯著」能進一步區分為效果不存在與檢定力不足。</p>
-<p><strong>二、失敗原因的可歸因性</strong> 若命題未獲支持，須區分「方法本身無效」與「本研究的實作選擇壓抑了方法」。 本研究對每一項可能的實作差異施加<strong>受控消融</strong>，逐一排除。</p>
-<p><strong>三、限制的量化揭露</strong> 存活者偏誤、資料覆蓋率、成本假設年代等限制須以<strong>具體數字</strong>呈現 並說明<strong>偏誤方向</strong>，而非僅作定性陳述。</p>
+<p><strong>二、失敗原因的可歸因性</strong> 若某項改良未顯示效果，須區分「方法本身無效」與「本研究的實作選擇壓抑了方法」。 本研究對每一項可能的實作差異施加受控消融，逐一排除。</p>
+<p><strong>三、限制的量化揭露</strong> 存活者偏誤、資料覆蓋率、成本假設年代等限制須以<strong>具體數字</strong>呈現 並說明其<strong>偏誤方向</strong>，而非僅作定性陳述。</p>
 </section></section>
 <section>
 <section id="研究架構" class="title-slide slide level1 center">
@@ -1377,13 +1392,13 @@ vert &gt; 2.0</span> 進場）； 待檢定者為逐期由模型選擇門檻的�
 <tr class="header">
 <th style="text-align: left;">章</th>
 <th style="text-align: left;">內容</th>
-<th style="text-align: left;">與命題的關係</th>
+<th style="text-align: left;">與兩層檢定的關係</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>一　緒論</strong></td>
-<td style="text-align: left;">背景、報酬衰減、兩條改良路線、兩大命題與方法論目標</td>
+<td style="text-align: left;">背景、報酬衰減、兩條改良路線、兩層與方法論目標</td>
 <td style="text-align: left;">提出問題</td>
 </tr>
 <tr class="even">
@@ -1398,7 +1413,7 @@ vert &gt; 2.0</span> 進場）； 待檢定者為逐期由模型選擇門檻的�
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>四　實證結果</strong></td>
-<td style="text-align: left;">績效表現分析（兩命題檢定 + 受控消融 + 機制診斷）、風險評估（regime／成本／絕對績效）</td>
+<td style="text-align: left;">績效表現分析（兩層檢定 + 受控消融 + 機制診斷）、風險評估（regime／成本／絕對績效）</td>
 <td style="text-align: left;">回答問題</td>
 </tr>
 <tr class="odd">

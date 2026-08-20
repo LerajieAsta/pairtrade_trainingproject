@@ -1052,126 +1052,157 @@ margin-right: 0; }
 <h1>5.1 研究發現綜整</h1>
 
 </section>
-<section id="先看要部署的那個系統" class="slide level2">
-<h2>先看要部署的那個系統</h2>
-<p>本研究將配對交易的改良拆解為<strong>形成期的分組方法</strong>與<strong>交易期的門檻選擇</strong>兩層， 分別檢驗其貢獻，並在<strong>系統層次</strong>檢驗兩者的組合。先報告系統層次的結果。</p>
-<blockquote>
-<p><strong>組合系統</strong>　252 日窗、21 日滾動的動態分群 ＋ <strong>DL-THR 門檻選擇</strong>交易端 <strong>傳統基準</strong>　GICS 產業分組 ＋ <strong>固定門檻 Z-Score</strong></p>
-</blockquote>
-<p><strong>六組對照中五組於 BH-FDR 校正後達 5% 顯著</strong>，效果量 <strong>+0.63 ~ +1.51 pp</strong>， 五組的信賴區間下界皆嚴格大於零。未達顯著者為全期的 K-means（BH <span class="math inline">p</span> = 0.186）。</p>
-<div class="callout callout-warning callout-titled callout-style-default">
+<section id="三項檢定校正後皆無顯著" class="slide level2">
+<h2>三項檢定，校正後皆無顯著</h2>
+<p>本研究將配對交易的改良拆解為<strong>形成期的分組方法</strong>與<strong>交易期的門檻選擇</strong>兩層， 分別檢驗其貢獻，並在<strong>系統層次</strong>檢驗兩者的組合。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">檢定</th>
+<th style="text-align: left;">內容</th>
+<th style="text-align: left;">方向</th>
+<th style="text-align: center;">校正後顯著</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">分組層</td>
+<td style="text-align: left;">資料驅動分群 vs GICS 產業分組</td>
+<td style="text-align: left;"><strong>9/9 偏向 GICS</strong></td>
+<td style="text-align: center;">0/9</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">交易層</td>
+<td style="text-align: left;">DL-THR vs 固定門檻 Z-Score</td>
+<td style="text-align: left;"><strong>5/5 為正</strong></td>
+<td style="text-align: center;">0/5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">兩層組合</td>
+<td style="text-align: left;">完整系統 vs 傳統基準</td>
+<td style="text-align: left;"><strong>全期 3/3 為負</strong></td>
+<td style="text-align: center;">0/3</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>這是<strong>相對</strong>主張，必須與下一句同時陳述</strong></p>
+<p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p>同一批系統的<strong>絕對</strong>績效在等權口徑下<strong>六組全部不顯著</strong>， 信賴區間寬達 <strong>2.4 ~ 2.9 pp</strong>，年化 Sharpe 僅 <strong>0.09 ~ 0.21</strong>。</p>
-<p>兩者虛無假設不同（前者「兩交易端績效相同」，後者「平均日報酬為零」）， 故不矛盾——本研究能主張的是<strong>方法之間的相對優劣</strong>， <strong>不是</strong>該策略可實現超額報酬。</p>
+<p><strong>方向的一致性是本研究最可靠的訊號，而非任何單組的 <span class="math inline">p</span> 值。</strong></p>
 </div>
 </div>
 </div>
+<blockquote>
+<p><strong>組合系統</strong>（資料驅動分群 ＋ DL-THR）<strong>劣於</strong>傳統基準（GICS ＋ 固定門檻） ——全期三組年化Δ 為 −0.265 ~ −0.630 pp。原因見下頁。</p>
+</blockquote>
 </section>
-<section id="成分分解功勞歸給哪一半" class="slide level2">
-<h2>成分分解：功勞歸給哪一半？</h2>
+<section id="成分分解損害來自哪一半" class="slide level2">
+<h2>成分分解：損害來自哪一半？</h2>
 <p><span class="math display">(\text{分群}+\text{DL-THR}) - (\text{GICS}+\text{ZS}) = \underbrace{\cdots}_{\text{DL-THR 成分}} + \underbrace{\cdots}_{\text{分群成分}}</span></p>
 <table class="caption-top" style="width:100%;">
 <colgroup>
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
-<col style="width: 16%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
 </colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">期間</th>
 <th style="text-align: left;">分群法</th>
 <th style="text-align: right;">總效果</th>
-<th style="text-align: right;">BH 校正 <span class="math inline">p</span></th>
 <th style="text-align: right;">DL-THR 成分</th>
+<th style="text-align: right;"><span class="math inline">p</span></th>
 <th style="text-align: right;">分群成分</th>
+<th style="text-align: right;"><span class="math inline">p</span></th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">全期</td>
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;"><strong>+1.156</strong></td>
-<td style="text-align: right;"><strong>0.0141</strong> ✔</td>
-<td style="text-align: right;"><strong>+0.787</strong> ✔</td>
-<td style="text-align: right;">+0.369 ✘</td>
+<td style="text-align: right;">−0.334</td>
+<td style="text-align: right;"><strong>+0.112</strong></td>
+<td style="text-align: right;">0.488</td>
+<td style="text-align: right;"><strong>−0.447</strong></td>
+<td style="text-align: right;">0.322</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">全期</td>
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;"><strong>+1.025</strong></td>
-<td style="text-align: right;"><strong>0.0141</strong> ✔</td>
-<td style="text-align: right;"><strong>+0.865</strong> ✔</td>
-<td style="text-align: right;">+0.160 ✘</td>
+<td style="text-align: right;">−0.265</td>
+<td style="text-align: right;"><strong>+0.456</strong></td>
+<td style="text-align: right;">0.052</td>
+<td style="text-align: right;"><strong>−0.721</strong></td>
+<td style="text-align: right;">0.061</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">全期</td>
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">+0.631</td>
-<td style="text-align: right;">0.1864 ✘</td>
-<td style="text-align: right;"><strong>+0.606</strong> ✔</td>
-<td style="text-align: right;">+0.025 ✘</td>
+<td style="text-align: right;">−0.630</td>
+<td style="text-align: right;"><strong>+0.283</strong></td>
+<td style="text-align: right;">0.073</td>
+<td style="text-align: right;"><strong>−0.913</strong></td>
+<td style="text-align: right;">0.080</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">2012+</td>
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;"><strong>+1.511</strong></td>
-<td style="text-align: right;"><strong>0.0074</strong> ✔</td>
-<td style="text-align: right;"><strong>+0.743</strong> ✔</td>
-<td style="text-align: right;">+0.768 ✘</td>
+<td style="text-align: right;">+0.470</td>
+<td style="text-align: right;">+0.279</td>
+<td style="text-align: right;">0.064</td>
+<td style="text-align: right;">+0.191</td>
+<td style="text-align: right;">0.590</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">2012+</td>
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;"><strong>+1.194</strong></td>
-<td style="text-align: right;"><strong>0.0074</strong> ✔</td>
-<td style="text-align: right;"><strong>+1.000</strong> ✔</td>
-<td style="text-align: right;">+0.195 ✘</td>
+<td style="text-align: right;">+0.193</td>
+<td style="text-align: right;">+0.511</td>
+<td style="text-align: right;">0.013</td>
+<td style="text-align: right;">−0.318</td>
+<td style="text-align: right;">0.387</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">2012+</td>
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;"><strong>+1.193</strong></td>
-<td style="text-align: right;"><strong>0.0203</strong> ✔</td>
-<td style="text-align: right;"><strong>+0.464</strong> ✔</td>
-<td style="text-align: right;">+0.730 ✘</td>
+<td style="text-align: right;">+0.582</td>
+<td style="text-align: right;">+0.424</td>
+<td style="text-align: right;">0.009</td>
+<td style="text-align: right;">+0.158</td>
+<td style="text-align: right;">0.687</td>
 </tr>
 </tbody>
 </table>
-<ul>
-<li><strong>DL-THR 成分六組全部顯著</strong>（+0.464 ~ +1.000 pp，<span class="math inline">p</span> = 0.0000 ~ 0.0200）</li>
-<li><strong>分群成分六組全部不顯著</strong>（+0.025 ~ +0.768 pp，<span class="math inline">p</span> = 0.122 ~ 0.954）</li>
-</ul>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>顯著的是「系統」，不是「分群」</strong></p>
+<p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p>組合系統跨過門檻，是兩個方向相同的效果<strong>相加</strong>的結果。 分群成分方向一致為正（2012+ 的 Agglomerative +0.768、K-means +0.730， 數值上已接近同列的 DL-THR 成分），但單獨檢定無一顯著。</p>
-<p>→ 可主張：<strong>本研究所提的完整系統顯著優於傳統作法。</strong> → 不可主張：<strong>ML 分群有效。</strong> 那需要分群成分自身顯著，而本研究做不到。</p>
+<p><strong>全期三組的 DL-THR 成分皆正、分群成分皆負，且分群成分的量級更大。</strong></p>
+<p>完整系統之所以劣於傳統基準，是因為<strong>分群層的損害超過交易端的貢獻</strong>。 兩個成分並不互補。</p>
 </div>
 </div>
 </div>
 <blockquote>
-<p><strong>正確的一句話</strong>：完整系統顯著優於傳統基準，<strong>但把功勞歸給哪一半，資料還答不出來。</strong></p>
-<p><strong>正確的一句話</strong>：完整系統顯著優於傳統基準，<strong>但把功勞歸給哪一半，資料還答不出來。</strong></p>
+<p>若要保留交易端的改良，應搭配<strong>傳統產業分組或不分組</strong>，而非資料驅動分群。</p>
 </blockquote>
 </section>
-<section id="分層歸因兩個命題方向相反的答覆" class="slide level2">
-<h2>分層歸因：兩個命題，方向相反的答覆</h2>
+<section id="分層歸因兩層的方向相反" class="slide level2">
+<h2>分層歸因：兩層的方向相反</h2>
 <table class="caption-top">
 <colgroup>
 <col style="width: 33%">
@@ -1181,35 +1212,40 @@ margin-right: 0; }
 <thead>
 <tr class="header">
 <th style="text-align: left;"></th>
-<th style="text-align: left;">命題 1（形成期）</th>
-<th style="text-align: left;">命題 2（交易期）</th>
+<th style="text-align: left;">形成期分組層</th>
+<th style="text-align: left;">交易期門檻選擇</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;"><strong>主張</strong></td>
-<td style="text-align: left;">ML 分群能建立更優的配對搜尋空間</td>
-<td style="text-align: left;">門檻選擇優於固定門檻規則</td>
+<td style="text-align: left;"><strong>待檢問題</strong></td>
+<td style="text-align: left;">分組施加的限制是否提升配對品質</td>
+<td style="text-align: left;">逐期選擇門檻是否優於固定門檻</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>結果</strong></td>
-<td style="text-align: left;"><strong>未獲支持</strong></td>
-<td style="text-align: left;"><strong>獲得支持</strong></td>
+<td style="text-align: left;"><strong>方向</strong></td>
+<td style="text-align: left;"><strong>9/9 偏向 GICS</strong>（限制愈強愈差）</td>
+<td style="text-align: left;"><strong>5/5 為正</strong></td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><strong>證據</strong></td>
-<td style="text-align: left;">9 組 BH 後無一顯著（最小 <span class="math inline">p</span>=0.455），方向 ML 優 5 組／GICS 優 4 組</td>
-<td style="text-align: left;">五配對底全部顯著（<span class="math inline">p</span>=0.0000–0.0060）</td>
+<td style="text-align: left;"><strong>效果量</strong></td>
+<td style="text-align: left;">−0.229 ~ −1.000 pp</td>
+<td style="text-align: left;">+0.112 ~ +0.573 pp</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>信賴區間</strong></td>
-<td style="text-align: left;">9 組<strong>全部涵蓋 0</strong>，寬 1.2–1.9 pp</td>
-<td style="text-align: left;">五組<strong>全部落在零的右側</strong>，最保守下界 +0.20 pp</td>
+<td style="text-align: left;"><strong>校正後顯著</strong></td>
+<td style="text-align: left;">0/9</td>
+<td style="text-align: left;">0/5</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><strong>穩健性</strong></td>
-<td style="text-align: left;">HAC 對照一致</td>
-<td style="text-align: left;">HAC 對照一致</td>
+<td style="text-align: left;"><strong>MDE</strong></td>
+<td style="text-align: left;">1.259 pp</td>
+<td style="text-align: left;">0.624 pp</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>不顯著的性質</strong></td>
+<td style="text-align: left;">MDE <strong>大於</strong>參照臂自身年化 → null 幾乎不帶資訊</td>
+<td style="text-align: left;">效果與 MDE 同量級 → 接近偵測極限</td>
 </tr>
 </tbody>
 </table>
@@ -1219,55 +1255,22 @@ margin-right: 0; }
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>命題 1 是「未能拒絕虛無假設」，<strong>非</strong>「GICS 顯著較優」</strong></p>
+<p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p>而且這個 null 的<strong>鑑別力可以量化</strong>，不必停在定性陳述：</p>
-<table class="caption-top">
-<thead>
-<tr class="header">
-<th style="text-align: left;"></th>
-<th style="text-align: right;"><span class="math inline">SE</span> 中位 (pp)</th>
-<th style="text-align: right;">MDE 中位 (pp)</th>
-<th style="text-align: right;">對 0.3 pp 真實效果的檢定力</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">命題 1（兩臂持<strong>不同</strong>配對）</td>
-<td style="text-align: right;">0.406</td>
-<td style="text-align: right;"><strong>1.14</strong></td>
-<td style="text-align: right;"><strong>11%</strong></td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">命題 2（兩臂<strong>共用</strong>配對）</td>
-<td style="text-align: right;">0.214</td>
-<td style="text-align: right;">0.60</td>
-<td style="text-align: right;">—</td>
-</tr>
-</tbody>
-</table>
-<p>若 ML 分群的真實優勢為 0.3 pp——已足以翻轉參照臂 −0.11% ~ −0.40% 的損益方向 ——本檢定偵測到它的機率僅 <strong>11%</strong>。即使命題 1 為真，本實驗仍有近九成機率 報告「不顯著」。<strong>故此一 null 對命題 1 的真偽幾乎不具鑑別力。</strong></p>
+<p><strong>兩者皆不顯著，但性質截然不同。</strong></p>
+<p>分組層：資料無法排除「資料驅動分群顯著較差」，其程度遠甚於無法排除「兩者相當」。</p>
+<p>交易層：效果存在但量級接近偵測極限。</p>
 </div>
 </div>
 </div>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>命題 2 的顯著則不是檢定力僥倖</strong></p>
-</div>
-<div class="callout-content">
-<p>點估計中位 +0.787 pp 明顯大於該比較自身的 MDE（0.60 pp）。 增益最大者為<strong>傳統 GICS 配對底</strong>（+1.105 pp）→ 此改良與「配對如何找到」正交。</p>
-</div>
-</div>
-</div>
+<blockquote>
+<p>納入「不分組」零點後型態更完整： <strong>不分組 &gt; GICS &gt; 任一資料驅動分群</strong>，15 格逐格成立。</p>
+</blockquote>
 </section>
-<section id="命題-2-的增益機制已釐清" class="slide level2">
-<h2>命題 2 的增益機制已釐清</h2>
-<p><strong>四項替代解釋皆被排除</strong></p>
+<section id="交易層的增益機制" class="slide level2">
+<h2>交易層的增益機制</h2>
+<p><strong>三項機械性替代解釋，在兩條 GICS 底皆被排除</strong></p>
 <table class="caption-top">
 <colgroup>
 <col style="width: 33%">
@@ -1283,63 +1286,127 @@ margin-right: 0; }
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">拉高進場門檻</td>
-<td style="text-align: left;">同門檻（2.2）對照</td>
-<td style="text-align: left;">五支仍顯著；門檻管道複製 <strong>−8.9% ~ 28.4%</strong>，五組中一組顯著</td>
+<td style="text-align: left;">SKIP 的選股方向</td>
+<td style="text-align: left;">置換檢定（2,000 次／格）</td>
+<td style="text-align: left;"><strong>75 格僅 4 格顯著</strong>（隨機期望 3.75）；AGG 與 KM 的技巧成分為<strong>負</strong></td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">篩掉劣質配對</td>
-<td style="text-align: left;">SKIP 置換檢定</td>
-<td style="text-align: left;"><strong>75 格僅 6 格顯著</strong>（隨機期望 3.75）</td>
+<td style="text-align: left;">門檻水準</td>
+<td style="text-align: left;">拉到同門檻（2.1/2.2/2.3）對照</td>
+<td style="text-align: left;">門檻管道僅複製 <strong>0–30%</strong></td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">減少曝險</td>
-<td style="text-align: left;">進場次數比較</td>
-<td style="text-align: left;">DL-THR 反為 Z-Score 的 <strong>1.55–1.92 倍</strong></td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">全資訊設定</td>
-<td style="text-align: left;">RL-THR 部分回饋對照</td>
-<td style="text-align: left;">兩臂<strong>相當</strong>（+0.015 pp，CI [−0.38, +0.45]，<span class="math inline">p</span>=0.94）</td>
+<td style="text-align: left;">總曝險減少</td>
+<td style="text-align: left;">固定門檻 + 隨機跳過同數量</td>
+<td style="text-align: left;">GICS 兩底 <strong>11/15、10/15 格顯著</strong>勝出</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p>⚠ 門檻管道並非毫無貢獻：HDBSCAN 底的 ZS(2.2)−ZS(2.0) 達 +0.246 pp（<span class="math inline">p</span>=0.014）， 複製 28.4%。但 DL-THR 在同門檻下仍顯著勝出（+0.619 pp，<span class="math inline">p</span>=0.0052）， 故「增益不僅是拉高門檻」的結論維持（§4.2）。</p>
-</blockquote>
-<p>殘差與「<strong>槽位週轉</strong>」假說一致 —— 惟需重跑回測方能直接驗證。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對底</th>
+<th style="text-align: center;">SKIP 選股</th>
+<th style="text-align: center;">門檻水準</th>
+<th style="text-align: center;">總曝險</th>
+<th style="text-align: left;">判定</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">GICS-SSD</td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;"><strong>排除</strong></td>
+<td style="text-align: left;">三項全排除</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GICS-SDP</td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;"><strong>排除</strong></td>
+<td style="text-align: left;">三項全排除</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;">部分</td>
+<td style="text-align: left;">證據較弱</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: center;"><strong>否證</strong></td>
+<td style="text-align: center;">排除</td>
+<td style="text-align: center;">未排除</td>
+<td style="text-align: left;">增益屬機械效應</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: center;"><strong>否證</strong></td>
+<td style="text-align: center;">—</td>
+<td style="text-align: center;"><strong>未排除</strong></td>
+<td style="text-align: left;">無增益</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>警告</strong></p>
+</div>
+<div class="callout-content">
+<p>三項檢定皆為<strong>事後重抽，不含槽位再配置效應</strong>—— 回答的是三項機械管道是否構成解釋，而非這些動作整體有無價值。</p>
+</div>
+</div>
+</div>
 </section>
-<section id="命題-1-的失敗不可歸因於實作選擇" class="slide level2 scrollable">
-<h2>命題 1 的失敗不可歸因於實作選擇</h2>
-<p>三項候選原因逐一受控檢驗，<strong>皆使形成期結構如預期改變，但績效皆未改善</strong>：</p>
-<ol type="1">
-<li><strong>形成期設計</strong> —— 產業 one-hot、共整合篩選、缺「不分組」零點</li>
-<li><strong>交易機制</strong> —— Han et al. 四項差異逐步施加</li>
-<li><strong>特徵維度</strong> —— 連續特徵 7 → 19 維</li>
-</ol>
-</section>
-<section id="核心發現形成期的改良難以驗證且難在設計" class="slide level2">
-<h2>核心發現：形成期的改良難以驗證，且難在<strong>設計</strong></h2>
+<section id="核心發現兩層的檢定力不對等來自設計" class="slide level2">
+<h2>核心發現：兩層的檢定力不對等來自<strong>設計</strong></h2>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>兩層比較的不對等來自設計，而非資料量</strong></p>
+<p><strong>不對等的成因</strong></p>
 </div>
 <div class="callout-content">
-<p>命題 2 的兩臂<strong>共用</strong>同一批配對，逐日差分消去共同的市場衝擊； 命題 1 的兩臂持有<strong>不同</strong>的配對集合，差分中混入兩套標的的特異變異。</p>
-<p>標準誤相差 <strong>1.89 倍</strong> → <strong>等效於形成期層需 3.6 倍的樣本期間</strong>。 若要求 MDE 降至 0.3 pp（能看見經濟上實質的差異）， 形成期層約需 <strong>14 倍</strong>樣本、<strong>逾三個世紀</strong>的日資料。</p>
-<p>更換分群演算法、增加特徵維度、改良插補方式<strong>皆不影響它</strong>。</p>
+<p>交易層的兩臂<strong>共用</strong>同一批配對，逐日差分消去共同的市場衝擊； 分組層的兩臂持有<strong>不同</strong>的配對集合，差分中混入兩套標的的特異變異。</p>
+<p>標準誤相差 <strong>2.02 倍</strong> → <strong>等效於形成期層需 4.1 倍的樣本期間</strong>。 若要求 MDE 降至 0.3 pp，形成期層約需 <strong>17.6 倍</strong>樣本、<strong>逾四個世紀</strong>的日資料。</p>
 </div>
 </div>
 </div>
-<p><strong>輔證</strong>：跨產業配對比例自 <strong>0%（GICS）變動至 69%（完全不分組）</strong>的六種設定中， 2012+ 績效全部落在 −1.84% ~ −0.66%，未觀察到可偵測的差異。 惟其全距（1.18 pp）<strong>尚不及單一對照的區間寬度（1.18–1.91 pp）</strong> → 此為<strong>輔證，不是等價證據</strong>（§4.5.2）。</p>
-<p><strong>絕對獲利能力未獲證實</strong></p>
-<p>以可事前實施的<strong>全網格等權組合</strong>計，六組配置年化落在 <strong>−0.36% ~ +0.77%</strong>， bootstrap 檢定<strong>無一顯著</strong>，信賴區間寬達 <strong>2.4 ~ 2.9 pp</strong>。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">層</th>
+<th style="text-align: right;"><span class="math inline">SE</span> 中位</th>
+<th style="text-align: right;">MDE</th>
+<th style="text-align: right;">對 0.3 pp 的檢定力</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">形成期（分組層）</td>
+<td style="text-align: right;">0.449</td>
+<td style="text-align: right;"><strong>1.259 pp</strong></td>
+<td style="text-align: right;"><strong>10%</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">交易期（交易層）</td>
+<td style="text-align: right;">0.223</td>
+<td style="text-align: right;"><strong>0.624 pp</strong></td>
+<td style="text-align: right;">27%</td>
+</tr>
+</tbody>
+</table>
 <blockquote>
-<p>此非樣本不足而是<strong>結構性限制</strong>：等權組合年化 Sharpe 僅 <strong>0.09 ~ 0.21</strong>， 在此量級下欲達統計顯著約需 <strong>88 年以上</strong>樣本。</p>
+<p><strong>此為結構性限制</strong>：更換分群演算法、增加特徵維度、改良插補方式皆不影響它。</p>
+<p>唯一的出路是在形成期層構造<strong>配對設計</strong>——使兩臂持有同一批標的而僅變動分組。 本研究未能設計出這樣的對照，列為後續研究的首要方法論課題。</p>
 </blockquote>
 </section></section>
 <section>
@@ -1382,7 +1449,7 @@ margin-right: 0; }
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">命題 2 效果量</td>
+<td style="text-align: left;">交易層 效果量</td>
 <td style="text-align: right;">+0.732 pp</td>
 <td style="text-align: right;"><strong>+0.787 pp</strong></td>
 </tr>
@@ -1458,7 +1525,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>配對交易文獻中，「更換分群方法」的實作通常伴隨其他環節一併改動 （不同的排序準則、不同的篩選門檻），使績效差異<strong>無法歸因至任一單項</strong>。 本研究第二章已將此列為缺口之一。</p>
-<p>把單變因做成<strong>架構保證</strong>而非人為約定後，本研究得以在命題未獲支持時 <strong>系統性地逐一排除實作原因</strong>——形成期設計、交易機制、特徵維度三項候選 全部受控檢驗且皆非原因（§4.4）——而不只是宣稱「方法無效」。</p>
+<p>把單變因做成<strong>架構保證</strong>而非人為約定後，本研究得以在某項改良未顯示效果時 <strong>系統性地逐一排除實作原因</strong>——形成期設計、交易機制、特徵維度三項候選 全部受控檢驗且皆非原因（§4.4）——而不只是宣稱「方法無效」。</p>
 </div>
 </div>
 </div>
@@ -1474,7 +1541,7 @@ margin-right: 0; }
 <p><strong>這項保證也有一處例外，已於第三章揭露</strong></p>
 </div>
 <div class="callout-content">
-<p>排序層的替換同時改變了排序與篩選的<strong>施行次序</strong>， 故排序層之間的比較嚴格說並非單一變因（§3.2）。 本研究的兩個主命題落在分組層與交易端，皆固定排序後端，不受此影響。</p>
+<p>排序層的替換同時改變了排序與篩選的<strong>施行次序</strong>， 故排序層之間的比較嚴格說並非單一變因（§3.2）。 本研究的兩項主要檢定落在分組層與交易端，皆固定排序後端，不受此影響。</p>
 </div>
 </div>
 </div>
@@ -1513,7 +1580,7 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">特徵覆蓋率</td>
 <td style="text-align: left;">自 SEC XBRL 建出 40 個，僅 12 個通過 70% 門檻；另 5 個評價類卡在 57–70%、11 個永遠無法取得</td>
-<td style="text-align: left;">命題 1 的特徵維度結論僅在「SEC 申報所能供給的範圍內」成立</td>
+<td style="text-align: left;">分組層的特徵維度結論僅在「SEC 申報所能供給的範圍內」成立</td>
 </tr>
 </tbody>
 </table>
@@ -1527,7 +1594,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>三項主要限制<strong>全部</strong>指向「絕對績效被高估」。 本研究的絕對績效結論是「無一顯著」——限制若被修正， 該結論只會更強而不會翻轉。</p>
-<p>反之，命題 1 的「未獲支持」則受母體範圍限制影響，<strong>方向不明</strong>， 故明確限定於本設定。</p>
+<p>反之，分組層的「未獲支持」則受母體範圍限制影響，<strong>方向不明</strong>， 故明確限定於本設定。</p>
 </div>
 </div>
 </div>
@@ -1537,26 +1604,17 @@ margin-right: 0; }
 </section>
 <section id="實證貢獻" class="slide level2">
 <h2>實證貢獻</h2>
-<p><strong>其一：為機器學習分群的適用邊界提供一份反面觀察</strong></p>
-<p>Han, He &amp; Toh (2021，SSRN 工作論文) 以 CRSP 全美股、126 維特徵報告年化 <strong>24.8%</strong> （扣 20bp 成本後 15.9%）。本研究在 S&amp;P 500、SEC 可得特徵子集下未能複製， 且以受控消融排除三項實作原因。</p>
+<p><strong>其一：為資料驅動分群的適用邊界提供一份反面觀察</strong></p>
+<p>Han, He &amp; Toh (2021) 以 CRSP 全美股、126 維特徵報告年化 <strong>24.8%</strong>。 本研究在 S&amp;P 500、可得特徵子集下未能複製，且以受控消融排除三項實作原因。</p>
 <blockquote>
-<p><strong>此結果不否定原研究</strong>，也<strong>不是</strong>對它的重製——母體與特徵條件差距過大。 可陳述者僅為：該方法的優勢<strong>可能</strong>依賴母體廣度與特徵維度， 在受限資料條件下<strong>本研究未能觀察到</strong>。</p>
-<p>且本研究對命題 1 的檢定力不足（MDE 1.14 pp）， 故這份反面觀察的證據強度<strong>低於</strong>一次成功的重製所能提供者。</p>
+<p>此結果<strong>不否定原研究</strong>，也<strong>不是</strong>對它的重製——母體與特徵條件差距過大。 可陳述者僅為：該方法的優勢<strong>可能</strong>依賴母體廣度與特徵維度。 且本研究對分組層的檢定力不足（MDE <strong>1.259 pp</strong>），此觀察本身的強度有限。</p>
 </blockquote>
 <p><strong>其二：釐清門檻選擇增益的來源與非來源</strong></p>
-<p>排除三項行為面的替代解釋（非拉高門檻、非篩掉劣質配對、非減少曝險） → 「DL-THR 確有貢獻」建立在更窄、也更可信的基礎上。 特別指出：損益分解中的「SKIP 貢獻 31–52%」是<strong>會計恆等式而非技巧歸因</strong>。</p>
-<p>再排除一項問題性質上的解釋：本研究另建 <strong>RL-THR</strong>——同一動作選單、同一狀態、 同一網路，僅把訓練標籤縮成「實際選中的那一個」並改採 <span class="math inline">\varepsilon</span>-greedy—— 使其成為真正的部分回饋問題。兩臂在等權口徑下<strong>無法區分</strong> （+0.015 pp，95% CI [−0.38, +0.45]，<span class="math inline">p</span>=0.94），且區間兩端皆遠小於總增益 +0.787 pp， 故為「相當」而非檢定力不足。</p>
-<blockquote>
-<p><strong>增益不來自「這個問題碰巧是全資訊的」。</strong> 配合已證偽的逐日定位動作空間 （三代真強化學習，中位 Sharpe −1.1 ~ −2.3），失敗與成功兩個方向指向同一結論： <strong>關鍵是動作空間設計，不是訓練方法。</strong></p>
-</blockquote>
-<p>此對照同時提供報告口徑的實例：改報最佳格時 DL-THR 五輪全勝且全距不重疊， 與等權口徑的「相當」結論相反（§4.2）。</p>
-<p><strong>其三：量化形成期比較的一項結構性檢定力障礙</strong></p>
-<p>形成期層的兩臂<strong>必然</strong>持有不同的配對集合，差分無法消去標的的特異變異； 交易期層的兩臂共用配對，差分即消噪。本研究量化此落差為 <strong>標準誤相差 1.89 倍、等效樣本需求 3.6 倍</strong>。</p>
-<blockquote>
-<p>這意味著<strong>形成期改良的實證門檻天生高於交易期改良</strong>， 而既有文獻多未區分兩者的檢定力條件即並列比較其結果。</p>
-<p>配對設計消噪的原理本身是標準統計知識；本研究的貢獻是<strong>在配對交易的兩個 改良層次上把它量化出來</strong>（1.89 倍、3.6 倍），使兩者的結果不再被等量齊觀。</p>
-</blockquote>
-<p>配合風險評估的三項發現（獲利集中動盪期、等權口徑下成本餘裕僅 −1.8 ~ +2.4 bps、 等權組合絕對績效全數不顯著），本研究對「配對交易在 2000 年代後的美股大型股 是否仍具可提取報酬」提供<strong>偏否定的證據</strong>。</p>
+<p>以三個虛無分布逐一檢驗最直觀的替代解釋（SKIP 選股方向、門檻水準、總曝險量）。 特別是指出損益分解中的「SKIP 貢獻」是<strong>會計恆等式而非技巧歸因</strong>—— 置換檢定證實兩個配對底的 SKIP 技巧成分為<strong>負</strong>。</p>
+<p><strong>其三：指出形成期比較的結構性檢定力障礙</strong></p>
+<p>量化為標準誤相差 <strong>2.02 倍</strong>、等效樣本需求 <strong>4.1 倍</strong>。 既有文獻多未區分兩層的檢定力條件即並列比較其結果。</p>
+<p><strong>其四：記錄一組實作錯誤及其對結論的影響</strong></p>
+<p>六項形成期實作與宣告不符（見附錄 B），修正後主軸 13 格中 12 格績效改善， <span class="math inline">\Delta</span>Sharpe 中位 <strong>+0.236</strong>。可陳述的觀察是： <strong>以錯誤的臨界值與測錯對象的估計量所篩掉的，系統性地是較好的配對。</strong></p>
 </section>
 <section id="方法論貢獻五產業資訊的三條管道" class="slide level2">
 <h2>方法論貢獻（五）：產業資訊的三條管道</h2>
@@ -1664,7 +1722,7 @@ margin-right: 0; }
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>5</strong></td>
-<td style="text-align: left;"><strong>命題 2 統計基礎為單輪 DL-THR</strong></td>
+<td style="text-align: left;"><strong>交易層 統計基礎為單輪 DL-THR</strong></td>
 <td style="text-align: left;">五輪 Sharpe 全距 0.013–0.047，遠小於效果量 0.27–0.30</td>
 </tr>
 <tr class="even">
@@ -1691,8 +1749,8 @@ margin-right: 0; }
 <p><strong>其八：形成期層的檢定力不足，<strong>且無法以更多資料補救</strong></strong></p>
 </div>
 <div class="callout-content">
-<p>兩臂標準誤相差 1.89 倍，形成期層需 <strong>3.6 倍</strong>樣本才能達到交易期層的解析度； 若要求 MDE 降至 0.3 pp，約需 <strong>14 倍</strong>樣本、<strong>逾三個世紀</strong>的日資料。</p>
-<p><strong>因此本研究對命題 1 的 null 不具鑑別力</strong>（已於 §4.1.3 量化）。 唯一的出路是在形成期層構造<strong>配對設計</strong>——使兩臂持有同一批標的而僅變動分組 ——本研究未能設計出這樣的對照。</p>
+<p>兩臂標準誤相差 <strong>2.02 倍</strong>，形成期層需 <strong>4.1 倍</strong>樣本才能達到交易期層的解析度； 若要求 MDE 降至 0.3 pp，約需 <strong>17.6 倍</strong>樣本、<strong>逾四個世紀</strong>的日資料。</p>
+<p><strong>因此本研究對分組層的 null 不具鑑別力</strong>（已於 §4.5 量化）。 唯一的出路是在形成期層構造<strong>配對設計</strong>——使兩臂持有同一批標的而僅變動分組 ——本研究未能設計出這樣的對照。</p>
 </div>
 </div>
 </div>
@@ -1705,16 +1763,11 @@ margin-right: 0; }
 <p><strong>其九：與前行研究回測結果的差距未能完全解釋</strong></p>
 </div>
 <div class="callout-content">
-<p>本研究的回測結果與<strong>許鈞翔（2025）</strong>差異甚大。逐項比對其程式與本研究第三章後 共辨識出<strong>八項</strong>實作差異，本研究僅隔離其中<strong>一項（進場時點）</strong>施加受控檢定， 其餘七項——尤以交易成本假設（本研究單邊 0.29% 對其 0.10%）與報酬口徑 （<span class="math inline">R^{CC}</span> 對 <span class="math inline">R^{EC}</span>）——未予檢驗。</p>
-<p>隔離結果見<strong>附錄 A</strong>：改採其回歸式進場後三種排序的年化報酬<strong>全部下降</strong> （−0.77 ~ −0.91 pp，BH 校正後 0/3 顯著）——即該項差異的方向<strong>與待解釋的差距相反</strong>。</p>
-<p>→ 故此項不是差距的來源，但<strong>差距本身仍未獲解釋</strong>。</p>
+<p>逐項比對後辨識出八項實作差異，本研究僅隔離其中一項（進場時點）作受控檢定， 其餘七項未予檢驗。就量級而言，<strong>成本假設</strong>（0.29% 對 0.10%） 與<strong>報酬口徑</strong>（<span class="math inline">R^{CC}</span> 對 <span class="math inline">R^{EC}</span>，本研究兩者相差 5–6 倍） 仍是最可能的主導因素。詳見附錄 A。</p>
 </div>
 </div>
 </div>
-
-<aside><div>
-<p>附錄 A 的三條策略已計入第四章 DSR 的試驗宇宙（<span class="math inline">N</span> = 110）。 結論為負的試驗仍佔用一次試驗——試驗數不因結果不利而豁免。</p>
-</div></aside></section></section>
+</section></section>
 <section>
 <section id="研究建議" class="title-slide slide level1 center">
 <h1>5.4 研究建議</h1>
@@ -1741,7 +1794,7 @@ margin-right: 0; }
 <div class="callout-content">
 <p><strong>其一：成本餘裕過薄</strong> 以可事前實施的等權組合計，往返 break-even 介於 <strong>0.562% ~ 0.604%</strong>， 較現行假設 0.58% 僅相差 <strong>−1.8 ~ +2.4 bps</strong>； 其中 K-means／GICS-SSD／GICS-SDP 三個 Z-Score 臂的餘裕<strong>已經是負的</strong>。 真實摩擦成本只要高出 1~2 bps（往返），全部配置的正報酬結論即不成立。</p>
 <p><strong>其二：獲利高度集中於特定市場環境</strong> 十組配置在平靜期<strong>全部</strong>為負 Sharpe（−1.24 ~ −0.20）。 策略實質上在<strong>賣出波動率的均值回歸選擇權</strong>，低波動環境即為結構性不利環境。</p>
-<p><strong>其三：絕對績效無法與零區分</strong> 以可事前實施的全網格等權組合計，年化 <strong>−0.36% ~ +0.77%</strong>，六組 CI 全部橫跨零。 附錄的 DSR 進一步顯示：即使改報最佳格，其 <span class="math inline">SR</span>（最高 <strong>0.392</strong>） 仍<strong>低於</strong>純靠運氣的期望門檻（<span class="math inline">SR_0</span> = <strong>0.408</strong>，<span class="math inline">N</span> = 110）。</p>
+<p><strong>其三：絕對績效無法與零區分</strong> 以可事前實施的全網格等權組合計，年化 <strong>−0.36% ~ +0.77%</strong>，六組 CI 全部橫跨零。 附錄的 DSR 進一步顯示：即使改報最佳格，其 <span class="math inline">SR</span>（最高 <strong>0.392</strong>） 仍<strong>低於</strong>純靠運氣的期望門檻（<span class="math inline">SR_0</span> = <strong>0.328</strong>，<span class="math inline">N</span> = 44）。</p>
 </div>
 </div>
 </div>
@@ -1756,9 +1809,9 @@ margin-right: 0; }
 <h1>5.5 結語</h1>
 
 </section>
-<section id="過程所揭露的三件事" class="slide level2">
-<h2>過程所揭露的三件事</h2>
-<p>兩個命題得到方向相反的答覆：交易期的<strong>門檻選擇</strong>改良獲得支持， 形成期的<strong>機器學習分組</strong>改良則否。但更值得記述的或許不是答覆本身， 而是取得答覆的過程所揭露的三件事。</p>
+<section id="過程所揭露的四件事" class="slide level2">
+<h2>過程所揭露的四件事</h2>
+<p>三項檢定經多重檢定校正後<strong>皆未獲統計支持</strong>，但方向並不對稱： 交易期的門檻選擇一致為正，形成期的分組改良一致為負，兩者組合後淨效果亦為負。 更值得記述的或許不是這些答覆本身，而是取得答覆的過程所揭露的四件事。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1771,10 +1824,12 @@ margin-right: 0; }
 <p><strong>其一：推論的正當性取決於抽樣單位的選擇</strong></p>
 <p>同一批資料、同一個效果量，在錯誤的抽樣單位下可以得到 <span class="math inline">p &lt; 0.001</span>； 在正確的抽樣單位下，則需要完全不同的檢定方法才能建立。</p>
 <p><strong>其二：「未獲支持」與「無效」不是同一件事</strong></p>
-<p>本研究對命題 1 施加三輪受控消融、逐一排除實作原因， 才能將結論從「我們的實作沒做出效果」提升為 「<strong>在此設計與樣本下，形成期搜尋空間的改良無法被驗證</strong>」。</p>
-<p>這仍不是「它沒有效果」——<strong>區分這三種說法，是本研究最花力氣的一件事。</strong></p>
+<p>本研究對分組層施加三輪受控消融、逐一排除實作原因， 才能將結論從「我們的實作沒做出效果」提升為 「在此設計與樣本下，該項改良無法被驗證」。這仍不是「它沒有效果」。</p>
 <p><strong>其三：設計選擇會以未預期的方式攜帶資訊</strong></p>
-<p>產業先驗不只存在於明確的 one-hot 編碼， 也潛藏於<strong>缺失值的插補規則</strong>與<strong>距離準則的選擇</strong>之中。 若不逐一檢視，研究者可能在自以為移除某項先驗時，實際上仍保留了它。</p>
+<p>產業先驗不只存在於明確的 one-hot 編碼，也潛藏於缺失值的插補規則與 距離準則的選擇之中。研究者可能在自以為移除某項先驗時，實際上仍保留了它。</p>
+<p><strong>其四：實作與宣告之間的落差可以大到改變結論的方向</strong></p>
+<p>六項形成期實作與方法章節所述不符——共整合檢定誤用了另一個分布的臨界值、 均值回歸指標測量的是錯誤的對象、密度分群的噪音標記被當成一個群。 修正後 GICS 三格自負 Sharpe 全數翻正。</p>
+<p><strong>方法章節寫了什麼，與程式實際做了什麼，是兩件需要分別驗證的事。</strong></p>
 </div>
 </div>
 </div>

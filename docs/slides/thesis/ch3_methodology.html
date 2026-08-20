@@ -1196,7 +1196,7 @@ margin-right: 0; }
 <p>配對交易的形成期通常被實作為<strong>單一整體流程</strong> → 更換任一環節時難以歸因其效果。</p>
 <p>本研究拆解為四個<strong>可獨立替換</strong>的層：</p>
 <svg viewbox="0 0 950 210" width="100%" style="max-width:1000px;font-family:Microsoft JhengHei, Noto Sans TC, Segoe UI, sans-serif">
-<defs><marker id="ar" markerwidth="8" markerheight="8" refx="7" refy="3" orient="auto"> <path d="M0,0 L7,3 L0,6 z" fill="#666" /></marker></defs> <text x="30" y="30" font-size="15" fill="#222">四層皆可獨立替換；檢定某一層時，其餘三層參數完全相同</text> <rect x="30" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="122" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">特徵萃取</text><text x="122" y="110" font-size="12.5" fill="#666" text-anchor="middle">個股 → 特徵向量</text><text x="122" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">19 維（連續 7）</text><line x1="221" y1="108" x2="259" y2="108" stroke="#666" stroke-width="1.6" marker-end="url(#ar)"></line><text x="241" y="98" font-size="11.5" fill="#666" text-anchor="middle">介面</text><rect x="267" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="359" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">分組</text><text x="359" y="110" font-size="12.5" fill="#666" text-anchor="middle">特徵 → 搜尋空間</text><text x="359" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">HDBSCAN／AGG／KM／GICS</text><line x1="458" y1="108" x2="496" y2="108" stroke="#666" stroke-width="1.6" marker-end="url(#ar)"></line><text x="478" y="98" font-size="11.5" fill="#666" text-anchor="middle">介面</text><rect x="504" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="596" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">群內排序</text><text x="596" y="110" font-size="12.5" fill="#666" text-anchor="middle">組內配對 → 優先序</text><text x="596" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">SSD／DTW／SSD-DTW-PCA</text><line x1="695" y1="108" x2="733" y2="108" stroke="#666" stroke-width="1.6" marker-end="url(#ar)"></line><text x="715" y="98" font-size="11.5" fill="#666" text-anchor="middle">介面</text><rect x="741" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="833" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">統計篩選</text><text x="833" y="110" font-size="12.5" fill="#666" text-anchor="middle">淘汰不合格配對</text><text x="833" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">ADF／半衰期／Hurst</text> <rect x="30" y="168" width="890" height="30" rx="6" fill="#fdf3e7" stroke="#e8964f" /> <text x="475" y="188" font-size="13.5" fill="#222" text-anchor="middle">→ 命題 1 只變動「分組」層　·　命題 2 固定全部四層，只換交易端</text>
+<defs><marker id="ar" markerwidth="8" markerheight="8" refx="7" refy="3" orient="auto"> <path d="M0,0 L7,3 L0,6 z" fill="#666" /></marker></defs> <text x="30" y="30" font-size="15" fill="#222">四層皆可獨立替換；檢定某一層時，其餘三層參數完全相同</text> <rect x="30" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="122" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">特徵萃取</text><text x="122" y="110" font-size="12.5" fill="#666" text-anchor="middle">個股 → 特徵向量</text><text x="122" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">19 維（連續 7）</text><line x1="221" y1="108" x2="259" y2="108" stroke="#666" stroke-width="1.6" marker-end="url(#ar)"></line><text x="241" y="98" font-size="11.5" fill="#666" text-anchor="middle">介面</text><rect x="267" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="359" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">分組</text><text x="359" y="110" font-size="12.5" fill="#666" text-anchor="middle">特徵 → 搜尋空間</text><text x="359" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">HDBSCAN／AGG／KM／GICS</text><line x1="458" y1="108" x2="496" y2="108" stroke="#666" stroke-width="1.6" marker-end="url(#ar)"></line><text x="478" y="98" font-size="11.5" fill="#666" text-anchor="middle">介面</text><rect x="504" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="596" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">群內排序</text><text x="596" y="110" font-size="12.5" fill="#666" text-anchor="middle">組內配對 → 優先序</text><text x="596" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">SSD／DTW／SSD-DTW-PCA</text><line x1="695" y1="108" x2="733" y2="108" stroke="#666" stroke-width="1.6" marker-end="url(#ar)"></line><text x="715" y="98" font-size="11.5" fill="#666" text-anchor="middle">介面</text><rect x="741" y="60" width="185" height="96" rx="8" fill="#f4f6fa" stroke="#8fa3bf" stroke-width="1.5" /><text x="833" y="88" font-size="17" font-weight="600" fill="#222" text-anchor="middle">統計篩選</text><text x="833" y="110" font-size="12.5" fill="#666" text-anchor="middle">淘汰不合格配對</text><text x="833" y="132" font-size="12.5" fill="#c0392b" text-anchor="middle">ADF／半衰期／Hurst</text> <rect x="30" y="168" width="890" height="30" rx="6" fill="#fdf3e7" stroke="#e8964f" /> <text x="475" y="188" font-size="13.5" fill="#222" text-anchor="middle">→ 分組層 只變動「分組」層　·　交易層 固定全部四層，只換交易端</text>
 </svg>
 
 <p>各層以標準化介面銜接： 特徵層輸出 <span class="math inline">(N   imes d)</span> 矩陣 → 分組層輸出 <span class="math inline">\{股票   o 組標籤\}</span> → 排序層在組內選前 <span class="math inline">N</span> 組 → 篩選層對價差施加統計檢定。</p>
@@ -1261,58 +1261,72 @@ margin-right: 0; }
 <p>⚠️ 第四章將指出：此插補方式構成一條<strong>未被察覺的產業資訊管道</strong>， 並引入全域中位數插補作為對照。</p>
 </blockquote>
 </section>
-<section id="分組層三種分群-對照組" class="slide level2">
-<h2>分組層：三種分群 + 對照組</h2>
+<section id="分組層五級限制強度" class="slide level2">
+<h2>分組層：五級限制強度</h2>
 <table class="caption-top">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
 </colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">方法</th>
 <th style="text-align: left;">關鍵參數</th>
 <th style="text-align: left;">群數決定方式</th>
+<th style="text-align: right;">排除標的</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;"><strong>HDBSCAN</strong></td>
-<td style="text-align: left;"><code>min_cluster_size</code>=5, <code>min_samples</code>=2</td>
-<td style="text-align: left;">資料驅動，可標記噪音</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><strong>Agglomerative</strong></td>
-<td style="text-align: left;">average linkage，門檻取距離分布 <strong>75 分位</strong></td>
-<td style="text-align: left;">由門檻決定</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;"><strong>K-means</strong></td>
-<td style="text-align: left;"><span class="math inline">k</span> = <strong>同期 Agglomerative 的群數</strong></td>
-<td style="text-align: left;">對齊使量級可比</td>
+<td style="text-align: left;"><strong>不分組</strong></td>
+<td style="text-align: left;">—</td>
+<td style="text-align: left;">全市場單一組</td>
+<td style="text-align: right;"><strong>0%</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>GICS（對照）</strong></td>
 <td style="text-align: left;">—</td>
 <td style="text-align: left;">11 大產業，不跑分群</td>
+<td style="text-align: right;">15.1%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>HDBSCAN</strong></td>
+<td style="text-align: left;"><code>min_cluster_size</code>=5, <code>min_samples</code>=2</td>
+<td style="text-align: left;">資料驅動，可標記噪音</td>
+<td style="text-align: right;">26.4%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;"><strong>Agglomerative</strong></td>
+<td style="text-align: left;">average linkage，門檻取距離分布 <strong>75 分位</strong></td>
+<td style="text-align: left;">由門檻決定</td>
+<td style="text-align: right;">35.3%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>K-means</strong></td>
+<td style="text-align: left;"><span class="math inline">k</span> = <strong>同期 Agglomerative 的群數</strong></td>
+<td style="text-align: left;">對齊以使量級可比</td>
+<td style="text-align: right;">42.0%</td>
 </tr>
 </tbody>
 </table>
-<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>K-means 的群數為何要對齊</strong></p>
+<p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p>K-means 需<strong>預先指定</strong>群數，若任意給定將使其與其他方法不可比。 本研究先跑一次 Agglomerative 取得資料驅動的群數再餵給 K-means， 確保比較聚焦於<strong>分群機制</strong>而非<strong>粒度</strong>。</p>
+<p><strong>噪音點無條件排除。</strong> HDBSCAN 的噪音標記（−1）每期可達全體兩成， 若僅依群大小判斷，噪音將因數量超過最小群規模而被當成一個合法群—— 該臂近半候選配對將來自「演算法判定無法歸類」的異質集合。</p>
 </div>
 </div>
 </div>
-<p>HDBSCAN 的噪音點（標籤 −1）與過小群（成員 &lt; 5）併入「Unknown」，於排序層跳過。</p>
+<blockquote>
+<p>GICS 的排除來自 <code>Constituents</code> 表中部分標的無產業對應； 三種分群法的排除來自過小群，HDBSCAN 另加噪音點。 <strong>各臂進入配對的母體規模因此有別</strong>，解讀結果時須一併考慮。</p>
+</blockquote>
 </section>
 <section id="排序層與篩選層" class="slide level2 scrollable">
 <h2>排序層與篩選層</h2>
@@ -1392,7 +1406,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>四層架構使分組層的替換成為乾淨的單變因對照。但<strong>排序層的替換同時改變了 排序與篩選的施行次序</strong>（上表），故排序層之間的比較嚴格說並非單一變因。</p>
-<p>本研究的主命題落在<strong>分組層</strong>（命題 1）與<strong>交易端</strong>（命題 2）， 兩者皆固定排序後端，不受此影響；涉及排序層的比較僅作描述性報告。</p>
+<p>本研究的兩項主要檢定落在<strong>分組層</strong>與<strong>交易端</strong>， 兩者皆固定排序後端，不受此影響；涉及排序層的比較僅作描述性報告。</p>
 </div>
 </div>
 </div>
@@ -1432,61 +1446,35 @@ margin-right: 0; }
 </tbody>
 </table>
 </section>
-<section id="動態性的實測①配對層級不具鑑別力" class="slide level2">
-<h2>動態性的實測①：配對層級不具鑑別力</h2>
-<table class="caption-top">
-<thead>
-<tr class="header">
-<th style="text-align: left;">分組方法</th>
-<th style="text-align: right;">相鄰期配對重疊率</th>
-<th style="text-align: right;">配對存續期數（中位）</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">9.8%</td>
-<td style="text-align: right;">1</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">9.4%</td>
-<td style="text-align: right;">1</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">K-means</td>
-<td style="text-align: right;">6.4%</td>
-<td style="text-align: right;">1</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;"><strong>GICS（靜態對照）</strong></td>
-<td style="text-align: right;"><strong>11.7%</strong></td>
-<td style="text-align: right;">1</td>
-</tr>
-</tbody>
-</table>
-<div class="callout callout-warning callout-titled callout-style-default">
+<section id="分組結構的跨期穩定度一" class="slide level2">
+<h2>分組結構的跨期穩定度（一）</h2>
+<p>三種分群法在「每期產生多相似的分組」上性質不同，此性質影響第四章結果的解讀。</p>
+<p><strong>量測方式</strong>：重跑形成期前兩層（特徵 → 分組，跳過排序與篩選）， 逐期取出群標籤，計算兩期在<strong>共同存在標的</strong>上的<strong>調整蘭德指數</strong>（ARI）。</p>
+<div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>靜態的 GICS 週轉率反而最高</strong></p>
+<p><strong>註釋</strong></p>
 </div>
 <div class="callout-content">
-<p>配對週轉主要由<strong>排序層與篩選層</strong>驅動——即使分組固定， 每期的距離排序與共整合檢定結果本就不同。 <strong>此指標無法佐證分群層的動態性。</strong></p>
+<p>採 ARI 而非直接比對群編號：群編號每期重新產生、本身無意義， 故須比對「任兩檔是否同群」的關係結構；且 ARI 已對隨機一致作期望值校正。</p>
+<p>量測對象為<strong>實際進入配對的分組</strong>——噪音點與過小群依 §3.2.3 的規則排除後才計算。</p>
 </div>
 </div>
 </div>
+<blockquote>
+<p>⚠️ <strong>配對層級的週轉率不可用於推論分組層</strong>： 配對週轉主要由排序層與篩選層驅動——即使分組完全固定， 每期的距離排序與共整合檢定結果本就不同。</p>
+</blockquote>
 </section>
-<section id="動態性的實測②分群層級以-ari-量測" class="slide level2">
-<h2>動態性的實測②：分群層級以 ARI 量測</h2>
-<p>重跑形成期前兩層取出群標籤，計算相鄰期在<strong>共同標的</strong>上的 <strong>調整蘭德指數</strong>（群編號無意義，故比對「兩兩是否同群」；ARI 已對隨機一致校正）。</p>
+<section id="分組結構的跨期穩定度二" class="slide level2">
+<h2>分組結構的跨期穩定度（二）</h2>
 <table class="caption-top">
 <thead>
 <tr class="header">
 <th style="text-align: left;">分組方法</th>
-<th style="text-align: right;">群數</th>
+<th style="text-align: right;">群數（中位）</th>
 <th style="text-align: right;">相隔 1 期（21 日）</th>
 <th style="text-align: right;">相隔 6 期（126 日）</th>
 </tr>
@@ -1494,44 +1482,51 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">104</td>
-<td style="text-align: right;"><strong>0.709</strong></td>
-<td style="text-align: right;">0.483</td>
+<td style="text-align: right;">27</td>
+<td style="text-align: right;">0.809（0.70–0.91）</td>
+<td style="text-align: right;">0.676（0.56–0.82）</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">16</td>
-<td style="text-align: right;"><strong>0.685</strong></td>
-<td style="text-align: right;">0.498</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;"><strong>0.936</strong>（0.06–0.99）</td>
+<td style="text-align: right;">0.881（0.54–0.95）</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">104</td>
-<td style="text-align: right;"><strong>0.515</strong></td>
-<td style="text-align: right;">0.350</td>
+<td style="text-align: right;">36</td>
+<td style="text-align: right;">0.663（0.55–0.80）</td>
+<td style="text-align: right;">0.519（0.42–0.62）</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>GICS（靜態）</strong></td>
-<td style="text-align: right;">11</td>
+<td style="text-align: left;"><strong>GICS（靜態對照）</strong></td>
+<td style="text-align: right;">13</td>
 <td style="text-align: right;"><strong>1.000</strong></td>
 <td style="text-align: right;">1.000</td>
 </tr>
 </tbody>
 </table>
-<ul>
-<li><strong>結構確實逐期改變</strong>：相隔 21 日已有三至五成分群關係改變</li>
-<li><strong>改變隨時間累積</strong>：一個交易期走完，過半結構已不同</li>
-<li><strong>K-means 最不穩定</strong>（隨機初始化；Agglomerative 的階層合併較不敏感）</li>
-</ul>
+<p>（中位數，括號內為 10–90 百分位；相鄰期 293 組、相隔 6 期 48 組。）</p>
+<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>HDBSCAN 的分布為雙峰，中位數不足以描述它</strong></p>
+</div>
+<div class="callout-content">
+<p>相鄰期有 <strong>69.3%</strong> 的比較 ARI &gt; 0.9（分組幾乎未變）， 同時有 <strong>10.6%</strong> 的比較 ARI &lt; 0.3（分組整個重組，最低 −0.006）。 相隔 6 期時該型態不變（43.8% 與 10.4%）——<strong>其不穩定性不隨時間尺度累積</strong>。</p>
+<p>相對地，Agglomerative 與 K-means 在相隔 6 期時落於兩尾的比例皆為 <strong>0%</strong>。</p>
+</div>
+</div>
+</div>
 <blockquote>
-<p><strong>範圍聲明</strong>：確立分群<strong>確實在變</strong>，但<strong>未</strong>檢定這種改變是否<strong>有益</strong>—— 本研究無「靜態分群」對照組。逐期重估是前視偏誤防範的必要設計， 而非受檢定的處理。</p>
+<p><strong>範圍聲明</strong>：本節僅刻畫穩定度，未檢定穩定或不穩定何者有益。 本研究未設「靜態分群」對照組，故無法就逐期重估本身的價值作任何主張。</p>
 </blockquote>
 </section>
-<section id="消融矩陣4-分組-3-排序" class="slide level2">
-<h2>消融矩陣：4 分組 × 3 排序</h2>
-</section>
-<section id="分組-3-排序消融矩陣" class="slide level2">
-<h2>4 分組 × 3 排序消融矩陣</h2>
+<section id="消融矩陣5-分組-3-排序" class="slide level2">
+<h2>消融矩陣：5 分組 × 3 排序</h2>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -1543,24 +1538,30 @@ margin-right: 0; }
 </thead>
 <tbody>
 <tr class="odd">
+<td style="text-align: left;"><strong>不分組（零點）</strong></td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+<td style="text-align: center;">✓</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;"><strong>GICS（對照）</strong></td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">HDBSCAN</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: center;">✓</td>
 <td style="text-align: center;">✓</td>
@@ -1568,9 +1569,9 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p>固定特徵層、篩選層與交易端 → <strong>唯一變因為分組方法</strong>。 每格再展開 <code>top_n</code> × <code>stop_loss</code>（5 × 3 = 15 種配置）。</p>
-<p>同一排序準則下的 ML 分群與 GICS 構成直接對照，共 <strong>9 組</strong>（3 分群 × 3 排序）。</p>
-<h3 id="三項受控消融用於失敗歸因">三項受控消融（用於失敗歸因）</h3>
+<p>固定特徵層、篩選層與交易端 → <strong>唯一變因為分組方法</strong>。 每格再展開 <code>top_n</code> × <code>stop_loss</code> 的參數網格（5 × 3 = 15 種配置）。</p>
+<p>同一排序準則下的資料驅動分群與 GICS 構成直接對照，共 <strong>9 組</strong>（3 分群 × 3 排序）。</p>
+<h3 id="三項受控消融">三項受控消融</h3>
 <table class="caption-top">
 <colgroup>
 <col style="width: 33%">
@@ -1580,35 +1581,32 @@ margin-right: 0; }
 <thead>
 <tr class="header">
 <th style="text-align: left;">消融</th>
-<th style="text-align: left;">參數</th>
-<th style="text-align: left;">檢驗什麼</th>
+<th style="text-align: left;">設定</th>
+<th style="text-align: left;">目的</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;"><strong>產業先驗強度</strong></td>
+<td style="text-align: left;">產業先驗強度</td>
 <td style="text-align: left;"><code>sector_onehot_weight</code> ∈ {1.0, 0}</td>
-<td style="text-align: left;">one-hot 對跨產業配對的距離懲罰</td>
+<td style="text-align: left;">移除特徵層對跨產業配對的距離懲罰</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>統計篩選</strong></td>
-<td style="text-align: left;"><code>filter_mode</code> ∈ {coint, none}</td>
-<td style="text-align: left;">篩選的貢獻，及其與分群的<strong>交互作用</strong></td>
+<td style="text-align: left;">統計篩選</td>
+<td style="text-align: left;"><code>filter_mode</code> ∈ {adf_only, none}</td>
+<td style="text-align: left;">檢驗篩選層的貢獻與其交互作用</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;"><strong>分組維度零點</strong></td>
-<td style="text-align: left;"><code>cluster_method</code> = <strong>none</strong></td>
-<td style="text-align: left;">「限制搜尋空間」本身的價值</td>
+<td style="text-align: left;">曝險對齊</td>
+<td style="text-align: left;">各臂供應的配對數</td>
+<td style="text-align: left;">排除「部署規模」而非「配對品質」的干擾</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p>若無「不分組」對照，所比較的僅是不同的<strong>限制方式</strong>，而非限制本身。</p>
-</blockquote>
 </section></section>
 <section>
-<section id="門檻選擇的深度學習實作命題-2" class="title-slide slide level1 center">
-<h1>3.4 門檻選擇的深度學習實作（命題 2）</h1>
+<section id="門檻選擇的深度學習實作交易層" class="title-slide slide level1 center">
+<h1>3.4 門檻選擇的深度學習實作（交易層）</h1>
 
 </section>
 <section id="動作空間門檻選擇式而非逐日定位" class="slide level2 scrollable">
@@ -1871,7 +1869,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>兩策略在同一天承受<strong>同一批市場衝擊</strong>——2008 年金融海嘯、2020 年三月熔斷， 兩邊都會虧。這些共同成分是<strong>噪音</strong>，它對「哪個方法比較好」這個問題不提供資訊， 卻主宰了報酬的變異。</p>
-<p>相減即可<strong>消去共同成分</strong>，剩下的才是兩個方法之間的差異。 這是配對設計（paired design）的標準作法，也是命題 2 的檢定力遠高於絕對績效 檢定的原因（§4.6.4）。</p>
+<p>相減即可<strong>消去共同成分</strong>，剩下的才是兩個方法之間的差異。 這是配對設計（paired design）的標準作法，也是交易層的檢定力遠高於絕對績效 檢定的原因（§4.6.4）。</p>
 <p><strong>未持倉日記為 0，而非遺漏值</strong>——該日策略確實沒有部位，這是它的行為的一部分； 視為遺漏會系統性排除「不交易」這個決策。</p>
 </div>
 </div>
@@ -1955,7 +1953,7 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p>命題 1 屬第三種、§4.2.3 的 RL-THR 對照屬第二種—— <strong>同樣是「不顯著」，結論相反</strong>。若只報 <span class="math inline">p</span> 值，這個區別會完全消失。</p>
+<p>分組層 屬第三種、§4.2.3 的 RL-THR 對照屬第二種—— <strong>同樣是「不顯著」，結論相反</strong>。若只報 <span class="math inline">p</span> 值，這個區別會完全消失。</p>
 </div>
 </div>
 </div>
@@ -2037,7 +2035,7 @@ margin-right: 0; }
 </div>
 </div>
 <svg viewbox="0 0 900 300" width="100%" style="max-width:960px;font-family:Microsoft JhengHei, Noto Sans TC, Segoe UI, sans-serif">
-<text x="20" y="30" font-size="15" fill="#222">同樣是「區間涵蓋 0」，結論可以相反——差別在<tspan font-weight="600">兩端離 0 多遠</tspan></text> <line x1="300" y1="52" x2="300" y2="272" stroke="#222" stroke-width="1.6"></line> <text x="300" y="48" font-size="13" fill="#222" text-anchor="middle">0</text> <text x="20" y="97" font-size="13.5" font-weight="600" fill="#222">命題 2（交易期）</text><line x1="326.0" y1="92" x2="528.8" y2="92" stroke="#2e7d32" stroke-width="7" stroke-linecap="round"></line><line x1="326.0" y1="83" x2="326.0" y2="101" stroke="#2e7d32" stroke-width="2.5"></line><line x1="528.8" y1="83" x2="528.8" y2="101" stroke="#2e7d32" stroke-width="2.5"></line><text x="318.0" y="97" font-size="12" fill="#666" text-anchor="end">+0.20</text><text x="536.8" y="97" font-size="12" fill="#666">+1.76</text><text x="20" y="118" font-size="12.5" fill="#2e7d32">區間完全在 0 右側 → 方向性主張成立</text><text x="20" y="165" font-size="13.5" font-weight="600" fill="#222">RL-THR vs DL-THR</text><line x1="250.6" y1="160" x2="358.5" y2="160" stroke="#1565c0" stroke-width="7" stroke-linecap="round"></line><line x1="250.6" y1="151" x2="250.6" y2="169" stroke="#1565c0" stroke-width="2.5"></line><line x1="358.5" y1="151" x2="358.5" y2="169" stroke="#1565c0" stroke-width="2.5"></line><text x="242.6" y="165" font-size="12" fill="#666" text-anchor="end">-0.38</text><text x="366.5" y="165" font-size="12" fill="#666">+0.45</text><text x="20" y="186" font-size="12.5" fill="#1565c0">含 0 且兩端皆小 → 可主張「相當」</text><text x="20" y="233" font-size="13.5" font-weight="600" fill="#222">命題 1（形成期）</text><line x1="173.9" y1="228" x2="422.2" y2="228" stroke="#c0392b" stroke-width="7" stroke-linecap="round"></line><line x1="173.9" y1="219" x2="173.9" y2="237" stroke="#c0392b" stroke-width="2.5"></line><line x1="422.2" y1="219" x2="422.2" y2="237" stroke="#c0392b" stroke-width="2.5"></line><text x="165.9" y="233" font-size="12" fill="#666" text-anchor="end">-0.97</text><text x="430.2" y="233" font-size="12" fill="#666">+0.94</text><text x="20" y="254" font-size="12.5" fill="#c0392b">含 0 且兩端皆大 → 檢定力不足，不可稱相當</text> <text x="300" y="292" font-size="12.5" fill="#666" text-anchor="middle">年化報酬差（百分點，pp）</text>
+<text x="20" y="30" font-size="15" fill="#222">同樣是「區間涵蓋 0」，結論可以相反——差別在<tspan font-weight="600">兩端離 0 多遠</tspan></text> <line x1="300" y1="52" x2="300" y2="272" stroke="#222" stroke-width="1.6"></line> <text x="300" y="48" font-size="13" fill="#222" text-anchor="middle">0</text> <text x="20" y="97" font-size="13.5" font-weight="600" fill="#222">交易期門檻選擇</text><line x1="326.0" y1="92" x2="528.8" y2="92" stroke="#2e7d32" stroke-width="7" stroke-linecap="round"></line><line x1="326.0" y1="83" x2="326.0" y2="101" stroke="#2e7d32" stroke-width="2.5"></line><line x1="528.8" y1="83" x2="528.8" y2="101" stroke="#2e7d32" stroke-width="2.5"></line><text x="318.0" y="97" font-size="12" fill="#666" text-anchor="end">+0.20</text><text x="536.8" y="97" font-size="12" fill="#666">+1.76</text><text x="20" y="118" font-size="12.5" fill="#2e7d32">區間完全在 0 右側 → 方向性主張成立</text><text x="20" y="165" font-size="13.5" font-weight="600" fill="#222">RL-THR vs DL-THR</text><line x1="250.6" y1="160" x2="358.5" y2="160" stroke="#1565c0" stroke-width="7" stroke-linecap="round"></line><line x1="250.6" y1="151" x2="250.6" y2="169" stroke="#1565c0" stroke-width="2.5"></line><line x1="358.5" y1="151" x2="358.5" y2="169" stroke="#1565c0" stroke-width="2.5"></line><text x="242.6" y="165" font-size="12" fill="#666" text-anchor="end">-0.38</text><text x="366.5" y="165" font-size="12" fill="#666">+0.45</text><text x="20" y="186" font-size="12.5" fill="#1565c0">含 0 且兩端皆小 → 可主張「相當」</text><text x="20" y="233" font-size="13.5" font-weight="600" fill="#222">形成期分組層</text><line x1="173.9" y1="228" x2="422.2" y2="228" stroke="#c0392b" stroke-width="7" stroke-linecap="round"></line><line x1="173.9" y1="219" x2="173.9" y2="237" stroke="#c0392b" stroke-width="2.5"></line><line x1="422.2" y1="219" x2="422.2" y2="237" stroke="#c0392b" stroke-width="2.5"></line><text x="165.9" y="233" font-size="12" fill="#666" text-anchor="end">-0.97</text><text x="430.2" y="233" font-size="12" fill="#666">+0.94</text><text x="20" y="254" font-size="12.5" fill="#c0392b">含 0 且兩端皆大 → 檢定力不足，不可稱相當</text> <text x="300" y="292" font-size="12.5" fill="#666" text-anchor="middle">年化報酬差（百分點，pp）</text>
 </svg>
 
 <aside><div>
@@ -2051,9 +2049,9 @@ margin-right: 0; }
 <li>區間涵蓋 0 且<strong>兩端皆小</strong> → 效果縱使存在也不具實質意義</li>
 <li>區間涵蓋 0 但<strong>兩端皆大</strong> → <strong>檢定力不足</strong>，資料無法區分</li>
 </ul>
-<p>命題 1 即屬後者。舊版以非劣性檢定處理同一問題，須事前指定並辯護 容忍邊界 <span class="math inline">\delta</span>；CI 承載相同資訊且不需此判斷，故改採 CI。</p>
+<p>分組層 即屬後者。舊版以非劣性檢定處理同一問題，須事前指定並辯護 容忍邊界 <span class="math inline">\delta</span>；CI 承載相同資訊且不需此判斷，故改採 CI。</p>
 <h3 id="多重檢定校正">多重檢定校正</h3>
-<p>同一命題涉及多組對照時（如命題 1 的 9 組）， 以 <strong>Benjamini-Hochberg</strong> 控制 FDR，同時報告原始與校正後 <span class="math inline">p</span> 值。</p>
+<p>同一項檢定涉及多組對照時（如分組層的 9 組）， 以 <strong>Benjamini-Hochberg</strong> 控制 FDR，同時報告原始與校正後 <span class="math inline">p</span> 值。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
