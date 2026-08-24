@@ -76,3 +76,6 @@ formation_data/formation_pairs_sp500_Tiingo_*.db
 # Distribution / packaging
 *.egg-info/
 formation_data/formation_pairs_sp500_Tiingo.db.lfs-pointer.bak
+
+# ML 形成期排序器的中間產物（可由 dev/ml_formation/build.py 重建）
+dev/ml_formation/cache/
