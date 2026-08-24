@@ -324,6 +324,35 @@ for _cm, _cs in _GRID_CLUSTERS.items():
             "trade_method":     "Z-Score",
             "params":           _p,
         })
+# ── 形成窗長度對照：config 全程固定 252，從未變動過 ─────────────────────
+# 2026-08-24 以候選池代理掃描 formation_window ∈ {63,126,189,252,378,504}
+# （GICS-SSD 臂、283 個共同交易期、entry_z=2.0/exit_z=0.0 不變）。K=5 時
+# 每期淨捕獲對跨期標準差之比：
+#     W=63 −0.171 ／ 126 −0.154 ／ 189 −0.014 ／ 252 +0.090 ／ 378 −0.000 ／ 504 +0.297
+# 平均持有日僅由 59.9（W=252）升至 66.8（W=504），吃不掉 3.3 倍的捕獲增幅；
+# 以 sqrt(126/持有日) 粗調後仍為 0.408 對 0.130。
+#
+# ⚠ 該代理曾外推失準：它說 entry_z 單調改善至 3.0，實測回測在 2.2 見頂、
+#   2.3 已回落（跨臂平均 Sharpe 0.0986→0.1205→0.1116）。失準原因是進場門檻
+#   會改變持有期與資金週轉，而代理只量每筆捕獲。formation_window 不改變
+#   交易期與進出場門檻，理應落在代理已驗證的適用範圍內——但這條假設本身
+#   需要實地驗證，故此處只加**一條**對照，不直接推廣到其他臂。
+#
+# 比較須同期：W=504 使 2001 全年 12 個視窗歷史不足（見 run_formation 的守衛），
+# 故對照 Grid (GICS-SSD) 時基準臂須同樣截至 2002-01 起重算。
+_p_fw504 = {**base_params, **_GRID_COMMON,
+            "cluster_method": "gics", "ranking_backend": "ssd",
+            "formation_window": 504}
+_grid_entries.append({
+    "name":             "Grid GICS-SSD-FW504",
+    "formation_module": "strategies.formation.cluster_formation",
+    "trading_module":   "strategies.trading.zscore_trading",
+    "sub_dir":          "Grid_GICS_SSD_FW504",
+    "db_method":        "Grid (GICS-SSD-FW504)",
+    "trade_method":     "Z-Score",
+    "params":           _p_fw504,
+})
+
 # ── DRL 疊加：對矩陣 top-2 贏家格（AGG-SSD、HDB-SDP）疊 DRL 門檻選擇式 ──────
 # 借用該格已算好的形成期配對（formation_strategy_id_base），零重跑 formation；
 # 交易端換成 drl_threshold_trading（走標準化空間 z_of，不讀 OLS_Alpha）。

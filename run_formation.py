@@ -199,6 +199,16 @@ def worker_task(
 
         for i, idx in enumerate(roll_start_indices):
             form_start_idx = idx - FORMATION_WINDOW
+            # 歷史不足的守衛：價格切片由主行程以**全域** FORMATION_WINDOW 取得
+            # （見 prepare_backtest_data 的呼叫），而此處用的是**各策略**的值。
+            # 兩者不同時（策略設 formation_window > 全域值）form_start_idx 會為負，
+            # 而 price_pivot.iloc[負:正] 在 pandas 回傳空表——不報錯、靜默產不出配對。
+            # 現行策略全部 formation_window=252 且 local_first_trade_idx>=252，
+            # 故 form_start_idx>=0 恆成立，本守衛對既有結果為 no-op。
+            if form_start_idx < 0:
+                print(f"Window {i+1}/{total_windows}: 歷史不足"
+                      f"（需 {FORMATION_WINDOW} 日，僅 {idx} 日）-> \033[90m跳過\033[0m")
+                continue
             form_end_idx   = idx - 1
             trade_end_idx  = min(idx + FORWARD_DAYS - 1, total_days - 1)
 
