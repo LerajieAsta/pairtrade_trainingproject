@@ -14,7 +14,8 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
-from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._utils import (_compute_hurst, _ols, _adf_stat,
+                                         _ols_batch, _adf_stat_batch)
 from strategies.formation._cointegration import screen_pair
 
 def _dtw_py(x: np.ndarray, y: np.ndarray, window: int) -> float:
@@ -99,6 +100,10 @@ def _sakoe_chiba_dtw(x: np.ndarray, y: np.ndarray, window: int = 15) -> float:
 
 
 
+# ADF 未通過的候選不會用到殘差（screen_pair 會短路返回），以此佔位避免
+# 無謂的 OLS；長度為 0 使誤用時立即失敗而非靜默產生錯誤結果。
+_EMPTY_RESID = np.empty(0, dtype=np.float64)
+
 warnings.filterwarnings("ignore")
 
 
@@ -166,21 +171,63 @@ class Formation:
                 continue
 
             n_sec = len(sector_tickers)
+
+            # ── 雙向 ADF 的分塊批次預算 ──────────────────────────────────
+            # 本模組沒有 ssd_rolling 的提前中止（要先算完全部候選才排序），故
+            # 群內每一對都要做 2×OLS + 2×ADF。實測 NOGRP 單一視窗 81,003 對
+            # 需 89 秒，其中約 94% 花在逐一呼叫 statsmodels.adfuller。
+            #
+            # 記憶體：NOGRP 群內達 106,953 對，殘差矩陣 (n,252) 就要 216 MB，
+            # _adf_stat_batch 的中間張量 (n,250,2) 更達 428 MB。故分塊計算、
+            # **只保留統計量**（4 個 float64 陣列，約 3.4 MB），殘差算完即丟。
+            # 通過 ADF 者（實測 2–7%）於下方迴圈內再以 _ols 重算一次取殘差。
+            #
+            # 配對順序：外層 i、內層 j>i，與 np.triu_indices(n, 1) 的列優先
+            # 順序一致，故可用單一計數器 _pc 對齊。
+            _V = self.normalized_df[sector_tickers].to_numpy().T
+            _iu, _ju = np.triu_indices(n_sec, k=1)
+            _np_pairs = len(_iu)
+            _st_ab = np.zeros(_np_pairs); _pv_ab = np.ones(_np_pairs)
+            _st_ba = np.zeros(_np_pairs); _pv_ba = np.ones(_np_pairs)
+            _CH = 8000
+            for _lo in range(0, _np_pairs, _CH):
+                _hi = min(_lo + _CH, _np_pairs)
+                _Y = _V[_ju[_lo:_hi]]
+                _X = _V[_iu[_lo:_hi]]
+                _, _, _r1 = _ols_batch(_Y, _X)
+                _st_ab[_lo:_hi], _pv_ab[_lo:_hi] = _adf_stat_batch(_r1, 1)
+                del _r1
+                _, _, _r2 = _ols_batch(_X, _Y)
+                _st_ba[_lo:_hi], _pv_ba[_lo:_hi] = _adf_stat_batch(_r2, 1)
+                del _r2
+            _pc = -1
+
             for i in range(n_sec):
                 ticker_b = sector_tickers[i]
-                x_val = self.normalized_df[ticker_b].values
+                # 取自上方已抽出的 _V（= normalized_df[sector_tickers] 的轉置），
+                # 與原本的 normalized_df[ticker].values 逐位相同；避免在 8 萬次
+                # 的內層迴圈裡重複做 pandas 欄位查找。
+                x_val = _V[i]
                 var_x = np.var(x_val, ddof=1)
-                
+
                 for j in range(i + 1, n_sec):
                     ticker_a = sector_tickers[j]
-                    y_val = self.normalized_df[ticker_a].values
-                    
-                    # 步驟 1：雙向 OLS + ADF 共整合
-                    al_ab, be_ab, re_ab = _ols(y_val, x_val)
-                    stat_ab, pval_ab = _adf_stat(re_ab, 1)
+                    y_val = _V[j]
+                    _pc += 1
 
-                    al_ba, be_ba, re_ba = _ols(x_val, y_val)
-                    stat_ba, pval_ba = _adf_stat(re_ba, 1)
+                    # 步驟 1：雙向 OLS + ADF 共整合（ADF 取自上方批次預算）
+                    stat_ab, pval_ab = _st_ab[_pc], _pv_ab[_pc]
+                    stat_ba, pval_ba = _st_ba[_pc], _pv_ba[_pc]
+                    # 殘差只在需要時重算：ADF 未過者 screen_pair 會直接短路返回，
+                    # 不會碰到殘差（見 _cointegration.screen_pair）。
+                    _need = (not self.enable_filters) or (
+                        min(pval_ab, pval_ba) < self.adf_pvalue_threshold)
+                    if _need:
+                        al_ab, be_ab, re_ab = _ols(y_val, x_val)
+                        al_ba, be_ba, re_ba = _ols(x_val, y_val)
+                    else:
+                        al_ab = be_ab = al_ba = be_ba = 0.0
+                        re_ab = re_ba = _EMPTY_RESID
 
                     if pval_ab <= pval_ba:
                         best_stat, best_pval = stat_ab, pval_ab

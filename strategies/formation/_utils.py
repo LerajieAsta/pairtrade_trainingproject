@@ -117,6 +117,75 @@ def _ols(y: np.ndarray, x: np.ndarray) -> tuple[float, float, np.ndarray]:
     alpha, beta = float(coeffs[0]), float(coeffs[1])
     return alpha, beta, y - alpha - beta * x
 
+def _ols_batch(Y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """`_ols` 的批次版。Y, X: (n, T)，回傳 (alpha, beta, resid)。
+
+    原版對每組配對呼叫 np.linalg.lstsq（SVD）。此處改用簡單迴歸的封閉解
+    beta = Cov(x,y)/Var(x)、alpha = mean(y) - beta*mean(x)——對滿秩的兩欄
+    設計矩陣兩者數學上等價，浮點路徑不同故差在機器精度（實測見
+    dev/ml_formation 的對帳）。x 變異為零時退回 (0, 0, y - mean(y))，
+    與原版的 LinAlgError 分支一致。
+    """
+    Y = np.asarray(Y, dtype=np.float64)
+    X = np.asarray(X, dtype=np.float64)
+    my = Y.mean(axis=1, keepdims=True)
+    mx = X.mean(axis=1, keepdims=True)
+    dy, dx = Y - my, X - mx
+    vxx = (dx * dx).sum(axis=1)
+    ok = vxx > 1e-300
+    beta = np.zeros(len(Y))
+    np.divide((dx * dy).sum(axis=1), vxx, out=beta, where=ok)
+    alpha = np.where(ok, my[:, 0] - beta * mx[:, 0], 0.0)
+    resid = np.where(ok[:, None], Y - alpha[:, None] - beta[:, None] * X, dy)
+    return alpha, beta, resid
+
+
+def _adf_stat_batch(R: np.ndarray, max_lags: int = 1,
+                    eg_nvars: int = 2) -> tuple[np.ndarray, np.ndarray]:
+    """`_adf_stat` 的批次版。R: (n, T) 每列一條殘差。回傳 (統計量, p 值)。
+
+    `adfuller(regression="n", maxlag=1, autolag=None)` 的迴歸即
+        dy[1:] ~ y[1:T-1] + dy[:-1]        （無截距、無趨勢）
+    取水準項係數的 t 統計量。此處把該迴歸批次化（2x2 常態方程逐對求解），
+    p 值仍走 mackinnonp(stat, "c", N=eg_nvars)——與原版同一條校準。
+
+    長度不足或設計矩陣奇異者回傳 (0.0, 1.0)，與原版的例外分支一致。
+    """
+    R = np.asarray(R, dtype=np.float64)
+    n, T = R.shape
+    stats = np.zeros(n)
+    pvals = np.ones(n)
+    if T < max_lags + 5 or T < 4:
+        return stats, pvals
+
+    dy = np.diff(R, axis=1)
+    lvl, dlag, resp = R[:, 1:-1], dy[:, :-1], dy[:, 1:]
+    Xm = np.stack([lvl, dlag], axis=2)
+    XtX = np.einsum("nmi,nmj->nij", Xm, Xm)
+    Xty = np.einsum("nmi,nm->ni", Xm, resp)
+    det = XtX[:, 0, 0] * XtX[:, 1, 1] - XtX[:, 0, 1] * XtX[:, 1, 0]
+    ok = np.abs(det) > 1e-12
+    if not ok.any():
+        return stats, pvals
+    b = np.zeros((n, 2))
+    b[ok] = np.linalg.solve(XtX[ok], Xty[ok])
+    res = resp - np.einsum("nmi,ni->nm", Xm, b)
+    m = Xm.shape[1]
+    s2 = (res ** 2).sum(axis=1) / (m - 2)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        var0 = s2 * XtX[:, 1, 1] / np.where(ok, det, 1.0)
+        t = b[:, 0] / np.sqrt(var0)
+    good = ok & np.isfinite(t)
+    stats[good] = t[good]
+    for i in np.flatnonzero(good):
+        try:
+            pvals[i] = float(mackinnonp(stats[i], regression="c", N=eg_nvars))
+        except Exception:
+            pvals[i] = 1.0
+    stats[~good] = 0.0
+    return stats, pvals
+
+
 def _adf_stat(resid: np.ndarray, max_lags: int = 1,
               eg_nvars: int = 2) -> tuple[float, float]:
     """

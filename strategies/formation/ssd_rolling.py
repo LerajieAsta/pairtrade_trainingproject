@@ -14,7 +14,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import scipy.spatial.distance as ssd
-from strategies.formation._utils import _compute_hurst, _ols, _adf_stat
+from strategies.formation._utils import (_compute_hurst, _ols, _adf_stat,
+                                         _adf_stat_batch)
 from strategies.formation._cointegration import screen_pair
 
 
@@ -127,12 +128,41 @@ class Formation:
         candidates = (all_pairs_df if self.candidate_limit is None
                       else all_pairs_df.head(int(self.candidate_limit)))
 
+        # ── ADF 分塊批次預算 ────────────────────────────────────────────
+        # 瓶頸實測：NOGRP 臂單一視窗 81,003 個候選需 89 秒，其中約 91% 花在
+        # 逐一呼叫 statsmodels.adfuller。改以 _adf_stat_batch 一次算一整塊，
+        # 再經 screen_pair 既有的 precomputed_adf 參數傳入——控制流與判定邏輯
+        # 完全不動，只換「算 ADF」這一步。
+        #
+        # 為何要分塊而非全批：下方的提前中止（湊滿 top_n 即停）是精確等價的
+        # 最佳化，全批會把它作廢、反而把 NOGRP 的 8 萬個候選全算一遍。塊大小
+        # 取 top_n×40，實測通過率 2–7%，故通常第一塊就湊滿。
+        _cand_n = len(candidates)
+        _tickA = candidates["Ticker_A"].tolist()
+        _tickB = candidates["Ticker_B"].tolist()
+        _betas = candidates["Hedge_Ratio"].to_numpy()
+        _chunk = max(200, int(self.top_n) * 40)
+        _adf_cache: dict[int, tuple] = {}
+
+        def _adf_for(pos: int, spread_vec: np.ndarray) -> tuple:
+            """取第 pos 個候選的 (stat, pval)；未算過則批次補算該塊。"""
+            if pos not in _adf_cache:
+                lo = (pos // _chunk) * _chunk
+                hi = min(lo + _chunk, _cand_n)
+                A = self.normalized_df[_tickA[lo:hi]].to_numpy().T
+                B = self.normalized_df[_tickB[lo:hi]].to_numpy().T
+                Sp = A - _betas[lo:hi, None] * B
+                st, pv = _adf_stat_batch(Sp, max_lags=1)
+                for j in range(hi - lo):
+                    _adf_cache[lo + j] = (float(st[j]), float(pv[j]))
+            return _adf_cache[pos]
+
         filtered_records = []
         for _cand_rank, (_, row) in enumerate(candidates.iterrows(), start=1):
             x_val = self.normalized_df[row["Ticker_B"]].values
             y_val = self.normalized_df[row["Ticker_A"]].values
             beta = row["Hedge_Ratio"]
-            
+
             spread = y_val - beta * x_val
 
             # 三道統計過濾（中性共用層；enable_filters=False 時整層跳過 → 純排序消融）
@@ -141,6 +171,8 @@ class Formation:
                 adf_pvalue_threshold=self.adf_pvalue_threshold,
                 halflife_min=1.0, halflife_max=self.halflife_max,
                 hurst_threshold=0.50, adf_max_lags=1,
+                precomputed_adf=(_adf_for(_cand_rank - 1, spread)
+                                 if self.enable_filters else None),
                 enabled=self.enable_filters,
                 adf_only=self.adf_only,
             )
