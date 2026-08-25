@@ -56,9 +56,14 @@ class Trading(_BaseTrading):
                  full_price_df: pd.DataFrame = None,
                  formation_start: str = None,
                  formation_end: str = None,
+                 normalize_mode: str = "zscore_log",
                  **kwargs):
         base_kwargs = {k: v for k, v in kwargs.items() if k in _BASE_INIT_PARAMS}
         super().__init__(*args, **base_kwargs)
+        # 正規化口徑必須與形成期一致，否則 P̃ 兩端定義不同、σ_D 失去意義。
+        #   "zscore_log"  P̃ = (ln P − μ)/σ     （現行；Log_Mean/Log_Std 為 μ、σ）
+        #   "ggr_index"   P̃ = P / P_{t0}        （GGR；Log_Mean 攜出 P_{t0}、Log_Std ≡ 1）
+        self.normalize_mode = normalize_mode
         _clean = lambda df: df.where(df.pct_change().abs() <= 0.50).ffill().bfill() if df is not None else None
         self.full_price_df = _clean(full_price_df.copy() if full_price_df is not None else None)
         self.formation_start = formation_start
@@ -69,6 +74,20 @@ class Trading(_BaseTrading):
         # 記住本配對，供 _compute_spread 由形成期價格計算距離 spread 的 σ_D
         self._cur_tickers = (ticker_a, ticker_b)
         return super()._simulate_pair(period_start, period_end, sector, ticker_a, ticker_b, *args, **kwargs)
+
+    def _normalize_pair(self, pa, pb, log_mean_a, log_std_a, log_mean_b, log_std_b):
+        """依 normalize_mode 建構兩條正規化價格 P̃_A、P̃_B（形成期與交易期共用）。"""
+        if self.normalize_mode == "ggr_index":
+            # GGR：P̃ = P / P_{t0}。形成期首日價由 Log_Mean 欄位攜出。
+            # 不轉 ndarray：_compute_spread 傳入的是 Series，下游需要保留索引
+            p0a = log_mean_a if log_mean_a else 1.0
+            p0b = log_mean_b if log_mean_b else 1.0
+            return pa / p0a, pb / p0b
+        lsa = log_std_a if log_std_a else 1.0
+        lsb = log_std_b if log_std_b else 1.0
+        lma = log_mean_a if log_mean_a is not None else 0.0
+        lmb = log_mean_b if log_mean_b is not None else 0.0
+        return (np.log(pa) - lma) / lsa, (np.log(pb) - lmb) / lsb
 
     def _formation_distance_stats(self, log_mean_a, log_std_a, log_mean_b, log_std_b):
         """
@@ -84,8 +103,8 @@ class Trading(_BaseTrading):
                     and ta in self.full_price_df.columns and tb in self.full_price_df.columns):
                 fp = self.full_price_df.loc[self.formation_start:self.formation_end, [ta, tb]].dropna()
                 if len(fp) > 20:
-                    la = (np.log(fp[ta].values) - log_mean_a) / (log_std_a if log_std_a else 1.0)
-                    lb = (np.log(fp[tb].values) - log_mean_b) / (log_std_b if log_std_b else 1.0)
+                    la, lb = self._normalize_pair(fp[ta].values, fp[tb].values,
+                                                  log_mean_a, log_std_a, log_mean_b, log_std_b)
                     d = la - lb
                     mu_d = float(np.mean(d))
                     sd_d = float(np.std(d, ddof=1))
@@ -113,8 +132,8 @@ class Trading(_BaseTrading):
         lsa = log_std_a if log_std_a else 1.0
         lsb = log_std_b if log_std_b else 1.0
 
-        norm_a = (np.log(price_a) - lma) / lsa
-        norm_b = (np.log(price_b) - lmb) / lsb
+        norm_a, norm_b = self._normalize_pair(price_a, price_b,
+                                              log_mean_a, log_std_a, log_mean_b, log_std_b)
         dist = norm_a - norm_b                      # 距離 spread（等權）
 
         mu_d, sd_d = self._formation_distance_stats(lma, lsa, lmb, lsb)

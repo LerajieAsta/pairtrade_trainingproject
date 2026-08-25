@@ -131,6 +131,9 @@ class Formation:
         # 註：本後端「先檢定、後排序」，故未通過者沒有距離分數（記 None）。
         self.trace = kwargs.get("trace", None)
         self.adf_only = kwargs.get("adf_only", False)
+        # 正規化口徑（GGR 復現用；預設值使現行行為逐位不變）。語意與
+        # ssd_rolling.normalize_prices 完全相同，見 dev/ggr/SPEC.md。
+        self.normalize_mode = kwargs.get("normalize_mode", "zscore_log")
 
         self.normalized_df: pd.DataFrame = pd.DataFrame()
         self.mean_prices: pd.Series = pd.Series(dtype=float)
@@ -138,7 +141,19 @@ class Formation:
         self.selected_pairs: pd.DataFrame = pd.DataFrame()
 
     def normalize_prices(self) -> pd.DataFrame:
-        """對數價格標準化"""
+        """依 normalize_mode 建構正規化價格（語意同 ssd_rolling.normalize_prices）。
+
+        "zscore_log"（預設）：對數價格標準化。
+        "ggr_index"：Gatev et al. (2006) 的累積報酬指數 P_t / P_{t0}，起點 = 1。
+            mean_prices 攜出 P_{t0}、std_prices 攜出 1.0，供交易端重建同一條 P̃。
+        """
+        if self.normalize_mode == "ggr_index":
+            p0 = self.price_df.iloc[0].replace(0.0, np.nan)
+            self.mean_prices = p0
+            self.std_prices = pd.Series(1.0, index=self.price_df.columns, dtype=float)
+            self.normalized_df = self.price_df.divide(p0, axis=1)
+            return self.normalized_df
+
         log_prices = np.log(np.maximum(self.price_df, 1e-8))
         self.mean_prices = log_prices.mean()
         self.std_prices = log_prices.std()

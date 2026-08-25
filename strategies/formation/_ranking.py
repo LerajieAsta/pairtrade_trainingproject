@@ -35,6 +35,7 @@ def rank_within_groups(
     enable_filters: bool = True,   # False → 跳過三道統計過濾（純排序消融）
     trace: list = None,            # 非 None 時，各後端附上排序分數與三道檢定統計量
     adf_only: bool = False,        # True → 篩選層只做 ADF
+    normalize_mode: str = "zscore_log",   # "ggr_index" → GGR 累積報酬指數（見 dev/ggr/SPEC.md）
     **_ignored,
 ) -> pd.DataFrame:
     """
@@ -58,6 +59,7 @@ def rank_within_groups(
             enable_filters=enable_filters,
             trace=trace,
             adf_only=adf_only,
+            normalize_mode=normalize_mode,
         )
         if adf_pvalue_threshold is not None:
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
@@ -78,6 +80,7 @@ def rank_within_groups(
             enable_filters=enable_filters,
             trace=trace,
             adf_only=adf_only,
+            normalize_mode=normalize_mode,
         )
         if adf_pvalue_threshold is not None:
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
