@@ -168,7 +168,9 @@ def _adf_stat_batch(R: np.ndarray, max_lags: int = 1,
     if not ok.any():
         return stats, pvals
     b = np.zeros((n, 2))
-    b[ok] = np.linalg.solve(XtX[ok], Xty[ok])
+    # 明確補上最後一維再取回：NumPy 1.x 把 (k,2) 當「k 個向量」，2.x 起改當
+    # 「單一 (k,2) 矩陣」而報 core dimension 不符。寫成 (k,2,1) 在兩版語意相同。
+    b[ok] = np.linalg.solve(XtX[ok], Xty[ok][..., None])[..., 0]
     res = resp - np.einsum("nmi,ni->nm", Xm, b)
     m = Xm.shape[1]
     s2 = (res ** 2).sum(axis=1) / (m - 2)
