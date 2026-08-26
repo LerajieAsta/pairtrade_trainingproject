@@ -134,6 +134,11 @@ def _build_filename(params: dict) -> str:
     dg = float(params.get("disp_gate_pctl", 0.0) or 0.0)
     if dg > 0:
         suffix += f"_DG{int(dg)}"
+    # 方案 D：市場波動政體進場閘門（2026-08-26）。現行 VG 臂各有獨立 sub_dir
+    # 故不依賴此後綴，但若把 vol_gate_pctl 設在既有方法上，缺後綴會覆寫其結果。
+    vg = float(params.get("vol_gate_pctl", 0.0) or 0.0)
+    if vg > 0:
+        suffix += f"_VG{int(vg)}"
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def check_trading_completed(strategy_config: dict, output_root: str, results_db_path: str = "", dataset_name: str = "") -> bool:
@@ -663,8 +668,18 @@ def run_all_trading():
         elif not isinstance(dsz_list, list):
             dsz_list = [dsz_list]
 
+        # 5. max_holding_days_list（時間停損；2026-08-26 接線）
+        #    未指定時退化為單一現值（預設 0 = 停用），網格不膨脹、既有行為不變。
+        #    檔名已有 _MHD{n} 後綴（見 _build_filename），故與既有結果並存不覆寫。
+        mhd_list = params.get("max_holding_days_list")  # type: ignore
+        if not mhd_list:
+            mhd_list = [params.get("max_holding_days", 0)]  # type: ignore
+        elif not isinstance(mhd_list, list):
+            mhd_list = [mhd_list]
+
         # (itertools and copy imports moved to top of file)
-        for top_n, sl, msr, ez, dsz in itertools.product(top_n_list, sl_list, msr_list, ez_list, dsz_list):
+        for top_n, sl, msr, ez, dsz, mhd in itertools.product(
+                top_n_list, sl_list, msr_list, ez_list, dsz_list, mhd_list):
             new_raw = copy.deepcopy(raw)
             new_params = new_raw["params"]
 
@@ -675,6 +690,7 @@ def run_all_trading():
             new_params["entry_z"] = ez  # type: ignore
             new_params["dynamic_stop_z"] = dsz  # type: ignore
             new_params["use_dynamic_stop"] = dsz > 0  # type: ignore
+            new_params["max_holding_days"] = int(mhd)  # type: ignore
 
             # 清理 list 參數以防混淆
             new_params.pop("top_n_list", None)  # type: ignore
@@ -683,6 +699,7 @@ def run_all_trading():
             new_params.pop("max_sector_ratio_list", None)  # type: ignore
             new_params.pop("entry_z_list", None)  # type: ignore
             new_params.pop("dynamic_stop_z_list", None)  # type: ignore
+            new_params.pop("max_holding_days_list", None)  # type: ignore
 
             # 對接 Formation 配對資料庫的 strategy_id (Formation 階段只受 max_sector_ratio 影響，固定 top_n=20)
             # formation_strategy_id_base：允許策略借用另一個策略的形成期配對
@@ -697,6 +714,8 @@ def run_all_trading():
             new_raw["name"] = f"{raw['name']}_Top{top_n}_SL{sl_pct}_MSR{msr_pct}"
             if abs(float(ez) - 2.0) > 1e-9 or float(dsz) > 0:
                 new_raw["name"] += f"_EZ{int(round(float(ez) * 10))}_DSZ{int(round(float(dsz) * 10))}"
+            if int(mhd) > 0:
+                new_raw["name"] += f"_MHD{int(mhd)}"
 
             expanded_strategies_raw.append(new_raw)
 

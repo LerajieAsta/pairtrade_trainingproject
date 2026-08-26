@@ -976,7 +976,12 @@ def make_sensitivity_variants(base_name: str, param: str, values: list) -> list:
 # 交易端 _list 網格參數 → SENSITIVITY_PARAM 命中時改設對應 _list（沿用既有
 # formation 配對、只重跑交易，成本低）。top_n/stop_loss 已預設掃描，此處補 entry_z。
 _SENSITIVITY_TRADING_LIST = {
-    "entry_z":   ("entry_z_list",   [1.5, 2.0, 2.5, 3.0]),
+    "entry_z":         ("entry_z_list",         [1.5, 2.0, 2.5, 3.0]),
+    # 2026-08-26 接線：兩者皆為文獻常用的出場機制，本研究此前從未啟用。
+    #   dynamic_stop_z —— z 停損（Kim & Kim 2019 / SAPT 的停損邊界即以標準差計）
+    #   max_holding_days —— 時間停損（config.py:55 的既有診斷：>63d 未收斂者勝率 26–46%）
+    "dynamic_stop_z":   ("dynamic_stop_z_list",   [3.0, 4.0, 5.0]),
+    "max_holding_days": ("max_holding_days_list", [21, 42, 63]),
     "top_n":     ("top_n_list",     [1, 3, 5, 10, 20]),
     "stop_loss": ("stop_loss_list", [0.0, 0.05, 0.10, 0.15]),
 }
