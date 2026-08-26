@@ -470,6 +470,40 @@ for _rb, _sfx in (("dtw", "DTW"), ("ssd_dtw_pca", "SDP")):
                              "stop_loss_list":  [0.0]},
     })
 
+# ── 時變對沖比率：Kalman 濾波（2026-08-26）─────────────────────────────────
+# 預先註冊見 dev/kalman/PREREGISTRATION.md（門檻一已過：追蹤誤差 0.4889→0.3551，
+# 降 27.4%，p≈0；修訂一記錄了「僅帶 K-EST 進門檻二」這項偏離與其理由）。
+#
+# 現行管線在形成期估一次 OLS beta，鎖定 126 個交易日不變。實測 SSD top-20
+# 的 beta 相對漂移中位 38.4%，且最高漂移五分位的 capture 為 -0.0594
+# （最低五分位 +0.0195）。Do, Faff & Hamza (2006) 早已主張 beta 應隨時間變動。
+#
+# 與已否證的方案 A／C 的結構性差異：兩案皆要求「在進場時預測」，而模型在選取
+# 區內的 AUC 僅 0.53–0.56。本案不要求預測——Kalman 只用當下為止的資料追蹤，
+# 是「適應」而非「預測」。
+#
+# 借用 Grid NOGRP-DTW 的形成期配對（formation_strategy_id_base），形成期不重跑，
+# 唯一變因在交易端，故「Kalman − 靜態」的差分完全歸因於對沖比率的時變性。
+for _sm, _sfx, _note in (
+    ("beta_only",  "KAL",     "B1：唯一變因是 beta，標準化沿用形成期 mu/sigma"),
+    ("innovation", "KALINN",  "B2：文獻版（Chan 2013），z = e_t/sqrt(S_t)"),
+):
+    _grid_entries.append({
+        "name":             f"Grid NOGRP-DTW-{_sfx}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.kalman_trading",
+        "sub_dir":          f"Grid_NOGRP_DTW_{_sfx}",
+        "db_method":        f"Grid (NOGRP-DTW-{_sfx})",
+        "trade_method":     "Kalman",
+        "formation_strategy_id_base": "Grid NOGRP-DTW",
+        "params":           {**base_params, **_GRID_COMMON,
+                             "cluster_method":  "none",
+                             "ranking_backend": "dtw",
+                             "ignore_ols_alpha": True,
+                             "spread_mode":     _sm,
+                             "q_mode":          "est"},
+    })
+
 # ── DRL 疊加：對矩陣 top-2 贏家格（AGG-SSD、HDB-SDP）疊 DRL 門檻選擇式 ──────
 # 借用該格已算好的形成期配對（formation_strategy_id_base），零重跑 formation；
 # 交易端換成 drl_threshold_trading（走標準化空間 z_of，不讀 OLS_Alpha）。
