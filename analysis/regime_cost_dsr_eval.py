@@ -106,6 +106,55 @@ def load_daily_returns(strategy_ids: list[str], result_db: str = RESULT_DB) -> d
     return {sid: daily[sid].dropna() for sid in daily.columns}
 
 
+# ── 進出場名目額（break-even 的分母）────────────────────────────────
+def traded_notional(path_key: str, top_n: int, trading_window: int = 126,
+                    rolling_step: int = 21, result_db: str = RESULT_DB) -> float:
+    """
+    該策略全期進出場的累計名目額。
+
+    2026-08-26 修正（此前的算法在兩處低估 break-even）：
+
+      其一，**資金基礎**。`portfolio_manager.py:84` 為
+          capital_per_pair = current_equity / max_pairs,  max_pairs = top_n × 並行期數
+      並行期數 = trading_window / rolling_step（現行 126/21 = 6）。
+      舊算法用 `INITIAL_CAPITAL / top_n`，既漏掉並行因子（名目額高估 6 倍），
+      也以初始資金取代逐日權益（權益自 10,000 成長至 22,350，後期被低估）。
+
+      其二，**事件數**。實測 Entries = Exits + Stop_Losses + Forced_Closes——
+      每次進場恰對應一次平倉，故費用事件為 2 × Entries。
+      舊算法用 Entries + Exits，漏計停損與強制平倉的出場費
+      （Top1/SL0 少 17.3%、Top20/SL0 少 23.2%）。
+
+    兩者方向相反，但資金基礎的 6 倍主導：修正後 10 條主力臂的往返 break-even
+    一律上升 0.20–0.40 個百分點（`Grid (NOGRP-DTW)` 0.820% → 1.219%）。
+
+    自洽檢驗：把費率設為本函式推得的 break-even，重算期末淨利得 −$9（NOGRP-DTW）
+    與 −$2（GGR），確認歸零。見 dev/breakeven_fix/。
+
+    每筆進場的名目額恰為 capital_per_pair（`_execute_entry` 中 v_a + v_b = cap，
+    而 |shares_a|·p_a = v_a），故以「進場日權益 / max_pairs」逐筆加總後 ×2。
+    """
+    conc = max(1, int(trading_window) // max(1, int(rolling_step)))
+    max_pairs = max(1, int(top_n) * conc)
+    con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
+    try:
+        pnl = pd.read_sql(
+            "SELECT Date, SUM(Daily_Delta) d FROM trade_logs "
+            "WHERE strategy_id = ? GROUP BY Date ORDER BY Date", con, params=(path_key,))
+        ent = pd.read_sql(
+            "SELECT Date, COUNT(*) n FROM trade_logs "
+            "WHERE strategy_id = ? AND Status LIKE 'ENTER%' GROUP BY Date", con,
+            params=(path_key,))
+    finally:
+        con.close()
+    if pnl.empty or ent.empty:
+        return float("nan")
+    pnl["Date"] = pd.to_datetime(pnl.Date); ent["Date"] = pd.to_datetime(ent.Date)
+    eq = INITIAL_CAPITAL + pnl.set_index("Date").d.cumsum()
+    cap_t = (eq / max_pairs).reindex(ent.Date).ffill().bfill()
+    return float((ent.set_index("Date").n * cap_t).sum()) * 2.0
+
+
 # ── Deflated Sharpe Ratio ───────────────────────────────────────────
 def deflated_sharpe(daily_ret: pd.Series, n_trials: int, var_sr_trials: float) -> dict:
     """
@@ -280,9 +329,8 @@ def run(methods: list[str] = None):
     rows1 = []
     for m, br in best_rows.items():
         top_n = _top_n_int(br["TOP N"])
-        cap_per_pair = INITIAL_CAPITAL / top_n
-        entries, exits = float(br["Entries"]), float(br["Exits"])
-        sigma_notional = cap_per_pair * (entries + exits)
+        # 名目額口徑見 traded_notional 的 docstring（2026-08-26 修正）
+        sigma_notional = traded_notional(br["_path"], top_n)
         p_net = float(br["Final_Equity"]) - INITIAL_CAPITAL
         c_side_be = CURRENT_FEE_SIDE + p_net / sigma_notional if sigma_notional > 0 else np.nan
         rt_be = 2.0 * c_side_be                                            # 往返 break-even
