@@ -504,6 +504,37 @@ for _sm, _sfx, _note in (
                              "q_mode":          "est"},
     })
 
+# ── 方案 D：Regime 條件曝險（2026-08-26）───────────────────────────────────
+# 預先註冊見 dev/regime/PREREGISTRATION.md。門檻一已過（曝險疊加對循環 block
+# 置換：pctl=50 p=0.0180、pctl=67 p=0.0210，皆 < 0.025）。
+#
+# regime_sharpe.csv 顯示每一條策略、無例外：Turbulent 全為正且大（+0.86~+1.09），
+# Normal 幾乎全負（-0.28~-0.75）。而市場波動狀態當日可觀測，不需預測——
+# 這是前五案（梯子/A/C 要求預測、Kalman 適應時吸收訊號、F 淨額化無量）
+# 都不滿足的結構條件。
+#
+# 閘門只擋「新開倉」，既有持倉與出場規則完全不受影響；z 的計算一字未動。
+# 沿用 zscore_trading 內建的 entry_gate 機制，不新寫交易模組。
+# 訊號無前視：vol 取 shift(1) 後做 expanding 分位排名，504 日暖身期一律允許。
+#
+# ⚠ 判準一律對上「同跳過率的循環 block 置換」，不對上全額進場——
+#   prop2_skip_permutation 已證明期望值為負時隨機跳過亦會避損。
+for _vp in (50, 67):
+    _grid_entries.append({
+        "name":             f"Grid NOGRP-DTW-VG{_vp}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          f"Grid_NOGRP_DTW_VG{_vp}",
+        "db_method":        f"Grid (NOGRP-DTW-VG{_vp})",
+        "trade_method":     "Z-Score",
+        "formation_strategy_id_base": "Grid NOGRP-DTW",
+        "params":           {**base_params, **_GRID_COMMON,
+                             "cluster_method":  "none",
+                             "ranking_backend": "dtw",
+                             "ignore_ols_alpha": True,
+                             "vol_gate_pctl":   _vp},
+    })
+
 # ── DRL 疊加：對矩陣 top-2 贏家格（AGG-SSD、HDB-SDP）疊 DRL 門檻選擇式 ──────
 # 借用該格已算好的形成期配對（formation_strategy_id_base），零重跑 formation；
 # 交易端換成 drl_threshold_trading（走標準化空間 z_of，不讀 OLS_Alpha）。

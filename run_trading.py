@@ -80,6 +80,33 @@ def _build_dispersion_gate(price_pivot, pctl: float) -> dict:
     return gate
 
 
+def _build_vol_regime_gate(price_pivot, pctl: float) -> dict:
+    """
+    方案 D regime 條件化進場（walk-forward，無前視）：
+      1. 等權市場日報酬 = 全體成分股 log 報酬的橫斷面平均
+      2. vol = 其 63 日滾動標準差年化，再 shift(1)（只用昨日以前資訊）
+      3. 對 vol 做 expanding 分位排名（min 504 日暖身）
+      4. gate[date] = True 若當日 vol 的歷史分位 >= pctl/100（允許新開倉）
+    暖身期一律允許（維持基準行為）。回傳 {Timestamp: bool}。
+
+    與 _build_dispersion_gate 的差別：訊號是**市場波動**而非橫斷面分散度，
+    且方向相反——本閘在**高波動時允許**進場（regime_sharpe.csv 顯示 Turbulent
+    全數為正、Normal 幾乎全負）。預先註冊見 dev/regime/PREREGISTRATION.md。
+    """
+    key = ("vol", id(price_pivot), float(pctl))
+    if key in _disp_gate_cache:
+        return _disp_gate_cache[key]
+    mkt = np.log(price_pivot.where(price_pivot > 0)).diff().mean(axis=1)
+    vol = (mkt.rolling(63, min_periods=40).std() * np.sqrt(252)).shift(1)
+    r = vol.expanding(min_periods=504).rank()
+    n = vol.expanding(min_periods=504).count()
+    pct_rank = r / n
+    gate = {ts: (bool(v >= pctl / 100.0) if pd.notna(v) else True)
+            for ts, v in pct_rank.items()}
+    _disp_gate_cache[key] = gate
+    return gate
+
+
 def _build_filename(params: dict) -> str:
     top_n = params.get("top_n", 10)
     sl    = int(params.get("stop_loss_pct", 0.0) * 100)
@@ -344,9 +371,13 @@ def worker_task(
                 form_params = pair_data["Params"]
 
                 _dg = float(params.get("disp_gate_pctl", 0.0) or 0.0)
+                _vg = float(params.get("vol_gate_pctl", 0.0) or 0.0)
+                # 兩個閘門互斥（同時設定會使變因不唯一）；vol 閘優先，見 dev/regime/
+                _gate = (_build_vol_regime_gate(price_pivot, _vg) if _vg > 0 else
+                         _build_dispersion_gate(price_pivot, _dg) if _dg > 0 else None)
                 kwargs = {
                     "price_df": trade_prices_extended,  # 傳入延伸價格數據，修復前期 NaN 交易缺失問題
-                    "entry_gate": _build_dispersion_gate(price_pivot, _dg) if _dg > 0 else None,
+                    "entry_gate": _gate,
                     "trade_dates": trade_dates,
                     "selected_pairs": pd.DataFrame(),
                     "capital_per_pair": capital,
