@@ -405,6 +405,136 @@ _grid_entries.append({
     "params":           _p_tw63,
 })
 
+# ── GGR (2006) 忠實復現：經典距離法的錨點（2026-08-25）─────────────────────
+# 規格見 dev/ggr/SPEC.md，**跑之前定稿**。本條目不是檢定、沒有成功判準，
+# 而是一次事前指定的描述性復現：建立「經典方法在本資料與本引擎上值多少」，
+# 使此後的比較有基準，而不是以「網格最高值」為基準。
+#
+# 與現行全部策略的關鍵差異在**正規化口徑**（normalize_mode="ggr_index"）：
+#   現行  P̃ = (ln P − μ)/σ    → SSD = 2(T−1)(1−ρ)，故「距離排序」實為相關係數排序
+#   GGR   P̃ = P_t / P_{t0}     → 對「形狀相同、波動不同」的配對給出大距離
+# 這不是外觀差異：實測五個形成期，兩者選出的前 20 對平均只重疊 2.6 對。
+# 沿用現行正規化跑 top_n=20，得到的是「本引擎在 20 對時的結果」，不是 GGR 復現。
+#
+# 只有 1 格（top_n=20、停損 0%、entry_z=2.0），全部事前指定、不掃描。
+# 故 method N 44→45、config N 819→820，DSR 門檻 SR0 由 0.328 升至約 0.330，
+# NOGRP-DTW Top1 的 DSR 由 0.769 降至約 0.767——影響可忽略，這正是單一配置的意義。
+#
+# 三項已知偏離（論文須揭露，見 SPEC.md）：母體為 S&P 500 而非 CRSP 全美股、
+# 一律扣 0.29% 單邊成本、期間 2000–2025 與原文 1962–2002 僅重疊 3 年。
+# 前兩項方向已知且同向：**本復現低估 GGR 的原始績效**。
+_p_ggr = {**base_params, **_GRID_COMMON,
+          "cluster_method":  "none",        # GGR 不分組
+          "ranking_backend": "ssd",         # 距離排序
+          "filter_mode":     "none",        # GGR 無任何統計篩選
+          "normalize_mode":  "ggr_index",   # P_t / P_{t0}，起點 = 1
+          "top_n_list":      [20],          # 原文固定 20 對
+          "stop_loss_list":  [0.0],         # 原文無停損
+          }
+_grid_entries.append({
+    "name":             "Grid GGR",
+    "formation_module": "strategies.formation.cluster_formation",
+    "trading_module":   "strategies.trading.distance_trading",   # 等權、β ≡ 1
+    "sub_dir":          "Grid_GGR",
+    "db_method":        "Grid (GGR)",
+    "trade_method":     "Distance",
+    "params":           _p_ggr,
+})
+
+# ── GGR 基準上的排序層對照（2026-08-25，SPEC.md §擴充一）────────────────────
+# 固定 GGR 的一切（不分組、ggr_index 正規化、無篩選、Distance 交易端、
+# top_n=20、停損 0%、entry_z=2.0），**只換排序後端**。單一變因。
+#
+# 與現有 Grid (NOGRP-DTW/SDP) 的差別：那三條臂雖同為不分組，但用 zscore_log
+# 正規化、ADF 篩選、Z-Score(OLS β) 交易端——三項全不同，故不是 GGR 的排序對照。
+#
+# 成本註記：篩選關閉後每一對都要算 DTW（實測 89,676 對／期），不像現行臂能靠
+# ADF 先擋掉 93–98%。實測 DTW 21.8 秒/期、SDP 23.1 秒/期，各約 110 分鐘。
+#
+# 各 1 格、全部事前指定、不掃描。method N 45→47、config N 820→822。
+for _rb, _sfx in (("dtw", "DTW"), ("ssd_dtw_pca", "SDP")):
+    _grid_entries.append({
+        "name":             f"Grid GGR-{_sfx}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.distance_trading",
+        "sub_dir":          f"Grid_GGR_{_sfx}",
+        "db_method":        f"Grid (GGR-{_sfx})",
+        "trade_method":     "Distance",
+        "params":           {**base_params, **_GRID_COMMON,
+                             "cluster_method":  "none",
+                             "ranking_backend": _rb,
+                             "filter_mode":     "none",
+                             "normalize_mode":  "ggr_index",
+                             "ignore_ols_alpha": True,
+                             "top_n_list":      [20],
+                             "stop_loss_list":  [0.0]},
+    })
+
+# ── 時變對沖比率：Kalman 濾波（2026-08-26）─────────────────────────────────
+# 預先註冊見 dev/kalman/PREREGISTRATION.md（門檻一已過：追蹤誤差 0.4889→0.3551，
+# 降 27.4%，p≈0；修訂一記錄了「僅帶 K-EST 進門檻二」這項偏離與其理由）。
+#
+# 現行管線在形成期估一次 OLS beta，鎖定 126 個交易日不變。實測 SSD top-20
+# 的 beta 相對漂移中位 38.4%，且最高漂移五分位的 capture 為 -0.0594
+# （最低五分位 +0.0195）。Do, Faff & Hamza (2006) 早已主張 beta 應隨時間變動。
+#
+# 與已否證的方案 A／C 的結構性差異：兩案皆要求「在進場時預測」，而模型在選取
+# 區內的 AUC 僅 0.53–0.56。本案不要求預測——Kalman 只用當下為止的資料追蹤，
+# 是「適應」而非「預測」。
+#
+# 借用 Grid NOGRP-DTW 的形成期配對（formation_strategy_id_base），形成期不重跑，
+# 唯一變因在交易端，故「Kalman − 靜態」的差分完全歸因於對沖比率的時變性。
+for _sm, _sfx, _note in (
+    ("beta_only",  "KAL",     "B1：唯一變因是 beta，標準化沿用形成期 mu/sigma"),
+    ("innovation", "KALINN",  "B2：文獻版（Chan 2013），z = e_t/sqrt(S_t)"),
+):
+    _grid_entries.append({
+        "name":             f"Grid NOGRP-DTW-{_sfx}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.kalman_trading",
+        "sub_dir":          f"Grid_NOGRP_DTW_{_sfx}",
+        "db_method":        f"Grid (NOGRP-DTW-{_sfx})",
+        "trade_method":     "Kalman",
+        "formation_strategy_id_base": "Grid NOGRP-DTW",
+        "params":           {**base_params, **_GRID_COMMON,
+                             "cluster_method":  "none",
+                             "ranking_backend": "dtw",
+                             "ignore_ols_alpha": True,
+                             "spread_mode":     _sm,
+                             "q_mode":          "est"},
+    })
+
+# ── 方案 D：Regime 條件曝險（2026-08-26）───────────────────────────────────
+# 預先註冊見 dev/regime/PREREGISTRATION.md。門檻一已過（曝險疊加對循環 block
+# 置換：pctl=50 p=0.0180、pctl=67 p=0.0210，皆 < 0.025）。
+#
+# regime_sharpe.csv 顯示每一條策略、無例外：Turbulent 全為正且大（+0.86~+1.09），
+# Normal 幾乎全負（-0.28~-0.75）。而市場波動狀態當日可觀測，不需預測——
+# 這是前五案（梯子/A/C 要求預測、Kalman 適應時吸收訊號、F 淨額化無量）
+# 都不滿足的結構條件。
+#
+# 閘門只擋「新開倉」，既有持倉與出場規則完全不受影響；z 的計算一字未動。
+# 沿用 zscore_trading 內建的 entry_gate 機制，不新寫交易模組。
+# 訊號無前視：vol 取 shift(1) 後做 expanding 分位排名，504 日暖身期一律允許。
+#
+# ⚠ 判準一律對上「同跳過率的循環 block 置換」，不對上全額進場——
+#   prop2_skip_permutation 已證明期望值為負時隨機跳過亦會避損。
+for _vp in (50, 67):
+    _grid_entries.append({
+        "name":             f"Grid NOGRP-DTW-VG{_vp}",
+        "formation_module": "strategies.formation.cluster_formation",
+        "trading_module":   "strategies.trading.zscore_trading",
+        "sub_dir":          f"Grid_NOGRP_DTW_VG{_vp}",
+        "db_method":        f"Grid (NOGRP-DTW-VG{_vp})",
+        "trade_method":     "Z-Score",
+        "formation_strategy_id_base": "Grid NOGRP-DTW",
+        "params":           {**base_params, **_GRID_COMMON,
+                             "cluster_method":  "none",
+                             "ranking_backend": "dtw",
+                             "ignore_ols_alpha": True,
+                             "vol_gate_pctl":   _vp},
+    })
+
 # ── DRL 疊加：對矩陣 top-2 贏家格（AGG-SSD、HDB-SDP）疊 DRL 門檻選擇式 ──────
 # 借用該格已算好的形成期配對（formation_strategy_id_base），零重跑 formation；
 # 交易端換成 drl_threshold_trading（走標準化空間 z_of，不讀 OLS_Alpha）。
@@ -846,7 +976,12 @@ def make_sensitivity_variants(base_name: str, param: str, values: list) -> list:
 # 交易端 _list 網格參數 → SENSITIVITY_PARAM 命中時改設對應 _list（沿用既有
 # formation 配對、只重跑交易，成本低）。top_n/stop_loss 已預設掃描，此處補 entry_z。
 _SENSITIVITY_TRADING_LIST = {
-    "entry_z":   ("entry_z_list",   [1.5, 2.0, 2.5, 3.0]),
+    "entry_z":         ("entry_z_list",         [1.5, 2.0, 2.5, 3.0]),
+    # 2026-08-26 接線：兩者皆為文獻常用的出場機制，本研究此前從未啟用。
+    #   dynamic_stop_z —— z 停損（Kim & Kim 2019 / SAPT 的停損邊界即以標準差計）
+    #   max_holding_days —— 時間停損（config.py:55 的既有診斷：>63d 未收斂者勝率 26–46%）
+    "dynamic_stop_z":   ("dynamic_stop_z_list",   [3.0, 4.0, 5.0]),
+    "max_holding_days": ("max_holding_days_list", [21, 42, 63]),
     "top_n":     ("top_n_list",     [1, 3, 5, 10, 20]),
     "stop_loss": ("stop_loss_list", [0.0, 0.05, 0.10, 0.15]),
 }

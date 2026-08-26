@@ -84,9 +84,12 @@ class Formation:
         adf_pvalue_threshold: float = 0.05,
         trading_window: int = 126,
         dtw_window: int = 15,
+        # 正規化口徑："zscore_log"（預設，現行全部策略）| "ggr_index"（GGR 復現）
+        normalize_mode: str = "zscore_log",
         **kwargs,
     ):
         self.price_df = price_df
+        self.normalize_mode = normalize_mode
         self.form_start = form_start
         self.form_end = form_end
         self.top_n = top_n
@@ -313,6 +316,7 @@ class Formation:
             trading_window=self.trading_window,
             dtw_window=self.dtw_window,
             enable_filters=(self.filter_mode != "none"),
+            normalize_mode=self.normalize_mode,
             lookback=self.reversal_lookback,
             sd_mult=self.reversal_sd_mult,
             sd_scope=self.reversal_sd_scope,

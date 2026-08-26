@@ -255,6 +255,25 @@ def load_data(strategy_path):
         return pd.DataFrame()
 
 
+def _canonical_method(path: str):
+    """由 sub_dir 還原 config.py 的 db_method（如 Grid_NOGRP_DTW_KAL → "Grid (NOGRP-DTW-KAL)"）。
+
+    下方的 path_lower 啟發式解析早於 `Grid (...)` 命名慣例，會把
+    Grid_NOGRP_DTW_KAL / VG50 / TW63 / AGG_DTW 全部壓成 "DTW"，
+    Grid_AGG_SSD_DRL / CHARS 全部壓成 "SSD"，並有 34% 落入 "Unknown"。
+    本函式優先以命名慣例還原；實測對 result.db 的 912 列全部與 METHOD 欄相符。
+    無法套用時回傳 None，交由既有啟發式處理（舊資料夾結構仍可解析）。
+    """
+    parts = str(path).split("/")
+    if len(parts) < 2:
+        return None
+    sub = parts[1]
+    for pre in ("F09GI_", "HSU25_", "Grid_"):
+        if sub.startswith(pre):
+            return f"{pre[:-1]} ({sub[len(pre):].replace('_', '-')})"
+    return None
+
+
 def extract_features_from_path(path):
     path_lower = path.lower()
     dataset = "Current" if "current" in path_lower else "Tiingo" if "tiingo" in path_lower else "Full"
@@ -345,6 +364,12 @@ def extract_features_from_path(path):
     m = re.search(r'dsz(\d+)', path_lower)
     if m:
         dsz_val = m.group(1)
+
+    # 命名慣例優先（見 _canonical_method）：啟發式會把 Grid_NOGRP_DTW_KAL/VG50/TW63
+    # 一律壓成 "DTW"、Grid_AGG_SSD_DRL/CHARS 壓成 "SSD"，並有 34% 落入 "Unknown"。
+    _canon = _canonical_method(path)
+    if _canon:
+        method = _canon
 
     return dataset, reentry, voladj, method, top_n, sl_pct, zwin, psl_pct, msr_pct, dsz_val
 
@@ -1357,6 +1382,81 @@ def main():
     # ══════════════════════════════════════════════
     # DISPLAY CONTROLS（必須在 display_df 欄位賦值之前）
     # ══════════════════════════════════════════════
+    # ── 方法層級彙總：一個策略一列（每個 METHOD 取指定指標最佳的那一格）──────
+    # 主表為 config 層級（912 列），要看「各個策略」得逐一篩選。此處提供
+    # 一個策略一列的總覽，並可切換「以哪個指標選出代表格」。
+    with st.expander("📊 Strategy Summary — one row per method", expanded=True):
+        _sum_src = filtered_df
+        if _sum_src.empty or 'METHOD' not in _sum_src.columns:
+            st.info("No strategies match the current filters.")
+        else:
+            _RANK_OPTS = {
+                "Sharpe":            "Sharpe_Raw",
+                "Ann. Return":       "Ann_Ret_Raw",
+                "Final Equity":      "Final_Equity",
+                "Calmar":            "Calmar_Raw",
+                "Ann. Ret Employed": "Ann_Ret_Employed",
+                "Profit Factor":     "Profit_Factor",
+            }
+            sc1, sc2 = st.columns([1, 3])
+            with sc1:
+                _rank_lab = st.selectbox("Best cell chosen by", list(_RANK_OPTS),
+                                         key="summary_rank_metric")
+            _rank_col = _RANK_OPTS[_rank_lab]
+            if _rank_col not in _sum_src.columns:
+                st.info(f"Column {_rank_col} not available.")
+            else:
+                _v = pd.to_numeric(_sum_src[_rank_col], errors='coerce')
+                _best_idx = _v.groupby(_sum_src['METHOD']).idxmax().dropna()
+                _b = _sum_src.loc[_best_idx].copy()
+
+                def _pc(col):
+                    return pd.to_numeric(_b.get(col, np.nan), errors='coerce') * 100
+
+                _out = pd.DataFrame({
+                    'METHOD':            _b['METHOD'],
+                    'BEST CELL':         (_b.get('TOP N', '').astype(str) + ' / SL' +
+                                          _b.get('STOP LOSS %', '').astype(str)),
+                    'TRADE':             _b.get('TRADE_METHOD', ''),
+                    'ANN. RETURN (%)':   _pc('Ann_Ret_Raw'),
+                    'SHARPE':            pd.to_numeric(_b.get('Sharpe_Raw', np.nan), errors='coerce'),
+                    'SORTINO':           pd.to_numeric(_b.get('Sortino_Raw', np.nan), errors='coerce'),
+                    'CALMAR':            pd.to_numeric(_b.get('Calmar_Raw', np.nan), errors='coerce'),
+                    'MAX DD (%)':        _pc('MDD_Raw'),
+                    'ANN. RET EMPL (%)': _pc('Ann_Ret_Employed'),
+                    'UTILIZATION (%)':   _pc('Avg_Utilization'),
+                    'WIN RATE (%)':      _pc('Win_Rate'),
+                    'PROFIT FACTOR':     pd.to_numeric(_b.get('Profit_Factor', np.nan), errors='coerce'),
+                    'ENTRIES':           pd.to_numeric(_b.get('Entries', np.nan), errors='coerce'),
+                    'FINAL EQUITY ($)':  pd.to_numeric(_b.get('Final_Equity', np.nan), errors='coerce'),
+                }).sort_values(_rank_lab if _rank_lab in ('SHARPE',) else 'SHARPE',
+                               ascending=False, na_position='last')
+                _out.insert(0, '#', range(1, len(_out) + 1))
+                st.dataframe(
+                    _out, width="stretch", hide_index=True, height=min(680, 40 + 36 * len(_out)),
+                    column_config={
+                        'ANN. RETURN (%)':   st.column_config.NumberColumn(format="%.3f"),
+                        'SHARPE':            st.column_config.NumberColumn(format="%.3f"),
+                        'SORTINO':           st.column_config.NumberColumn(format="%.3f"),
+                        'CALMAR':            st.column_config.NumberColumn(format="%.3f"),
+                        'MAX DD (%)':        st.column_config.NumberColumn(format="%.2f"),
+                        'ANN. RET EMPL (%)': st.column_config.NumberColumn(format="%.3f"),
+                        'UTILIZATION (%)':   st.column_config.NumberColumn(format="%.1f"),
+                        'WIN RATE (%)':      st.column_config.NumberColumn(format="%.1f"),
+                        'PROFIT FACTOR':     st.column_config.NumberColumn(format="%.3f"),
+                        'ENTRIES':           st.column_config.NumberColumn(format="%d"),
+                        'FINAL EQUITY ($)':  st.column_config.NumberColumn(format="$%.0f"),
+                    })
+                st.caption(
+                    f"{len(_out)} methods · each row is that method's best cell by **{_rank_lab}** "
+                    f"out of its {len(_sum_src)} filtered configurations. "
+                    "低利用率的臂（如 Utilization ≈ 0）其 Ann. Ret Employed 會極大，"
+                    "那是分母近乎零的假象而非績效——請對照 ENTRIES 與 UTILIZATION 一起讀。"
+                )
+                st.download_button("⬇ Download summary CSV",
+                                   _out.to_csv(index=False).encode('utf-8-sig'),
+                                   file_name="strategy_summary.csv", mime="text/csv")
+
     ctrl1, ctrl2, ctrl3 = st.columns(3)
     with ctrl1:
         expand_config = st.toggle("Expand Config Columns", value=False,

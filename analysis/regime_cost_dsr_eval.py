@@ -106,6 +106,55 @@ def load_daily_returns(strategy_ids: list[str], result_db: str = RESULT_DB) -> d
     return {sid: daily[sid].dropna() for sid in daily.columns}
 
 
+# ── 進出場名目額（break-even 的分母）────────────────────────────────
+def traded_notional(path_key: str, top_n: int, trading_window: int = 126,
+                    rolling_step: int = 21, result_db: str = RESULT_DB) -> float:
+    """
+    該策略全期進出場的累計名目額。
+
+    2026-08-26 修正（此前的算法在兩處低估 break-even）：
+
+      其一，**資金基礎**。`portfolio_manager.py:84` 為
+          capital_per_pair = current_equity / max_pairs,  max_pairs = top_n × 並行期數
+      並行期數 = trading_window / rolling_step（現行 126/21 = 6）。
+      舊算法用 `INITIAL_CAPITAL / top_n`，既漏掉並行因子（名目額高估 6 倍），
+      也以初始資金取代逐日權益（權益自 10,000 成長至 22,350，後期被低估）。
+
+      其二，**事件數**。實測 Entries = Exits + Stop_Losses + Forced_Closes——
+      每次進場恰對應一次平倉，故費用事件為 2 × Entries。
+      舊算法用 Entries + Exits，漏計停損與強制平倉的出場費
+      （Top1/SL0 少 17.3%、Top20/SL0 少 23.2%）。
+
+    兩者方向相反，但資金基礎的 6 倍主導：修正後 10 條主力臂的往返 break-even
+    一律上升 0.20–0.40 個百分點（`Grid (NOGRP-DTW)` 0.820% → 1.219%）。
+
+    自洽檢驗：把費率設為本函式推得的 break-even，重算期末淨利得 −$9（NOGRP-DTW）
+    與 −$2（GGR），確認歸零。見 dev/breakeven_fix/。
+
+    每筆進場的名目額恰為 capital_per_pair（`_execute_entry` 中 v_a + v_b = cap，
+    而 |shares_a|·p_a = v_a），故以「進場日權益 / max_pairs」逐筆加總後 ×2。
+    """
+    conc = max(1, int(trading_window) // max(1, int(rolling_step)))
+    max_pairs = max(1, int(top_n) * conc)
+    con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
+    try:
+        pnl = pd.read_sql(
+            "SELECT Date, SUM(Daily_Delta) d FROM trade_logs "
+            "WHERE strategy_id = ? GROUP BY Date ORDER BY Date", con, params=(path_key,))
+        ent = pd.read_sql(
+            "SELECT Date, COUNT(*) n FROM trade_logs "
+            "WHERE strategy_id = ? AND Status LIKE 'ENTER%' GROUP BY Date", con,
+            params=(path_key,))
+    finally:
+        con.close()
+    if pnl.empty or ent.empty:
+        return float("nan")
+    pnl["Date"] = pd.to_datetime(pnl.Date); ent["Date"] = pd.to_datetime(ent.Date)
+    eq = INITIAL_CAPITAL + pnl.set_index("Date").d.cumsum()
+    cap_t = (eq / max_pairs).reindex(ent.Date).ffill().bfill()
+    return float((ent.set_index("Date").n * cap_t).sum()) * 2.0
+
+
 # ── Deflated Sharpe Ratio ───────────────────────────────────────────
 def deflated_sharpe(daily_ret: pd.Series, n_trials: int, var_sr_trials: float) -> dict:
     """
@@ -173,13 +222,40 @@ INCOMPLETE_RUNS = {
 # 與寫作當下不同，DSR 表就對不上，而且不會有任何錯誤訊息。
 # 故此處釘死為常數並記錄清點日期；_trial_specs 仍會實地清點作交叉比對，
 # 發現漂移時警告（代表你加了新策略，該重新清點並更新論文的 N）。
-TRIAL_CENSUS_DATE = "2026-08-20"
+TRIAL_CENSUS_DATE = "2026-08-26b"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (44,    0.00008584088699455),
-    "config": (819,   0.00026687963033353),
+    "method": (53,    0.00010258710337016),
+    "config": (1392,  0.00033621469727494),
 }
+# var_sr 的定義（2026-08-26 逆推確認，與 2026-08-20 的釘死值逐位相符）：
+#   method — 每個 METHOD 取其 15 格的**平均** Sharpe_Raw，再取橫斷面變異 ÷ 252
+#   config — 全部回測列的 Sharpe_Raw 橫斷面變異 ÷ 252
+# 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
+# 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-08-26b method 53 / config 1392 —— 交易端參數掃描，method 數不變：
+#               entry_z ∈ {2.5, 3.0} × 4 臂 × 15 格 = 120
+#               dynamic_stop_z ∈ {3,4,5} × 4 臂 × 15 格 = 180
+#               max_holding_days ∈ {21,42,63} × 4 臂 × 15 格 = 180
+#               三者皆為同一 METHOD 下的配置變體（帶 _EZ/_DSZ/_MHD 檔名後綴），
+#               故 method N 維持 53、config N 由 912 增至 1392。
+#               ⚠ method 口徑的 var_sr 仍會變動（0.00010926 → 0.00010259）：
+#               其定義為「每 METHOD 取其全部格的平均 Sharpe」，
+#               四條受影響的臂加入大量負值變體後平均被拉低。
+#   2026-08-26  method 53 / config 912 —— 本次新增九條：
+#               GGR 復現三條（GGR / GGR-DTW / GGR-SDP，各 1 格）、
+#               Kalman 時變對沖比率兩條（KAL / KALINN，各 15 格）、
+#               Regime 條件曝險兩條（VG50 / VG67，各 15 格）、
+#               以及前次的 GICS-SSD-FW504 與 NOGRP-DTW-TW63。
+#               ⚠ 其中 Kalman 與 Regime 四條的預先註冊曾誤記為「未過閘 →
+#               試驗宇宙維持」——**跑了門檻二的回測即進入宇宙，與過閘與否無關**。
+#               僅停在門檻一、從未回測者（方案 A / C / G）才真的不計入。
+#               GGR 三條雖為預先註冊的描述性錨點（明文無成功判準），
+#               仍依 Bailey & López de Prado 的嚴格讀法計入。
+#               影響（實跑值）：門檻 SR0 由 0.328 升至 0.381，
+#               Grid (NOGRP-DTW) 的 DSR 由 0.769 降至 0.674。
+#               全表 48 條策略仍無一達 DSR > 0.95。
 #   2026-08-04  method 101 / config 1869
 #   2026-08-06  method 104 / config 1914 —— 新增 RL-THR 部分回饋對照三條
 #               （Grid (AGG-SSD-RLTHR-E05/E10/E20D)，各 15 格）。
@@ -280,9 +356,8 @@ def run(methods: list[str] = None):
     rows1 = []
     for m, br in best_rows.items():
         top_n = _top_n_int(br["TOP N"])
-        cap_per_pair = INITIAL_CAPITAL / top_n
-        entries, exits = float(br["Entries"]), float(br["Exits"])
-        sigma_notional = cap_per_pair * (entries + exits)
+        # 名目額口徑見 traded_notional 的 docstring（2026-08-26 修正）
+        sigma_notional = traded_notional(br["_path"], top_n)
         p_net = float(br["Final_Equity"]) - INITIAL_CAPITAL
         c_side_be = CURRENT_FEE_SIDE + p_net / sigma_notional if sigma_notional > 0 else np.nan
         rt_be = 2.0 * c_side_be                                            # 往返 break-even

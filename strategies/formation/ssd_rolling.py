@@ -45,6 +45,16 @@ class Formation:
         self.trace = kwargs.get("trace", None)
         # filter_mode="adf_only"：只做 ADF（復現許鈞翔 2025 的篩選層）
         self.adf_only = kwargs.get("adf_only", False)
+        # 正規化口徑（GGR 復現用；預設值使現行行為逐位不變）：
+        #   "zscore_log"  標準化 log 價格 (ln P − μ)/σ ——本研究全部既有策略
+        #   "ggr_index"   累積報酬指數 P_t / P_{t0} ——Gatev et al. (2006) 原文
+        #
+        # 兩者不是外觀差異。對 z 標準化的序列，SSD 與相關係數為仿射恆等
+        # （SSD = 2(T−1)(1−ρ)，5,736 對驗到小數五位 100.00% 成立），故現行的
+        # 「距離排序」實為相關係數排序；GGR 的距離則對「形狀相同、波動不同」
+        # 的配對給出大距離。選出的配對實質不同。詳見 dev/ggr/SPEC.md。
+        self.normalize_mode = kwargs.get("normalize_mode", "zscore_log")
+
         # 候選池上限：None＝不截斷，對群內全部配對施加篩選後才排序（現行預設）。
         #
         # 舊行為為 max(200, top_n*15)：先全域按 SSD 排序、只對最近的那些候選做統計
@@ -61,7 +71,21 @@ class Formation:
         self.selected_pairs: pd.DataFrame = pd.DataFrame()
 
     def normalize_prices(self) -> pd.DataFrame:
-        """將價格轉換為對數價格，並進行 Z-Score 正規化"""
+        """依 normalize_mode 建構正規化價格。
+
+        "zscore_log"（預設）：對數價格的 Z-Score 正規化。
+        "ggr_index"：Gatev et al. (2006) 的累積報酬指數 P_t / P_{t0}，起點 = 1。
+            price_df 由 run_formation 以 iloc[form_start_idx:idx] 切出，
+            故 iloc[0] 即形成期首日。mean_prices 攜出 P_{t0}、std_prices 攜出 1.0，
+            使交易端（distance_trading）能由 Log_Mean/Log_Std 欄位重建同一條 P̃。
+        """
+        if self.normalize_mode == "ggr_index":
+            p0 = self.price_df.iloc[0].replace(0.0, np.nan)
+            self.mean_prices = p0
+            self.std_prices = pd.Series(1.0, index=self.price_df.columns, dtype=float)
+            self.normalized_df = self.price_df.divide(p0, axis=1)
+            return self.normalized_df
+
         log_prices = np.log(np.maximum(self.price_df, 1e-8))
         self.mean_prices = log_prices.mean()
         self.std_prices = log_prices.std()
