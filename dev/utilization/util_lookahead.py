@@ -2,6 +2,7 @@
 """前視檢驗：用「當日占用」定規模等於偷看。改用落後資訊重測。"""
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from strategies.metrics import metrics_from_pnl
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.config import INITIAL_CAPITAL
 TD=252
@@ -15,10 +16,9 @@ for sub,tn,lab in [('Grid_NOGRP_SDP',5,'NOGRP-SDP Top5'),('Grid_NOGRP_SSD',5,'NO
     cap=INITIAL_CAPITAL/(tn*6)
     df=pd.DataFrame({'occ':occ,'pnl':pnl}).dropna(); df=df[df.occ>0]
     print('=== %s ==='%lab)
-    base=INITIAL_CAPITAL+df.pnl.cumsum(); rb=base.pct_change().dropna()
+    _b=metrics_from_pnl(df.pnl)
     print('  【現行】               年化 %+.3f%%  Sharpe %.3f  MDD %.2f%%'%(
-        ((base.iloc[-1]/INITIAL_CAPITAL)**(TD/len(rb))-1)*100,
-        rb.mean()/rb.std(ddof=1)*np.sqrt(TD),(base/base.cummax()-1).min()*100))
+        _b['Ann_Ret_Raw']*100,_b['Sharpe_Raw'],_b['MDD_Raw']*100))
     for lagname, basis in [('當日占用（有前視）', df.occ),
                            ('落後 1 日', df.occ.shift(1)),
                            ('落後 21 日', df.occ.shift(21)),
@@ -27,10 +27,8 @@ for sub,tn,lab in [('Grid_NOGRP_SDP',5,'NOGRP-SDP Top5'),('Grid_NOGRP_SSD',5,'NO
         b=basis.reindex(df.index).ffill().bfill().clip(lower=1)
         scale=(0.85*INITIAL_CAPITAL/(b*cap)).clip(upper=3.0)
         p2=df.pnl*scale
-        eq=INITIAL_CAPITAL+p2.cumsum(); r=eq.pct_change().dropna()
-        ann=(eq.iloc[-1]/INITIAL_CAPITAL)**(TD/len(r))-1
-        sh=r.mean()/r.std(ddof=1)*np.sqrt(TD)
-        mdd=(eq/eq.cummax()-1).min()
+        _m=metrics_from_pnl(p2)
+        ann,sh,mdd=_m['Ann_Ret_Raw'],_m['Sharpe_Raw'],_m['MDD_Raw']
         print('  85%% 曝險 / %-22s 年化 %+.3f%%  Sharpe %.3f  MDD %.2f%%  均倍數 %.2fx'%(
             lagname,ann*100,sh,mdd*100,scale.mean()))
     print()

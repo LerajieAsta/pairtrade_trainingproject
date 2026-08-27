@@ -2,6 +2,7 @@
 """門檻二：regime 閘實跑回測 vs 基準 + 循環 block 置換。依 dev/regime/PREREGISTRATION.md。"""
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from strategies.metrics import metrics_from_returns
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.returns import daily_returns
 from analysis.block_bootstrap import bootstrap_test
@@ -21,7 +22,7 @@ def nw(d):
     d=np.asarray(d,float); d=d[~np.isnan(d)]
     return float(sm.OLS(d,np.ones(len(d))).fit(cov_type='HAC',cov_kwds={'maxlags':21}).pvalues[0])
 def ann(x):
-    x=np.asarray(x,float); return ((1+x).prod())**(TD/len(x))-1
+    return metrics_from_returns(pd.Series(np.asarray(x,float)))['Ann_Ret_Raw']
 
 print('=== 門檻二第 1 項：對基準的年化報酬差 ===')
 for k in ['VG50','VG67']:
@@ -62,7 +63,7 @@ for k,p_ in [('VG50',50),('VG67',67)]:
 print()
 print('=== 逐格 Sharpe（參考）===')
 def sh(s):
-    s=s.dropna(); return s.mean()/s.std(ddof=1)*np.sqrt(TD) if len(s)>20 and s.std()>0 else np.nan
+    return metrics_from_returns(s)['Sharpe_Raw']
 rows=[]
 for t in TOPS:
     for s_ in SLS:

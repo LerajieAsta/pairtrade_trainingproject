@@ -2,6 +2,7 @@
 """零成本情境的 Sharpe：把手續費逐日加回權益曲線。"""
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from strategies.metrics import metrics_from_pnl
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.config import INITIAL_CAPITAL
 TD=252; RDB=r'C:\Clark\YZU\Papper\Code\results\result.db'
@@ -23,11 +24,8 @@ def run(sid, top_n, lab, fee_rates=(0.0029,0.0015,0.0010,0.0005,0.0)):
     for fr in fee_rates:
         add=(fee_events*cap*(0.0029-fr)).reindex(pnl.index).fillna(0.0)
         p=pnl+add
-        eq=INITIAL_CAPITAL+p.cumsum()
-        r=eq.pct_change().dropna()
-        ann=(eq.iloc[-1]/INITIAL_CAPITAL)**(TD/len(r))-1
-        sh=r.mean()/r.std(ddof=1)*np.sqrt(TD)
-        mdd=(eq/eq.cummax()-1).min()
+        _m=metrics_from_pnl(p)
+        ann,sh,mdd=_m['Ann_Ret_Raw'],_m['Sharpe_Raw'],_m['MDD_Raw']
         if base is None: base=sh
         print('   %.2f%%      %+7.3f    %6.3f     %6.2f'%(fr*100,ann*100,sh,mdd*100))
     print()

@@ -5,6 +5,7 @@ W=504 使 2001 全年 12 個視窗歷史不足（run_formation 的守衛），�
 """
 import sys
 sys.path.insert(0, "."); sys.path.insert(0, "analysis")
+from strategies.metrics import metrics_from_returns
 import numpy as np, pandas as pd, sqlite3
 from regime_cost_dsr_eval import load_daily_returns, deflated_sharpe, TRIAL_CENSUS
 
@@ -26,8 +27,10 @@ print(f"FW504 起始交易日 {start.date()}；基準臂一律截自同日重算
 
 
 def sharpe(s):
-    s = s.dropna()
-    return s.mean() / s.std(ddof=1) * np.sqrt(252) if len(s) > 20 else np.nan
+    # 原有 `len(s) > 20` 守衛已移除：實測 345 條序列最短 6,035 日，守衛從未觸發。
+    # 口徑改由 strategies/metrics.py 統一（此前 fw504 用 >20、tw63 用 >100、
+    # regime_cost_dsr_eval 無守衛——三者並存而無人察覺，正因它們都不會生效）。
+    return metrics_from_returns(s)['Sharpe_Raw']
 
 
 rows = []

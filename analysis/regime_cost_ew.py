@@ -46,6 +46,7 @@ from analysis.proposition2_daily_hac import (
     PAIRS, RESULT_DB, baseline_only, _grid_cell, load_daily_sids)
 from analysis.regime_cost_dsr_eval import (
     build_market_regimes, CURRENT_FEE_SIDE, TRADING_DAYS, _top_n_int)
+from strategies.metrics import traded_notional
 from strategies.config import INITIAL_CAPITAL
 
 OUT_DIR = "results/analysis"
@@ -124,8 +125,15 @@ def _breakeven(summ, m2s, method, cells_wanted):
     for _, r in g.iterrows():
         if _grid_cell(r["_path"]) not in cells_wanted:
             continue
-        cap = INITIAL_CAPITAL / _top_n_int(r["TOP N"])
-        notional += cap * (float(r["Entries"]) + float(r["Exits"]))
+        # 名目額改用 regime_cost_dsr_eval.traded_notional（2026-08-27 修正）。
+        # 舊算法在兩處低估 break-even，與該檔 2026-08-26 修正的是同一組錯誤：
+        #   其一，cap = INITIAL_CAPITAL / top_n 漏掉並行期數（max_pairs = top_n × 6），
+        #        且應用逐日權益而非初始資金；
+        #   其二，事件數用 Entries + Exits，漏計停損與強制平倉的出場費
+        #        （實測 Entries = Exits + Stop_Losses + Forced_Closes）。
+        # 當時只修了 regime_cost_dsr_eval.py，本檔被漏掉——而它產生的
+        # breakeven_ew.csv 為論文 4.x 與 5.3「成本餘裕過薄」所引用。
+        notional += traded_notional(r["_path"], _top_n_int(r["TOP N"]))
         net += float(r["Final_Equity"]) - INITIAL_CAPITAL
         n += 1
     if notional <= 0:

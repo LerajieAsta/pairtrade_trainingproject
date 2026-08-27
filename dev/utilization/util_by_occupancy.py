@@ -2,6 +2,7 @@
 """低占用日加碼的風險面：每部位-日報酬的均值與波動。"""
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from strategies.metrics import metrics_from_pnl
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.config import INITIAL_CAPITAL
 TD=252
@@ -30,15 +31,11 @@ for sub,tn,lab in [('Grid_NOGRP_SDP',5,'NOGRP-SDP Top5'),('Grid_NOGRP_SSD',5,'NO
     for target in [0.7,0.85,1.0]:
         scale=(target*INITIAL_CAPITAL/(df.occ*cap)).clip(upper=3.0)   # 上限 3x 防爆
         p2=df.pnl*scale
-        eq=INITIAL_CAPITAL+p2.cumsum()
-        r=eq.pct_change().dropna()
-        ann=(eq.iloc[-1]/INITIAL_CAPITAL)**(TD/len(r))-1
-        sh=r.mean()/r.std(ddof=1)*np.sqrt(TD)
-        mdd=(eq/eq.cummax()-1).min()
+        _m=metrics_from_pnl(p2)
+        ann,sh,mdd=_m['Ann_Ret_Raw'],_m['Sharpe_Raw'],_m['MDD_Raw']
         print('  固定總曝險 %.0f%%：年化 %+.3f%%  Sharpe %.3f  MDD %.2f%%  平均倍數 %.2fx'%(
             target*100,ann*100,sh,mdd*100,scale.mean()))
-    base=INITIAL_CAPITAL+df.pnl.cumsum(); rb=base.pct_change().dropna()
+    _b=metrics_from_pnl(df.pnl)
     print('  【現行】            年化 %+.3f%%  Sharpe %.3f  MDD %.2f%%'%(
-        ((base.iloc[-1]/INITIAL_CAPITAL)**(TD/len(rb))-1)*100,
-        rb.mean()/rb.std(ddof=1)*np.sqrt(TD),(base/base.cummax()-1).min()*100))
+        _b['Ann_Ret_Raw']*100,_b['Sharpe_Raw'],_b['MDD_Raw']*100))
     print()

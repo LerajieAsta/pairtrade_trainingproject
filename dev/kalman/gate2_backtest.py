@@ -2,6 +2,7 @@
 """門檻二：Kalman vs 靜態 beta，逐日抽樣 + block bootstrap。依 dev/kalman/PREREGISTRATION.md。"""
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from strategies.metrics import metrics_from_returns
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.returns import daily_returns
 from analysis.block_bootstrap import bootstrap_test
@@ -44,7 +45,7 @@ for lab in ARMS:
 print()
 print('=== 逐格 Sharpe 對照（參考，非判準）===')
 def sh(s):
-    s=s.dropna(); return s.mean()/s.std(ddof=1)*np.sqrt(252) if len(s)>20 and s.std()>0 else np.nan
+    return metrics_from_returns(s)['Sharpe_Raw']
 rows=[]
 for c in cells:
     row={'格':c,'靜態':round(sh(R[ids[('base',c)]]),3)}

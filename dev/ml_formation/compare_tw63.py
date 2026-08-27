@@ -5,6 +5,7 @@
 """
 import sys
 sys.path.insert(0, "."); sys.path.insert(0, "analysis")
+from strategies.metrics import metrics_from_returns
 import numpy as np, pandas as pd, sqlite3
 import statsmodels.api as sm
 from regime_cost_dsr_eval import load_daily_returns, deflated_sharpe, TRIAL_CENSUS
@@ -30,8 +31,8 @@ print(f"共同交易日區間 {lo.date()} ~ {hi.date()}\n")
 
 
 def sh(s):
-    s = s.dropna()
-    return s.mean() / s.std(ddof=1) * np.sqrt(252) if len(s) > 100 else np.nan
+    # 原有 `len(s) > 100` 守衛已移除，理由同 compare_fw504.sharpe。
+    return metrics_from_returns(s)['Sharpe_Raw']
 
 
 rows = []

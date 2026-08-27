@@ -2,6 +2,7 @@
 """門檻一：regime 曝險疊加 vs 循環 block 置換。依 dev/regime/PREREGISTRATION.md。"""
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from strategies.metrics import metrics_from_returns
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.config import DB_PATH, TABLE_NAME
 from strategies.returns import daily_returns
@@ -29,8 +30,8 @@ for t in TOPS:
 ret=pd.concat(cols,axis=1).mean(axis=1).dropna()
 print('基準逐日報酬 %d 日'%len(ret))
 
-def ann(x): 
-    x=np.asarray(x,float); return ((1+x).prod())**(TD/len(x))-1
+def ann(x):
+    return metrics_from_returns(pd.Series(np.asarray(x,float)))['Ann_Ret_Raw']
 
 def circ_perm(g, L, B, rng):
     """循環 block 置換：保留跳過率與叢集結構，只打亂時點。"""
