@@ -2,17 +2,12 @@
 """機制檢驗：模型是否偏好「發散幅度小」的配對？"""
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from scipy.stats import spearmanr
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
-pool=pd.read_parquet(f'{C}/pool.parquet',
-      columns=['Period_Start','Ticker_A','Ticker_B','SSD','adf_pass','label_valid',
-               'not_converged','capture_frac','z_entry','days_to_conv','Spread_Std'])
 K=['Period_Start','Ticker_A','Ticker_B']
-d=(pool.merge(pd.read_parquet(f'{C}/scores.parquet'),on=K)
-        .merge(pd.read_parquet(f'{C}/m3_scores.parquet'),on=K))
-d=d[(d.adf_pass==1)&d.label_valid].dropna(subset=['score_M1','score_M3','capture_frac','z_entry'])
-d['ssd_rank']=d.groupby('Period_Start').SSD.rank(method='first')
+d=with_model_scores(selection_region())
 t=d[d.ssd_rank<=40].copy()
 t['abs_z_entry']=t.z_entry.abs()
 print('SSD 前 40 名、%d 期、%d 列'%(t.Period_Start.nunique(),len(t)))

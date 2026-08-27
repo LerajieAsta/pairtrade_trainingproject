@@ -2,6 +2,7 @@
 """方案 B 診斷：形成期 beta 與交易期實現 beta 的漂移。"""
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.config import (DB_PATH, TABLE_NAME, BACKTEST_START, BACKTEST_END,
                                FORMATION_WINDOW, FORWARD_DAYS)
@@ -13,12 +14,8 @@ pp, ad, td, fi = proc.prepare_backtest_data(BACKTEST_START, BACKTEST_END, FORMAT
 dstr=np.array(pd.DatetimeIndex(ad).strftime('%Y-%m-%d'))
 pos={s:i for i,s in enumerate(dstr)}
 
-d=pd.read_parquet(f'{C}/pool.parquet',
-   columns=['Period_Start','Ticker_A','Ticker_B','SSD','adf_pass','label_valid',
-            'not_converged','capture_frac','Hedge_Ratio'])
-d=d[(d.adf_pass==1)&d.label_valid].copy()
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
-t=d[d.r<=20]
+d=selection_region()
+t=d[d.ssd_rank<=20]
 print('樣本：SSD top-20、%d 期、%d 對'%(t.Period_Start.nunique(),len(t)))
 
 def zb(P):                       # 管線的口徑：形成窗內 z 標準化 log 價，再 OLS

@@ -2,27 +2,15 @@
 """方案 A：模型當否決權。依 dev/ml_formation/PREREGISTRATION_FILTER.md 執行。"""
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from scipy.stats import ttest_rel
 from sklearn.metrics import roc_auc_score
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
 
-pool=pd.read_parquet(f'{C}/pool.parquet',
-      columns=['Period_Start','Ticker_A','Ticker_B','SSD','adf_pass',
-               'label_valid','not_converged','capture_frac'])
-s1=pd.read_parquet(f'{C}/scores.parquet')
-s3=pd.read_parquet(f'{C}/m3_scores.parquet')
-K=['Period_Start','Ticker_A','Ticker_B']
-d=pool.merge(s1,on=K,how='inner').merge(s3,on=K,how='inner')
-print('合併後 %d 列，%d 期'%(len(d), d.Period_Start.nunique()))
-
-# 暖身 36 期無分數（前推協定所致，與梯子相同）：一律排除
-d=d[(d.adf_pass==1)&(d.label_valid)].copy()
-_n0=len(d)
-d=d.dropna(subset=['score_M1','score_M3','capture_frac'])
-print('去除暖身期／無效捕獲後：%d 列（-%d），%d 期'%(len(d),_n0-len(d),d.Period_Start.nunique()))
+pool=selection_region()
+d=with_model_scores(pool)
 print('ADF 通過且標籤有效：%d 列，%d 期'%(len(d), d.Period_Start.nunique()))
-d['ssd_rank']=d.groupby('Period_Start').SSD.rank(method='first')
 
 # ── 門檻一：模型在 SSD 前 40 名內的 AUC ─────────────────────────
 print()

@@ -2,6 +2,7 @@
 """以監督回歸學習逐對門檻。依 dev/action_learn/PREREGISTRATION.md。"""
 import sys, numpy as np, pandas as pd, warnings
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 warnings.filterwarnings('ignore')
 from scipy.stats import ttest_rel
@@ -9,20 +10,20 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
 K=['Period_Start','Ticker_A','Ticker_B']
 es=pd.read_parquet(f'{C}/exit_scan.parquet'); caps=[c for c in es.columns if c.startswith('cap_e')]
-tr=pd.read_parquet(f'{C}/train.parquet')
+tr=selection_region(with_features=True)
 d=tr.merge(es[K+caps],on=K,how='inner')
-d=d[(d.adf_pass==1)&d.label_valid].copy()
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
 per=sorted(d.Period_Start.unique()); pidx={p:i for i,p in enumerate(per)}
 d['pi']=d.Period_Start.map(pidx)
 Y=np.where(np.isnan(d[caps].to_numpy(dtype=float)),0.0,d[caps].to_numpy(dtype=float))
-drop=set(K+caps+['Trade_Start','Group','r','pi','label_valid','not_converged','capture_frac',
+# ssd_rank 是選取用的排名，不是特徵。selection_region() 會加這一欄，
+# 而本檔以排除法建特徵清單——漏掉它會讓模型拿排名當特徵訓練（實測 p 由 0.0004 變 0.0014）。
+drop=set(K+caps+['Trade_Start','Group','r','ssd_rank','pi','label_valid','not_converged','capture_frac',
                  'entry_day','conv_day','days_to_conv','n_cross_trade','z_end','z_entry','valid_days'])
 feats=[c for c in d.columns if c not in drop and pd.api.types.is_numeric_dtype(d[c])]
 X=d[feats].to_numpy(dtype=np.float32)
 print('特徵 %d 維、動作 %d 個、樣本 %d 列、%d 期'%(len(feats),len(caps),len(d),len(per)))
 WARM,RETRAIN,PURGE=36,12,6
-pi=d.pi.values; top5=(d.r<=5).values
+pi=d.pi.values; top5=(d.ssd_rank<=5).values
 rows=[]; models=None; last=-999
 for t in range(WARM,len(per)):
     if models is None or t-last>=RETRAIN:

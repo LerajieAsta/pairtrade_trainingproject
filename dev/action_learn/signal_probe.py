@@ -2,18 +2,17 @@
 """探針：最佳動作是否與可觀測特徵相關（決定是否投入完整前推）。"""
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from scipy.stats import spearmanr
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
 K=['Period_Start','Ticker_A','Ticker_B']
 es=pd.read_parquet(f'{C}/exit_scan.parquet')
-tr=pd.read_parquet(f'{C}/train.parquet')
+tr=selection_region(with_features=True)
 caps=[c for c in es.columns if c.startswith('cap_e')]
 es=es[K+caps]
 d=tr.merge(es,on=K,how='inner')
-d=d[(d.adf_pass==1)&d.label_valid].copy()
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
-d=d[d.r<=5]
+d=d[d.ssd_rank<=5]
 M=np.where(np.isnan(d[caps].to_numpy(dtype=float)),0.0,d[caps].to_numpy(dtype=float))
 best=np.argmax(M,axis=1)
 d['best_ez']=[float(caps[i].split('_')[1][1:]) for i in best]

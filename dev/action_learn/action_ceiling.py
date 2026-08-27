@@ -2,19 +2,18 @@
 """任何門檻選擇演算法的天花板：完美預知的逐對動作 vs 最佳常數動作。"""
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
 d=pd.read_parquet(f'{C}/exit_scan.parquet')
-p=pd.read_parquet(f'{C}/pool.parquet',columns=['Period_Start','Ticker_A','Ticker_B','SSD','adf_pass','label_valid'])
+p=selection_region()
 K=['Period_Start','Ticker_A','Ticker_B']
 d=d.drop(columns=[c for c in ('SSD','adf_pass') if c in d.columns]).merge(p,on=K,how='inner')
-d=d[(d.adf_pass==1)&d.label_valid]
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
 caps=[c for c in d.columns if c.startswith('cap_e')]
 print('動作數（entry_z × exit_z 組合）: %d'%len(caps))
 print('候選: %s ...'%caps[:4])
 for TOPN in [1,5,20]:
-    sub=d[d.r<=TOPN].dropna(subset=caps)
+    sub=d[d.ssd_rank<=TOPN].dropna(subset=caps)
     if sub.empty: continue
     M=sub[caps].to_numpy()
     per=sub.Period_Start.values

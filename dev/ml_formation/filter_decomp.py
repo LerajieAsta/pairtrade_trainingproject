@@ -1,26 +1,22 @@
 # -*- coding: utf-8 -*-
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
-pool=pd.read_parquet(f'{C}/pool.parquet',
-  columns=['Period_Start','Ticker_A','Ticker_B','SSD','adf_pass','label_valid',
-           'not_converged','capture_frac'])
+pool=selection_region()
 K=['Period_Start','Ticker_A','Ticker_B']
-d=(pool.merge(pd.read_parquet(f'{C}/scores.parquet'),on=K)
-        .merge(pd.read_parquet(f'{C}/m3_scores.parquet'),on=K))
-d=d[(d.adf_pass==1)&d.label_valid].dropna(subset=['score_M1','score_M3','capture_frac'])
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
+d=with_model_scores(pool)
 print('=== SSD 名次帶的水準（259 期）===')
 print('  名次帶      平均capture   未收斂率')
 for lo,hi in [(1,20),(21,40),(41,60),(61,100)]:
-    b=d[(d.r>=lo)&(d.r<=hi)]
+    b=d[(d.ssd_rank>=lo)&(d.ssd_rank<=hi)]
     print('  %3d–%-3d    %+.6f     %.4f'%(lo,hi,b.capture_frac.mean(),b.not_converged.mean()))
 print()
 print('=== 分解 N=40 的否決結果（對 SSD top-20 的差）===')
-base=d[d.r<=20].groupby('Period_Start').capture_frac.mean()
+base=d[d.ssd_rank<=20].groupby('Period_Start').capture_frac.mean()
 for m in ['score_M1','score_M3']:
-    sub=d[d.r<=40]
+    sub=d[d.ssd_rank<=40]
     sel=sub.sort_values(['Period_Start',m]).groupby('Period_Start').head(20)
     got=sel.groupby('Period_Start').capture_frac.mean()
     pool40=sub.groupby('Period_Start').capture_frac.mean()   # top-40 全體平均＝隨機取 20 的期望

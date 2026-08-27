@@ -3,6 +3,7 @@
 依 dev/kalman/PREREGISTRATION.md。濾波僅用 t 之前資料。"""
 import sys, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from scipy.stats import ttest_rel
 from strategies.config import (DB_PATH, TABLE_NAME, BACKTEST_START, BACKTEST_END,
@@ -14,11 +15,8 @@ proc=DataProcessor(db_path=DB_PATH, table_name=TABLE_NAME)
 pp, ad, td, fi = proc.prepare_backtest_data(BACKTEST_START, BACKTEST_END, FORMATION_WINDOW)
 dstr=np.array(pd.DatetimeIndex(ad).strftime('%Y-%m-%d')); pos={s:i for i,s in enumerate(dstr)}
 
-d=pd.read_parquet(f'{C}/pool.parquet',
-   columns=['Period_Start','Ticker_A','Ticker_B','SSD','adf_pass','label_valid'])
-d=d[(d.adf_pass==1)&d.label_valid].copy()
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
-t=d[d.r<=20]
+d=selection_region()
+t=d[d.ssd_rank<=20]
 
 def kalman(za, zb, a0, b0, R, Q):
     """回傳 beta_t 序列（每個 t 的事前估計，只用 t 之前的觀測）。"""

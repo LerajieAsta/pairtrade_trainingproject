@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import sys, sqlite3, numpy as np, pandas as pd
 sys.path.insert(0, r'C:\Clark\YZU\Papper\Code')
+from dev.ml_formation.selection import selection_region, with_model_scores
 if hasattr(sys.stdout,'reconfigure'): sys.stdout.reconfigure(encoding='utf-8')
 from strategies.config import DB_PATH, TABLE_NAME
 TD=252
@@ -26,11 +27,8 @@ print('  全樣本 Turbulent 佔比 %.1f%%   擴張窗 Turbulent 佔比 %.1f%%'%
 print()
 # ── 事實二：選中配對的價差波動離散度（等額配置是否等於等風險）──
 C=r'C:\Clark\YZU\Papper\Code\dev\ml_formation\cache'
-d=pd.read_parquet(f'{C}/pool.parquet',
-  columns=['Period_Start','SSD','adf_pass','label_valid','Spread_Std_exact','capture_frac','Hedge_Ratio'])
-d=d[(d.adf_pass==1)&d.label_valid].copy()
-d['r']=d.groupby('Period_Start').SSD.rank(method='first')
-t=d[d.r<=20]
+d=selection_region()
+t=d[d.ssd_rank<=20]
 g=t.groupby('Period_Start').Spread_Std_exact
 ratio=(g.max()/g.min().clip(1e-9))
 print('=== 事實二：top-20 內價差波動的離散度（等額配置 ≠ 等風險？）===')
