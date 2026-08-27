@@ -2201,7 +2201,7 @@ margin-right: 0; }
 </div>
 </div>
 </div>
-<p><strong>Deflated Sharpe</strong>（<span class="math inline">N</span>=44、<span class="math inline">SR_0</span>=0.328）：最高 <strong>0.769</strong>，<strong>無一通過 0.95</strong>。</p>
+<p><strong>Deflated Sharpe</strong>（<span class="math inline">N</span>=53、<span class="math inline">SR_0</span>=0.37）：最高 <strong>0.900</strong>（形成窗 504 對照臂），<strong>無一通過 0.95</strong>；該臂後半期 Sharpe 為 −0.395。</p>
 </section>
 <section id="相對比較與絕對績效是兩件事" class="slide level2">
 <h2>相對比較與絕對績效是兩件事</h2>
@@ -2359,93 +2359,101 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative × SSD</td>
-<td style="text-align: center;">−0.81</td>
-<td style="text-align: center;">−0.60</td>
-<td style="text-align: center;">0.79</td>
-<td style="text-align: center;">−0.23</td>
-<td style="text-align: center;">0.41</td>
+<td style="text-align: center;">−0.47</td>
+<td style="text-align: center;">−0.66</td>
+<td style="text-align: center;">0.55</td>
+<td style="text-align: center;">−0.07</td>
+<td style="text-align: center;">0.03</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative <strong>+ DL-THR</strong></td>
-<td style="text-align: center;"><strong>−0.38</strong></td>
-<td style="text-align: center;"><strong>−0.36</strong></td>
-<td style="text-align: center;"><strong>0.95</strong></td>
-<td style="text-align: center;"><strong>+0.08</strong></td>
-<td style="text-align: center;"><strong>0.59</strong></td>
+<td style="text-align: center;"><strong>−0.23</strong></td>
+<td style="text-align: center;"><strong>−0.43</strong></td>
+<td style="text-align: center;">0.31</td>
+<td style="text-align: center;"><strong>+0.02</strong></td>
+<td style="text-align: center;">0.00</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN × SDP</td>
-<td style="text-align: center;">−0.64</td>
-<td style="text-align: center;">−0.55</td>
-<td style="text-align: center;">0.63</td>
-<td style="text-align: center;">−0.17</td>
-<td style="text-align: center;">0.29</td>
+<td style="text-align: center;">−0.42</td>
+<td style="text-align: center;">−0.85</td>
+<td style="text-align: center;">0.52</td>
+<td style="text-align: center;">−0.20</td>
+<td style="text-align: center;">0.13</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN <strong>+ DL-THR</strong></td>
-<td style="text-align: center;"><strong>−0.20</strong></td>
-<td style="text-align: center;"><strong>−0.09</strong></td>
-<td style="text-align: center;"><strong>0.66</strong></td>
-<td style="text-align: center;"><strong>+0.15</strong></td>
-<td style="text-align: center;"><strong>0.46</strong></td>
+<td style="text-align: center;"><strong>−0.19</strong></td>
+<td style="text-align: center;"><strong>−0.45</strong></td>
+<td style="text-align: center;">0.44</td>
+<td style="text-align: center;"><strong>−0.05</strong></td>
+<td style="text-align: center;"><strong>0.25</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means × SSD</td>
-<td style="text-align: center;">−0.71</td>
-<td style="text-align: center;">−0.60</td>
-<td style="text-align: center;">0.41</td>
-<td style="text-align: center;">−0.22</td>
-<td style="text-align: center;">−0.02</td>
+<td style="text-align: center;">−0.45</td>
+<td style="text-align: center;">−0.90</td>
+<td style="text-align: center;">0.26</td>
+<td style="text-align: center;">−0.30</td>
+<td style="text-align: center;">−0.21</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">K-means <strong>+ DL-THR</strong></td>
+<td style="text-align: center;"><strong>−0.06</strong></td>
 <td style="text-align: center;"><strong>−0.55</strong></td>
-<td style="text-align: center;"><strong>−0.12</strong></td>
-<td style="text-align: center;"><strong>0.48</strong></td>
-<td style="text-align: center;"><strong>−0.03</strong></td>
-<td style="text-align: center;"><strong>0.29</strong></td>
+<td style="text-align: center;">0.11</td>
+<td style="text-align: center;"><strong>−0.10</strong></td>
+<td style="text-align: center;"><strong>−0.13</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">GICS × SSD</td>
-<td style="text-align: center;">−1.24</td>
-<td style="text-align: center;">−0.52</td>
-<td style="text-align: center;">0.54</td>
-<td style="text-align: center;">−0.44</td>
-<td style="text-align: center;">0.31</td>
+<td style="text-align: center;">−0.41</td>
+<td style="text-align: center;">−0.50</td>
+<td style="text-align: center;">0.77</td>
+<td style="text-align: center;">−0.10</td>
+<td style="text-align: center;">0.46</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS × SSD <strong>+ DL-THR</strong></td>
-<td style="text-align: center;"><strong>−0.72</strong></td>
-<td style="text-align: center;"><strong>−0.15</strong></td>
-<td style="text-align: center;"><strong>0.70</strong></td>
-<td style="text-align: center;"><strong>−0.04</strong></td>
-<td style="text-align: center;"><strong>0.52</strong></td>
+<td style="text-align: center;"><strong>−0.23</strong></td>
+<td style="text-align: center;"><strong>−0.26</strong></td>
+<td style="text-align: center;">0.75</td>
+<td style="text-align: center;"><strong>+0.04</strong></td>
+<td style="text-align: center;"><strong>0.58</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">GICS × SDP</td>
-<td style="text-align: center;">−0.69</td>
-<td style="text-align: center;">−0.77</td>
-<td style="text-align: center;">0.68</td>
-<td style="text-align: center;">−0.27</td>
-<td style="text-align: center;">0.31</td>
+<td style="text-align: center;">−0.25</td>
+<td style="text-align: center;">−0.47</td>
+<td style="text-align: center;">0.76</td>
+<td style="text-align: center;">−0.02</td>
+<td style="text-align: center;">0.45</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS × SDP <strong>+ DL-THR</strong></td>
-<td style="text-align: center;"><strong>−0.49</strong></td>
-<td style="text-align: center;"><strong>−0.32</strong></td>
-<td style="text-align: center;"><strong>0.75</strong></td>
-<td style="text-align: center;"><strong>−0.01</strong></td>
-<td style="text-align: center;"><strong>0.47</strong></td>
+<td style="text-align: center;"><strong>−0.05</strong></td>
+<td style="text-align: center;"><strong>−0.15</strong></td>
+<td style="text-align: center;">0.68</td>
+<td style="text-align: center;"><strong>+0.14</strong></td>
+<td style="text-align: center;"><strong>0.50</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>DL-THR 在 25 個 regime 格中改善 25 格、劣化 0 格。</strong> 交易層 的增益不依賴特定市場環境。</p>
-<p><strong>同時揭露一項策略層面的限制</strong>：配對交易的獲利完全集中於 <strong>高波動與空頭</strong>環境；<strong>平靜期十組配置全部為負 Sharpe</strong>（−1.24 ~ −0.20）， DL-THR 只能減輕虧損而無法反轉。 此與本研究另一項發現一致：損益集中於高分散度期間（附錄 D 的 regime 閘門依據）。</p>
+<p><strong>DL-THR 在 25 個 regime 格中改善 19 格、劣化 6 格。</strong> 劣化的 6 格中有 5 格落在 Turbulent——即原本就獲利的那一檔； 改善集中於虧損較大的 Calm 與 Normal。</p>
+<p><strong>同時揭露一項策略層面的限制</strong>：配對交易的獲利完全集中於 <strong>高波動與空頭</strong>環境；<strong>平靜期十組配置全部為負 Sharpe</strong>（−0.47 ~ −0.05）， DL-THR 只能減輕虧損而無法反轉。 此與本研究另一項發現一致：損益集中於高分散度期間（附錄 D 的 regime 閘門依據）。</p>
 </section>
 <section id="成本敏感度break-even-分析" class="slide level2">
 <h2>成本敏感度：Break-even 分析</h2>
 <p>成本模型可解析求解——進出場費用 = friction × 名目額， 且每配對名目額恰等於每配對資金，故往返 break-even <span class="math inline">c^* = 2\,(0.29\% +     ext{淨利} / \Sigma    ext{名目額})</span>。</p>
 <table class="caption-top">
+<colgroup>
+<col style="width: 13%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+<col style="width: 17%">
+</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">配對底</th>
@@ -2459,59 +2467,60 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative × SSD</td>
-<td style="text-align: center;">0.582%</td>
-<td style="text-align: center;"><strong>0.601%</strong></td>
-<td style="text-align: center;">+1.9</td>
-<td style="text-align: center;">+0.2</td>
-<td style="text-align: center;"><strong>+2.1</strong></td>
+<td style="text-align: center;">0.555%</td>
+<td style="text-align: center;"><strong>0.567%</strong></td>
+<td style="text-align: center;">+1.2</td>
+<td style="text-align: center;"><strong>−2.5</strong></td>
+<td style="text-align: center;"><strong>−1.3</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN × SDP</td>
-<td style="text-align: center;">0.582%</td>
-<td style="text-align: center;"><strong>0.604%</strong></td>
-<td style="text-align: center;">+2.1</td>
-<td style="text-align: center;">+0.2</td>
-<td style="text-align: center;"><strong>+2.4</strong></td>
+<td style="text-align: center;">0.519%</td>
+<td style="text-align: center;"><strong>0.690%</strong></td>
+<td style="text-align: center;">+17.0</td>
+<td style="text-align: center;"><strong>−6.1</strong></td>
+<td style="text-align: center;">+11.0</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means × SSD</td>
-<td style="text-align: center;">0.562%</td>
-<td style="text-align: center;"><strong>0.591%</strong></td>
-<td style="text-align: center;">+2.9</td>
-<td style="text-align: center;"><strong>−1.8</strong></td>
-<td style="text-align: center;">+1.1</td>
+<td style="text-align: center;">0.391%</td>
+<td style="text-align: center;"><strong>0.444%</strong></td>
+<td style="text-align: center;">+5.3</td>
+<td style="text-align: center;"><strong>−18.9</strong></td>
+<td style="text-align: center;"><strong>−13.6</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS × SSD</td>
-<td style="text-align: center;">0.568%</td>
-<td style="text-align: center;"><strong>0.594%</strong></td>
-<td style="text-align: center;">+2.7</td>
-<td style="text-align: center;"><strong>−1.2</strong></td>
-<td style="text-align: center;">+1.4</td>
+<td style="text-align: center;">0.676%</td>
+<td style="text-align: center;"><strong>0.920%</strong></td>
+<td style="text-align: center;">+24.4</td>
+<td style="text-align: center;">+9.6</td>
+<td style="text-align: center;"><strong>+34.0</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">GICS × SDP</td>
-<td style="text-align: center;">0.576%</td>
-<td style="text-align: center;"><strong>0.592%</strong></td>
-<td style="text-align: center;">+1.6</td>
-<td style="text-align: center;"><strong>−0.4</strong></td>
-<td style="text-align: center;">+1.2</td>
+<td style="text-align: center;">0.711%</td>
+<td style="text-align: center;"><strong>0.924%</strong></td>
+<td style="text-align: center;">+21.3</td>
+<td style="text-align: center;">+13.1</td>
+<td style="text-align: center;"><strong>+34.4</strong></td>
 </tr>
 </tbody>
 </table>
 <p><em>往返 break-even 成本；現行假設 0.58%（單邊 0.29%，Do &amp; Faff 2012）。 口徑：15 格等權、逐格對齊兩臂</em></p>
-<p><strong>DL-THR 在五種配對底上一致提高成本承受度</strong>（+1.6 ~ +2.9 bps）。機制為 SKIP 與 較高的進場門檻共同減少交易次數，使同樣的毛利分攤在更少的名目額上。</p>
+<p><strong>DL-THR 在五種配對底上一致提高成本承受度</strong>（+1.2 ~ +24.4 bps）。機制為 SKIP 與 較高的進場門檻共同減少交易次數，使同樣的毛利分攤在更少的名目額上。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>但餘裕本身薄到接近於零</strong></p>
+<p><strong>但餘裕的離散程度遠大於中心水準</strong></p>
 </div>
 <div class="callout-content">
-<p>十組配置的餘裕介於 <strong>−1.8 ~ +2.4 bps</strong>，且 <strong>K-means／GICS-SSD／GICS-SDP 三個 Z-Score 臂已經為負</strong>——現行假設下它們本來就不獲利。 DL-THR 把五個配對底全部推回正值，幅度僅 1~2 bps。</p>
-<p><strong>本研究之結論應限於方法間的相對比較。</strong></p>
+<p>十組配置的餘裕介於 <strong>−18.9 ~ +34.4 bps</strong>，全距 53 bps， 幾與成本假設本身（58 bps）同量級。</p>
+<p><strong>三個資料驅動分群底的 Z-Score 臂已經為負</strong>——現行假設下它們本來就不獲利， 且 DL-THR 只把其中一條（HDBSCAN）推回正值。 兩條 GICS 底加 DL-THR 則達 +34 bps，在成本維度上站得住。</p>
+<p><strong>成本可行性取決於配對底，不是全篇一致的結論。</strong></p>
 </div>
 </div>
 </div>
