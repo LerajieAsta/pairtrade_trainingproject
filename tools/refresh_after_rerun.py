@@ -39,6 +39,11 @@ if hasattr(sys.stdout, "reconfigure"):
 
 RESULT_DB = "results/result.db"
 CACHE = "results/analysis/daily_returns_mainaxis.parquet"
+#: 第二份同樣「只以 strategy_id 為鍵、無上游指紋」的快取（prop2_skip_permutation
+#: 的配對期損益）。2026-09-08 補進本工具——它原本不在，於是 2026-09-04 的對沖
+#: 修正重跑之後，SKIP 置換檢定仍在讀 9/1 聚合的舊 DRL 配對期損益，
+#: 且不會有任何錯誤訊息。與 CACHE 是同一類失效，處置也相同。
+PP_CACHE = "results/analysis/pairperiod_pnl_mainaxis.parquet"
 
 # 重算順序：命題 1 先，因為它決定其餘敘述怎麼寫（基本面回補後結論可能翻轉）
 PIPELINE = [
@@ -52,9 +57,45 @@ PIPELINE = [
     ("命題 2 SKIP 置換",   "analysis.prop2_skip_permutation"),
     ("命題 2 標籤資訊",    "analysis.prop2_label_information"),
     ("命題 2 行為解析",    "analysis.drl_behavior"),
+    ("命題 2 分層統計",    "analysis.proposition2_stats"),
+    # prop1_han_chain 需在 proposition2_daily_hac 之後（它 import 後者）。
+    ("命題 1 Han 歸因鏈",  "analysis.prop1_han_chain"),
+    ("HSU25 進場時點",     "analysis.hsu25_entry_timing"),
     ("組合系統",           "analysis.prop3_combined_system"),
     ("regime / 成本 / DSR", "analysis.regime_cost_dsr_eval"),
+    # 2026-08-27 新增的等權口徑；其 breakeven_ew.csv 為論文 5.3 引用的表。
+    # 2026-08-28 補進本清單——它一直不在，重跑後會靜默留著舊數字。
+    ("regime / 成本（等權）", "analysis.regime_cost_ew"),
+    ("敏感度",             "analysis.sensitivity_report"),
+    # 2026-09-08 新增。論文 4.4.3 的「期末強平後是否回歸」原本是一次性腳本、
+    # 未進版本庫，2026-08-13 result.db 重建後該數字已無法重算。補成模組並入列。
+    ("期末強平後續",       "analysis.forced_close_followup"),
+    # 2026-09-08 新增。論文 4.6.4「以全期 Sharpe 挑選會挑到已在後半期失效的策略」
+    # 原本也是一次性腳本、未進版本庫。需在 regime_cost_dsr_eval 之後（吃它補齊的快取）。
+    ("前後半分割",         "analysis.split_half"),
+    # 2026-09-08 新增。論文 4.4.1 的「收斂獲利 vs 期末強平」兩股流量分解，
+    # 原本也是一次性腳本、未進版本庫，輸出停在 2026-08-17。
+    ("出場別損益分解",     "analysis.exit_status_decomp"),
 ]
+
+#: 讀回測結果但**不可獨立執行**的函式庫模組，由上列腳本 import。
+#: 列在這裡只為說明「為何它不在 PIPELINE」，不是遺漏。
+_LIBRARY_ONLY = ("analysis.block_bootstrap",)
+
+
+def _invalidate_pairperiod(live_sids: set, dry_run: bool) -> None:
+    """配對期損益快取的失效——與逐日快取同理，但它是**列**而非欄。"""
+    if not os.path.exists(PP_CACHE):
+        print(f"找不到 {PP_CACHE}，無需失效")
+        return
+    pp = pd.read_parquet(PP_CACHE)
+    hit = pp.strategy_id.isin(live_sids)
+    print(f"配對期快取 {pp.strategy_id.nunique()} 條 strategy_id／{len(pp):,} 列")
+    print(f"  現役（本次重跑過）→ 失效  {int(pp.loc[hit, 'strategy_id'].nunique()):>5} 條")
+    if dry_run or not hit.any():
+        return
+    pp[~hit].to_parquet(PP_CACHE)
+    print(f"  已刪 {int(hit.sum()):,} 列 → {PP_CACHE}")
 
 
 def main():
@@ -92,6 +133,8 @@ def main():
         for i, (name, mod) in enumerate(PIPELINE, 1):
             print(f"  {i:>2}. {name:<20} python -m {mod}")
         return
+
+    _invalidate_pairperiod(live_sids, args.dry_run)
 
     if to_drop:
         cached.drop(columns=to_drop).to_parquet(CACHE)

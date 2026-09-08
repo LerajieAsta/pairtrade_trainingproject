@@ -64,8 +64,15 @@ def formation_param_sensitivity(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def trading_param_sensitivity(df: pd.DataFrame) -> pd.DataFrame:
-    """交易端 _list 網格參數（top_n、stop_loss）對 Sharpe 的敏感度，逐 METHOD。"""
+    """交易端 _list 網格參數（top_n、stop_loss）對 Sharpe 的敏感度，逐 METHOD。
+
+    2026-09-01：加上基準格過濾。此前 `_EZ` / `_DSZ` / `_MHD` 等後綴變體與基準格
+    共用 METHOD，同一組 (METHOD, TopN, SL) 會match到多列，而下方取 `.iloc[0]`
+    ——取到哪一列由資料庫列序決定，等於隨機挑一個 entry_z 印進敏感度表。
+    """
     base = df[~df.METHOD.str.contains(r"\[", regex=True)]
+    base = base[base._path.str.contains(
+        r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$", regex=True, na=False)]
     rows = []
     for method in base.METHOD.unique():
         g = base[base.METHOD == method]

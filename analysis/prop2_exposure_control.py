@@ -72,15 +72,36 @@ def _cell(sid: str) -> str | None:
 
 
 def _entry_z(sid: str) -> float:
-    """檔名無 _EZ 後綴 → 預設 2.0（run_trading._log_name 的約定）。"""
+    """
+    檔名無 _EZ 後綴 → 預設 2.0（run_trading._log_name 的約定）。
+
+    `_EZ0` 是「未設定」的字面寫法，同樣代表預設 2.0，不是門檻 0.0。
+    """
     m = _EZ.search(os.path.basename(sid))
-    return round(int(m.group(1)) / 10.0, 2) if m else 2.0
+    if not m:
+        return 2.0
+    ez = int(m.group(1))
+    return 2.0 if ez == 0 else round(ez / 10.0, 2)
 
 
 def _has_other_suffix(sid: str) -> bool:
-    """排除 _DYN/_MHD/_XZ/_DG 等其他實驗變體，只留純 entry_z 變動。"""
+    """
+    排除 _DYN/_MHD/_XZ/_DG/_LAG 等其他實驗變體，只留**純 entry_z** 變動。
+
+    ⚠ `_DSZ` 必須為 0。2026-09-08 修正：原本把整段 `_EZ(\d+)_DSZ(\d+)` 剝掉，
+    於是動態停損變體 `_EZ20_DSZ30/40/50` 被判定為 entry_z=2.0 的基準格。
+    它們與真基準同格名（Top{N}_SL{X}），在 `reg[...][2.0][cell] = sid` 這步
+    **覆蓋掉真基準**——GICS-SSD 的 15 格全數被 `_EZ20_DSZ30` 取代，
+    使 A 對照（DRL − ZS(2.0)）由 +0.798 虛增為 +1.869，
+    C 對照（門檻管道）的複製率亦由個位數虛增至 60–77%。
+    只有 `Grid (GICS-SSD)` 同時具備 _EZ20_DSZ* 與基準格，故僅該臂受影響。
+    """
     tail = os.path.basename(sid).replace(".csv", "")
-    tail = _EZ.sub("", tail)
+    m = _EZ.search(tail)
+    if m:
+        if int(m.group(2)) != 0:      # 動態停損變體，不是 entry_z 對照
+            return True
+        tail = _EZ.sub("", tail)
     return not re.fullmatch(r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+", tail)
 
 

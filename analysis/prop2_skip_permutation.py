@@ -37,6 +37,7 @@
 用法：python -m analysis.prop2_skip_permutation
 """
 import os
+import re
 import sqlite3
 import sys
 
@@ -63,11 +64,18 @@ BASES = [
 ]
 
 
+#: 基準格：`MSR{n}` 之後直接接 `.csv`。改為**錨定式白名單**（2026-09-08）——
+#: 原本是後綴黑名單 `_EZ|_DYN|_MHD|_XZ|_DG`，每加一種消融就要記得補一項，
+#: 而 dev/exec_lag 的 `_LAG*`（45 格）與 dev/ 的 `_VG*`、`_DSZ*` 都沒補進去，
+#: 於是漏進等權組合：GICS-SSD 臂實得 60 格而非 15 格，置換檢定的基準被污染。
+#: 與 proposition2_daily_hac._BASELINE_CELL 同一套判定。
+_BASELINE_CELL = re.compile(r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$")
+
+
 def _baseline_cells(summ: pd.DataFrame, method: str) -> pd.DataFrame:
-    """只取無檔名後綴的基準格（排除 entry_z 等變體）。"""
+    """只取無檔名後綴的基準格（排除 entry_z／動態停損／執行落後等變體）。"""
     g = summ[summ.METHOD == method].copy()
-    g = g[~g._path.str.contains(r"_EZ\d+|_DYN|_MHD|_XZ|_DG", regex=True, na=False)]
-    return g
+    return g[g._path.map(lambda p: bool(_BASELINE_CELL.search(os.path.basename(p))))]
 
 
 def load_pairperiod(sids: list[str]) -> pd.DataFrame:
@@ -99,14 +107,31 @@ def load_pairperiod(sids: list[str]) -> pd.DataFrame:
     return cached[cached.strategy_id.isin(sids)]
 
 
-def _permute(pnl: np.ndarray, k: int, actual: float, rng) -> dict:
-    """自 pnl 隨機抽 k 個（不放回），回傳虛無分布統計。"""
+def _permute(pnl: np.ndarray, k: int, actual: float, rng,
+             excess: float | None = None) -> dict:
+    """
+    自 pnl 隨機抽 k 個（不放回），回傳虛無分布統計。
+
+    同一組抽樣同時回答**兩個**問題，兩者的虛無分布相同但檢定量不同：
+
+    1. **替代解釋一（SKIP 的選股方向）** —— `actual` ＝ 實際被跳過那批配對期
+       在 Z-Score 臂的損失（取負號＝避開的損失）。問「跳得比隨機好嗎」。
+    2. **替代解釋三（總曝險減少）** —— `excess` ＝ DL-THR 的實際總損益
+       減去 Z-Score 的全額。問「DL-THR 贏過『同樣少交易但隨機挑』嗎」。
+       因為「隨機跳過後的總額」＝ zs_full + draw，故
+       `drl_actual > zs_full + draw` 等價於 `excess > draw`，可共用同一組 draw。
+
+    ⚠ 2026-09-08 修正：曝險表原本直接沿用第 1 題的 `5%顯著` 欄，
+    但那是「跳得比隨機好」的判定，不是「DL-THR 贏過隨機跳過」的判定——
+    後者的檢定量含 DRL 臂自身的損益，根本不在第 1 題的虛無分布裡。
+    兩者現分開輸出（`5%顯著` vs `曝險5%顯著`）。
+    """
     n = len(pnl)
     draws = np.empty(N_BOOT)
     for i in range(N_BOOT):
         draws[i] = -pnl[rng.choice(n, size=k, replace=False)].sum()
     p = float((draws >= actual).mean())
-    return {
+    out = {
         "隨機期望": round(float(draws.mean()), 1),
         "隨機p95": round(float(np.percentile(draws, 95)), 1),
         "實際百分位": round(float((draws < actual).mean()) * 100, 1),
@@ -114,6 +139,12 @@ def _permute(pnl: np.ndarray, k: int, actual: float, rng) -> dict:
         "p值": round(p, 4),
         "5%顯著": "✔" if p < 0.05 else "✘",
     }
+    if excess is not None:
+        pe = float((draws >= excess).mean())
+        out["曝險百分位"] = round(float((draws < excess).mean()) * 100, 1)
+        out["曝險p值"] = round(pe, 4)
+        out["曝險5%顯著"] = "✔" if pe < 0.05 else "✘"
+    return out
 
 
 def run():
@@ -153,10 +184,20 @@ def run():
         if k < 5 or k >= len(j):
             continue
         actual = float(-j.loc[j.skip == 1, "pnl"].sum())
+        zs_full = float(j.pnl.sum())
+        drl_actual = float(d.pnl.sum())
+        st = _permute(j.pnl.values.astype(float), k, actual, rng,
+                      excess=drl_actual - zs_full)
+        # 替代解釋三（總曝險）所需的三個總額。與上面同一組虛無分布：
+        # 「固定門檻 2.0、隨機跳過與 DL-THR 同數量的配對期」。
+        # 差別只在報告的量——這裡報總損益，上面報避開的損失。
         rows.append({"配對底": base, "格": cell, "配對期數": len(j), "SKIP 數": k,
                      "SKIP率%": round(k / len(j) * 100, 1),
-                     "實際避損$": round(actual, 1),
-                     **_permute(j.pnl.values.astype(float), k, actual, rng)})
+                     "實際避損$": round(actual, 1), **st,
+                     "ZS全額$": round(zs_full, 1),
+                     "隨機跳過$": round(zs_full + st["隨機期望"], 1),
+                     "DLTHR實際$": round(drl_actual, 1),
+                     "超額$": round(drl_actual - (zs_full + st["隨機期望"]), 1)})
 
     res = pd.DataFrame(rows)
     if res.empty:
@@ -182,6 +223,25 @@ def run():
 
     print("\n--- 逐格明細（前 12 列）")
     print(res.head(12).to_string(index=False))
+
+    # 替代解釋三：總曝險減少能否解釋增益。2026-09-08 併入本模組——
+    # 原本是獨立的一次性腳本、未進版本庫，其輸出 prop2_exposure_random_skip.csv
+    # 自 2026-08-18 起即無法重算，論文 4.2.3 卻仍在引用。
+    expo = res.groupby("配對底").agg(
+        格數=("格", "count"),
+        ZS全額=("ZS全額$", "mean"),
+        隨機跳過=("隨機跳過$", "mean"),
+        DLTHR實際=("DLTHR實際$", "mean"),
+        超額=("超額$", "mean"),
+        平均百分位=("曝險百分位", "mean"),
+        顯著格數=("曝險5%顯著", lambda x: f"{(x == '✔').sum()}/{len(x)}"),
+    ).round(1).sort_values("超額", ascending=False)
+    print()
+    print("=" * 100)
+    print("替代解釋三：總曝險減少　H0：DL-THR 的績效等同「隨機跳過同數量」")
+    print("=" * 100)
+    print(expo.to_string())
+    expo.to_csv(f"{OUT_DIR}/prop2_exposure_random_skip.csv", encoding="utf-8-sig")
 
     res.to_csv(f"{OUT_DIR}/prop2_skip_permutation.csv", index=False, encoding="utf-8-sig")
     agg.to_csv(f"{OUT_DIR}/prop2_skip_permutation_summary.csv", encoding="utf-8-sig")

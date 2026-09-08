@@ -40,7 +40,20 @@ from analysis.regime_cost_dsr_eval import (
 )
 
 RESULT_DB = "results/result.db"
-VARIANCE_CSV = "results/analysis/drl_variance_runs_mainaxis.csv"
+#: 五輪重訓變異數的來源，按序尋找第一個存在者。
+#: `_mainaxis` 是本檔自建立起就寫死的預期名稱，但那次跑忘了帶
+#: `DRL_VARIANCE_TAG`，產出落在無標籤的 `drl_variance_runs.csv`（2026-08-18），
+#: 於是本檔從未成功執行過。2026-09-05 signal 對沖口徑修正後，主軸五支 DRL 臂的
+#: 五輪重訓由 `tools/run_hedge_variance.py` 重跑，產出即 `_drlhedge`
+#: （METHOD 集合與本檔 PAIRS 所需完全相同）。
+#: ⚠ 無標籤那份是**修正前**的抽樣，排在最後且僅為相容保留——
+#: 讀到它會印出警告，因為它與現行 result.db 的對沖口徑不一致。
+VARIANCE_CSV_CANDIDATES = [
+    "results/analysis/drl_variance_runs_mainaxis.csv",
+    "results/analysis/drl_variance_runs_drlhedge.csv",
+    "results/analysis/drl_variance_runs.csv",
+]
+STALE_VARIANCE = "results/analysis/drl_variance_runs.csv"
 OUT_DIR = "results/analysis"
 TRADING_DAYS = 252
 
@@ -185,15 +198,27 @@ def _absolute_tests(summ, summ_all=None):
     return pd.DataFrame(abs_rows), pd.DataFrame(dsr)
 
 
+def _variance_csv() -> str:
+    """挑出實際要讀的五輪變異數檔，並把選擇印出來——不可靜默吃到舊資料。"""
+    for f in VARIANCE_CSV_CANDIDATES:
+        if os.path.exists(f):
+            print(f"五輪變異數來源：{f}")
+            if f == STALE_VARIANCE:
+                print("  [警告] 這份是 signal 對沖口徑修正**之前**的抽樣，"
+                      "與現行 result.db 不一致；結果僅供參考，不可引用。")
+            return f
+    raise SystemExit("缺少五輪變異數資料，找過："
+                     + "、".join(VARIANCE_CSV_CANDIDATES)
+                     + "。請先執行 python tools/run_hedge_variance.py")
+
+
 def run():
-    if not os.path.exists(VARIANCE_CSV):
-        raise SystemExit(f"缺少五輪變異數資料：{VARIANCE_CSV}\n"
-                         f"請先執行 DRL_VARIANCE_TAG=mainaxis python -m tools.run_drl_variance")
+    variance_csv = _variance_csv()
 
     con = sqlite3.connect(RESULT_DB)
     summ_all = pd.read_sql("SELECT * FROM strategy_summaries", con)
     con.close()
-    runs = pd.read_csv(VARIANCE_CSV)
+    runs = pd.read_csv(variance_csv)
 
     # 只保留基準格。entry_z 等交易端變體與基準共用 db_method 與同一組
     # (TOP N, STOP LOSS %, MAX SEC %)，若不濾除，set_index(GRID) 會產生
@@ -201,8 +226,11 @@ def run():
     # 且會把對照組混入配對檢定。
     # 註：DSR 的試驗宇宙仍用完整 summ_all（見 _trial_specs），兩者刻意不同——
     #     檢定要乾淨的基準格，選擇偏誤校正要完整的試驗史。
-    summ = summ_all[~summ_all._path.str.contains(
-        r"_EZ\d+|_DYN|_MHD|_XZ|_DG", regex=True, na=False)]
+    # 2026-09-08：後綴黑名單改為錨定式白名單。黑名單漏掉 dev/ 後續加的
+    # `_LAG*`／`_VG*`／`_DSZ*`，那些格會混進配對檢定；白名單只認基準格式，
+    # 未來新增任何消融都不必回頭修這裡。
+    summ = summ_all[summ_all._path.str.contains(
+        r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$", regex=True, na=False)]
 
     t1 = _paired_tests(summ, runs)
     t2 = _per_round(summ, runs)

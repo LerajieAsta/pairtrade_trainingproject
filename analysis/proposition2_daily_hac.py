@@ -53,7 +53,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-from analysis.block_bootstrap import BLOCK_L, bootstrap_test
+from analysis.block_bootstrap import BLOCK_L, bh_adjust, bootstrap_test
 
 # Windows 主控台預設 cp950，無法輸出 U+2212 等符號（config.py 亦作同樣處理）
 if hasattr(sys.stdout, "reconfigure"):
@@ -309,6 +309,11 @@ def run():
                           "年化Δ最大": round(float(np.max(anns)), 3)})
 
     ew = pd.DataFrame(ew_rows)
+    # 2026-09-08 補上 BH 校正欄。此前只有 proposition1_daily_hac 輸出該欄，
+    # 交易層的「BH 校正 p」在論文表 4.2.1 是手算的——沒有產生器就會過期，
+    # 且無從核對。五個配對底為同一項檢定，故一起校正（與命題 1 的九組同理）。
+    ew["BH校正p"] = bh_adjust(ew["BB p"].values).round(4)
+    ew["5%顯著(校正後)"] = np.where(ew["BH校正p"] < 0.05, "✔", "✘")
     cells_df = pd.DataFrame(cell_rows)
 
     pd.set_option("display.width", 250)
@@ -317,6 +322,8 @@ def run():
     print(f"    H0: E[r_DRL − r_ZScore] = 0；L={BLOCK_L}，10,000 次重抽")
     print("=" * 88)
     print(ew.to_string(index=False))
+    print(f"    → BH 校正後顯著 {int((ew['BH校正p'] < 0.05).sum())}/{len(ew)} 組"
+          f"（校正前 {int((ew['BB p'] < 0.05).sum())}/{len(ew)}）")
 
     print("\n" + "=" * 88)
     print("二、逐格檢定（次口徑；15 格各自重抽）——單一參數設定的檢定力")

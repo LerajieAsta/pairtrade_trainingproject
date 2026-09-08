@@ -176,18 +176,44 @@ INCOMPLETE_RUNS = {
 # 與寫作當下不同，DSR 表就對不上，而且不會有任何錯誤訊息。
 # 故此處釘死為常數並記錄清點日期；_trial_specs 仍會實地清點作交叉比對，
 # 發現漂移時警告（代表你加了新策略，該重新清點並更新論文的 N）。
-TRIAL_CENSUS_DATE = "2026-08-26b"
+#: 基準格的檔名樣式：`MSR{n}` 之後直接接 `.csv`，任何後綴（_EZ/_DSZ/_MHD/_LAG/
+#: _DYN/_VG/_XZ/_DG）都不算基準格。與 analysis/proposition2_daily_hac 的
+#: `_BASELINE_CELL` 同一套判定。
+_BASELINE_CELL_RE = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
+
+TRIAL_CENSUS_DATE = "2026-09-01"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (53,    0.00010258710337016),
-    "config": (1392,  0.00033621469727494),
+    "method": (53,    0.00012531293253106),
+    "config": (1392,  0.00035631902853788),
 }
+# 2026-09-01 起 N 與 var_sr **來源不同**，這是刻意的，不是疏漏：
+#
+#   N       維持 53 / 1392 —— 對沖口徑修正（REVIEW.md §A）之後，
+#           `result.db` 只剩 49 / 1152 列，因為 MHD 掃描（180 格）與四支已退役的
+#           METHOD（60 格）無法以現行 config 重現，已刪除。
+#           **但那些試驗確實跑過、確實被看過。** DSR 的 N 計的是「為了挑出
+#           最終報告的那個策略，總共看過幾個候選」——把結果刪掉並不會讓你
+#           沒看過它們。維持較大的 N 只會使門檻更嚴，不會使結論更寬鬆。
+#
+#   var_sr  改用修正後的 1,152 列重算 —— 它是「試驗之間 Sharpe 的離散度」，
+#           必須取自同一個引擎的數字。拿舊引擎的離散度配新引擎的 Sharpe
+#           是兩個尺度混用。
+#
+# 副作用：`_trial_specs` 的漂移偵測會恆常示警（實地 49/1152 vs 釘死 53/1392）。
+# 該示警現在是**預期行為**，訊息已改寫說明原因，不要用「更新常數」消掉它。
 # var_sr 的定義（2026-08-26 逆推確認，與 2026-08-20 的釘死值逐位相符）：
 #   method — 每個 METHOD 取其 15 格的**平均** Sharpe_Raw，再取橫斷面變異 ÷ 252
 #   config — 全部回測列的 Sharpe_Raw 橫斷面變異 ÷ 252
 # 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
 # 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-09-01  N 維持 53 / 1392；var_sr 依修正後的引擎重算
+#               （method 0.00010259 → 0.00012531；config 0.00033621 → 0.00035632）。
+#               起因：dev/trading_arch/ 的 §A 對沖權重修正與 §E 首列前視修正，
+#               全網格 1,152 格重跑。`result.db` 由 1,392 列縮為 1,152 列，
+#               但 N 不隨之縮小（理由見上方 TRIAL_CENSUS 的說明）。
+#               var_sr 上升 → 門檻 SR0 上升 → DSR 略降，方向偏保守。
 #   2026-08-26b method 53 / config 1392 —— 交易端參數掃描，method 數不變：
 #               entry_z ∈ {2.5, 3.0} × 4 臂 × 15 格 = 120
 #               dynamic_stop_z ∈ {3,4,5} × 4 臂 × 15 格 = 180
@@ -258,10 +284,14 @@ def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
     live = summ[~summ.METHOD.isin(INCOMPLETE_RUNS)]
     live_n = {"method": int(live.METHOD.nunique()), "config": int(len(live))}
     for spec, (pinned_n, _) in TRIAL_CENSUS.items():
-        if live_n[spec] != pinned_n:
-            print(f"  ⚠ 試驗宇宙已漂移：{spec} 口徑實地清點 {live_n[spec]}，"
+        if live_n[spec] < pinned_n:
+            print(f"  · 試驗宇宙：{spec} 實地 {live_n[spec]} < 釘死 {pinned_n} —— "
+                  f"預期行為。2026-09-01 對沖口徑修正後，MHD 掃描與四支已退役的 "
+                  f"METHOD 無法重現而刪除，但那些試驗跑過即計入 N。")
+        elif live_n[spec] > pinned_n:
+            print(f"  ⚠ 試驗宇宙已擴張：{spec} 口徑實地清點 {live_n[spec]}，"
                   f"TRIAL_CENSUS 釘死 {pinned_n}（清點於 {TRIAL_CENSUS_DATE}）。"
-                  f"DSR 仍用釘死值；若要改用新宇宙，請更新常數並同步修改論文的 N。")
+                  f"你新增了策略——請重新清點並同步修改論文的 N。")
 
     return {
         "cells":  (int(len(g)), _var(g.Sharpe_Raw)),
@@ -295,9 +325,21 @@ def run(methods: list[str] = None):
 
     # 每策略最佳配置（Sharpe 最高）。試驗間 Sharpe 變異改由 _trial_specs 依
     # 各口徑同步計算，確保 N 與 var_sr 永遠取自同一組試驗。
+    #
+    # 2026-09-01：**選取限定於基準格**（TopN × 停損 = 15 格），與本檔開頭
+    # 「在每策略族挑 15 個配置（TopN×停損）中選最佳」的宣告一致。
+    # 此前未加此限制，`_EZ` / `_DSZ` / `_MHD` 等後綴變體一併參與選最佳，
+    # 使五個 METHOD 的「最佳配置」實際落在非預設 entry_z 上
+    # （如 GICS-SSD 落在 entry_z=3.0，Sharpe 0.4327 vs 基準格 0.3548），
+    # 而「最佳配置」欄只印 Top{n}/SL{x}%，讀者看不出 entry_z 已被改動。
+    #
+    # 試驗宇宙 N **不隨之縮小**：那些變體確實跑過、確實參與了搜尋，
+    # 仍須計入多重檢定的懲罰（與 TRIAL_CENSUS 的處置一致）。
+    # 選取變窄而 N 不變 → 門檻只會更嚴，是保守的一側。
+    _base = summ._path.str.contains(_BASELINE_CELL_RE, regex=True, na=False)
     best_rows = {}
     for m in methods:
-        g = summ[summ.METHOD == m]
+        g = summ[(summ.METHOD == m) & _base]
         if g.empty:
             continue
         best_rows[m] = g.loc[g.Sharpe_Raw.idxmax()]
