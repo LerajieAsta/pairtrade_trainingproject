@@ -95,8 +95,17 @@ def collect_config(f: Facts):
     f.add("3.1.3", "formation_window", "形成期長度（交易日）", C.FORMATION_WINDOW)
     f.add("3.1.3", "trading_window", "交易期長度（交易日）", C.FORWARD_DAYS)
     f.add("3.1.3", "rolling_step", "滾動步長（交易日）", C.rolling_step)
-    f.add("3.1.3", "concurrent_periods", "同時重疊期數", C.CONCURRENT_PERIODS,
-          f"= {C.FORWARD_DAYS} / {C.rolling_step}")
+    # 並行期數是**逐策略**的，不是全域常數（2026-08-28，REVIEW.md §B）。
+    # 論文正文引用的是預設設定（126/21 = 6）；此處一併列出例外，
+    # 免得讀者把 6 當成全體適用。
+    _conc = {}
+    for _e in C.strategies_raw_all:
+        _conc.setdefault(C.concurrent_periods(_e.get("params", {})), []).append(
+            _e.get("db_method", _e["name"]))
+    _exc = "；".join(f"{k} 期：{', '.join(v)}" for k, v in sorted(_conc.items()) if k != 6)
+    f.add("3.1.3", "concurrent_periods", "同時重疊期數（預設設定）", C.CONCURRENT_PERIODS,
+          f"= {C.FORWARD_DAYS} / {C.rolling_step}"
+          + (f"；逐策略例外 —— {_exc}" if _exc else ""))
     f.add("3.1.4", "fee_rate_oneway", "單邊交易成本", bp["fee_rate"],
           "Do & Faff (2012)；一往返 = 2 倍")
     f.add("3.5.5", "n_grid_configs", "每策略參數配置數", n_grid,

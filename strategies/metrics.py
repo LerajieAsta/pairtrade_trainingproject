@@ -52,13 +52,46 @@ import sqlite3
 import numpy as np
 import pandas as pd
 
-from strategies.config import INITIAL_CAPITAL, RF_ANNUAL, CONCURRENT_PERIODS
+from strategies.config import INITIAL_CAPITAL, RF_ANNUAL
 
 RESULT_DB = "results/result.db"
 TRADING_DAYS = 252
 
 #: 現行單邊摩擦成本（Do & Faff 2012 對美股 pairs trading 的估計）
 CURRENT_FEE_SIDE = 0.0029
+
+
+def concurrent_of(path_key: str, result_db: str = RESULT_DB) -> int:
+    """該策略**引擎實際使用**的並行期數，取自 `strategy_summaries`。
+
+    為何不在此處重算：讀端拿不到 `params`，只能猜。而猜出來的全域 6 正是
+    2026-08-28 那次錯誤的來源——`Grid (HAN4-MONTHLY)` 是 21/21 → 1 期，
+    被當成 6 期後 `Avg_Utilization` 縮成真值的 1/6、break-even 位移最多
+    5.2 pp（`dev/trading_arch/REVIEW.md` §B）。
+
+    權威值由 `db_utils.calculate_metrics_from_params` 於寫入時落庫。
+    舊列為 NULL 時**直接拋錯**，不退回預設值——這個量猜錯不會有任何徵狀，
+    靜默的預設就是上一次的失敗模式。回填見 `tools/backfill_concurrency.py`。
+    """
+    con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
+    try:
+        row = con.execute(
+            'SELECT "Concurrent_Periods" FROM strategy_summaries WHERE _path = ?',
+            (path_key,)).fetchone()
+    except sqlite3.OperationalError as e:
+        raise RuntimeError(
+            f"strategy_summaries 沒有 Concurrent_Periods 欄（{e}）。"
+            f"請先跑 python tools/backfill_concurrency.py") from e
+    finally:
+        con.close()
+
+    if row is None:
+        raise KeyError(f"strategy_summaries 查無 {path_key}")
+    if row[0] is None:
+        raise RuntimeError(
+            f"{path_key} 的 Concurrent_Periods 為 NULL（此列早於 2026-08-28）。"
+            f"請先跑 python tools/backfill_concurrency.py")
+    return int(row[0])
 
 
 def metrics_from_pnl(daily_pnl: pd.Series,
@@ -218,7 +251,7 @@ def metrics(path_key: str, dates=None, top_n: int = None,
     out = metrics_from_pnl(df["d"])
 
     if top_n:
-        max_pairs = int(top_n) * CONCURRENT_PERIODS
+        max_pairs = int(top_n) * concurrent_of(path_key, result_db)
         years = len(df) / float(TRADING_DAYS)
         final_pnl = float(df["d"].sum())
         if years > 0 and max_pairs > 0:
@@ -232,8 +265,8 @@ def metrics(path_key: str, dates=None, top_n: int = None,
     return out
 
 
-def traded_notional(path_key: str, top_n: int, trading_window: int = 126,
-                    rolling_step: int = 21, result_db: str = RESULT_DB) -> float:
+def traded_notional(path_key: str, top_n: int, result_db: str = RESULT_DB,
+                    n_concurrent: int = None) -> float:
     """該策略全期進出場的累計名目額（break-even 的分母）。
 
     每筆進場的名目額恰為當時的 `capital_per_pair`
@@ -241,16 +274,24 @@ def traded_notional(path_key: str, top_n: int, trading_window: int = 126,
     而 `capital_per_pair = current_equity / (top_n × 並行期數)`
     （`portfolio_manager.py:84`）。每次進場恰對應一次平倉，故 ×2。
 
-    **兩處曾被算錯，皆已在此收攏**：
+    **三處曾被算錯，皆已在此收攏**：
       · 資金基礎漏掉並行期數（名目額高估 6 倍），且以初始資金取代逐日權益
       · 事件數用 `Entries + Exits`，漏計停損與強制平倉的出場費
         （實測 `Entries = Exits + Stop_Losses + Forced_Closes`）
+      · 2026-08-28：並行期數本身寫成**預設參數** `trading_window=126,
+        rolling_step=21`，而兩個呼叫端都沒傳。`Grid (HAN4-MONTHLY)` 是
+        21/21 → 1 期，名目額因此低估 6 倍、break-even 位移最多 5.2 pp
+        （見 `dev/trading_arch/REVIEW.md` §B）。
+
+    修法是**移除那兩個預設參數**：並行期數不是呼叫端該知道的東西，
+    它由 `concurrent_of()` 自 `strategy_summaries` 取引擎落庫的權威值。
+    `n_concurrent` 僅供診斷腳本做「錯誤口徑 vs 正確口徑」的對照。
 
     自洽檢驗：把費率設為本函式推得的 break-even，重算期末淨利應歸零
     （實測 −$9 / −$2，見 `dev/breakeven_fix/`）。
     """
-    conc = max(1, int(trading_window) // max(1, int(rolling_step)))
-    max_pairs = max(1, int(top_n) * conc)
+    conc = int(n_concurrent) if n_concurrent else concurrent_of(path_key, result_db)
+    max_pairs = max(1, int(top_n) * max(1, conc))
     con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
     try:
         pnl = pd.read_sql(

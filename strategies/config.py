@@ -94,8 +94,27 @@ rolling_step     = 21
 use_vol_adjust = False
 
 INITIAL_CAPITAL = 10000.0
-# 最大同時重疊交易期數（rolling_step 整除 FORWARD_DAYS）
+# 預設設定（126/21）的最大同時重疊交易期數。
+#
+# ⚠ 這是**預設值**，不是全域性質。並行期數是逐策略的——`Grid HAN4-MONTHLY`
+#    以 trading_window=rolling_step=21 覆寫，實際並行 1 期。任何需要它的地方
+#    一律走 concurrent_periods(params)，不要直接用這個常數。
+#    誤用的代價見 dev/trading_arch/REVIEW.md §B（該臂的 Avg_Utilization 被
+#    報成真值的 1/6、break-even 位移最多 5.2 pp）。
 CONCURRENT_PERIODS = max(1, FORWARD_DAYS // rolling_step)
+
+
+def concurrent_periods(params: dict) -> int:
+    """該策略的同時重疊交易期數 —— **唯一定義**。
+
+    引擎依此開槽位（`run_trading.py` 的 `max_pairs = top_n × 並行期數`），
+    故所有讀端的資金分母、利用率與名目額都必須用同一個數。
+
+    params 缺欄時退回全域預設，與引擎的 `params.get(..., 預設)` 行為一致。
+    """
+    tw = int(params.get("trading_window", FORWARD_DAYS) or FORWARD_DAYS)
+    rs = int(params.get("rolling_step", rolling_step) or rolling_step)
+    return max(1, tw // max(1, rs))
 
 # 無風險利率年化假設（Excess_Ret_RF 口徑用；市場中性策略的閒置現金與保證金收 rf）
 # 2000–2025 美國 3M T-bill 平均約 1.8–2.0%；可日後換成實際序列
@@ -155,6 +174,29 @@ base_params = {
     "dynamic_stop_z":               0.0,
     "vol_regime_threshold":         0.0,
     "vol_target_allocation":        False,
+    # ── 對沖權重口徑（2026-08-28，dev/trading_arch/PREREGISTRATION.md）──────
+    # "signal"：v_A : v_B = (1/σ_A) : (β/σ_B)，複製訊號 spread 的變動。
+    # "dollar"：v_A : v_B = 1 : |β|，2026-08-28 前的行為。
+    #
+    # 訊號 spread 定義在標準化空間 (ln P − μ)/σ，其變動為 r_A/σ_A − β·r_B/σ_B；
+    # 舊的純美元權重省略了 1/σ，在 σ_A ≠ σ_B 的 40% 配對上交易的不是自己的訊號
+    # （實測 6.34% 的交易損益符號與訊號相反）。這是實作錯誤而非建模選擇，
+    # 故就地修正、不新增 METHOD。"dollar" 保留供重現舊結果與 A/B 對照。
+    #
+    # 路徑 A（OLS log-price）與 distance 的 ggr_index 不受影響——它們的
+    # $1:β 本來就正確，見 zscore_trading._leg_scales 的逐路徑判定。
+    "hedge_mode":                   "signal",
+
+    # ── 執行延遲（dev/exec_lag/PREREGISTRATION.md, REVIEW.md §F） ──────────
+    # 現行全鏈無執行延遲：訊號 z_i 與成交價 P_i 取自同一根收盤棒，
+    # 即「先知道收盤價才算得出 z，再以那個收盤價成交」。
+    # execution_lag = L 時：決策用 bar i-L 的資訊，成交仍用 bar i 的收盤價。
+    # scope 決定延遲套用到哪一邊——進場與出場的方向未必相同，故可分離：
+    #   "both"（預設）/ "entry"（只延遲進場）/ "exit"（只延遲出場，含三種停損）
+    # 期末強平不延遲（機械事件，非訊號決策）。
+    # L=0 時所有分支短路，結果與加入本參數前逐位元相同。
+    "execution_lag":                0,
+    "exec_lag_scope":               "both",
 }
 
 # hdbscan_common — kept as empty dict for import compatibility;
@@ -948,6 +990,8 @@ SENSITIVITY_BASES = [
 # 若套到無此參數的策略，會被 run_formation 的 inspect.signature 過濾成無效重複）。
 SENSITIVITY_PARAM_BASES = {}  # （beta_feature_weight → SEC-PIT Beta 已封存）
 _SENSITIVITY_INT_PARAMS = {"pca_n_components"}
+#: 取值為字串、不可轉數值的敏感性參數（見 _SENSITIVITY_TRADING_LIST）
+_SENSITIVITY_STR_PARAMS = {"exec_lag"}
 
 
 def _sens_slug(v) -> str:
@@ -982,6 +1026,12 @@ _SENSITIVITY_TRADING_LIST = {
     #   max_holding_days —— 時間停損（config.py:55 的既有診斷：>63d 未收斂者勝率 26–46%）
     "dynamic_stop_z":   ("dynamic_stop_z_list",   [3.0, 4.0, 5.0]),
     "max_holding_days": ("max_holding_days_list", [21, 42, 63]),
+    # §F 執行延遲（dev/exec_lag/PREREGISTRATION.md）。取值為字串，
+    # 一個維度同時編碼延遲根數與範圍：1E 只進場 / 1X 只出場 / 1B 兩者。
+    "exec_lag":         ("exec_lag_list",         ["1E", "1X", "1B"]),
+    # 出場門檻（dev/exit_z/PREREGISTRATION.md）。引擎與 `_XZ` 檔名後綴自始就在，
+    # 但從未進入本清單，故一次都沒掃過。0.0 為現行值，不列入掃描值。
+    "exit_z":           ("exit_z_list",           [0.25, 0.5, 0.75, 1.0]),
     "top_n":     ("top_n_list",     [1, 3, 5, 10, 20]),
     "stop_loss": ("stop_loss_list", [0.0, 0.05, 0.10, 0.15]),
 }
@@ -1029,7 +1079,9 @@ elif _sens_param:
     if _sens_param in _SENSITIVITY_TRADING_LIST:
         # 交易端參數：對每個基準策略設對應 _list，run_trading 網格自動展開（不建 formation 變體）
         _list_key, _default = _SENSITIVITY_TRADING_LIST[_sens_param]
-        _cast = int if _sens_param == "top_n" else float
+        # exec_lag 的取值是字串（"1E"/"1X"/"1B"），不可轉數值
+        _cast = (str if _sens_param in _SENSITIVITY_STR_PARAMS
+                 else int if _sens_param == "top_n" else float)
         _vals = [_cast(x) for x in _venv.split(",")] if _venv else _default
         _sel = []
         for _b in _bases:

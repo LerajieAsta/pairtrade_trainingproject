@@ -39,7 +39,7 @@ from strategies.preprocess_equity import DataProcessor
 from strategies.portfolio_manager import PortfolioManager
 from strategies.db_utils import get_db_connection
 from strategies.config import (
-    INITIAL_CAPITAL, CONCURRENT_PERIODS, WRITE_TRADE_CSV,
+    INITIAL_CAPITAL, CONCURRENT_PERIODS, concurrent_periods, WRITE_TRADE_CSV,
     FORCE_RERUN, CPU_LIMIT_PCT, DRL_MAX_WORKERS, DB_PROFILES, DB_PATH, TABLE_NAME, INFO_TABLE,
     TICKER_COL, SECTOR_COL, BACKTEST_START, BACKTEST_END,
     FORMATION_WINDOW, FORWARD_DAYS, rolling_step,
@@ -123,9 +123,13 @@ def _build_filename(params: dict) -> str:
     if params.get("dynamic_slots", False):
         suffix += f"_DYN{int(params.get('slot_percentile', 75.0))}"
     # P2：非預設出場門檻（exit_z != 0）
+    # 2026-09-01：編碼由 ×10 改為 ×100。×10 配上 Python 的 banker's rounding 會把
+    # 0.25 寫成 `_XZ2`、0.75 寫成 `_XZ8`——與 0.2 / 0.8 相撞，兩個不同的 exit_z
+    # 會寫進同一個 path_key。實掃 `result.db` 確認改動前 `_XZ` 列數為 0，
+    # 故無既有結果受影響（見 dev/exit_z/）。
     xz = float(params.get("exit_z", 0.0))
     if abs(xz) > 1e-9:
-        suffix += f"_XZ{int(round(xz * 10))}"
+        suffix += f"_XZ{int(round(xz * 100))}"
     # P1：時間停損（max_holding_days > 0）
     mhd = int(params.get("max_holding_days", 0) or 0)
     if mhd > 0:
@@ -139,12 +143,50 @@ def _build_filename(params: dict) -> str:
     vg = float(params.get("vol_gate_pctl", 0.0) or 0.0)
     if vg > 0:
         suffix += f"_VG{int(vg)}"
+    # §F：執行延遲（dev/exec_lag/）。後綴不可省——`_DYN75` 與 `_VG` 已各出過一次
+    # 事：缺後綴時重跑會寫進舊 path_key，新舊口徑並存而不報錯。
+    lag = int(params.get("execution_lag", 0) or 0)
+    if lag > 0:
+        scope = str(params.get("exec_lag_scope", "both")).lower()
+        tag = {"entry": "E", "exit": "X"}.get(scope, "B")
+        suffix += f"_LAG{lag}{tag}"
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
+
+def effective_hedge_mode(strategy_config: dict) -> str:
+    """該策略**實際執行**的對沖口徑——不是 config 宣告的那個。
+
+    2026-09-02：`Hedge_Mode` 原本直接抄 `params["hedge_mode"]`，
+    而 `drl_threshold_trading` / `rl_threshold_trading` 根本沒實作它，
+    導致 120 列標著 "signal" 卻以 "dollar" 執行，且三層防護全部沒攔到
+    ——它們比對的是標籤，標籤抄自 params（見 dev/drl_hedge/）。
+
+    改為以交易模組的 `SUPPORTS_HEDGE_MODE` 為準，**未宣告即視為不支援**。
+    新模組若忘了實作，落庫會誠實記 "dollar"，不會再假冒 "signal"。
+
+    注意這只擋「模組沒宣告」，擋不了「宣告了卻沒真的用」；
+    後者由 dev/drl_hedge/verify_hedge_modes.py 的行為測試負責。
+    """
+    want = str(strategy_config["params"].get("hedge_mode", "signal"))
+    try:
+        mod = importlib.import_module(strategy_config["trading_module"])
+    except Exception:
+        return "dollar"
+    return want if bool(getattr(mod, "SUPPORTS_HEDGE_MODE", False)) else "dollar"
+
 
 def check_trading_completed(strategy_config: dict, output_root: str, results_db_path: str = "", dataset_name: str = "") -> bool:
     """
     完成判定「純以 result.db 為準」：strategy_summaries 有該 config 的列即視為完成。
     不再要求 CSV 存在 → CSV 成為可選產物（見 WRITE_TRADE_CSV），可安全清除以省空間。
+
+    ⚠ **有列還不夠，口徑也要對得上。**（2026-08-28，REVIEW.md §A）
+    全網格重跑若中途中斷，續跑時舊口徑的列**看起來就是完成的**，會被跳過，
+    使 result.db 永久停在「一半 signal、一半 dollar」的狀態——而這兩種列
+    不可並列比較。故此處比對 `Hedge_Mode`：不符即視為未完成、重跑。
+    舊列的 `Hedge_Mode` 為 NULL，代表修正前的 "dollar"。
+
+    這使續跑的正確做法是**不帶 FORCE_RERUN 直接再跑一次**：已用新口徑跑完的
+    格會被跳過，尚未重跑的舊格會被補上。
     """
     if FORCE_RERUN:
         return False
@@ -154,13 +196,16 @@ def check_trading_completed(strategy_config: dict, output_root: str, results_db_
 
     sub_dir  = strategy_config["sub_dir"]
     filename = _build_filename(strategy_config["params"])
+    want_mode = effective_hedge_mode(strategy_config)
     try:
         path_key = f"{dataset_name.lower()}/{sub_dir}/{filename}"
         with sqlite3.connect(results_db_path, timeout=5.0) as _conn:
             row = _conn.execute(
-                "SELECT 1 FROM strategy_summaries WHERE _path = ?", (path_key,)
+                'SELECT "Hedge_Mode" FROM strategy_summaries WHERE _path = ?', (path_key,)
             ).fetchone()
-            return row is not None
+            if row is None:
+                return False
+            return (row[0] or "dollar") == want_mode
     except Exception:
         return False
 
@@ -248,8 +293,11 @@ def worker_task(
         # 實際並行 1 期）。沿用全域 CONCURRENT_PERIODS(=6) 會把槽位開成實際的
         # 6 倍，使每對只分到 1/6 資金、績效被系統性低估。
         # 既有策略皆為 126/21 → 6，與舊值相同，行為不變。
-        _concurrent = max(1, int(params.get("trading_window", FORWARD_DAYS))
-                          // max(1, int(params.get("rolling_step", rolling_step))))
+        #
+        # 2026-08-28：改用 config.concurrent_periods 這個單一擁有者。此處原本
+        # 是這個推導的**唯一**正確副本，而 db_utils / metrics 兩個讀端各自寫死
+        # 全域 6，使 HAN4-MONTHLY 的利用率與 break-even 全錯（REVIEW.md §B）。
+        _concurrent = concurrent_periods(params)
         pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL,
                               max_pairs=params.get("top_n", 10) * _concurrent,
                               dynamic_slots=bool(params.get("dynamic_slots", False)),
@@ -493,10 +541,14 @@ def worker_task(
             path_key = f"{dataset_subdir}/{sub_dir}/{filename}"
             
             from strategies.db_utils import export_df_to_db
+            # 落庫的 Hedge_Mode 必須是**引擎實際跑的**那個，不是 config 宣告的。
+            # 見 effective_hedge_mode 的 docstring 與 dev/drl_hedge/。
+            _params_out = dict(params)
+            _params_out["hedge_mode"] = effective_hedge_mode(strategy_config)
             _ok = export_df_to_db(
                 df=df_all,
                 strategy_name=strategy_config.get("db_method", name),
-                params=params,
+                params=_params_out,
                 dataset_name=dataset_name,
                 path_key=path_key,
                 db_path=db_path,
@@ -677,9 +729,37 @@ def run_all_trading():
         elif not isinstance(mhd_list, list):
             mhd_list = [mhd_list]
 
+        # 7. exit_z_list（出場門檻；dev/exit_z/）。未指定時退化為單一現值
+        #    （預設 0.0），網格不膨脹。檔名後綴 `_XZ{n}` 早已存在（見 _build_filename）。
+        xz_list = params.get("exit_z_list")  # type: ignore
+        if not xz_list:
+            xz_list = [params.get("exit_z", 0.0)]  # type: ignore
+        elif not isinstance(xz_list, list):
+            xz_list = [xz_list]
+
+        # 6. exec_lag_list（§F 執行延遲；dev/exec_lag/）。一個維度同時編碼延遲根數
+        #    與套用範圍，格式 "<L><scope>"：0 / 1E（只進場）/ 1X（只出場）/ 1B（兩者）。
+        #    未指定時退化為單一現值（預設 "0" = 停用），網格不膨脹、既有行為不變。
+        xlag_list = params.get("exec_lag_list")  # type: ignore
+        if not xlag_list:
+            _L0 = int(params.get("execution_lag", 0) or 0)  # type: ignore
+            _s0 = {"entry": "E", "exit": "X"}.get(
+                str(params.get("exec_lag_scope", "both")).lower(), "B")  # type: ignore
+            xlag_list = [f"{_L0}{_s0}" if _L0 > 0 else "0"]
+        elif not isinstance(xlag_list, list):
+            xlag_list = [xlag_list]
+
+        def _parse_xlag(tok: str) -> tuple:
+            tok = str(tok).strip()
+            L = int(tok[0])
+            if L == 0:
+                return 0, "both"
+            return L, {"E": "entry", "X": "exit"}.get(tok[1:2].upper(), "both")
+
         # (itertools and copy imports moved to top of file)
-        for top_n, sl, msr, ez, dsz, mhd in itertools.product(
-                top_n_list, sl_list, msr_list, ez_list, dsz_list, mhd_list):
+        for top_n, sl, msr, ez, dsz, mhd, xlag, xz in itertools.product(
+                top_n_list, sl_list, msr_list, ez_list, dsz_list, mhd_list,
+                xlag_list, xz_list):
             new_raw = copy.deepcopy(raw)
             new_params = new_raw["params"]
 
@@ -691,6 +771,10 @@ def run_all_trading():
             new_params["dynamic_stop_z"] = dsz  # type: ignore
             new_params["use_dynamic_stop"] = dsz > 0  # type: ignore
             new_params["max_holding_days"] = int(mhd)  # type: ignore
+            _xL, _xS = _parse_xlag(xlag)
+            new_params["execution_lag"] = _xL  # type: ignore
+            new_params["exec_lag_scope"] = _xS  # type: ignore
+            new_params["exit_z"] = float(xz)  # type: ignore
 
             # 清理 list 參數以防混淆
             new_params.pop("top_n_list", None)  # type: ignore
@@ -700,6 +784,8 @@ def run_all_trading():
             new_params.pop("entry_z_list", None)  # type: ignore
             new_params.pop("dynamic_stop_z_list", None)  # type: ignore
             new_params.pop("max_holding_days_list", None)  # type: ignore
+            new_params.pop("exec_lag_list", None)  # type: ignore
+            new_params.pop("exit_z_list", None)  # type: ignore
 
             # 對接 Formation 配對資料庫的 strategy_id (Formation 階段只受 max_sector_ratio 影響，固定 top_n=20)
             # formation_strategy_id_base：允許策略借用另一個策略的形成期配對
@@ -716,6 +802,11 @@ def run_all_trading():
                 new_raw["name"] += f"_EZ{int(round(float(ez) * 10))}_DSZ{int(round(float(dsz) * 10))}"
             if int(mhd) > 0:
                 new_raw["name"] += f"_MHD{int(mhd)}"
+            if _xL > 0:
+                _xtag = {"entry": "E", "exit": "X"}.get(_xS, "B")
+                new_raw["name"] += f"_LAG{_xL}{_xtag}"
+            if abs(float(xz)) > 1e-9:
+                new_raw["name"] += f"_XZ{int(round(float(xz) * 100))}"
 
             expanded_strategies_raw.append(new_raw)
 
@@ -739,9 +830,14 @@ def run_all_trading():
     strategies_to_run = []
     strategies_config = []
 
-    # 全域結果資料庫路徑
-    results_db_path = "results/result.db"
+    # 全域結果資料庫路徑。
+    # RESULT_DB_PATH 可覆寫，供試跑寫到別處而不污染正式庫
+    # （正式庫混入兩種口徑的列，比沒有結果更糟——分析會靜默地把兩者並列）：
+    #   $env:RESULT_DB_PATH="results/pilot.db"; $env:STRATEGIES_SLICE="i:j"; python run_trading.py
+    results_db_path = os.environ.get("RESULT_DB_PATH", "").strip() or "results/result.db"
     os.makedirs(os.path.dirname(results_db_path), exist_ok=True)
+    if results_db_path != "results/result.db":
+        print(f"[INFO] 結果將寫入 {results_db_path}（非正式庫）", flush=True)
 
     for raw in expanded_strategies_raw:
         config = {

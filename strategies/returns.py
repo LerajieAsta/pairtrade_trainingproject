@@ -210,6 +210,50 @@ def fingerprints(sids: list, result_db: str = RESULT_DB) -> dict:
             for _, row in df.iterrows()}
 
 
+def assert_uniform_hedge_mode(sids: list, result_db: str = RESULT_DB) -> None:
+    """要求這批策略出自**同一種對沖權重口徑**，否則拋錯。
+
+    2026-08-28 起 `strategy_summaries.Hedge_Mode` 記錄每列是以
+    `"signal"`（$v_A:v_B=(1/\\sigma_A):(\\beta/\\sigma_B)$，複製訊號 spread）
+    還是 `"dollar"`（$1:|\\beta|$，修正前）跑出來的。`NULL` = `"dollar"`。
+
+    兩種口徑的損益序列**不可並列比較**——它們是不同的投資組合，不是同一個
+    投資組合的兩種量法。而全網格重跑中斷時 result.db 就會同時存在兩者。
+
+    這道檢查放在這裡，是因為本模組是逐日序列的單一擁有者：所有跨策略比較
+    都經過 `daily_pnl`，在此擋下就不會有分析靜默地混用。
+    修法是把落後的那批補跑完（不帶 `FORCE_RERUN` 再跑一次 `run_trading.py`，
+    `check_trading_completed` 會自動辨識並只補舊口徑的格）。
+
+    單一策略不檢查——一條序列自己不會混。
+    """
+    if len(sids) < 2:
+        return
+    con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
+    try:
+        q = ('SELECT _path, "Hedge_Mode" FROM strategy_summaries '
+             f'WHERE _path IN ({",".join("?" * len(sids))})')
+        rows = con.execute(q, list(sids)).fetchall()
+    except sqlite3.OperationalError:
+        return          # 舊資料庫還沒有這一欄 → 全體同為修正前，無從混用
+    finally:
+        con.close()
+
+    modes = {}
+    for path, mode in rows:
+        modes.setdefault(mode or "dollar", []).append(path)
+    if len(modes) <= 1:
+        return
+
+    detail = "；".join(
+        f"{m}: {len(v)} 條（例：{v[0].split('/')[-2] if '/' in v[0] else v[0]}）"
+        for m, v in sorted(modes.items()))
+    raise RuntimeError(
+        f"這批策略橫跨兩種對沖權重口徑，不可並列比較 —— {detail}。"
+        f"result.db 停在全網格重跑的中途。請不帶 FORCE_RERUN 再跑一次 "
+        f"run_trading.py 把落後的格補完（見 dev/trading_arch/REVIEW.md §A）。")
+
+
 def _cache_paths(name: str) -> tuple:
     return (os.path.join(CACHE_DIR, f"{name}.parquet"),
             os.path.join(CACHE_DIR, f"{name}.fp.json"))
@@ -261,6 +305,8 @@ def daily_pnl(sids, result_db: str = RESULT_DB, calendar=None,
     分母不變，故此處刻意不除以資本。
     """
     sids = list(dict.fromkeys(sids))
+    # 混用兩種對沖口徑的序列是無意義的比較，在此擋下（見該函式的說明）。
+    assert_uniform_hedge_mode(sids, result_db)
     cal = price_calendar() if calendar is None else calendar
     fps = fingerprints(sids, result_db)
 

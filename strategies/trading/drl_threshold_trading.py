@@ -52,6 +52,11 @@ def _build_actions(menu_version: int):
 _ACTIONS_V4, _BASELINE_V4 = _build_actions(4)
 N_FEAT = 12
 
+#: 本模組是否真的實作 `hedge_mode`（dev/drl_hedge/）。
+#: `run_trading` 據此決定落庫的 `Hedge_Mode`——未宣告者一律記為 "dollar"。
+#: 2026-09-02 之前本模組**沒有**實作卻被記為 "signal"，120 列因此標錯。
+SUPPORTS_HEDGE_MODE = True
+
 
 @dataclass(slots=True)
 class PairState:
@@ -82,13 +87,20 @@ class ThresholdNet(nn.Module):
 def _fast_threshold_pnl(z: np.ndarray, pa: np.ndarray, pb: np.ndarray,
                         hedge_ratio: float, capital: float, friction: float,
                         entry_z: float, exit_z: float, max_hold: int = 0,
-                        allow: np.ndarray = None) -> float:
+                        allow: np.ndarray = None,
+                        leg_scales: tuple = (1.0, 1.0)) -> float:
     """
     以指定門檻在交易期上模擬 Z-Score 狀態機，回傳期末已實現 PnL。
     與 zscore_trading 相同語意（進場 |z|>ez、出場 z 穿越 ±exit_z、期末強平），
     精確股數會計；用於反事實標籤與正式模擬。
+
+    `leg_scales`：兩腳的每單位報酬縮放 $(s_A, s_B)$，見 dev/drl_hedge/。
+      (1.0, 1.0)        → dollar 口徑 1 : beta（2026-09-02 之前的唯一行為）
+      (1/σ_A, 1/σ_B)    → signal 口徑，複製 z_of 所用的標準化空間 spread
+    預設值使舊呼叫端行為逐位元不變。
     """
-    tw = 1.0 + abs(hedge_ratio)
+    s_a, s_b = leg_scales
+    tw = s_a + s_b * abs(hedge_ratio)
     st = PairState()
     T = len(z)
     frozen = False
@@ -110,8 +122,8 @@ def _fast_threshold_pnl(z: np.ndarray, pa: np.ndarray, pb: np.ndarray,
                 st.days_held = 0
                 continue
         elif (not frozen) and (allow is None or allow[i]) and abs(zi) > entry_z and i < T - 1:
-            v_a = capital / tw
-            v_b = capital * abs(hedge_ratio) / tw
+            v_a = capital * s_a / tw
+            v_b = capital * s_b * abs(hedge_ratio) / tw
             if zi > entry_z:
                 st.position, st.shares_a, st.shares_b = -1, -v_a / p_a, v_b / p_b
             else:
@@ -134,6 +146,8 @@ class Trading:
                  thr_train_epochs: int = 40,       # 每期增量訓練 epoch 數
                  thr_min_train_samples: int = 200,  # 樣本不足時使用基準動作
                  thr_menu_version: int = 4,         # P4：5 = 選單含 max_hold 時間維度
+                 hedge_mode: str = "signal",        # 對沖口徑，見 dev/drl_hedge/
+                 min_spread_std: float = 1e-6,
                  entry_gate: dict = None,           # P3：低分散度閘門（date->bool，False 暫停新開倉）
                  full_price_df: pd.DataFrame = None,
                  formation_start: str = None, formation_end: str = None,
@@ -159,7 +173,24 @@ class Trading:
         self.n_actions = len(self.actions)
         self.variant_id = variant_id
         self.entry_gate = entry_gate
+        self.hedge_mode = str(hedge_mode or "signal")
+        self.min_spread_std = float(min_spread_std)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def _leg_scales(self, log_std_a, log_std_b) -> tuple:
+        """兩腳的每單位報酬縮放係數（dev/drl_hedge/PREREGISTRATION.md §四）。
+
+        本模組的 `z_of()` 只有一條路徑——標準化空間
+        $\tilde P = (\ln P - \mu)/\sigma$，故 $\Delta S = r_A/\sigma_A -
+        \beta\, r_B/\sigma_B$，複製它需要 $(1/\sigma_A):(\beta/\sigma_B)$
+        的金額權重。無 `ols_alpha` / `ggr_index` 分支，故比
+        `zscore_trading._leg_scales` 簡單。
+        """
+        if self.hedge_mode != "signal":
+            return 1.0, 1.0
+        sa = max(abs(float(log_std_a)) if log_std_a else 1.0, self.min_spread_std)
+        sb = max(abs(float(log_std_b)) if log_std_b else 1.0, self.min_spread_std)
+        return 1.0 / sa, 1.0 / sb
 
     # ── 形成期特徵（12 維，標準化 ~[-3,3]） ──────────────────────────────
     @staticmethod
@@ -265,6 +296,11 @@ class Trading:
         z_t = z_of(pa_t, pb_t)
         pa_arr, pb_arr = pa_t.values.astype(float), pb_t.values.astype(float)
 
+        # 兩腳的每單位報酬縮放（dev/drl_hedge/）。z_of 只有一條路徑——標準化空間，
+        # 故不需 zscore_trading._leg_scales 的 ols_alpha / ggr_index 分支。
+        # 反事實標籤與正式模擬共用同一組，否則 agent 學的與執行的不是同一件事。
+        leg_scales = self._leg_scales(log_std_a, log_std_b)
+
         # P3 閘門遮罩（None = 全允許）；反事實標籤與正式模擬共用，
         # 確保訓練標籤 = 閘門下可實現的報酬
         if self.entry_gate is not None:
@@ -306,7 +342,8 @@ class Trading:
                 rets[ai] = _fast_threshold_pnl(z_t, pa_arr, pb_arr, hedge_ratio,
                                                self.capital_per_pair, self.friction_rate,
                                                act[0], act[1], act[2],
-                                               allow=gate_arr) / self.capital_per_pair * 100.0
+                                               allow=gate_arr,
+                                               leg_scales=leg_scales) / self.capital_per_pair * 100.0
             sh["buffer"].append((feats, rets, valid_idx[-1]))
 
         # ── 以選定動作執行正式模擬（完整交易紀錄） ────────────────────────
@@ -345,9 +382,10 @@ class Trading:
                         unrealized = cur_pnl
                         status = "HOLDING"
                 elif (not pair_frozen) and (gate_arr is None or gate_arr[i]) and abs(zi) > ez and i < T - 1:
-                    tw = 1.0 + abs(hedge_ratio)
-                    v_a = self.capital_per_pair / tw
-                    v_b = self.capital_per_pair * abs(hedge_ratio) / tw
+                    _sa, _sb = leg_scales
+                    tw = _sa + _sb * abs(hedge_ratio)
+                    v_a = self.capital_per_pair * _sa / tw
+                    v_b = self.capital_per_pair * _sb * abs(hedge_ratio) / tw
                     if zi > ez:
                         st.position, st.shares_a, st.shares_b = -1, -v_a / p_a, v_b / p_b
                         status = "ENTER_SHORT_A"

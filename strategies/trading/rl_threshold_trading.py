@@ -52,10 +52,18 @@ from strategies.trading.drl_threshold_trading import (
 torch.set_num_threads(1)
 
 
+#: 本模組是否真的實作 `hedge_mode`（dev/drl_hedge/）。見 drl_threshold_trading 的同名常數。
+SUPPORTS_HEDGE_MODE = True
+
+
 class Trading:
     """RL (contextual bandit) Threshold-Selection Strategy Interface for run_trading.py"""
 
     _shared: dict = {}      # {scope key -> dict(net, opt, buffer, trained_n, rng, n_decisions)}
+
+    #: 直接沿用 DL-THR 的定義而非另寫一份——本組是「唯一變因為部分回饋」的
+    #: 對照，兩邊的部位建構必須逐位元同源，否則對照的前提就破了。
+    _leg_scales = _DLThreshold._leg_scales
 
     def __init__(self, price_df: pd.DataFrame, trade_dates: pd.DatetimeIndex,
                  selected_pairs: pd.DataFrame, capital_per_pair: float,
@@ -69,10 +77,15 @@ class Trading:
                  rl_epsilon_final: float = None,    # None = 常數 ε；給值則線性衰減至此
                  rl_epsilon_decay_steps: int = 2000,  # 衰減走完所需的決策次數
                  rl_seed: int = None,               # None = 不固定（與 DL-THR 同慣例）
+                 hedge_mode: str = "signal",        # 對沖口徑，見 dev/drl_hedge/
+                 min_spread_std: float = 1e-6,
                  entry_gate: dict = None,
                  full_price_df: pd.DataFrame = None,
                  formation_start: str = None, formation_end: str = None,
                  variant_id: str = "default", **kwargs):
+
+        self.hedge_mode = str(hedge_mode or "signal")
+        self.min_spread_std = float(min_spread_std)
 
         _pct_clean = lambda df: df.where(df.pct_change().abs() <= 0.50).ffill().bfill() if df is not None else None
         self.trade_prices = _pct_clean(price_df.copy())
@@ -188,6 +201,10 @@ class Trading:
         z_t = z_of(pa_t, pb_t)
         pa_arr, pb_arr = pa_t.values.astype(float), pb_t.values.astype(float)
 
+        # 兩腳的每單位報酬縮放（dev/drl_hedge/）。與 DL-THR 共用 _leg_scales 的
+        # 定義，否則「唯一變因為部分回饋」這個對照的前提不成立。
+        leg_scales = self._leg_scales(log_std_a, log_std_b)
+
         if self.entry_gate is not None:
             gate_arr = np.array([self.entry_gate.get(ts, True) for ts in valid_idx], dtype=bool)
         else:
@@ -238,7 +255,7 @@ class Trading:
                 obs_ret = _fast_threshold_pnl(
                     z_t, pa_arr, pb_arr, hedge_ratio,
                     self.capital_per_pair, self.friction_rate,
-                    act[0], act[1], act[2], allow=gate_arr
+                    act[0], act[1], act[2], allow=gate_arr, leg_scales=leg_scales
                 ) / self.capital_per_pair * 100.0
             sh["buffer"].append((feats, action_idx, np.float32(obs_ret), valid_idx[-1]))
 
@@ -278,9 +295,10 @@ class Trading:
                         unrealized = cur_pnl
                         status = "HOLDING"
                 elif (not pair_frozen) and (gate_arr is None or gate_arr[i]) and abs(zi) > ez and i < T - 1:
-                    tw = 1.0 + abs(hedge_ratio)
-                    v_a = self.capital_per_pair / tw
-                    v_b = self.capital_per_pair * abs(hedge_ratio) / tw
+                    _sa, _sb = leg_scales
+                    tw = _sa + _sb * abs(hedge_ratio)
+                    v_a = self.capital_per_pair * _sa / tw
+                    v_b = self.capital_per_pair * _sb * abs(hedge_ratio) / tw
                     if zi > ez:
                         st.position, st.shares_a, st.shares_b = -1, -v_a / p_a, v_b / p_b
                         status = "ENTER_SHORT_A"

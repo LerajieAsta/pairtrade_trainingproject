@@ -28,7 +28,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 # 定義策略初始資金常數，用於計算報酬率與部位佔比
-from strategies.config import INITIAL_CAPITAL, CONCURRENT_PERIODS, RF_ANNUAL
+from strategies.config import INITIAL_CAPITAL, RF_ANNUAL, concurrent_periods
 
 
 # SQLite 的 busy_timeout（秒）。WAL 下寫入者互相排隊，每個 worker 要 executemany
@@ -177,6 +177,22 @@ def init_db(db_path="results/result.db"):
         except Exception:
             pass
 
+    # 舊資料庫遷移：引擎實際使用的並行期數（2026-08-28，REVIEW.md §B）。
+    # 舊列為 NULL；tools/backfill_concurrency.py 負責回填並重算受影響的三欄。
+    try:
+        cursor.execute('ALTER TABLE strategy_summaries ADD COLUMN "Concurrent_Periods" INTEGER;')
+    except Exception:
+        pass
+
+    # 舊資料庫遷移：對沖權重口徑（2026-08-28，REVIEW.md §A）。
+    # **舊列為 NULL 即代表 "dollar"**（修正前的行為）。
+    # 這一欄的存在理由是：全網格重跑若中途中斷，result.db 會同時含兩種口徑的
+    # 列，而它們**不可並列比較**。沒有這個標記就無從辨識，分析會靜默地混用。
+    try:
+        cursor.execute('ALTER TABLE strategy_summaries ADD COLUMN "Hedge_Mode" TEXT;')
+    except Exception:
+        pass
+
     # 2. 建立 trade_logs 表：存放每日明細，包含價格、Z-Score、部位及未實現/已實現損益等
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS trade_logs (
@@ -324,7 +340,13 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
     # Ann_Ret_Employed：動用資本年化 = 總損益 / (日均動用資金 × 年數)
     # Excess_Ret_RF：閒置現金計 rf 利息後的超額年化
     #   = 承諾資本算術年化 + rf×(1−利用率) − rf = 算術年化 − rf×利用率
-    max_pairs = top_n_int * CONCURRENT_PERIODS
+    #
+    # 並行期數逐策略（config.concurrent_periods），不可用全域常數：
+    # HAN4-MONTHLY 為 21/21 → 1 期，用全域 6 會使 max_pairs 大 6 倍，
+    # Avg_Utilization 縮成真值的 1/6、Ann_Ret_Employed 脹成 6 倍。
+    # 2026-08-28 修正，見 dev/trading_arch/REVIEW.md §B。
+    n_concurrent = concurrent_periods(params)
+    max_pairs = top_n_int * n_concurrent
     avg_utilization = ann_ret_employed = excess_ret_rf = 0.0
     if 'Position' in df.columns and max_pairs > 0 and len(portfolio_daily) > 0:
         _daily_open = (
@@ -440,6 +462,11 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         'Avg_Utilization': float(avg_utilization),
         'Ann_Ret_Employed': float(ann_ret_employed),
         'Excess_Ret_RF': float(excess_ret_rf),
+        # 引擎實際使用的並行期數。落庫的理由：讀端（metrics / analysis）
+        # 拿不到 params，只能從此處取權威值，否則又會退回猜全域常數。
+        'Concurrent_Periods': int(n_concurrent),
+        # 對沖權重口徑；NULL/舊列 = "dollar"（見 init_db 的遷移註解）
+        'Hedge_Mode': str(params.get("hedge_mode", "signal")),
         '_path': path_key
     }
 
@@ -490,8 +517,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             "Win_Rate", "Profit_Factor", "Avg_Trade_Days",
             "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss",
             "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF",
-            "ENTRY Z", "DYN Z NUM"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            "ENTRY Z", "DYN Z NUM", "Concurrent_Periods", "Hedge_Mode"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             metrics['_path'], metrics['DATASET'],
             metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
@@ -503,7 +530,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             metrics['Entries'], metrics['Exits'], metrics['Stop_Losses'], metrics['Forced_Closes'],
             metrics['Gross_Profit'], metrics['Gross_Loss'],
             metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF'],
-            metrics['ENTRY Z'], metrics['DYN Z NUM']
+            metrics['ENTRY Z'], metrics['DYN Z NUM'], metrics['Concurrent_Periods'],
+            metrics['Hedge_Mode']
         ))
 
         df_db = df.copy()

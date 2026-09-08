@@ -36,6 +36,7 @@ import numpy as np
 import pandas as pd
 
 from strategies.trading.zscore_trading import Trading as _BaseTrading
+from strategies.trading.zscore_trading import clean_prices
 
 _BASE_INIT_PARAMS = {
     "price_df", "trade_dates", "selected_pairs", "capital_per_pair",
@@ -43,6 +44,9 @@ _BASE_INIT_PARAMS = {
     "allow_reentry", "zscore_clip", "min_spread_std",
     "use_dynamic_stop", "dynamic_stop_z", "portfolio_stop_loss_pct",
     "use_vol_adjust", "vol_regime_threshold", "hold_to_period_end",
+    "hedge_mode",
+    # §F 執行延遲（dev/exec_lag/）。未列入此集合的鍵會被 base_kwargs 過濾掉而靜默失效。
+    "execution_lag", "exec_lag_scope",
 }
 
 
@@ -71,6 +75,11 @@ def _kalman_beta(za: np.ndarray, zb: np.ndarray, a0: float, b0: float,
     return a_out, b_out, e_out, s_out
 
 
+#: 本模組是否真的實作 `hedge_mode`（dev/drl_hedge/PREREGISTRATION.md §四）。
+#: `run_trading` 據此決定落庫的 `Hedge_Mode`——未宣告者一律記為 "dollar"。
+SUPPORTS_HEDGE_MODE = True
+
+
 class Trading(_BaseTrading):
     """Kalman 時變對沖比率。繼承 zscore_trading 的完整狀態機，僅覆寫 spread 建構。"""
 
@@ -84,9 +93,10 @@ class Trading(_BaseTrading):
                  **kwargs):
         base_kwargs = {k: v for k, v in kwargs.items() if k in _BASE_INIT_PARAMS}
         super().__init__(*args, **base_kwargs)
-        _clean = lambda df: (df.where(df.pct_change().abs() <= 0.50).ffill().bfill()
-                             if df is not None else None)
-        self.full_price_df = _clean(full_price_df.copy() if full_price_df is not None else None)
+        # 清洗改走 zscore_trading.clean_prices（單一擁有者 + .attrs 快取）：
+        # 原本此處的 lambda 帶有同一個首列 bfill 前視（REVIEW.md §E），
+        # 且對整張全表逐配對重算一次。
+        self.full_price_df = clean_prices(full_price_df)
         self.formation_start = formation_start
         self.formation_end = formation_end
         self.spread_mode = spread_mode

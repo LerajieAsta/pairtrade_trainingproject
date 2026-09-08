@@ -148,8 +148,13 @@ def compute_range_metrics(path: str, y1: int, y2: int, top_n_str: str,
     pf = float(gp / abs(gl)) if gl != 0 else 0.0
 
     # 文獻口徑（利用率 / 動用資本年化 / rf 超額）
+    #
+    # 並行期數逐策略，不可寫死 6：HAN4-MONTHLY 為 1 期、NOGRP-DTW-TW63 為 3 期。
+    # 權威值由引擎寫入 strategy_summaries.Concurrent_Periods
+    # （2026-08-28，見 dev/trading_arch/REVIEW.md §B）。
     m = re.search(r"(\d+)", str(top_n_str or ""))
-    max_pairs = (int(m.group(1)) if m else 10) * 6      # CONCURRENT_PERIODS = 6
+    from strategies.metrics import concurrent_of
+    max_pairs = (int(m.group(1)) if m else 10) * concurrent_of(path, db_path)
     years = len(daily) / 252.0
     util = float(daily['n_open'].mean() / max_pairs) if max_pairs > 0 else 0.0
     ann_arith = final_pnl / cap / years if years > 0 else 0.0

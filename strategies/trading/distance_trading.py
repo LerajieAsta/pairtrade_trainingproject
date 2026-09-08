@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 
 from strategies.trading.zscore_trading import Trading as _BaseTrading
+from strategies.trading.zscore_trading import clean_prices
 
 # 基底類別 __init__ 明確宣告的參數（過濾 run_trading 傳入的額外 kwargs）
 _BASE_INIT_PARAMS = {
@@ -42,7 +43,15 @@ _BASE_INIT_PARAMS = {
     "allow_reentry", "zscore_clip", "min_spread_std",
     "use_dynamic_stop", "dynamic_stop_z", "portfolio_stop_loss_pct",
     "use_vol_adjust", "vol_regime_threshold", "hold_to_period_end",
+    "hedge_mode",
+    # §F 執行延遲（dev/exec_lag/）。未列入此集合的鍵會被 base_kwargs 過濾掉而靜默失效。
+    "execution_lag", "exec_lag_scope",
 }
+
+
+#: 本模組是否真的實作 `hedge_mode`（dev/drl_hedge/PREREGISTRATION.md §四）。
+#: `run_trading` 據此決定落庫的 `Hedge_Mode`——未宣告者一律記為 "dollar"。
+SUPPORTS_HEDGE_MODE = True
 
 
 class Trading(_BaseTrading):
@@ -64,8 +73,10 @@ class Trading(_BaseTrading):
         #   "zscore_log"  P̃ = (ln P − μ)/σ     （現行；Log_Mean/Log_Std 為 μ、σ）
         #   "ggr_index"   P̃ = P / P_{t0}        （GGR；Log_Mean 攜出 P_{t0}、Log_Std ≡ 1）
         self.normalize_mode = normalize_mode
-        _clean = lambda df: df.where(df.pct_change().abs() <= 0.50).ffill().bfill() if df is not None else None
-        self.full_price_df = _clean(full_price_df.copy() if full_price_df is not None else None)
+        # 清洗改走 zscore_trading.clean_prices 這個單一擁有者：原本此處的 lambda
+        # 帶有同一個首列 bfill 前視（REVIEW.md §E），且對整張全表逐配對重算一次
+        # （211 ms × 5,900 次 ≈ 21 分鐘／變體）。clean_prices 以 .attrs 快取。
+        self.full_price_df = clean_prices(full_price_df)
         self.formation_start = formation_start
         self.formation_end = formation_end
         self._cur_tickers = (None, None)   # 由 _simulate_pair 設定，供 _compute_spread 取形成期相關性
@@ -74,6 +85,24 @@ class Trading(_BaseTrading):
         # 記住本配對，供 _compute_spread 由形成期價格計算距離 spread 的 σ_D
         self._cur_tickers = (ticker_a, ticker_b)
         return super()._simulate_pair(period_start, period_end, sector, ticker_a, ticker_b, *args, **kwargs)
+
+    def _leg_scales(self, ols_alpha, log_std_a, log_std_b, log_mean_a, first_price_a):
+        """距離法的兩腳縮放。
+
+        `zscore_log`：D = P̃_A − P̃_B（β ≡ 1），需 v_A : v_B = 1/σ_A : 1/σ_B。
+            親代的實作已能得出（它以 β=1 代入），故直接沿用。
+
+        `ggr_index`：P̃ = P/P_{t0}，GGR 原文在進場時各投入 \\$1。
+            **不改**——GGR 的 \\$1/\\$1 本就不精確複製它自己的發散度量，那是該
+            方法的既有性質；改了這條臂就不再是 GGR 復現。
+            （此模式下 `log_mean` 攜的是 P_{t0}、`log_std` 恆為 1.0，
+             若誤走親代路徑會得到 (1, 1)，結果相同；此處明寫是為了讓
+             這個決定看得見，而不是靠參數剛好等於 1 而成立。）
+        """
+        if self.normalize_mode == "ggr_index":
+            return 1.0, 1.0
+        return super()._leg_scales(ols_alpha, log_std_a, log_std_b,
+                                   log_mean_a, first_price_a)
 
     def _normalize_pair(self, pa, pb, log_mean_a, log_std_a, log_mean_b, log_std_b):
         """依 normalize_mode 建構兩條正規化價格 P̃_A、P̃_B（形成期與交易期共用）。"""

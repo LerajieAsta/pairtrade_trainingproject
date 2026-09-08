@@ -21,6 +21,12 @@
 from strategies.trading.zscore_trading import Trading as _Breakout, PairState
 
 
+#: 本模組是否真的實作 `hedge_mode`（dev/drl_hedge/PREREGISTRATION.md §四）。
+#: 覆寫的 `_execute_entry` 只改方向引數，資金配置委派給 `super()`，
+#: 故完整沿用親代的 signal 口徑。
+SUPPORTS_HEDGE_MODE = True
+
+
 class Trading(_Breakout):
     """進場時點改為「發散後收斂回帶內」，其餘與 zscore_trading.Trading 相同。"""
 
