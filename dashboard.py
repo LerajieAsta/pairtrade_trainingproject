@@ -1196,6 +1196,255 @@ def render_pair_consistency():
     except Exception as e:
         st.error(f"Error in pair consistency analysis: {e}")
 
+def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
+    """
+    方法層級彙總：一個 METHOD 一列，取該法在目前篩選下最佳的那一格。
+
+    主表是 **config 層級**（每個 METHOD × top_n × 停損 各一列），
+    要看「各個策略誰比較好」得逐一篩選；本表把它壓成一列一策略。
+
+    **「最佳」是一項選擇，不是事實。** 故排名指標由使用者指定，
+    並以同一指標排序——挑選與排序用不同指標會讓表看起來自相矛盾
+    （2026-09-08 修正：原本的三元運算式 `x if x in ('SHARPE',) else 'SHARPE'`
+    因大小寫不符而恆為 'SHARPE'，選了「Ann. Return」仍按 Sharpe 排序）。
+
+    ⚠ 本表**內含選擇偏誤**：每列都是該方法網格中最好的一格。
+    論文的一切績效主張改以全網格等權組合為口徑（見 notebooks/performance_guide），
+    此表僅供瀏覽與挑選 Deep Dive 的對象。
+    """
+    #: 排名指標 → (result.db 欄位, 本表顯示欄名)。兩者必須成對，否則排序會落空。
+    RANK_OPTS = {
+        "Sharpe":            ("Sharpe_Raw",       "SHARPE"),
+        "Ann. Return":       ("Ann_Ret_Raw",      "ANN. RETURN (%)"),
+        "Final Equity":      ("Final_Equity",     "FINAL EQUITY ($)"),
+        "Calmar":            ("Calmar_Raw",       "CALMAR"),
+        "Ann. Ret Employed": ("Ann_Ret_Employed", "ANN. RET EMPL (%)"),
+        "Profit Factor":     ("Profit_Factor",    "PROFIT FACTOR"),
+    }
+
+    st.markdown("### Strategy Summary")
+    st.caption("一個方法一列——每列是該方法在目前篩選下、依所選指標最佳的那一格。")
+
+    if filtered_df.empty or 'METHOD' not in filtered_df.columns:
+        st.info("No strategies match the current filters.")
+        return
+
+    sc1, _sc2 = st.columns([1, 3])
+    with sc1:
+        rank_lab = st.selectbox("Best cell chosen by", list(RANK_OPTS),
+                                key="summary_rank_metric")
+    rank_col, sort_col = RANK_OPTS[rank_lab]
+    if rank_col not in filtered_df.columns:
+        st.info(f"Column {rank_col} not available.")
+        return
+
+    vals = pd.to_numeric(filtered_df[rank_col], errors='coerce')
+    best_idx = vals.groupby(filtered_df['METHOD']).idxmax().dropna()
+    best = filtered_df.loc[best_idx].copy()
+
+    def pct(col):
+        return pd.to_numeric(best.get(col, np.nan), errors='coerce') * 100
+
+    def num(col):
+        return pd.to_numeric(best.get(col, np.nan), errors='coerce')
+
+    out = pd.DataFrame({
+        'METHOD':            best['METHOD'],
+        'BEST CELL':         (best.get('TOP N', '').astype(str) + ' / SL' +
+                              best.get('STOP LOSS %', '').astype(str)),
+        'TRADE':             best.get('TRADE_METHOD', ''),
+        'ANN. RETURN (%)':   pct('Ann_Ret_Raw'),
+        'SHARPE':            num('Sharpe_Raw'),
+        'SORTINO':           num('Sortino_Raw'),
+        'CALMAR':            num('Calmar_Raw'),
+        'MAX DD (%)':        pct('MDD_Raw'),
+        'ANN. RET EMPL (%)': pct('Ann_Ret_Employed'),
+        'UTILIZATION (%)':   pct('Avg_Utilization'),
+        'WIN RATE (%)':      pct('Win_Rate'),
+        'PROFIT FACTOR':     num('Profit_Factor'),
+        'ENTRIES':           num('Entries'),
+        'FINAL EQUITY ($)':  num('Final_Equity'),
+    }).sort_values(sort_col, ascending=False, na_position='last')
+    out.insert(0, '#', range(1, len(out) + 1))
+
+    st.dataframe(
+        out, width="stretch", hide_index=True, height=min(680, 40 + 36 * len(out)),
+        column_config={
+            'ANN. RETURN (%)':   st.column_config.NumberColumn(format="%.3f"),
+            'SHARPE':            st.column_config.NumberColumn(format="%.3f"),
+            'SORTINO':           st.column_config.NumberColumn(format="%.3f"),
+            'CALMAR':            st.column_config.NumberColumn(format="%.3f"),
+            'MAX DD (%)':        st.column_config.NumberColumn(format="%.2f"),
+            'ANN. RET EMPL (%)': st.column_config.NumberColumn(format="%.3f"),
+            'UTILIZATION (%)':   st.column_config.NumberColumn(format="%.1f"),
+            'WIN RATE (%)':      st.column_config.NumberColumn(format="%.1f"),
+            'PROFIT FACTOR':     st.column_config.NumberColumn(format="%.3f"),
+            'ENTRIES':           st.column_config.NumberColumn(format="%d"),
+            'FINAL EQUITY ($)':  st.column_config.NumberColumn(format="$%.0f"),
+        })
+    st.caption(
+        f"{len(out)} methods · 依 **{rank_lab}** 挑格並排序 · "
+        f"自 {len(filtered_df)} 個篩選後的配置壓縮而來。"
+        "低利用率的臂（Utilization ≈ 0）其 Ann. Ret Employed 會極大，"
+        "那是分母近乎零的假象而非績效——請對照 ENTRIES 與 UTILIZATION 一起讀。"
+    )
+    st.download_button("⬇ Download summary CSV",
+                       out.to_csv(index=False).encode('utf-8-sig'),
+                       file_name="strategy_summary.csv", mime="text/csv")
+
+
+def render_equity_curves(display_df: pd.DataFrame, selected_rows: list,
+                         yr_filter_active: bool, yr_start: int, yr_end: int) -> None:
+    """
+    已選列的權益曲線與回撤子圖，並把第一列交給 Deep Dive。
+
+    僅在使用者於主表勾選列時才有內容——未勾選時直接返回，不佔版面。
+    Deep Dive 的日期範圍以「圖上框選」優先，未框選時退回年份篩選區間；
+    兩者都沒有就是全期。
+    """
+    if not selected_rows:
+        return
+    eq_title = f"### Equity Curves"
+    if yr_filter_active:
+        eq_title += f" &nbsp;<span style='font-size:0.85em;color:#94a3b8'>({yr_start}–{yr_end}, re-based to ${INITIAL_CAPITAL:,.0f})</span>"
+    st.markdown(eq_title, unsafe_allow_html=True)
+
+    eq_ctrl1, eq_ctrl2 = st.columns(2)
+    with eq_ctrl1:
+        equity_pct_mode = st.toggle("Show as % Return (not $)", value=False,
+                                    key="eq_pct_mode")
+    with eq_ctrl2:
+        show_drawdown = st.toggle("Show Drawdown subplot", value=True,
+                                  key="eq_show_dd")
+
+    plot_rows = selected_rows[:5]
+    colors = ['#4ade80', '#60a5fa', '#fbd38d', '#f87171', '#c084fc']
+
+    # 上一次框選的日期範圍（rerun 時自 session_state 取得）→ 圖表放大 + Deep Dive 限定
+    box_range = _plotly_box_range(st.session_state.get("eq_chart_sel"))
+    _zoom_y = []      # 收集框選視窗內的 equity y 值極值
+    _zoom_dd_min = 0.0
+
+    n_rows_eq = 2 if show_drawdown else 1
+    row_h = [0.65, 0.35] if show_drawdown else [1.0]
+    fig_eq = make_subplots(
+        rows=n_rows_eq, cols=1, shared_xaxes=True,
+        row_heights=row_h, vertical_spacing=0.05,
+        subplot_titles=(["Equity / Return", "Drawdown (%)"] if show_drawdown
+                        else ["Equity / Return"])
+    )
+
+    y_label = "Return (%)" if equity_pct_mode else "Account Equity ($)"
+
+    # Drawdown 一律以紅色系呈現（水下深度視覺）；多策略以紅橙色階區分
+    dd_colors = ['#ef4444', '#f97316', '#f43f5e', '#fb923c', '#dc2626']
+    single_sel = len(plot_rows) == 1
+
+    for i, row_idx in enumerate(plot_rows):
+        row_sel = display_df.iloc[row_idx]
+        path = row_sel['_path']
+        rank = row_sel['#']
+        # 圖例用完整配置描述（同 METHOD 不同配置可區分）
+        desc = f"#{rank} {make_desc(row_sel)}"
+        raw_df = load_data(path)
+        if raw_df.empty or 'Daily_Delta' not in raw_df.columns:
+            continue
+
+        port = raw_df.groupby('Date')['Daily_Delta'].sum().reset_index()
+        port = port.sort_values('Date').reset_index(drop=True)
+
+        # 年份範圍篩選：re-base 至 INITIAL_CAPITAL（僅累計窗內損益）
+        if yr_filter_active:
+            port = port[
+                (port['Date'].dt.year >= yr_start) &
+                (port['Date'].dt.year <= yr_end)
+            ].copy().reset_index(drop=True)
+        if port.empty:
+            continue
+        port['Equity'] = INITIAL_CAPITAL + port['Daily_Delta'].cumsum()
+
+        if equity_pct_mode:
+            y_vals = (port['Equity'] - INITIAL_CAPITAL) / INITIAL_CAPITAL
+        else:
+            y_vals = port['Equity']
+
+        fig_eq.add_trace(go.Scatter(
+            x=port['Date'], y=y_vals, mode='lines', name=desc,
+            line=dict(width=2, color=colors[i % len(colors)])
+        ), row=1, col=1)
+
+        if show_drawdown:
+            roll_max = port['Equity'].cummax()
+            dd = (port['Equity'] - roll_max) / roll_max
+            fig_eq.add_trace(go.Scatter(
+                x=port['Date'], y=dd, mode='lines', name=f"{desc} DD",
+                line=dict(width=1.5, color=dd_colors[i % len(dd_colors)]),
+                fill='tozeroy' if single_sel else None,
+                fillcolor='rgba(239,68,68,0.22)' if single_sel else None,
+                showlegend=False
+            ), row=2, col=1)
+
+        # 框選視窗內的 y 極值（供放大後的 y 軸自動貼合）
+        if box_range is not None:
+            _m = (port['Date'] >= box_range[0]) & (port['Date'] <= box_range[1])
+            if _m.any():
+                _yw = y_vals[_m]
+                _zoom_y += [float(np.nanmin(_yw)), float(np.nanmax(_yw))]
+                if show_drawdown:
+                    _zoom_dd_min = min(_zoom_dd_min, float(dd[_m].min()))
+
+    # 基準線
+    if equity_pct_mode:
+        fig_eq.add_hline(y=0, line=dict(color='rgba(128,128,128,0.5)', dash='dash', width=1),
+                         row=1, col=1)
+    else:
+        fig_eq.add_hline(y=INITIAL_CAPITAL,
+                         line=dict(color='rgba(128,128,128,0.5)', dash='dash', width=1),
+                         annotation_text=f"Initial Capital ${INITIAL_CAPITAL:,.0f}",
+                         annotation_position="bottom right",
+                         row=1, col=1)
+    if show_drawdown:
+        fig_eq.add_hline(y=0, line=dict(color='rgba(128,128,128,0.3)', width=1),
+                         row=2, col=1)
+
+    fig_eq.update_yaxes(title_text=y_label, row=1)
+    if show_drawdown:
+        fig_eq.update_yaxes(title_text="Drawdown", tickformat=".1%", row=2)
+    # 跳過週末（消除非交易日造成的水平/斜線段）
+    fig_eq.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
+
+    # 框選區間 → 圖表放大到該區間（x 軸鎖定、y 軸貼合視窗內極值）
+    if box_range is not None:
+        fig_eq.update_xaxes(range=[box_range[0], box_range[1]])
+        if _zoom_y:
+            _pad = (max(_zoom_y) - min(_zoom_y)) * 0.05 or (abs(max(_zoom_y)) * 0.02 + 1e-9)
+            fig_eq.update_yaxes(range=[min(_zoom_y) - _pad, max(_zoom_y) + _pad], row=1)
+        if show_drawdown:
+            fig_eq.update_yaxes(range=[_zoom_dd_min * 1.1 - 1e-4, 0.002], row=2)
+
+    fig_eq.update_layout(
+        hovermode="x unified",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=0, r=0, t=40, b=0),
+        height=480 if show_drawdown else 320
+    )
+    if box_range is not None:
+        st.caption(f"🔍 已放大至框選區間 **{box_range[0]:%Y-%m-%d} ~ {box_range[1]:%Y-%m-%d}**，"
+                   f"下方 Deep Dive 同步限定此區間 —— **雙擊圖表** 還原全景。")
+    else:
+        st.caption("🔍 使用圖表工具列的 **Box Select** 框選日期區間：走勢圖將放大至該區間，"
+                   "下方 Deep Dive 亦只分析該區間（雙擊圖表還原）。")
+    st.plotly_chart(fig_eq, width='stretch', key="eq_chart_sel",
+                    on_select="rerun", selection_mode=("box",))
+
+    # Deep Dive 日期範圍：框選優先，未框選時退回年份篩選範圍
+    dd_range = box_range
+    if dd_range is None and yr_filter_active:
+        dd_range = (pd.Timestamp(f"{yr_start}-01-01"), pd.Timestamp(f"{yr_end}-12-31"))
+
+    target_row = display_df.iloc[selected_rows[0]]
+    render_deep_dive(target_row, date_range=dd_range)
+
 
 def main():
     st.write("")
@@ -1368,8 +1617,7 @@ def main():
                                         str(_row.get('TOP N', '')))
             if _rm is not None:
                 for _k, _v in _rm.items():
-                    if _k in filtered_df.columns or True:
-                        filtered_df.loc[_idx, _k] = _v
+                    filtered_df.loc[_idx, _k] = _v
             _pb.progress((_i + 1) / _n)
         _pb.empty()
         # t-test 為全期統計，區間模式下不適用
@@ -1387,81 +1635,6 @@ def main():
     # ══════════════════════════════════════════════
     # DISPLAY CONTROLS（必須在 display_df 欄位賦值之前）
     # ══════════════════════════════════════════════
-    # ── 方法層級彙總：一個策略一列（每個 METHOD 取指定指標最佳的那一格）──────
-    # 主表為 config 層級（912 列），要看「各個策略」得逐一篩選。此處提供
-    # 一個策略一列的總覽，並可切換「以哪個指標選出代表格」。
-    with st.expander("📊 Strategy Summary — one row per method", expanded=True):
-        _sum_src = filtered_df
-        if _sum_src.empty or 'METHOD' not in _sum_src.columns:
-            st.info("No strategies match the current filters.")
-        else:
-            _RANK_OPTS = {
-                "Sharpe":            "Sharpe_Raw",
-                "Ann. Return":       "Ann_Ret_Raw",
-                "Final Equity":      "Final_Equity",
-                "Calmar":            "Calmar_Raw",
-                "Ann. Ret Employed": "Ann_Ret_Employed",
-                "Profit Factor":     "Profit_Factor",
-            }
-            sc1, sc2 = st.columns([1, 3])
-            with sc1:
-                _rank_lab = st.selectbox("Best cell chosen by", list(_RANK_OPTS),
-                                         key="summary_rank_metric")
-            _rank_col = _RANK_OPTS[_rank_lab]
-            if _rank_col not in _sum_src.columns:
-                st.info(f"Column {_rank_col} not available.")
-            else:
-                _v = pd.to_numeric(_sum_src[_rank_col], errors='coerce')
-                _best_idx = _v.groupby(_sum_src['METHOD']).idxmax().dropna()
-                _b = _sum_src.loc[_best_idx].copy()
-
-                def _pc(col):
-                    return pd.to_numeric(_b.get(col, np.nan), errors='coerce') * 100
-
-                _out = pd.DataFrame({
-                    'METHOD':            _b['METHOD'],
-                    'BEST CELL':         (_b.get('TOP N', '').astype(str) + ' / SL' +
-                                          _b.get('STOP LOSS %', '').astype(str)),
-                    'TRADE':             _b.get('TRADE_METHOD', ''),
-                    'ANN. RETURN (%)':   _pc('Ann_Ret_Raw'),
-                    'SHARPE':            pd.to_numeric(_b.get('Sharpe_Raw', np.nan), errors='coerce'),
-                    'SORTINO':           pd.to_numeric(_b.get('Sortino_Raw', np.nan), errors='coerce'),
-                    'CALMAR':            pd.to_numeric(_b.get('Calmar_Raw', np.nan), errors='coerce'),
-                    'MAX DD (%)':        _pc('MDD_Raw'),
-                    'ANN. RET EMPL (%)': _pc('Ann_Ret_Employed'),
-                    'UTILIZATION (%)':   _pc('Avg_Utilization'),
-                    'WIN RATE (%)':      _pc('Win_Rate'),
-                    'PROFIT FACTOR':     pd.to_numeric(_b.get('Profit_Factor', np.nan), errors='coerce'),
-                    'ENTRIES':           pd.to_numeric(_b.get('Entries', np.nan), errors='coerce'),
-                    'FINAL EQUITY ($)':  pd.to_numeric(_b.get('Final_Equity', np.nan), errors='coerce'),
-                }).sort_values(_rank_lab if _rank_lab in ('SHARPE',) else 'SHARPE',
-                               ascending=False, na_position='last')
-                _out.insert(0, '#', range(1, len(_out) + 1))
-                st.dataframe(
-                    _out, width="stretch", hide_index=True, height=min(680, 40 + 36 * len(_out)),
-                    column_config={
-                        'ANN. RETURN (%)':   st.column_config.NumberColumn(format="%.3f"),
-                        'SHARPE':            st.column_config.NumberColumn(format="%.3f"),
-                        'SORTINO':           st.column_config.NumberColumn(format="%.3f"),
-                        'CALMAR':            st.column_config.NumberColumn(format="%.3f"),
-                        'MAX DD (%)':        st.column_config.NumberColumn(format="%.2f"),
-                        'ANN. RET EMPL (%)': st.column_config.NumberColumn(format="%.3f"),
-                        'UTILIZATION (%)':   st.column_config.NumberColumn(format="%.1f"),
-                        'WIN RATE (%)':      st.column_config.NumberColumn(format="%.1f"),
-                        'PROFIT FACTOR':     st.column_config.NumberColumn(format="%.3f"),
-                        'ENTRIES':           st.column_config.NumberColumn(format="%d"),
-                        'FINAL EQUITY ($)':  st.column_config.NumberColumn(format="$%.0f"),
-                    })
-                st.caption(
-                    f"{len(_out)} methods · each row is that method's best cell by **{_rank_lab}** "
-                    f"out of its {len(_sum_src)} filtered configurations. "
-                    "低利用率的臂（如 Utilization ≈ 0）其 Ann. Ret Employed 會極大，"
-                    "那是分母近乎零的假象而非績效——請對照 ENTRIES 與 UTILIZATION 一起讀。"
-                )
-                st.download_button("⬇ Download summary CSV",
-                                   _out.to_csv(index=False).encode('utf-8-sig'),
-                                   file_name="strategy_summary.csv", mime="text/csv")
-
     ctrl1, ctrl2, ctrl3 = st.columns(3)
     with ctrl1:
         expand_config = st.toggle("Expand Config Columns", value=False,
@@ -1511,8 +1684,11 @@ def main():
     else:
         best_ann = best_shp = best_mdd = best_cal = best_pf = best_wr = empty_series
 
+    # 年份區間也算篩選：此時卡片上的數字已是 compute_range_metrics 的重算值，
+    # 不標註會讓人誤以為是全期績效。
     filter_note = " (filtered)" if (sel_methods or any(v != "All" for v in sel_vals.values())
-                                    or qf_profitable or qf_high_sharpe) else ""
+                                    or qf_profitable or qf_high_sharpe
+                                    or yr_filter_active) else ""
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric(f"BEST ANN. RETURN{filter_note}",
@@ -1540,6 +1716,7 @@ def main():
 
     if len(filtered_df) == 0:
         st.info("No data matches current filters.")
+        render_strategy_summary(filtered_df)
         return
 
     # 預設依年化報酬排序；使用者可直接點表頭改排序（欄位皆為數值型別）
@@ -1722,149 +1899,20 @@ def main():
     selected_rows = event.selection.rows
 
     # ══════════════════════════════════════════════
-    # EQUITY CURVE + DRAWDOWN CHART
+    # EQUITY CURVE + DRAWDOWN + DEEP DIVE
     # ══════════════════════════════════════════════
-    if len(selected_rows) > 0:
-        eq_title = f"### Equity Curves"
-        if yr_filter_active:
-            eq_title += f" &nbsp;<span style='font-size:0.85em;color:#94a3b8'>({yr_start}–{yr_end}, re-based to ${INITIAL_CAPITAL:,.0f})</span>"
-        st.markdown(eq_title, unsafe_allow_html=True)
+    render_equity_curves(display_df, selected_rows,
+                         yr_filter_active, int(yr_start), int(yr_end))
 
-        eq_ctrl1, eq_ctrl2 = st.columns(2)
-        with eq_ctrl1:
-            equity_pct_mode = st.toggle("Show as % Return (not $)", value=False,
-                                        key="eq_pct_mode")
-        with eq_ctrl2:
-            show_drawdown = st.toggle("Show Drawdown subplot", value=True,
-                                      key="eq_show_dd")
-
-        plot_rows = selected_rows[:5]
-        colors = ['#4ade80', '#60a5fa', '#fbd38d', '#f87171', '#c084fc']
-
-        # 上一次框選的日期範圍（rerun 時自 session_state 取得）→ 圖表放大 + Deep Dive 限定
-        box_range = _plotly_box_range(st.session_state.get("eq_chart_sel"))
-        _zoom_y = []      # 收集框選視窗內的 equity y 值極值
-        _zoom_dd_min = 0.0
-
-        n_rows_eq = 2 if show_drawdown else 1
-        row_h = [0.65, 0.35] if show_drawdown else [1.0]
-        fig_eq = make_subplots(
-            rows=n_rows_eq, cols=1, shared_xaxes=True,
-            row_heights=row_h, vertical_spacing=0.05,
-            subplot_titles=(["Equity / Return", "Drawdown (%)"] if show_drawdown
-                            else ["Equity / Return"])
-        )
-
-        y_label = "Return (%)" if equity_pct_mode else "Account Equity ($)"
-
-        # Drawdown 一律以紅色系呈現（水下深度視覺）；多策略以紅橙色階區分
-        dd_colors = ['#ef4444', '#f97316', '#f43f5e', '#fb923c', '#dc2626']
-        single_sel = len(plot_rows) == 1
-
-        for i, row_idx in enumerate(plot_rows):
-            row_sel = display_df.iloc[row_idx]
-            path = row_sel['_path']
-            rank = row_sel['#']
-            # 圖例用完整配置描述（同 METHOD 不同配置可區分）
-            desc = f"#{rank} {make_desc(row_sel)}"
-            raw_df = load_data(path)
-            if raw_df.empty or 'Daily_Delta' not in raw_df.columns:
-                continue
-
-            port = raw_df.groupby('Date')['Daily_Delta'].sum().reset_index()
-            port = port.sort_values('Date').reset_index(drop=True)
-
-            # 年份範圍篩選：re-base 至 INITIAL_CAPITAL（僅累計窗內損益）
-            if yr_filter_active:
-                port = port[
-                    (port['Date'].dt.year >= yr_start) &
-                    (port['Date'].dt.year <= yr_end)
-                ].copy().reset_index(drop=True)
-            if port.empty:
-                continue
-            port['Equity'] = INITIAL_CAPITAL + port['Daily_Delta'].cumsum()
-
-            if equity_pct_mode:
-                y_vals = (port['Equity'] - INITIAL_CAPITAL) / INITIAL_CAPITAL
-            else:
-                y_vals = port['Equity']
-
-            fig_eq.add_trace(go.Scatter(
-                x=port['Date'], y=y_vals, mode='lines', name=desc,
-                line=dict(width=2, color=colors[i % len(colors)])
-            ), row=1, col=1)
-
-            if show_drawdown:
-                roll_max = port['Equity'].cummax()
-                dd = (port['Equity'] - roll_max) / roll_max
-                fig_eq.add_trace(go.Scatter(
-                    x=port['Date'], y=dd, mode='lines', name=f"{desc} DD",
-                    line=dict(width=1.5, color=dd_colors[i % len(dd_colors)]),
-                    fill='tozeroy' if single_sel else None,
-                    fillcolor='rgba(239,68,68,0.22)' if single_sel else None,
-                    showlegend=False
-                ), row=2, col=1)
-
-            # 框選視窗內的 y 極值（供放大後的 y 軸自動貼合）
-            if box_range is not None:
-                _m = (port['Date'] >= box_range[0]) & (port['Date'] <= box_range[1])
-                if _m.any():
-                    _yw = y_vals[_m]
-                    _zoom_y += [float(np.nanmin(_yw)), float(np.nanmax(_yw))]
-                    if show_drawdown:
-                        _zoom_dd_min = min(_zoom_dd_min, float(dd[_m].min()))
-
-        # 基準線
-        if equity_pct_mode:
-            fig_eq.add_hline(y=0, line=dict(color='rgba(128,128,128,0.5)', dash='dash', width=1),
-                             row=1, col=1)
-        else:
-            fig_eq.add_hline(y=INITIAL_CAPITAL,
-                             line=dict(color='rgba(128,128,128,0.5)', dash='dash', width=1),
-                             annotation_text=f"Initial Capital ${INITIAL_CAPITAL:,.0f}",
-                             annotation_position="bottom right",
-                             row=1, col=1)
-        if show_drawdown:
-            fig_eq.add_hline(y=0, line=dict(color='rgba(128,128,128,0.3)', width=1),
-                             row=2, col=1)
-
-        fig_eq.update_yaxes(title_text=y_label, row=1)
-        if show_drawdown:
-            fig_eq.update_yaxes(title_text="Drawdown", tickformat=".1%", row=2)
-        # 跳過週末（消除非交易日造成的水平/斜線段）
-        fig_eq.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])])
-
-        # 框選區間 → 圖表放大到該區間（x 軸鎖定、y 軸貼合視窗內極值）
-        if box_range is not None:
-            fig_eq.update_xaxes(range=[box_range[0], box_range[1]])
-            if _zoom_y:
-                _pad = (max(_zoom_y) - min(_zoom_y)) * 0.05 or (abs(max(_zoom_y)) * 0.02 + 1e-9)
-                fig_eq.update_yaxes(range=[min(_zoom_y) - _pad, max(_zoom_y) + _pad], row=1)
-            if show_drawdown:
-                fig_eq.update_yaxes(range=[_zoom_dd_min * 1.1 - 1e-4, 0.002], row=2)
-
-        fig_eq.update_layout(
-            hovermode="x unified",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=0, r=0, t=40, b=0),
-            height=480 if show_drawdown else 320
-        )
-        if box_range is not None:
-            st.caption(f"🔍 已放大至框選區間 **{box_range[0]:%Y-%m-%d} ~ {box_range[1]:%Y-%m-%d}**，"
-                       f"下方 Deep Dive 同步限定此區間 —— **雙擊圖表** 還原全景。")
-        else:
-            st.caption("🔍 使用圖表工具列的 **Box Select** 框選日期區間：走勢圖將放大至該區間，"
-                       "下方 Deep Dive 亦只分析該區間（雙擊圖表還原）。")
-        st.plotly_chart(fig_eq, width='stretch', key="eq_chart_sel",
-                        on_select="rerun", selection_mode=("box",))
-
-        # Deep Dive 日期範圍：框選優先，未框選時退回年份篩選範圍
-        dd_range = box_range
-        if dd_range is None and yr_filter_active:
-            dd_range = (pd.Timestamp(f"{yr_start}-01-01"), pd.Timestamp(f"{yr_end}-12-31"))
-
-        target_row = display_df.iloc[selected_rows[0]]
-        render_deep_dive(target_row, date_range=dd_range)
+    # ══════════════════════════════════════════════
+    # STRATEGY SUMMARY（置於最下層）
+    # ══════════════════════════════════════════════
+    # 放在最後而非最前：本頁的閱讀動線是「篩選 → 看整體最佳 → 主表挑列 →
+    # 曲線與 Deep Dive 逐格細看」，而本表是**壓縮過的**總覽（每個方法只留
+    # 最好的一格），屬於看完細節後的回顧，不是進入細節前的前提。
+    # 它也內含選擇偏誤，放在最前會讓人把「各方法最佳格」誤讀為代表值。
+    st.markdown("---")
+    render_strategy_summary(filtered_df)
 
 
 if __name__ == "__main__":
