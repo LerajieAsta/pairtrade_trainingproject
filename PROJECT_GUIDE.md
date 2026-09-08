@@ -7,12 +7,12 @@
 ```text
 pairtrade_trainingproject/
 ├── strategies/
-│   ├── config.py                  # 5×3 分組×排序 Grid 宣告式展開（40 條現役策略）、網格參數、全域設定、敏感性 OFAT 產生器
+│   ├── config.py                  # 5×3 分組×排序 Grid 宣告式展開（49 條現役策略）、網格參數、全域設定、敏感性 OFAT 產生器
 │   ├── db_utils.py                # SQLite 合併、讀寫工具
 │   ├── portfolio_manager.py       # 組合層級資金管理（MSR 產業上限）
 │   ├── preprocess_equity.py       # 權益曲線前處理
 │   ├── formation/
-│   │   ├── cluster_formation.py   # ★ 中性組裝器：feature_mode × cluster_method × ranking_backend 參數驅動，40 條現役策略共用
+│   │   ├── cluster_formation.py   # ★ 中性組裝器：feature_mode × cluster_method × ranking_backend 參數驅動，49 條現役策略共用
 │   │   ├── _clustering.py         # 分群 dispatcher：hdbscan／agglomerative／kmeans backend（GICS 分組不經此層）
 │   │   ├── _ranking.py            # 排序 dispatcher：委派 ssd_rolling.Formation（ssd）／DTW_Cointegration_Paper.Formation（dtw、ssd_dtw_pca）
 │   │   ├── _features.py           # 報酬 PCA 因子載荷 + 基本面混合特徵萃取（供任何分群 backend 共用）
@@ -145,7 +145,7 @@ results/
 **分組層對候選池的限制強度**為有序維度（不再是「ML vs 傳統」的二分對照），
 `_GRID_CLUSTERS` 擴為五級，主軸成為 **5 分組 × 3 排序 = 15 格**。
 
-`strategies_raw_all` 為現役策略池（**40 條**，0-based 索引），
+`strategies_raw_all` 為現役策略池（**49 條**，0-based 索引），
 `strategies_raw = strategies_raw_all[:]` 決定實際執行範圍
 （或用環境變數 `STRATEGIES_SLICE` 免改檔覆寫，支援逗號複合切片）：
 
@@ -181,28 +181,42 @@ STRATEGIES_SLICE="0:15" python run_trading.py   # 只跑主軸 15 格
 **交易層**（#15–19 對其配對底）學習式門檻選擇是否優於固定門檻；
 **兩層組合**（資料驅動分群 + DL-THR vs GICS + 固定門檻）。
 
-**2026-08-20 檢定結果**（`analysis/`，抽樣單位為時間、循環 block bootstrap L=126）：
+**2026-09-08 檢定結果**（`analysis/`，抽樣單位為時間、循環 block bootstrap L=126；
+對沖口徑修正後全鏈重算）：
 
-- **三項檢定經 BH-FDR 校正後皆 0 顯著**，方向則一致：
-  分組層 9/9 偏向 GICS、交易層 5/5 為正、兩層組合全期 3/3 為負。
+- **三項檢定中僅交易層通過 BH-FDR 校正**，方向則一致：
+  分組層 9/9 偏向 GICS（0/9 顯著）、交易層 5/5 為正（**3/5 顯著**）、
+  兩層組合全期 2/3 為負（0/3 顯著）。
 - **分組層**：限制愈強績效愈差。逐格觀之，不分組三格全部優於同排序的 GICS，
   GICS 三格又全部優於任一資料驅動分群格。列平均 Sharpe 為
-  不分組 +0.081、GICS +0.024、AGG −0.065、HDB −0.116、KM −0.249。
+  不分組 +0.109、GICS +0.062、AGG +0.010、HDB −0.053、KM −0.179。
   ⚠️ 非嚴格單調：AGG 排除標的多於 HDB 卻表現較好。
-- **機制**：期末強制平倉。強平率隨限制強度自 36.8% 單調升至 43.1%，
-  與績效的相關在 15 個參數配置中一致為負（中位 r = −0.801）。
-  逐筆勝率 0.578、獲利因子 0.969——多數交易收斂獲利但被少數大額虧損吃光。
-  強平的配對再追 126 日僅 39.1% 回歸，其餘 |z| 自 4.88 擴大至 6.61。
-  ⚠️ 全樣本混合的相關為 **+0.201**（符號相反，停損維度造成的 Simpson 悖論），
+  ⚠️ GICS 最低格 +0.043 對分群最高格 +0.042——**該分離僅差 0.001，已無餘裕**。
+- **機制**：期末強制平倉。強平率隨限制強度自 33.5% 單調升至 39.0%，
+  與績效的相關在 15 個參數配置中一致為負（中位 r = −0.747）。
+  逐筆勝率 0.591、獲利因子 0.995——多數交易收斂獲利，但期末強平與停損兩股虧損
+  合計吃掉收斂獲利的 89%–107%，淨額佔比自不分組 10.7% 降至 K-means −6.9%。
+  強平的配對再追 126 日僅 45.4% 回歸，其餘 |z| 自 4.57 擴大至 6.82。
+  ⚠️ 全樣本混合的相關為 **+0.483**（符號相反，停損維度造成的 Simpson 悖論），
   **不可引用**。
-- **交易層**：五底方向全正（+0.112 ~ +0.573pp），增益最大者為兩條 GICS 底。
-  三項機械性替代解釋（SKIP 選股、門檻水準、總曝險）在 GICS 兩底皆排除；
-  K-means 底的增益屬機械效應，Agglomerative 底無增益。
-  五輪重訓的跨輪全距 0.010–0.047 個 Sharpe 單位。
-- **絕對績效**：最佳為 GICS-SDP + DL-THR，25 年 10,000 → 12,548（年化 0.914%）；
-  最佳固定門檻配置為不分組 × DTW（12,236）。
+- **交易層**：五底方向全正（+0.239 ~ +0.798pp），增益最大者為 GICS-SSD 底。
+  **這是全篇唯一通過多重檢定校正的一組**，惟其中兩組的校正後 p 恰為 0.050。
+  三項機械性替代解釋（SKIP 選股、門檻水準、總曝險）在 **GICS-SSD／HDBSCAN／GICS-SDP
+  三底全部排除**；AGG 底的表面增益多半可由「調高門檻」解釋（其純門檻管道自身即顯著），
+  K-means 底的 SKIP 技巧成分為負。
+  SKIP 置換由 4/75 改為 **8/75** 顯著（p=0.034）——方向是「SKIP 確有技巧」，
+  舊版「不具可證實的技巧」已撤回（起因見附錄 B.5.4 的快取未失效）。
+  五輪重訓的跨輪標準差中位 0.031、全距中位 0.069；
+  對沖修正造成的位移已由預先註冊判準確認超出雜訊（88/120，p=3.7e−36），
+  唯 `KM-SSD-DRL` 臂（6/15，p=0.061）不可單獨宣稱。
+- **絕對績效**：最佳為 GICS-SSD + DL-THR，25 年 10,000 → 13,062（年化 1.026%）；
+  最佳固定門檻配置為不分組 × DTW（12,827）。
   同期無風險（2%）約 16,400——**任何配置皆未達此水準**。
-  DSR 於 N=44 下無一通過 0.95（最高 0.769）。
+  對「日均報酬為零」的檢定 **6/6 不顯著**；
+  DSR 於 N=53、SR0=0.408 下無一通過 0.95（最高 0.885，該臂後半 Sharpe −0.389）。
+  前後半分割：491 個可分割基準格中僅 **29 個（5.9%）**兩半皆正；
+  以前半 Sharpe 取前 10，後半 **10/10 為負**。
+  **相對顯著不等於可交易**——交易層通過的是相對於 Z-Score 的差。
 
 **⚠️ 2026-08 管線修正**：形成期有六項實作與宣告不符（ADF 誤用 DF 臨界值、
 Hurst 測錯對象、HDBSCAN 噪音被當成群、產業中位數插補、候選截斷、
@@ -255,7 +269,7 @@ _features.py            _clustering.py              _ranking.py
 ```
 
 `cluster_formation.py` 依 `strategies/config.py` 傳入的 `feature_mode`／`cluster_method`／
-`ranking_backend`／`filter_mode` 四個參數，把上述三層串成一條 formation pipeline；17 條現役
+`ranking_backend`／`filter_mode` 四個參數，把上述三層串成一條 formation pipeline；49 條現役
 策略（見第 3 節）皆走同一份程式碼，唯一差異是這四個參數的組合。舊版「一策略一模組」的公式
 與診斷細節（已封存但可復活）仍可在對應 notebook 找到，見 `notebooks/formation/`
 （`hdbscan_cluster_pca5.ipynb`、`agglomerative_fundamentals.ipynb`、`kmeans_fundamentals.ipynb`、
@@ -279,7 +293,7 @@ ADF 淘汰 22.6%、半衰期 **0.2%**、Hurst **96.8%**；而承擔 96.8% 的 Hu
 標準版的 `H<0.5` 通過率為 0%。完整診斷見 `thesis/07_附錄B_管線修正記錄.md` B.1.2。
 
 `filter_mode` 三值：`adf_only`（現役）／`coint`（三道，僅供復現舊結果）／
-`none`（零道，消融用）。現役 40 條中 34 條為 `adf_only`、6 條為 `none`
+`none`（零道，消融用）。現役 49 條中 40 條為 `adf_only`、9 條為 `none`
 （刻意的無篩選消融）。
 
 ### 「組合優於重寫」架構模式（已從模組層下沉到函式層）

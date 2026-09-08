@@ -1115,7 +1115,7 @@ margin-right: 0; }
 <p><strong>兩個最容易誤讀的欄位</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>「pp」不是「%」。</strong> 本研究的策略絕對年化報酬多落在 −0.6% 至 +0.9%， 而交易層的效果量中位為 +0.456 <strong>pp</strong>——<strong>效果量與報酬水準本身同量級</strong>。 這不矛盾：Δ 是兩臂相減，共同的市場成分已被消去（§3.5）。</p>
+<p><strong>「pp」不是「%」。</strong> 本研究的策略絕對年化報酬多落在 −0.6% 至 +0.9%， 而交易層的效果量中位為 +0.579 <strong>pp</strong>——<strong>效果量與報酬水準本身同量級</strong>。 這不矛盾：Δ 是兩臂相減，共同的市場成分已被消去（§3.5）。</p>
 <p><strong>「逐格顯著 2/15」不是「只有 2 格有效」。</strong> 15 格方向多數一致卻只有少數 單獨顯著，代表的是<strong>單格樣本不足以偵測</strong>，而非效果只出現在那幾格。 主張一律以等權組合為準（§3.5 報告口徑）。</p>
 </div>
 </div>
@@ -1148,84 +1148,84 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: left;">DTW</td>
-<td style="text-align: right;">−0.229</td>
-<td style="text-align: center;">[−1.11, +0.65]</td>
-<td style="text-align: right;">0.607</td>
-<td style="text-align: right;">0.607</td>
+<td style="text-align: right;">−0.164</td>
+<td style="text-align: center;">[−0.98, +0.62]</td>
+<td style="text-align: right;">0.689</td>
+<td style="text-align: right;">0.689</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
 <td style="text-align: left;">DTW</td>
-<td style="text-align: right;">−0.387</td>
-<td style="text-align: center;">[−1.17, +0.40]</td>
-<td style="text-align: right;">0.335</td>
-<td style="text-align: right;">0.377</td>
+<td style="text-align: right;">−0.289</td>
+<td style="text-align: center;">[−1.04, +0.44]</td>
+<td style="text-align: right;">0.454</td>
+<td style="text-align: right;">0.531</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: left;">SSD</td>
-<td style="text-align: right;">−0.447</td>
-<td style="text-align: center;">[−1.38, +0.38]</td>
-<td style="text-align: right;">0.322</td>
-<td style="text-align: right;">0.377</td>
+<td style="text-align: left;">SDP</td>
+<td style="text-align: right;">−0.302</td>
+<td style="text-align: center;">[−1.11, +0.46]</td>
+<td style="text-align: right;">0.458</td>
+<td style="text-align: right;">0.531</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: left;">SDP</td>
-<td style="text-align: right;">−0.451</td>
-<td style="text-align: center;">[−1.31, +0.35]</td>
-<td style="text-align: right;">0.281</td>
-<td style="text-align: right;">0.377</td>
+<td style="text-align: left;">SSD</td>
+<td style="text-align: right;">−0.336</td>
+<td style="text-align: center;">[−1.30, +0.52]</td>
+<td style="text-align: right;">0.472</td>
+<td style="text-align: right;">0.531</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: left;">SSD</td>
-<td style="text-align: right;">−0.715</td>
-<td style="text-align: center;">[−1.53, +0.01]</td>
-<td style="text-align: right;">0.068</td>
-<td style="text-align: right;">0.179</td>
+<td style="text-align: left;">SDP</td>
+<td style="text-align: right;">−0.538</td>
+<td style="text-align: center;">[−1.29, +0.15]</td>
+<td style="text-align: right;">0.139</td>
+<td style="text-align: right;">0.250</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: left;">SDP</td>
-<td style="text-align: right;">−0.721</td>
-<td style="text-align: center;">[−1.51, <strong>−0.01</strong>]</td>
-<td style="text-align: right;">0.061</td>
-<td style="text-align: right;">0.179</td>
+<td style="text-align: left;">SSD</td>
+<td style="text-align: right;">−0.664</td>
+<td style="text-align: center;">[−1.52, +0.07]</td>
+<td style="text-align: right;">0.097</td>
+<td style="text-align: right;">0.218</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: left;">SSD</td>
+<td style="text-align: right;">−0.881</td>
+<td style="text-align: center;">[−1.86, +0.03]</td>
+<td style="text-align: right;">0.066</td>
+<td style="text-align: right;">0.218</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: left;">DTW</td>
-<td style="text-align: right;">−0.900</td>
-<td style="text-align: center;">[−2.06, +0.21]</td>
-<td style="text-align: right;">0.118</td>
-<td style="text-align: right;">0.213</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">K-means</td>
-<td style="text-align: left;">SSD</td>
-<td style="text-align: right;">−0.913</td>
-<td style="text-align: center;">[−2.01, +0.06]</td>
-<td style="text-align: right;">0.080</td>
-<td style="text-align: right;">0.179</td>
+<td style="text-align: right;">−0.922</td>
+<td style="text-align: center;">[−1.98, +0.12]</td>
+<td style="text-align: right;">0.083</td>
+<td style="text-align: right;">0.218</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: left;">SDP</td>
-<td style="text-align: right;">−1.000</td>
-<td style="text-align: center;">[−2.13, +0.01]</td>
-<td style="text-align: right;">0.065</td>
-<td style="text-align: right;">0.179</td>
+<td style="text-align: right;"><strong>−0.996</strong></td>
+<td style="text-align: center;">[−2.04, <strong>−0.07</strong>]</td>
+<td style="text-align: right;"><strong>0.048</strong></td>
+<td style="text-align: right;">0.218</td>
 </tr>
 </tbody>
 </table>
-<p><strong>方向 9/9 偏向 GICS，BH 校正後無一顯著</strong>（校正後最小 <span class="math inline">p</span> = 0.179）。</p>
+<p><strong>方向 9/9 偏向 GICS，BH 校正後無一顯著</strong>（校正後最小 <span class="math inline">p</span> = 0.218）。 校正前有一組達 5% 顯著——K-means × SDP，區間整段落在零的左側， <strong>方向是 GICS 較優</strong>，即該格指向資料驅動分群顯著較差。</p>
 <blockquote>
 <p>九組方向全部一致，此型態比任何單組的 <span class="math inline">p</span> 值更有訊息量。 惟九組彼此不獨立（每三組共用同一 GICS 臂），故不施加正式的方向一致性檢定。</p>
 </blockquote>
 
 <aside><div>
-<p>全程並行計算 Newey-West HAC 作為參數法對照，<strong>17 組對照兩法結論完全一致</strong>（校正後皆不顯著）；完整雙欄見 <code>results/analysis/</code> 各 CSV。</p>
+<p>全程並行計算 Newey-West HAC 作為參數法對照，<strong>17 組對照兩法的方向與量級一致</strong>；分組層與兩層組合在兩法下皆無顯著，交易層兩法皆有四組於校正前顯著。完整雙欄見 <code>results/analysis/</code> 各 CSV。</p>
 </div></aside></section>
 <section id="兩種不顯著的性質不同" class="slide level2">
 <h2>兩種「不顯著」的性質不同</h2>
@@ -1255,23 +1255,24 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">分組層</td>
-<td style="text-align: right;">0.449</td>
-<td style="text-align: right;">1.762 pp</td>
-<td style="text-align: right;"><strong>1.259 pp</strong></td>
-<td style="text-align: right;"><strong>10%</strong></td>
+<td style="text-align: right;">0.408</td>
+<td style="text-align: right;">1.600 pp</td>
+<td style="text-align: right;"><strong>1.143 pp</strong></td>
+<td style="text-align: right;"><strong>11%</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">交易層</td>
 <td style="text-align: right;">0.223</td>
-<td style="text-align: right;">0.874 pp</td>
-<td style="text-align: right;"><strong>0.624 pp</strong></td>
+<td style="text-align: right;">0.876 pp</td>
+<td style="text-align: right;"><strong>0.626 pp</strong></td>
 <td style="text-align: right;">27%</td>
 </tr>
 </tbody>
 </table>
-<p><strong>分組層的 MDE（1.26 pp）大於 GICS 參照臂自身的等權年化（+0.419%）</strong> → 連「效果大到足以翻轉參照臂損益方向」的差異都未必看得見。</p>
+<p><strong>分組層的 MDE（1.14 pp）大於 GICS 參照臂自身的等權年化（+0.461%）</strong> → 連「效果大到足以翻轉參照臂損益方向」的差異都未必看得見。</p>
 <blockquote>
-<p>分組層的 null <strong>幾乎不帶資訊</strong>；但其點估計方向 9/9 一致、量級中位 −0.715 pp， 已達 MDE 的一半以上——資料無法排除「資料驅動分群顯著較差」， 其程度遠甚於無法排除「兩者相當」。</p>
+<p>分組層的 null <strong>幾乎不帶資訊</strong>；但其點估計方向 9/9 一致、量級中位 −0.538 pp， 且最負的一格已於校正前顯著——資料無法排除「資料驅動分群顯著較差」， 其程度遠甚於無法排除「兩者相當」。</p>
+<p>交易層則相反：MDE 0.63 pp 與觀測中位 +0.579 pp 同量級， 效果恰落在看得見的邊界上，故該層能通過校正而分組層不能。</p>
 </blockquote>
 </section>
 <section id="分組限制強度一條有序的維度" class="slide level2">
@@ -1291,37 +1292,37 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;"><strong>不分組</strong></td>
 <td style="text-align: right;"><strong>0%</strong></td>
-<td style="text-align: right;"><strong>36.8%</strong></td>
-<td style="text-align: right;"><strong>+0.081</strong></td>
-<td style="text-align: right;"><strong>+0.683%</strong></td>
+<td style="text-align: right;"><strong>33.5%</strong></td>
+<td style="text-align: right;"><strong>+0.109</strong></td>
+<td style="text-align: right;"><strong>+0.676%</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS 產業</td>
 <td style="text-align: right;">15.1%</td>
-<td style="text-align: right;">39.6%</td>
-<td style="text-align: right;">+0.024</td>
-<td style="text-align: right;">+0.419%</td>
+<td style="text-align: right;">36.1%</td>
+<td style="text-align: right;">+0.062</td>
+<td style="text-align: right;">+0.461%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN</td>
 <td style="text-align: right;">26.4%</td>
-<td style="text-align: right;">40.5%</td>
-<td style="text-align: right;">−0.116</td>
-<td style="text-align: right;">−0.186%</td>
+<td style="text-align: right;">36.7%</td>
+<td style="text-align: right;">−0.053</td>
+<td style="text-align: right;">+0.019%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: right;">35.3%</td>
-<td style="text-align: right;">41.5%</td>
-<td style="text-align: right;">−0.065</td>
-<td style="text-align: right;">+0.049%</td>
+<td style="text-align: right;">37.9%</td>
+<td style="text-align: right;">+0.010</td>
+<td style="text-align: right;">+0.236%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: right;">42.0%</td>
-<td style="text-align: right;">43.1%</td>
-<td style="text-align: right;">−0.249</td>
-<td style="text-align: right;">−0.531%</td>
+<td style="text-align: right;">39.0%</td>
+<td style="text-align: right;">−0.179</td>
+<td style="text-align: right;">−0.386%</td>
 </tr>
 </tbody>
 </table>
@@ -1338,33 +1339,33 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>不分組</strong></td>
-<td style="text-align: right;"><strong>+0.099</strong></td>
-<td style="text-align: right;"><strong>+0.083</strong></td>
-<td style="text-align: right;"><strong>+0.061</strong></td>
+<td style="text-align: right;"><strong>+0.110</strong></td>
+<td style="text-align: right;"><strong>+0.105</strong></td>
+<td style="text-align: right;"><strong>+0.112</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS 產業</td>
-<td style="text-align: right;">+0.022</td>
-<td style="text-align: right;">+0.014</td>
-<td style="text-align: right;">+0.037</td>
+<td style="text-align: right;">+0.043</td>
+<td style="text-align: right;">+0.068</td>
+<td style="text-align: right;">+0.076</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">−0.092</td>
-<td style="text-align: right;">−0.056</td>
-<td style="text-align: right;">−0.048</td>
+<td style="text-align: right;">−0.040</td>
+<td style="text-align: right;">+0.028</td>
+<td style="text-align: right;">+0.042</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">−0.153</td>
-<td style="text-align: right;">−0.066</td>
-<td style="text-align: right;">−0.128</td>
+<td style="text-align: right;">−0.129</td>
+<td style="text-align: right;">+0.012</td>
+<td style="text-align: right;">−0.044</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">−0.271</td>
-<td style="text-align: right;">−0.241</td>
-<td style="text-align: right;">−0.234</td>
+<td style="text-align: right;">−0.215</td>
+<td style="text-align: right;">−0.158</td>
+<td style="text-align: right;">−0.165</td>
 </tr>
 </tbody>
 </table>
@@ -1378,6 +1379,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p><strong>不分組三格全部優於同排序的 GICS；GICS 三格又全部優於任一資料驅動分群格。</strong></p>
+<p>⚠️ 惟兩者最接近處僅差 <strong>0.001</strong> 個 Sharpe 單位（GICS-SSD +0.043 對 AGG-SDP +0.042）—— 該分離在現行資料上成立，但已無實質餘裕，不應視為穩健。</p>
 </div>
 </div>
 </div>
@@ -1390,8 +1392,8 @@ margin-right: 0; }
 <h1>4.2 交易層：門檻選擇 vs. 固定門檻</h1>
 
 </section>
-<section id="主檢定五種配對底方向全正校正後-05-顯著" class="slide level2">
-<h2>主檢定：五種配對底方向全正，校正後 0/5 顯著</h2>
+<section id="主檢定五種配對底方向全正校正後-35-顯著" class="slide level2">
+<h2>主檢定：五種配對底方向全正，校正後 3/5 顯著</h2>
 <p>對照的兩臂為 <strong>DL-THR</strong>（逐期由模型選擇進場門檻）與 <strong>Z-Score</strong>（固定 <span class="math inline">z</span>=2.0）。 兩臂共用同一批配對、同一組參數格，唯一變因是門檻如何決定。</p>
 <table class="caption-top" style="width:100%;">
 <colgroup>
@@ -1417,48 +1419,48 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>GICS × SSD（傳統）</strong></td>
-<td style="text-align: right;"><strong>+0.573</strong></td>
-<td style="text-align: center;">[+0.09, +1.19]</td>
-<td style="text-align: right;">0.427</td>
-<td style="text-align: right;">51.5</td>
-<td style="text-align: right;">0.042</td>
-<td style="text-align: right;">0.087</td>
+<td style="text-align: right;"><strong>+0.798</strong></td>
+<td style="text-align: center;">[+0.17, +1.69]</td>
+<td style="text-align: right;">0.505</td>
+<td style="text-align: right;">51.3</td>
+<td style="text-align: right;">0.0403</td>
+<td style="text-align: right;">0.0504</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>GICS × SDP（傳統）</strong></td>
-<td style="text-align: right;"><strong>+0.495</strong></td>
-<td style="text-align: center;">[+0.08, +0.96]</td>
-<td style="text-align: right;">0.357</td>
-<td style="text-align: right;">51.7</td>
-<td style="text-align: right;">0.028</td>
-<td style="text-align: right;">0.087</td>
+<td style="text-align: left;"><strong>HDBSCAN × SDP</strong></td>
+<td style="text-align: right;"><strong>+0.666</strong></td>
+<td style="text-align: center;">[+0.27, +1.15]</td>
+<td style="text-align: right;">0.493</td>
+<td style="text-align: right;">52.1</td>
+<td style="text-align: right;">0.0042</td>
+<td style="text-align: right;"><strong>0.0210</strong></td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">HDBSCAN × SDP</td>
-<td style="text-align: right;">+0.456</td>
-<td style="text-align: center;">[+0.04, +0.96]</td>
-<td style="text-align: right;">0.344</td>
-<td style="text-align: right;">51.2</td>
-<td style="text-align: right;">0.052</td>
-<td style="text-align: right;">0.087</td>
+<td style="text-align: left;"><strong>GICS × SDP（傳統）</strong></td>
+<td style="text-align: right;"><strong>+0.579</strong></td>
+<td style="text-align: center;">[+0.17, +1.05]</td>
+<td style="text-align: right;">0.429</td>
+<td style="text-align: right;">51.8</td>
+<td style="text-align: right;">0.0111</td>
+<td style="text-align: right;"><strong>0.0278</strong></td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">K-means × SSD</td>
-<td style="text-align: right;">+0.283</td>
-<td style="text-align: center;">[−0.04, +0.58]</td>
-<td style="text-align: right;">0.223</td>
-<td style="text-align: right;">52.5</td>
-<td style="text-align: right;">0.073</td>
-<td style="text-align: right;">0.091</td>
+<td style="text-align: left;"><strong>K-means × SSD</strong></td>
+<td style="text-align: right;">+0.310</td>
+<td style="text-align: center;">[+0.03, +0.59]</td>
+<td style="text-align: right;">0.267</td>
+<td style="text-align: right;">51.6</td>
+<td style="text-align: right;">0.0297</td>
+<td style="text-align: right;"><strong>0.0495</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative × SSD</td>
-<td style="text-align: right;">+0.112</td>
-<td style="text-align: center;">[−0.20, +0.44]</td>
-<td style="text-align: right;">0.086</td>
+<td style="text-align: right;">+0.239</td>
+<td style="text-align: center;">[−0.09, +0.61]</td>
+<td style="text-align: right;">0.189</td>
 <td style="text-align: right;">51.5</td>
-<td style="text-align: right;">0.488</td>
-<td style="text-align: right;">0.488</td>
+<td style="text-align: right;">0.1802</td>
+<td style="text-align: right;">0.1802</td>
 </tr>
 </tbody>
 </table>
@@ -1471,8 +1473,9 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>方向 5/5 為正，但 BH 校正後 0/5 顯著</strong>（校正前 2/5）。</p>
-<p>觀測效果中位 +0.456 pp 對最小可偵測效果 0.62 pp → 屬「效果存在但接近偵測極限」，非「檢定力不足到無從判斷」。</p>
+<p><strong>方向 5/5 為正，BH 校正後 3/5 顯著</strong>（校正前 4/5）。 這是<strong>全篇唯一通過多重檢定校正的一組</strong>。</p>
+<p>觀測效果中位 +0.579 pp 對最小可偵測效果 0.63 pp → 效果恰好落在本設計看得見的邊界上。</p>
+<p>⚠️ 邊界極不穩固：K-means 以 <strong>0.0495</strong> 通過、GICS-SSD 以 <strong>0.0504</strong> 未通過， 兩者相差 0.0009。<strong>不應以「顯著／不顯著」的二分法陳述本表。</strong> 且通過的是<strong>相對於 Z-Score 的差</strong>——同一批策略的絕對檢定 6/6 不顯著、 DSR 6/6 未過門檻（見 4.6）。</p>
 </div>
 </div>
 </div>
@@ -1481,7 +1484,7 @@ margin-right: 0; }
 </blockquote>
 
 <aside><div>
-<p>五輪獨立重訓的跨輪全距為 0.010–0.047 個 Sharpe 單位，遠小於增益本身——訓練隨機性不是結果的來源。</p>
+<p>五輪獨立重訓的跨輪標準差中位 0.031、全距中位 0.069，小於增益本身。對沖口徑修正造成的位移已由預先註冊的判準確認超出重訓雜訊（120 格中 88 格，<span class="math inline">p</span> = 3.7e−36）；唯 <code>KM-SSD-DRL</code> 臂 6/15（<span class="math inline">p</span> = 0.061）不可單獨宣稱。</p>
 </div></aside></section>
 <section id="單一參數配置的檢定力限制" class="slide level2">
 <h2>單一參數配置的檢定力限制</h2>
@@ -1498,33 +1501,33 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN × SDP</td>
-<td style="text-align: center;">5/15</td>
-<td style="text-align: right;">+0.623</td>
-<td style="text-align: center;">−0.37 ~ +0.96</td>
+<td style="text-align: center;">6/15</td>
+<td style="text-align: right;">+0.647</td>
+<td style="text-align: center;">−0.43 ~ +1.95</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS × SDP</td>
 <td style="text-align: center;">5/15</td>
-<td style="text-align: right;">+0.506</td>
-<td style="text-align: center;">−0.56 ~ +1.61</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">K-means × SSD</td>
-<td style="text-align: center;">3/15</td>
-<td style="text-align: right;">+0.335</td>
-<td style="text-align: center;">−0.29 ~ +0.75</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Agglomerative × SSD</td>
-<td style="text-align: center;">2/15</td>
-<td style="text-align: right;">+0.040</td>
-<td style="text-align: center;">−0.50 ~ +0.74</td>
+<td style="text-align: right;">+0.532</td>
+<td style="text-align: center;">−0.97 ~ +2.37</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">GICS × SSD</td>
-<td style="text-align: center;">2/15</td>
-<td style="text-align: right;">+0.520</td>
-<td style="text-align: center;">−0.76 ~ +1.84</td>
+<td style="text-align: center;">5/15</td>
+<td style="text-align: right;">+0.759</td>
+<td style="text-align: center;">−0.59 ~ +3.14</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">K-means × SSD</td>
+<td style="text-align: center;">4/15</td>
+<td style="text-align: right;">+0.404</td>
+<td style="text-align: center;">−0.17 ~ +0.88</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative × SSD</td>
+<td style="text-align: center;">3/15</td>
+<td style="text-align: right;">+0.231</td>
+<td style="text-align: center;">−0.37 ~ +0.95</td>
 </tr>
 </tbody>
 </table>
@@ -1535,7 +1538,7 @@ margin-right: 0; }
 </section>
 <section id="增益來源①不是拉高門檻" class="slide level2">
 <h2>增益來源①：不是拉高門檻</h2>
-<p>DL-THR 實際進場門檻中位數 <strong>2.11–2.33</strong>，高於基準 2.0。 若增益僅來自「調高門檻」，把 Z-Score 拉到同一水準應能複製。</p>
+<p>DL-THR 實際進場門檻中位數 <strong>2.19–2.37</strong>，高於基準 2.0。 若增益僅來自「調高門檻」，把 Z-Score 拉到同一水準應能複製。</p>
 <table class="caption-top">
 <colgroup>
 <col style="width: 20%">
@@ -1556,35 +1559,49 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">GICS-SSD</td>
-<td style="text-align: right;">+0.573</td>
-<td style="text-align: right;">+0.502 ~ +0.575</td>
-<td style="text-align: right;">−0.002 ~ +0.071</td>
-<td style="text-align: right;"><strong>−0.3 ~ 12.4%</strong></td>
+<td style="text-align: right;">+0.798</td>
+<td style="text-align: right;">+0.676 ~ +0.769</td>
+<td style="text-align: right;">+0.029 ~ +0.122</td>
+<td style="text-align: right;"><strong>3.6 ~ 15.3%</strong></td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">GICS-SDP</td>
-<td style="text-align: right;">+0.495</td>
-<td style="text-align: right;">+0.407 ~ +0.445</td>
-<td style="text-align: right;">+0.050 ~ +0.088</td>
-<td style="text-align: right;">10.1 ~ 17.8%</td>
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">+0.666</td>
+<td style="text-align: right;">+0.576 ~ +0.611</td>
+<td style="text-align: right;">+0.055 ~ +0.090</td>
+<td style="text-align: right;">8.3 ~ 13.5%</td>
 </tr>
 <tr class="odd">
+<td style="text-align: left;">GICS-SDP</td>
+<td style="text-align: right;">+0.579</td>
+<td style="text-align: right;">+0.537 ~ +0.594</td>
+<td style="text-align: right;">−0.015 ~ +0.042</td>
+<td style="text-align: right;">−2.6 ~ 7.3%</td>
+</tr>
+<tr class="even">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">+0.283</td>
-<td style="text-align: right;">+0.198 ~ +0.246</td>
-<td style="text-align: right;">+0.037 ~ +0.085</td>
-<td style="text-align: right;">13.1 ~ 30.0%</td>
+<td style="text-align: right;">+0.310</td>
+<td style="text-align: right;">+0.210 ~ +0.250</td>
+<td style="text-align: right;">+0.060 ~ +0.100</td>
+<td style="text-align: right;">19.4 ~ 32.3%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">+0.239</td>
+<td style="text-align: right;">+0.061 ~ +0.149</td>
+<td style="text-align: right;">+0.091 ~ +0.178</td>
+<td style="text-align: right;"><strong>38.1 ~ 74.5%</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>門檻管道僅能複製表面增益的 0–30%</strong>，且對照 B 的效果量幾乎未縮水 （GICS-SSD 自 +0.573 僅降至 +0.502）。</p>
+<p><strong>門檻管道在四個配對底僅能複製表面增益的 −3 ~ 32%</strong>，且對照 B 的效果量 幾乎未縮水（GICS-SSD 自 +0.798 僅降至 +0.676）。</p>
 <blockquote>
-<p>增益不是「單純調高門檻」的效果。</p>
+<p>增益不是「單純調高門檻」的效果——<strong>但 Agglomerative 是例外</strong>： 其複製率 38–75%，且純門檻管道 ZS(2.2)−ZS(2.0) 自身即達 5% 顯著 （+0.178 pp，<span class="math inline">p</span> = 0.019），而該底的 A 對照本就不顯著。 該底那點微弱的表面增益，多半就是調高門檻的效果。</p>
 </blockquote>
 </section>
 <section id="增益來源②不是-skip-的選股方向" class="slide level2">
 <h2>增益來源②：不是 SKIP 的選股方向</h2>
-<p>DL-THR 的 SKIP 率為 <strong>32.9–38.1%</strong>。</p>
+<p>DL-THR 的 SKIP 率為 <strong>30.1–32.2%</strong>（逐格平均）。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1612,47 +1629,49 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">−12.9</td>
-<td style="text-align: right;">+139.2</td>
-<td style="text-align: right;"><strong>−152.0</strong></td>
-<td style="text-align: right;">36.7</td>
+<td style="text-align: right;">−84.5</td>
+<td style="text-align: right;">+17.4</td>
+<td style="text-align: right;"><strong>−101.9</strong></td>
+<td style="text-align: right;">43.0</td>
 <td style="text-align: center;">0/15</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">+338.9</td>
-<td style="text-align: right;">+461.2</td>
-<td style="text-align: right;"><strong>−122.3</strong></td>
-<td style="text-align: right;">38.6</td>
+<td style="text-align: right;">+138.9</td>
+<td style="text-align: right;">+359.0</td>
+<td style="text-align: right;"><strong>−220.1</strong></td>
+<td style="text-align: right;">30.7</td>
 <td style="text-align: center;">0/15</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">GICS-SDP</td>
-<td style="text-align: right;">+78.3</td>
-<td style="text-align: right;">−237.6</td>
-<td style="text-align: right;">+315.9</td>
-<td style="text-align: right;">63.9</td>
-<td style="text-align: center;">1/15</td>
+<td style="text-align: right;">+13.9</td>
+<td style="text-align: right;">−355.2</td>
+<td style="text-align: right;">+369.1</td>
+<td style="text-align: right;">68.3</td>
+<td style="text-align: center;">2/15</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">GICS-SSD</td>
-<td style="text-align: right;">+115.1</td>
-<td style="text-align: right;">−199.8</td>
-<td style="text-align: right;">+314.8</td>
-<td style="text-align: right;">66.6</td>
-<td style="text-align: center;">1/15</td>
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">+343.0</td>
+<td style="text-align: right;">+17.7</td>
+<td style="text-align: right;">+325.4</td>
+<td style="text-align: right;">72.7</td>
+<td style="text-align: center;">3/15</td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">+409.9</td>
-<td style="text-align: right;">+235.1</td>
-<td style="text-align: right;">+174.8</td>
-<td style="text-align: right;">65.3</td>
-<td style="text-align: center;">2/15</td>
+<td style="text-align: left;">GICS-SSD</td>
+<td style="text-align: right;">+203.6</td>
+<td style="text-align: right;">−270.8</td>
+<td style="text-align: right;">+474.4</td>
+<td style="text-align: right;">81.2</td>
+<td style="text-align: center;">3/15</td>
 </tr>
 </tbody>
 </table>
-<p><strong>75 格中僅 4 格顯著（隨機期望 3.75）</strong> → SKIP 的選股方向不具可證實的技巧。 Agglomerative 與 K-means 的技巧成分甚至為<strong>負</strong>。</p>
+<p><strong>75 格中 8 格顯著（隨機期望 3.75，單尾二項 <span class="math inline">p</span> = 0.034）</strong> → 拒絕虛無假設，即 <strong>SKIP 確有選股技巧</strong>，「避損純屬機械效應」被排除。</p>
+<p>⚠️ 舊版報 4/75（<span class="math inline">p</span> = 0.52）並據以寫「不具可證實的技巧」， 該敘述已撤回——舊版讀到的是未失效的配對期快取（附錄 B.5.4）。</p>
+<p>惟證據弱且集中於 GICS-SSD／HDBSCAN／GICS-SDP 三底； Agglomerative 與 K-means 的技巧成分為<strong>負</strong>（比亂跳更差）。</p>
 </section>
 <section id="增益來源③也不是總曝險減少" class="slide level2">
 <h2>增益來源③：也不是總曝險減少</h2>
@@ -1682,54 +1701,67 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>GICS-SSD</strong></td>
-<td style="text-align: right;">+904</td>
-<td style="text-align: right;">+705</td>
-<td style="text-align: right;"><strong>+2,334</strong></td>
-<td style="text-align: right;"><strong>+1,629</strong></td>
-<td style="text-align: right;">88.3</td>
+<td style="text-align: right;">+1,072</td>
+<td style="text-align: right;">+801</td>
+<td style="text-align: right;"><strong>+3,063</strong></td>
+<td style="text-align: right;"><strong>+2,262</strong></td>
+<td style="text-align: right;">92.5</td>
 <td style="text-align: center;"><strong>11/15</strong></td>
 </tr>
 <tr class="even">
-<td style="text-align: left;"><strong>GICS-SDP</strong></td>
-<td style="text-align: right;">+1,281</td>
-<td style="text-align: right;">+1,036</td>
-<td style="text-align: right;"><strong>+2,515</strong></td>
-<td style="text-align: right;"><strong>+1,480</strong></td>
-<td style="text-align: right;">85.1</td>
-<td style="text-align: center;"><strong>10/15</strong></td>
+<td style="text-align: left;"><strong>HDBSCAN</strong></td>
+<td style="text-align: right;">+341</td>
+<td style="text-align: right;">+359</td>
+<td style="text-align: right;"><strong>+2,002</strong></td>
+<td style="text-align: right;"><strong>+1,643</strong></td>
+<td style="text-align: right;">89.1</td>
+<td style="text-align: center;"><strong>11/15</strong></td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">−518</td>
-<td style="text-align: right;">−283</td>
-<td style="text-align: right;">+651</td>
-<td style="text-align: right;">+934</td>
-<td style="text-align: right;">80.2</td>
-<td style="text-align: center;">8/15</td>
+<td style="text-align: left;"><strong>GICS-SDP</strong></td>
+<td style="text-align: right;">+1,682</td>
+<td style="text-align: right;">+1,327</td>
+<td style="text-align: right;"><strong>+3,126</strong></td>
+<td style="text-align: right;"><strong>+1,799</strong></td>
+<td style="text-align: right;">86.8</td>
+<td style="text-align: center;"><strong>9/15</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">−1,374</td>
-<td style="text-align: right;">−912</td>
-<td style="text-align: right;">−668</td>
-<td style="text-align: right;">+244</td>
-<td style="text-align: right;">66.0</td>
-<td style="text-align: center;">4/15</td>
+<td style="text-align: right;">−1,125</td>
+<td style="text-align: right;">−766</td>
+<td style="text-align: right;">−351</td>
+<td style="text-align: right;">+415</td>
+<td style="text-align: right;">72.7</td>
+<td style="text-align: center;">7/15</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">−210</td>
-<td style="text-align: right;">−64</td>
-<td style="text-align: right;">−72</td>
-<td style="text-align: right;">−8</td>
-<td style="text-align: right;">51.0</td>
-<td style="text-align: center;">4/15</td>
+<td style="text-align: right;">+233</td>
+<td style="text-align: right;">+250</td>
+<td style="text-align: right;">+830</td>
+<td style="text-align: right;">+580</td>
+<td style="text-align: right;">73.5</td>
+<td style="text-align: center;">6/15</td>
 </tr>
 </tbody>
 </table>
 <blockquote>
-<p>兩條 GICS 底的 <strong>ZS 全額高於隨機跳過</strong>（+904 &gt; +705）—— 對期望值為正的底層策略，少交易本身是虧的， 故「降低曝險」不可能是其增益來源。</p>
+<p>兩條 GICS 底的 <strong>ZS 全額高於隨機跳過</strong>（+1,072 &gt; +801、+1,682 &gt; +1,327）—— 對期望值為正的底層策略，少交易本身是虧的， 故「降低曝險」不可能是其增益來源。 另三底則相反，本項只證明「DL-THR 贏過隨機少做」。</p>
 </blockquote>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>註釋</strong></p>
+</div>
+<div class="callout-content">
+<p>本表的顯著性於 2026-09-08 更正：先前沿用替代解釋一的判定欄， 但那問的是「跳得比隨機好嗎」，而本項問的是 「DL-THR 的<strong>總損益</strong>贏過『同樣少交易但隨機挑』嗎」——兩者檢定量不同。</p>
+</div>
+</div>
+</div>
 
 <aside><div>
 <p>三項檢定共同侷限：皆為事後重抽，不含槽位再配置效應。</p>
@@ -1756,33 +1788,33 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">DL-THR − Z-Score</td>
-<td style="text-align: right;">+0.112</td>
-<td style="text-align: center;">[−0.20, +0.44]</td>
-<td style="text-align: right;">0.488</td>
+<td style="text-align: right;">+0.239</td>
+<td style="text-align: center;">[−0.09, +0.61]</td>
+<td style="text-align: right;">0.180</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>RL-THR(<span class="math inline">\varepsilon</span>=0.05) − Z-Score</strong></td>
-<td style="text-align: right;"><strong>+0.329</strong></td>
-<td style="text-align: center;">[−0.09, +0.93]</td>
-<td style="text-align: right;">0.203</td>
+<td style="text-align: right;"><strong>+0.528</strong></td>
+<td style="text-align: center;">[+0.01, +1.28]</td>
+<td style="text-align: right;">0.092</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;"><strong>RL-THR(<span class="math inline">\varepsilon</span>=0.10) − Z-Score</strong></td>
-<td style="text-align: right;"><strong>+0.299</strong></td>
-<td style="text-align: center;">[−0.10, +0.88]</td>
-<td style="text-align: right;">0.223</td>
+<td style="text-align: right;"><strong>+0.479</strong></td>
+<td style="text-align: center;">[−0.03, +1.23]</td>
+<td style="text-align: right;">0.130</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">RL-THR(<span class="math inline">\varepsilon</span>=0.05) − DL-THR</td>
-<td style="text-align: right;">+0.217</td>
-<td style="text-align: center;">[−0.16, +0.68]</td>
-<td style="text-align: right;">0.312</td>
+<td style="text-align: right;">+0.288</td>
+<td style="text-align: center;">[−0.13, +0.83]</td>
+<td style="text-align: right;">0.231</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">RL-THR(<span class="math inline">\varepsilon</span>=0.10) − DL-THR</td>
-<td style="text-align: right;">+0.187</td>
-<td style="text-align: center;">[−0.16, +0.62]</td>
-<td style="text-align: right;">0.355</td>
+<td style="text-align: right;">+0.240</td>
+<td style="text-align: center;">[−0.18, +0.78]</td>
+<td style="text-align: right;">0.326</td>
 </tr>
 </tbody>
 </table>
@@ -1838,29 +1870,29 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: left;">GICS-SSD</td>
-<td style="text-align: right;"><strong>−0.334</strong></td>
-<td style="text-align: right;">−0.128</td>
-<td style="text-align: center;">[−1.28, +0.53]</td>
-<td style="text-align: right;">0.469</td>
-<td style="text-align: right;">0.558</td>
+<td style="text-align: right;"><strong>−0.097</strong></td>
+<td style="text-align: right;">−0.037</td>
+<td style="text-align: center;">[−1.00, +0.74]</td>
+<td style="text-align: right;">0.831</td>
+<td style="text-align: right;">0.831</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
 <td style="text-align: left;">GICS-SDP</td>
-<td style="text-align: right;"><strong>−0.265</strong></td>
-<td style="text-align: right;">−0.105</td>
-<td style="text-align: center;">[−1.20, +0.59]</td>
-<td style="text-align: right;">0.558</td>
-<td style="text-align: right;">0.558</td>
+<td style="text-align: right;">+0.128</td>
+<td style="text-align: right;">+0.050</td>
+<td style="text-align: center;">[−0.70, +0.93]</td>
+<td style="text-align: right;">0.760</td>
+<td style="text-align: right;">0.831</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: left;">GICS-SSD</td>
-<td style="text-align: right;"><strong>−0.630</strong></td>
-<td style="text-align: right;">−0.227</td>
-<td style="text-align: center;">[−1.73, +0.36]</td>
-<td style="text-align: right;">0.228</td>
-<td style="text-align: right;">0.558</td>
+<td style="text-align: right;"><strong>−0.570</strong></td>
+<td style="text-align: right;">−0.208</td>
+<td style="text-align: center;">[−1.56, +0.34]</td>
+<td style="text-align: right;">0.232</td>
+<td style="text-align: right;">0.695</td>
 </tr>
 </tbody>
 </table>
@@ -1873,7 +1905,7 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>三組方向全部為負，校正後無一顯著。</strong> 完整系統<strong>劣於</strong>傳統基準——原因見下頁的成分分解。</p>
+<p><strong>三組中兩負一正，校正後無一顯著。</strong> 對沖口徑修正後 HDBSCAN 那組已由負轉正，故<strong>不再宣稱「完整系統劣於傳統基準」</strong>； 可陳述者僅為「三組皆不顯著，點估計散布於零的兩側」——原因見下頁的成分分解。</p>
 </div>
 </div>
 </div>
@@ -1965,56 +1997,56 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">全期</td>
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">−0.334</td>
-<td style="text-align: right;"><strong>+0.112</strong></td>
-<td style="text-align: right;">0.488</td>
-<td style="text-align: right;"><strong>−0.447</strong></td>
-<td style="text-align: right;">0.322</td>
+<td style="text-align: right;">−0.097</td>
+<td style="text-align: right;"><strong>+0.239</strong></td>
+<td style="text-align: right;">0.180</td>
+<td style="text-align: right;"><strong>−0.336</strong></td>
+<td style="text-align: right;">0.472</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">全期</td>
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">−0.265</td>
-<td style="text-align: right;"><strong>+0.456</strong></td>
-<td style="text-align: right;">0.052</td>
-<td style="text-align: right;"><strong>−0.721</strong></td>
-<td style="text-align: right;">0.061</td>
+<td style="text-align: right;">+0.128</td>
+<td style="text-align: right;"><strong>+0.666</strong></td>
+<td style="text-align: right;">0.004</td>
+<td style="text-align: right;"><strong>−0.538</strong></td>
+<td style="text-align: right;">0.139</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">全期</td>
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">−0.630</td>
-<td style="text-align: right;"><strong>+0.283</strong></td>
-<td style="text-align: right;">0.073</td>
-<td style="text-align: right;"><strong>−0.913</strong></td>
-<td style="text-align: right;">0.080</td>
+<td style="text-align: right;">−0.570</td>
+<td style="text-align: right;"><strong>+0.310</strong></td>
+<td style="text-align: right;">0.030</td>
+<td style="text-align: right;"><strong>−0.881</strong></td>
+<td style="text-align: right;">0.066</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">2012+</td>
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">+0.470</td>
-<td style="text-align: right;">+0.279</td>
-<td style="text-align: right;">0.064</td>
-<td style="text-align: right;">+0.191</td>
-<td style="text-align: right;">0.590</td>
+<td style="text-align: right;">+0.798</td>
+<td style="text-align: right;">+0.278</td>
+<td style="text-align: right;">0.108</td>
+<td style="text-align: right;">+0.521</td>
+<td style="text-align: right;">0.157</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">2012+</td>
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">+0.193</td>
-<td style="text-align: right;">+0.511</td>
-<td style="text-align: right;">0.013</td>
-<td style="text-align: right;">−0.318</td>
-<td style="text-align: right;">0.387</td>
+<td style="text-align: right;">+0.527</td>
+<td style="text-align: right;">+0.695</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">−0.169</td>
+<td style="text-align: right;">0.624</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">2012+</td>
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">+0.582</td>
-<td style="text-align: right;">+0.424</td>
-<td style="text-align: right;">0.009</td>
-<td style="text-align: right;">+0.158</td>
-<td style="text-align: right;">0.687</td>
+<td style="text-align: right;">+0.686</td>
+<td style="text-align: right;">+0.329</td>
+<td style="text-align: right;">0.032</td>
+<td style="text-align: right;">+0.357</td>
+<td style="text-align: right;">0.360</td>
 </tr>
 </tbody>
 </table>
@@ -2027,8 +2059,8 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>全期三組的 DL-THR 成分皆正、分群成分皆負且量級更大。</strong></p>
-<p>系統劣於基準的原因是<strong>分群層的損害超過交易端的貢獻</strong>——兩成分並不互補。</p>
+<p><strong>全期三組的 DL-THR 成分皆正、分群成分皆負。</strong></p>
+<p>在 Agglomerative 與 K-means 兩組，分群層的損害超過交易端的貢獻而淨效果為負； <strong>HDBSCAN 組相反</strong>（DL +0.666 對分群 −0.538），淨效果為正。 兩成分方向相反且大致相抵——不宜宣稱組合系統優於或劣於基準。</p>
 </div>
 </div>
 </div>
@@ -2041,7 +2073,7 @@ margin-right: 0; }
 </section>
 <section id="損益結構兩股對衝流量的殘差" class="slide level2">
 <h2>損益結構：兩股對衝流量的殘差</h2>
-<p>489 個 Z-Score 配置的逐筆交易統計（計數器修正後，見附錄 B.2）：</p>
+<p>399 個 Z-Score 基準格的逐筆交易統計（計數器修正後，見附錄 B.2）：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -2052,20 +2084,88 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">逐筆勝率</td>
-<td style="text-align: right;"><strong>0.578</strong></td>
+<td style="text-align: right;"><strong>0.591</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">獲利因子</td>
-<td style="text-align: right;">0.969</td>
+<td style="text-align: right;">0.995</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">期末強制平倉 ÷ 進場</td>
-<td style="text-align: right;"><strong>0.418</strong></td>
+<td style="text-align: right;"><strong>0.403</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>多數交易確實收斂獲利，但獲利被少數大額虧損吃光。</strong></p>
-<p>以 GICS-SSD 為例（15 配置平均）：收斂獲利 <strong>+15,199</strong>、強平虧損 <strong>−8,424</strong>、 淨額僅 <strong>+6,775</strong>。淨額佔收斂獲利的比例隨限制強度單調下降： 不分組 48.2% → K-means 36.8%。</p>
+<p><strong>多數交易確實收斂獲利，但獲利被兩股虧損吃到幾乎不剩。</strong></p>
+<p>損益是<strong>三股</strong>流量的殘差（每格平均，初始資金 10,000）：</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分組方式</th>
+<th style="text-align: right;">收斂獲利</th>
+<th style="text-align: right;">期末強平</th>
+<th style="text-align: right;">停損</th>
+<th style="text-align: right;">淨額</th>
+<th style="text-align: right;">淨額÷收斂</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;"><strong>不分組</strong></td>
+<td style="text-align: right;">+21,157</td>
+<td style="text-align: right;">−11,454</td>
+<td style="text-align: right;">−7,438</td>
+<td style="text-align: right;"><strong>+2,266</strong></td>
+<td style="text-align: right;"><strong>10.7%</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GICS 產業</td>
+<td style="text-align: right;">+17,137</td>
+<td style="text-align: right;">−9,679</td>
+<td style="text-align: right;">−6,026</td>
+<td style="text-align: right;">+1,431</td>
+<td style="text-align: right;">8.4%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">+16,227</td>
+<td style="text-align: right;">−9,721</td>
+<td style="text-align: right;">−6,314</td>
+<td style="text-align: right;">+192</td>
+<td style="text-align: right;">1.2%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">+15,400</td>
+<td style="text-align: right;">−8,997</td>
+<td style="text-align: right;">−5,638</td>
+<td style="text-align: right;">+764</td>
+<td style="text-align: right;">5.0%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: right;">+13,049</td>
+<td style="text-align: right;">−8,265</td>
+<td style="text-align: right;">−5,679</td>
+<td style="text-align: right;"><strong>−895</strong></td>
+<td style="text-align: right;"><strong>−6.9%</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>兩股虧損合計吃掉收斂獲利的 89%–107%</strong>；K-means 底的淨額已為負。 以 GICS-SSD 為例：+16,217 / −9,369 / −5,776 → 淨額僅 <strong>+1,072</strong>。</p>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>警告</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>本表於 2026-09-08 重算，並更正一項結構性遺漏。</strong> 先前版本只清點 <code>EXIT</code> 與 <code>PERIOD_END_EXIT</code>，<strong>完全漏掉 <code>STOP_LOSS_TRIGGERED</code></strong>， 把 GICS-SSD 的淨額算成 +6,775（真值 +1,072，高估約六倍）。 現行淨額與 4.2.3 曝險表的「ZS 全額 +1,072」逐位相符。</p>
+</div>
+</div>
+</div>
 <blockquote>
 <p>典型個案（Top 1，第一期 UNH／CI，<span class="math inline">\beta</span>=0.9638）： <span class="math inline">z</span>=2.06 進場 → 價差擴大至 <span class="math inline">z</span>=5.46 → 95 日後期末強平，單筆虧 10.9%。</p>
 </blockquote>
@@ -2086,32 +2186,32 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;"><strong>不分組</strong></td>
 <td style="text-align: right;"><strong>0%</strong></td>
-<td style="text-align: right;"><strong>36.8%</strong></td>
-<td style="text-align: right;"><strong>+0.081</strong></td>
+<td style="text-align: right;"><strong>33.5%</strong></td>
+<td style="text-align: right;"><strong>+0.109</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS 產業</td>
 <td style="text-align: right;">15.1%</td>
-<td style="text-align: right;">39.6%</td>
-<td style="text-align: right;">+0.024</td>
+<td style="text-align: right;">36.1%</td>
+<td style="text-align: right;">+0.062</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN</td>
 <td style="text-align: right;">26.4%</td>
-<td style="text-align: right;">40.5%</td>
-<td style="text-align: right;">−0.116</td>
+<td style="text-align: right;">36.7%</td>
+<td style="text-align: right;">−0.053</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: right;">35.3%</td>
-<td style="text-align: right;">41.5%</td>
-<td style="text-align: right;">−0.065</td>
+<td style="text-align: right;">37.9%</td>
+<td style="text-align: right;">+0.010</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: right;">42.0%</td>
-<td style="text-align: right;">43.1%</td>
-<td style="text-align: right;">−0.249</td>
+<td style="text-align: right;">39.0%</td>
+<td style="text-align: right;">−0.179</td>
 </tr>
 </tbody>
 </table>
@@ -2125,11 +2225,11 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">逐臂（15 臂）</td>
-<td style="text-align: left;">Pearson <span class="math inline">r</span> = <strong>−0.895</strong>（<span class="math inline">p</span>&lt;0.0001）</td>
+<td style="text-align: left;">Pearson <span class="math inline">r</span> = <strong>−0.819</strong>（<span class="math inline">p</span>=0.0002）</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">逐配置內、跨 15 臂</td>
-<td style="text-align: left;"><strong>15/15 為負</strong>，中位 <span class="math inline">r</span> = −0.801</td>
+<td style="text-align: left;"><strong>15/15 為負</strong>，中位 <span class="math inline">r</span> = −0.747</td>
 </tr>
 </tbody>
 </table>
@@ -2142,14 +2242,14 @@ margin-right: 0; }
 <p><strong>警告</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>全樣本混合（n=225）的相關為 +0.201，符號相反</strong>——停損維度造成的 Simpson 悖論 （SL5% 強平率 32.8%／Sharpe −0.286；SL0% 45.2%／+0.115）。<strong>不可引用混合值。</strong></p>
+<p><strong>全樣本混合（n=225）的相關為 +0.483，符號相反</strong>——停損維度造成的 Simpson 悖論 （SL5% 強平率 23.9%／Sharpe −0.233；SL0% 45.0%／+0.183）。<strong>不可引用混合值。</strong></p>
 </div>
 </div>
 </div>
 </section>
 <section id="強平的配對只是尚未回歸嗎" class="slide level2">
 <h2>強平的配對只是「尚未回歸」嗎？</h2>
-<p>對 <strong>4,738 筆</strong>期末強制平倉的交易，往後追蹤 126 個交易日（一個完整交易期）：</p>
+<p>取主軸 15 臂的 <code>Top1/SL0%</code> 格（無停損，強平不被停損截斷）， 對其 <strong>3,107 筆</strong>期末強制平倉的交易往後追蹤 126 個交易日（一個完整交易期）， 以引擎自身的出場條件（<span class="math inline">z</span> 觸及 0）判定回歸：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -2160,23 +2260,23 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">21 日</td>
-<td style="text-align: right;">13.8%</td>
+<td style="text-align: right;">17.5%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">42 日</td>
-<td style="text-align: right;">22.2%</td>
+<td style="text-align: right;">25.7%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">63 日</td>
-<td style="text-align: right;">28.1%</td>
+<td style="text-align: right;">33.2%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;"><strong>126 日</strong></td>
-<td style="text-align: right;"><strong>39.1%</strong></td>
+<td style="text-align: right;"><strong>45.4%</strong></td>
 </tr>
 </tbody>
 </table>
-<p>平倉時 <span class="math inline">|z|</span> 中位 <strong>3.82</strong>。再給一個完整交易期，<strong>僅 39.1% 回歸</strong>； 未回歸的 <strong>60.9%</strong>，其 <span class="math inline">|z|</span> 自 4.88 <strong>繼續擴大至 6.61</strong>。</p>
+<p>平倉時 <span class="math inline">|z|</span> 中位 <strong>3.51</strong>。再給一個完整交易期，<strong>僅 45.4% 回歸</strong>； 未回歸的 <strong>54.6%</strong>，其 <span class="math inline">|z|</span> 自 4.57 <strong>繼續擴大至 6.82</strong>。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -2187,7 +2287,7 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p><strong>這些配對不是尚未回歸，是持續發散。</strong></p>
-<p>延長交易期會讓四成轉盈、六成擴大虧損 → 已否證（附錄 C.3）。</p>
+<p>延長交易期會讓四成五轉盈、五成五擴大虧損 → 已否證（附錄 C.3）。 且「回歸」只要求 <span class="math inline">z</span> 曾觸及 0、不計能否成交，故已是對延長交易期有利的上界。</p>
 </div>
 </div>
 </div>
@@ -2213,20 +2313,20 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">形成期（分組層）</td>
 <td style="text-align: right;">9</td>
-<td style="text-align: right;">0.715 pp</td>
-<td style="text-align: right;">0.449</td>
-<td style="text-align: right;"><strong>1.259 pp</strong></td>
+<td style="text-align: right;">0.538 pp</td>
+<td style="text-align: right;">0.408</td>
+<td style="text-align: right;"><strong>1.143 pp</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">交易期（交易層）</td>
 <td style="text-align: right;">5</td>
-<td style="text-align: right;">0.456 pp</td>
+<td style="text-align: right;">0.579 pp</td>
 <td style="text-align: right;">0.223</td>
-<td style="text-align: right;"><strong>0.624 pp</strong></td>
+<td style="text-align: right;"><strong>0.626 pp</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>形成期層的 <span class="math inline">SE</span> 是交易期層的 2.02 倍</strong> → 等效需 <strong>4.1 倍</strong>樣本期間。</p>
+<p><strong>形成期層的 <span class="math inline">SE</span> 是交易期層的 1.83 倍</strong> → 等效需 <strong>3.3 倍</strong>樣本期間。</p>
 <p><strong>成因是設計，不是資料量：</strong></p>
 <table class="caption-top">
 <thead>
@@ -2250,7 +2350,7 @@ margin-right: 0; }
 </tbody>
 </table>
 <blockquote>
-<p>欲把 MDE 壓到 0.3 pp：形成期層需 <strong>17.6 倍</strong>樣本（逾四個世紀的日資料）， 交易期層需 4.3 倍。<strong>更換演算法、增加特徵、改良插補皆不影響此限制。</strong> 唯一出路是構造使兩臂共用同一批標的的配對設計。</p>
+<p>欲把 MDE 壓到 0.3 pp：形成期層需 <strong>14.5 倍</strong>樣本（逾三個半世紀的日資料）， 交易期層需 4.4 倍。<strong>更換演算法、增加特徵、改良插補皆不影響此限制。</strong> 唯一出路是構造使兩臂共用同一批標的的配對設計。</p>
 </blockquote>
 </section>
 <section id="篩選層與分組層的交互作用" class="slide level2">
@@ -2271,43 +2371,43 @@ margin-right: 0; }
 <td style="text-align: left;">不分組</td>
 <td style="text-align: center;">ADF</td>
 <td style="text-align: center;">—</td>
-<td style="text-align: right;"><strong>+0.099</strong></td>
-<td style="text-align: right;"><strong>+0.715%</strong></td>
+<td style="text-align: right;"><strong>+0.110</strong></td>
+<td style="text-align: right;"><strong>+0.641%</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">不分組</td>
 <td style="text-align: center;">無</td>
 <td style="text-align: center;">—</td>
-<td style="text-align: right;">+0.028</td>
-<td style="text-align: right;">+0.190%</td>
+<td style="text-align: right;">+0.066</td>
+<td style="text-align: right;">+0.306%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: center;">ADF</td>
 <td style="text-align: center;">1.0</td>
-<td style="text-align: right;">−0.092</td>
-<td style="text-align: right;">−0.112%</td>
+<td style="text-align: right;">−0.040</td>
+<td style="text-align: right;">+0.040%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: center;">無</td>
 <td style="text-align: center;">1.0</td>
-<td style="text-align: right;">−0.078</td>
-<td style="text-align: right;">−0.296%</td>
+<td style="text-align: right;">−0.033</td>
+<td style="text-align: right;">−0.094%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: center;">ADF</td>
 <td style="text-align: center;">0</td>
-<td style="text-align: right;">−0.178</td>
-<td style="text-align: right;">−0.107%</td>
+<td style="text-align: right;">−0.133</td>
+<td style="text-align: right;">−0.140%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: center;">無</td>
 <td style="text-align: center;">0</td>
-<td style="text-align: right;">−0.009</td>
-<td style="text-align: right;"><strong>+0.306%</strong></td>
+<td style="text-align: right;">−0.001</td>
+<td style="text-align: right;"><strong>+0.180%</strong></td>
 </tr>
 </tbody>
 </table>
@@ -2321,16 +2421,16 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p><strong>篩選層的價值取決於候選池規模。</strong></p>
-<p>不分組時施加篩選：+0.190% → <strong>+0.715%</strong>（有益） 分群且無產業先驗時施加篩選：+0.306% → <strong>−0.107%</strong>（有害）</p>
+<p>不分組時施加篩選：+0.306% → <strong>+0.641%</strong>（有益） 分群且無產業先驗時施加篩選：+0.180% → <strong>−0.140%</strong>（有害）</p>
 </div>
 </div>
 </div>
 <blockquote>
-<p>四項條件全開（分群 + 篩選 + 產業先驗，即多數文獻的預設）為 −0.112%， 比表中任一格都差。</p>
+<p>四項條件全開（分群 + 篩選 + 產業先驗，即多數文獻的預設）為 +0.040%， 低於不分組的任一格。</p>
 </blockquote>
 
 <aside><div>
-<p>本頁為描述性比較，未施加統計檢定；最大差距 0.82 pp 低於 4.5 節量化的 1.26 pp 偵測門檻。</p>
+<p>本頁為描述性比較，未施加統計檢定；最大差距 0.78 pp 低於 4.5 節量化的 1.14 pp 偵測門檻。對應的正式檢定（<code>prop1_mechanism_contrasts.csv</code>）14 組經 BH 校正後無一顯著。</p>
 </div></aside></section></section>
 <section>
 <section id="風險評估" class="title-slide slide level1 center">
@@ -2354,62 +2454,76 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">GICS-SSD</td>
 <td style="text-align: left;">Z-Score</td>
+<td style="text-align: right;">−0.42</td>
 <td style="text-align: right;">−0.41</td>
-<td style="text-align: right;">−0.50</td>
-<td style="text-align: right;"><strong>+0.77</strong></td>
+<td style="text-align: right;"><strong>+0.81</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS-SSD</td>
 <td style="text-align: left;">DL-THR</td>
-<td style="text-align: right;">−0.23</td>
-<td style="text-align: right;">−0.26</td>
-<td style="text-align: right;"><strong>+0.75</strong></td>
+<td style="text-align: right;">−0.22</td>
+<td style="text-align: right;">−0.24</td>
+<td style="text-align: right;"><strong>+0.83</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">GICS-SDP</td>
 <td style="text-align: left;">Z-Score</td>
-<td style="text-align: right;">−0.25</td>
-<td style="text-align: right;">−0.47</td>
-<td style="text-align: right;"><strong>+0.76</strong></td>
+<td style="text-align: right;">−0.27</td>
+<td style="text-align: right;">−0.34</td>
+<td style="text-align: right;"><strong>+0.80</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS-SDP</td>
 <td style="text-align: left;">DL-THR</td>
-<td style="text-align: right;">−0.05</td>
-<td style="text-align: right;">−0.15</td>
-<td style="text-align: right;"><strong>+0.68</strong></td>
+<td style="text-align: right;">0.00</td>
+<td style="text-align: right;">−0.16</td>
+<td style="text-align: right;"><strong>+0.79</strong></td>
 </tr>
 <tr class="odd">
-<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: left;">HDBSCAN</td>
 <td style="text-align: left;">Z-Score</td>
 <td style="text-align: right;">−0.47</td>
-<td style="text-align: right;">−0.66</td>
-<td style="text-align: right;">+0.55</td>
+<td style="text-align: right;">−0.50</td>
+<td style="text-align: right;">+0.64</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: left;">DL-THR</td>
+<td style="text-align: right;">−0.20</td>
+<td style="text-align: right;">−0.13</td>
+<td style="text-align: right;">+0.62</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: left;">Z-Score</td>
+<td style="text-align: right;">−0.39</td>
+<td style="text-align: right;">−0.44</td>
+<td style="text-align: right;">+0.56</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
 <td style="text-align: left;">DL-THR</td>
-<td style="text-align: right;">−0.23</td>
-<td style="text-align: right;">−0.43</td>
-<td style="text-align: right;">+0.31</td>
+<td style="text-align: right;">−0.14</td>
+<td style="text-align: right;">−0.22</td>
+<td style="text-align: right;">+0.41</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: left;">Z-Score</td>
-<td style="text-align: right;">−0.45</td>
-<td style="text-align: right;">−0.90</td>
-<td style="text-align: right;">+0.26</td>
+<td style="text-align: right;">−0.42</td>
+<td style="text-align: right;">−0.91</td>
+<td style="text-align: right;">+0.39</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">K-means</td>
 <td style="text-align: left;">DL-THR</td>
-<td style="text-align: right;">−0.06</td>
-<td style="text-align: right;">−0.55</td>
-<td style="text-align: right;">+0.11</td>
+<td style="text-align: right;">−0.07</td>
+<td style="text-align: right;">−0.60</td>
+<td style="text-align: right;">+0.25</td>
 </tr>
 </tbody>
 </table>
-<p><strong>十列型態一致：動盪期為正，平靜期與一般期為負。</strong> DL-THR 25 格中改善 19 格，集中於虧損較大的兩檔。</p>
+<p><strong>十列型態一致：動盪期為正，平靜期與一般期為負或零。</strong> DL-THR 30 格中改善 22 格，集中於虧損較大的兩檔。</p>
 <div class="callout callout-warning callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -2440,38 +2554,38 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">GICS-SDP</td>
-<td style="text-align: right;">0.711</td>
-<td style="text-align: right;">0.924</td>
-<td style="text-align: right;">+13.1 bps</td>
-<td style="text-align: right;"><strong>+34.4 bps</strong></td>
+<td style="text-align: right;">0.745</td>
+<td style="text-align: right;">0.993</td>
+<td style="text-align: right;">+16.5 bps</td>
+<td style="text-align: right;"><strong>+41.3 bps</strong></td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS-SSD</td>
-<td style="text-align: right;">0.676</td>
-<td style="text-align: right;">0.920</td>
-<td style="text-align: right;">+9.6 bps</td>
-<td style="text-align: right;"><strong>+34.0 bps</strong></td>
+<td style="text-align: right;">0.691</td>
+<td style="text-align: right;">1.010</td>
+<td style="text-align: right;">+11.1 bps</td>
+<td style="text-align: right;"><strong>+43.0 bps</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">0.519</td>
-<td style="text-align: right;">0.690</td>
-<td style="text-align: right;">−6.1 bps</td>
-<td style="text-align: right;">+11.0 bps</td>
+<td style="text-align: right;">0.617</td>
+<td style="text-align: right;">0.889</td>
+<td style="text-align: right;">+3.7 bps</td>
+<td style="text-align: right;">+30.9 bps</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">0.555</td>
-<td style="text-align: right;">0.567</td>
-<td style="text-align: right;">−2.5 bps</td>
-<td style="text-align: right;">−1.3 bps</td>
+<td style="text-align: right;">0.607</td>
+<td style="text-align: right;">0.727</td>
+<td style="text-align: right;">+2.7 bps</td>
+<td style="text-align: right;">+14.7 bps</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">0.391</td>
-<td style="text-align: right;">0.444</td>
-<td style="text-align: right;">−18.9 bps</td>
-<td style="text-align: right;">−13.6 bps</td>
+<td style="text-align: right;">0.428</td>
+<td style="text-align: right;">0.511</td>
+<td style="text-align: right;">−15.2 bps</td>
+<td style="text-align: right;">−6.9 bps</td>
 </tr>
 </tbody>
 </table>
@@ -2485,8 +2599,9 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>五個配對底的 DL-THR 皆提高 break-even</strong>（1.2–24.4 bps）， 餘裕全距 <strong>−18.9 ~ +34.4 bps</strong>——橫跨 53 bps，幾與成本假設本身同量級。</p>
-<p>三個資料驅動分群底的 Z-Score 臂已為負； 兩條 GICS 底加 DL-THR 則達 0.92%，對 0.58% 尚有約六成餘裕。 <strong>成本可行性不是全篇一致的結論，而取決於配對底。</strong></p>
+<p><strong>五個配對底的 DL-THR 皆提高 break-even</strong>（8.3–31.9 bps）， 餘裕全距 <strong>−15.2 ~ +43.0 bps</strong>——橫跨 58 bps，恰與成本假設本身同量級。</p>
+<p>僅 K-means 底的兩臂餘裕皆為負；另三個分群底的 Z-Score 臂雖已轉正， 但只有 +2.7 ~ +3.7 bps，實務上等同打平。 兩條 GICS 底加 DL-THR 則達 0.99–1.01%，對 0.58% 有逾七成餘裕。 <strong>成本可行性不是全篇一致的結論，而取決於配對底。</strong></p>
+<p>⚠️ 此為對沖口徑修正影響最大的一頁：修正前 AGG 與 HDB 的 Z-Score 臂餘裕為負， 據此曾寫下「三個分群底皆不具可行性」，該敘述已撤回（附錄 B.5）。</p>
 </div>
 </div>
 </div>
@@ -2506,37 +2621,37 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;"><strong>不分組</strong></td>
-<td style="text-align: right;">+0.715%</td>
-<td style="text-align: right;"><strong>+0.812%</strong></td>
-<td style="text-align: right;">+0.521%</td>
+<td style="text-align: right;">+0.641%</td>
+<td style="text-align: right;"><strong>+0.780%</strong></td>
+<td style="text-align: right;">+0.607%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">GICS 產業</td>
-<td style="text-align: right;">+0.346%</td>
-<td style="text-align: right;">+0.415%</td>
-<td style="text-align: right;">+0.495%</td>
+<td style="text-align: right;">+0.345%</td>
+<td style="text-align: right;">+0.499%</td>
+<td style="text-align: right;">+0.541%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Agglomerative</td>
-<td style="text-align: right;">−0.112%</td>
-<td style="text-align: right;">+0.199%</td>
-<td style="text-align: right;">+0.059%</td>
+<td style="text-align: right;">+0.040%</td>
+<td style="text-align: right;">+0.358%</td>
+<td style="text-align: right;">+0.310%</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">HDBSCAN</td>
-<td style="text-align: right;">−0.391%</td>
-<td style="text-align: right;">+0.049%</td>
-<td style="text-align: right;">−0.215%</td>
+<td style="text-align: right;">−0.287%</td>
+<td style="text-align: right;">+0.269%</td>
+<td style="text-align: right;">+0.076%</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">K-means</td>
-<td style="text-align: right;">−0.583%</td>
-<td style="text-align: right;">−0.499%</td>
-<td style="text-align: right;">−0.511%</td>
+<td style="text-align: right;">−0.484%</td>
+<td style="text-align: right;">−0.330%</td>
+<td style="text-align: right;">−0.343%</td>
 </tr>
 </tbody>
 </table>
-<p>疊加 DL-THR 後最佳者為 <strong>GICS-SDP</strong>：年化 +0.914%、25 年終值 <strong>12,548</strong>、 動用資本口徑 +2.161%、平均 Sharpe 0.217。</p>
+<p>疊加 DL-THR 後最佳者為 <strong>GICS-SSD</strong>：年化 +1.026%、25 年終值 <strong>13,062</strong>、 動用資本口徑 +2.793%、平均 Sharpe 0.276（GICS-SDP 幾乎相同）。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -2551,8 +2666,9 @@ margin-right: 0; }
 </div>
 </div>
 </div>
-<p><strong>Deflated Sharpe</strong>（<span class="math inline">N</span>=53、<span class="math inline">SR_0</span>=0.37）：不分組×DTW 為 <strong>0.696</strong>， <strong>無一通過 0.95</strong>。</p>
-<p>全宇宙最高者為形成窗 504 對照臂 <code>GICS-SSD-FW504</code> 的 <strong>0.900</strong>—— 但它後半期 Sharpe 為 <strong>−0.395</strong>：以全期 Sharpe 挑選即會選中它。 <strong>DSR 校正「看過幾個候選」，不校正「以全期指標挑到已失效的策略」。</strong></p>
+<p><strong>Deflated Sharpe</strong>（<span class="math inline">N</span>=53、<span class="math inline">SR_0</span>=0.408）：不分組×DTW 為 <strong>0.738</strong>， <strong>無一通過 0.95</strong>。命題 2 的六個主角 DSR 更低（0.036–0.260）。</p>
+<p>全宇宙最高者為形成窗 504 對照臂 <code>GICS-SSD-FW504</code> 的 <strong>0.885</strong>—— 但它後半期 Sharpe 為負：以全期 Sharpe 挑選即會選中它。 <strong>DSR 校正「看過幾個候選」，不校正「以全期指標挑到已失效的策略」。</strong></p>
+<p>另：對「日均報酬是否為零」的絕對檢定 <strong>6/6 不顯著</strong>（<span class="math inline">p</span> = 0.186–0.850）。</p>
 </section>
 <section id="相對比較與絕對績效為何是兩件事" class="slide level2">
 <h2>相對比較與絕對績效為何是兩件事</h2>
@@ -2592,8 +2708,8 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p>本章的三項檢定<strong>全部是相對比較</strong>。即使某一項達顯著， 也只代表「A 優於 B」，不代表 A 本身可獲利。</p>
-<p>而本研究的絕對績效<strong>明確為負</strong>（低於無風險利率）， 故連「相對較優者是否值得部署」都不成立。</p>
+<p>本章的三項檢定<strong>全部是相對比較</strong>。交易層確實有一項達到校正後顯著（3/5）， 但那只代表「A 優於 B」，不代表 A 本身可獲利。</p>
+<p>而本研究的絕對績效<strong>低於無風險利率且 6/6 不顯著</strong>、DSR 6/6 未過門檻， 故連「相對較優者是否值得部署」都不成立。 <strong>這正是相對顯著與絕對可交易必須分開陳述的理由。</strong></p>
 </div>
 </div>
 </div>
@@ -2623,17 +2739,17 @@ margin-right: 0; }
 <td style="text-align: left;">交易層</td>
 <td style="text-align: left;">DL-THR vs 固定門檻</td>
 <td style="text-align: left;">5/5 為正</td>
-<td style="text-align: center;"><strong>0/5</strong></td>
+<td style="text-align: center;"><strong>3/5</strong></td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">兩層組合</td>
 <td style="text-align: left;">完整系統 vs 傳統基準</td>
-<td style="text-align: left;">全期 3/3 為負</td>
+<td style="text-align: left;">全期 2/3 為負</td>
 <td style="text-align: center;"><strong>0/3</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>方向的一致性是最可靠的訊號，而非任何單組的 <span class="math inline">p</span> 值。</strong></p>
+<p><strong>交易層是全篇唯一通過多重檢定校正的一組</strong>；方向的一致性仍是最可靠的訊號。</p>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -2643,9 +2759,9 @@ margin-right: 0; }
 <p><strong>重要</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>其一，分組層是淨損害</strong>，且限制愈強損害愈大—— 不分組 &gt; GICS &gt; 任一資料驅動分群，15 格逐格成立。 機制為期末強制平倉：強平率自 36.8% 升至 43.1%， 與績效的相關在 15 個參數配置中一致為負（中位 <span class="math inline">r</span> = −0.801）。 強平的配對再追一個交易期僅 39.1% 回歸——<strong>是持續發散，非尚未回歸</strong>。</p>
-<p><strong>其二，門檻選擇是唯一方向為正的改良</strong>，且價值與分群無關： 增益最大者為傳統 GICS 底，三項機械性替代解釋在該兩底皆排除。 惟量級接近偵測極限，校正後不顯著。</p>
-<p><strong>其三，兩層的檢定力不對等來自設計</strong>： 形成期層的 <span class="math inline">SE</span> 為交易期層的 2.02 倍，等效需 4.1 倍樣本。 此為結構性限制，更換演算法或增加特徵皆不影響。</p>
+<p><strong>其一，分組層是淨損害</strong>，且限制愈強損害愈大—— 不分組 &gt; GICS &gt; 任一資料驅動分群，15 格逐格成立（惟最接近處僅差 0.001）。 機制為期末強制平倉：強平率自 33.5% 升至 39.0%， 與績效的相關在 15 個參數配置中一致為負（中位 <span class="math inline">r</span> = −0.747）。 強平的配對再追一個交易期僅 45.4% 回歸——<strong>是持續發散，非尚未回歸</strong>。</p>
+<p><strong>其二，門檻選擇是本研究唯一通過多重檢定校正的改良</strong>，且價值與分群無關： 5/5 方向為正、校正後 3/5 顯著，增益最大者為傳統 GICS 底， 三項機械性替代解釋在 GICS-SSD／HDBSCAN／GICS-SDP 三底全排除。 惟「統計顯著」與「機制證據」兩份清單的交集僅 <strong>HDBSCAN 與 GICS-SDP</strong>， 通過與否又落在門檻上（0.0495 對 0.0504），且絕對績效與 DSR 皆未過關。</p>
+<p><strong>其三，兩層的檢定力不對等來自設計</strong>： 形成期層的 <span class="math inline">SE</span> 為交易期層的 1.83 倍，等效需 3.3 倍樣本。 此為結構性限制，更換演算法或增加特徵皆不影響。</p>
 </div>
 </div>
 </div>
@@ -2658,8 +2774,8 @@ margin-right: 0; }
 <p><strong>警告</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>絕對績效</strong>：最佳配置（GICS-SDP + DL-THR）25 年將 10,000 變為 <strong>12,548</strong>， 低於同期無風險利率假設的約 <strong>16,400</strong>；DSR 無一通過 0.95。</p>
-<p><strong>本研究不主張任何配置具可交易的獲利能力；全部結論均為相對宣稱。</strong></p>
+<p><strong>絕對績效</strong>：最佳配置（GICS-SSD + DL-THR）25 年將 10,000 變為 <strong>13,062</strong>， 低於同期無風險利率假設的約 <strong>16,400</strong>； 絕對檢定 6/6 不顯著、DSR 無一通過 0.95。</p>
+<p><strong>本研究不主張任何配置具可交易的獲利能力；可宣稱者全為相對比較。</strong></p>
 </div>
 </div>
 </div>

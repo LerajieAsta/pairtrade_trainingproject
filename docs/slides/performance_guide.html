@@ -1629,7 +1629,8 @@ margin-right: 0; }
 </div>
 <div class="callout-content">
 <p>一切績效主張與統計檢定，皆以該策略 <strong>15 個參數配置的等權組合</strong>為口徑。 改報「網格最佳格」會內含 15 選 1 的選擇偏誤，必須再以 DSR 之類的程序扣回去—— 而該程序的關鍵參數（試驗數 <span class="math inline">N</span>）是判斷而非事實。 <strong>等權組合沒有東西可挑，選擇偏誤自源頭消失。</strong></p>
-<p><em>例外</em>：regime 分層與 break-even 成本表以最佳格計算—— 二者刻畫風險的<strong>形狀</strong>而非主張績效水準，且最佳格對其論證方向是保守的。</p>
+<p><em>此原則自 2026-08-27 起亦適用於 regime 分層與 break-even 成本表</em>： 兩者現由 <code>analysis/regime_cost_ew.py</code> 以 <strong>15 格等權、兩臂逐格對齊</strong>計算 （輸出 <code>regime_sharpe_ew.csv</code>／<code>breakeven_ew.csv</code>），論文第 4.6 節引用的即為此版。</p>
+<p><code>analysis/regime_cost_dsr_eval.py</code> 仍保留<strong>最佳格</strong>版本 （<code>regime_sharpe.csv</code>／<code>breakeven_dsr.csv</code>），但其用途只有一個： 計算 DSR——<strong>DSR 的定義本來就要求「網格最佳」那一格</strong>， 因為它校正的正是「挑最佳」所帶來的偏誤。 兩份輸出不可混用，檔名的 <code>_ew</code> 後綴即為區辨。</p>
 </div>
 </div>
 </div>

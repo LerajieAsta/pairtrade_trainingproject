@@ -40,10 +40,18 @@ Deflated Sharpe Ratio 的 $N$：**為了挑出最終報告的那個策略，總�
 
 兩種口徑，兩者都釘死在 `analysis/regime_cost_dsr_eval.py` 的 `TRIAL_CENSUS`：
 
-| 口徑 | 現值 | 含意 |
+| 口徑 | 釘死值 | 含意 |
 |:---|---:|:---|
 | `method` | 53 | 相異的 `METHOD`，每個代表一次獨立的建模決策 |
 | `config` | 1,392 | 全部回測配置（`METHOD` × `top_n` × 停損 × …） |
+
+⚠️ **兩者都是刻意大於實地清點值，不是過期。** 對沖口徑修正（2026-09）之後
+`result.db` 只剩 49 個 `METHOD`／1,152 個基準格——MHD 掃描與四支已退役的 METHOD
+無法以現行 config 重現而遭刪除。**但那些試驗確實跑過、確實被看過**，
+DSR 的 $N$ 計的是「為了挑出最終報告的那個策略，總共看過幾個候選」，
+把結果刪掉並不會讓你沒看過它們。維持較大的 $N$ 只會使門檻更嚴。
+故 `_trial_specs` 的漂移示警是**預期行為**，不要用「更新常數」消掉它。
+（`var_sr` 則相反，已改用修正後的引擎重算——它必須與 Sharpe 同尺度。）
 
 **`method` 是主口徑**：同一 `METHOD` 下的 15 格共用配對、高度相關，
 不宜各算一次試驗（偽重複，見論文 5.2.1 其一）。
@@ -54,10 +62,41 @@ Deflated Sharpe Ratio 的 $N$：**為了挑出最終報告的那個策略，總�
 2026-08-26 第一次清點（44 → 53，新增方法）使 `Grid (NOGRP-DTW)` 的 DSR 由 0.769 降至 0.674；
 同日第二次（config 912 → 1392，只新增配置）反而使它升至 0.696。
 
+> 上述三個數字是 **2026-08-26 當時**的，留作方向性的示例，不是現值。
+> 對沖口徑修正（2026-09）之後同一支的 DSR 為 **0.738**（$SR_0$ = 0.408）。
+> 現值一律以 `results/analysis/breakeven_dsr.csv` 為準。
+
 **其二，`var_sr` 的口徑本身有內在矛盾（未解決）。**
 現行定義為「每 `METHOD` 取其**全部參數格的平均** Sharpe，再取橫斷面變異」，
 故**在既有方法內新增爛配置會降低門檻**——與 DSR 的懲罰意圖相反。
 三種可能口徑各有問題，記於 `dev/IMPASSE.md` §四之二。
+
+---
+
+## Concurrent periods（並行期數）
+
+交易期重疊的層數 —— **逐策略，不是全域常數**：
+
+$$\text{並行期數} = \left\lfloor \frac{\texttt{trading\_window}}{\texttt{rolling\_step}} \right\rfloor$$
+
+多數臂為 126/21 = **6**，但 `Grid HAN4-MONTHLY` 是 21/21 = **1**、
+`Grid NOGRP-DTW-TW63` 是 63/21 = **3**。
+
+它決定資金分母：`capital_per_pair = equity / (top_n × 並行期數)`。
+凡是利用率、動用資本年化、名目額、break-even，全部經過它。
+
+> **這個量已經錯過三次，全都是同一個形狀：把它當成常數 6。**
+> 前兩次是漏乘（`regime_cost_dsr_eval` 2026-08-26、`regime_cost_ew` 2026-08-27），
+> 第三次是硬編（`db_utils` 與 `metrics` 的讀端，2026-08-28）。
+> 第三次讓 `HAN4-MONTHLY` 的 break-even 報成 **−0.76%**（真值 +0.36%）。
+
+唯一擁有者：`config.concurrent_periods(params)`。
+引擎把實際值寫入 `strategy_summaries.Concurrent_Periods`；
+讀端一律經 `metrics.concurrent_of(path_key)` 取該值，**取不到就拋錯，不猜**。
+
+⚠ 利用率**可以略超 100%**：`max_pairs` 是名目槽位，執行期沒有記帳，
+期界對齊時實際部署會短暫超出（HAN4 於 6,287 個交易日中有 13 日跑 2 期）。
+超過 5% 才代表分母錯。詳見 `dev/trading_arch/REVIEW.md` §B、§D-1。
 
 ---
 
