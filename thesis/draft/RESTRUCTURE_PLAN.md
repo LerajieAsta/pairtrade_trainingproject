@@ -255,6 +255,87 @@
 
 ---
 
+## 四之四、方向 A 的可行性實測（2026-09-09）
+
+改題方向 A（以「動作空間設計是關鍵約束」為主軸）需要把已封存的三代自由持倉
+DRL 掛回現行配對來源。**實測結論：掛得回去，但只能跑縮小版。**
+
+### 掛回去沒有障礙
+
+| 檢查項 | 結果 |
+| :--- | :--- |
+| 三支模組能否 import | ✔ `archive/trading/drl_{lstm,lstm_v2,fqi}_trading.py` 皆乾淨載入 |
+| `Trading.__init__` | ✔ 前六個位置參數與 v4 逐字相同 |
+| `_simulate_pair` 簽章 | ✔ 四支完全一致，且都有 `**kwargs` 吸收 `first_price_a/b`、`ols_alpha` |
+| 掛到現行配對來源 | ✔ 用 `formation_strategy_id_base` 借用，**零重跑形成期** |
+
+封存 config 裡那 6 條舊宣告**不能直接用**——它們綁的是舊形成期模組
+（`ssd_rolling`／`HDBSCAN_UMAP`／`HDBSCAN_MultiScale`），非現行四層組裝器。
+已改寫為借用制，見 `dev/action_space/candidate_strategies.py`（**未接線**）。
+
+### 殺手是算力
+
+`archive/trading/drl_lstm_trading.py` 的
+`agent_key = f"{period_start}_{trade_start}_{ticker_a}_{ticker_b}"`
+——快取鍵**含 ticker**，所以那個名為「shared agent」的東西其實是
+**逐配對逐期各訓練一個**；log 印的 "for period" 是誤導的命名。
+
+實測（以 5→10 episodes 的斜率外推；2 episodes 那筆不可用，
+當時 replay buffer 未滿 `batch_size=512`，根本沒進行訓練）：
+
+| episodes | 單對單期耗時 |
+| ---: | ---: |
+| 5 | 85 秒 |
+| 10 | 272 秒 |
+| **150（原設定）** | **約 92 分鐘** |
+
+成本是架構固有的，**不是可修的 bug**：`replay(512)` 每步都跑一次
+LSTM(hidden 256、2 層) 的前後傳，150 episodes × 約 126 步 ≈ 1.9 萬次。
+PyTorch 警告的 `torch.FloatTensor(list of ndarray)` 位於 `act()`，
+batch 為 1，佔比小。**原專案為此租用 H200 GPU，已於 2026-07-06 退租**，
+現為 CPU-only。
+
+平行化幫不上忙：`run_trading` 以**策略設定**為單位平行、
+CPU 上限 4 worker（無 CUDA 時），**單一格內的 295 期是循序的**。
+
+| 方案 | 期數 | episodes | 單格總時 |
+| :--- | ---: | ---: | ---: |
+| 原設定（全期） | 295 | 150 | **18.8 天** |
+| **連續子期間（保留超參）** | 約 74 | 150 | **4.7 天** |
+| 全期、episodes 降為 30 | 295 | 30 | 3.5 天 |
+| 子期間 + 30 episodes | 約 74 | 30 | 0.9 天 |
+
+v1/v2/v3 可同時跑（在 4 worker 內），故牆鐘時間約等於上表單格時間。
+
+### 建議的縮小方式：縮期間，不要縮訓練預算
+
+**取一段連續子期間**（`BACKTEST_START`／`BACKTEST_END` 為環境變數，
+config 註明子期間結果與全期並存於 `result.db`），五條臂跑同一段，
+**保留 150 episodes**。
+
+理由：要重現的是「自由持倉導致過度交易」這個**病理**，而訓練預算正是
+最明顯的替代解釋——降 episodes 會讓「是不是訓練不足才亂交易」變成
+無法排除的質疑。縮期間沒有這個問題，而換手率（6 倍那個數字）
+在 74 期上依然量得出來。
+
+> ⚠ **選窗要揭露一件事**：早期窗口（2001–2007）成本最低，但
+> `analysis/split_half.py` 顯示前半期幾乎所有策略都好看、後半期轉負
+> （491 格僅 29 格兩半皆正）。在前半期做消融，其結論未必外推。
+
+### 兩項必須先決定的事
+
+1. **對沖口徑**。v1–v3 未宣告 `SUPPORTS_HEDGE_MODE`，依 `run_trading` 的守衛
+   會被誠實記為 `dollar`；而現行 `result.db` 的 1,620 列**全部是 `signal`**。
+   直接比較會踩到附錄 B.5.1 剛修好的那個 confound。
+   `candidate_strategies.py` 的處置是為 v4 與 Z-Score 另建 `dollar` 對照臂，
+   讓五條臂在同一口徑下比較（代價：多兩條臂，但兩者都很便宜）。
+
+2. **是否值得花 5 天算力**。若答案是否，方向 A 仍可成立，
+   只是第一段證據降級為「設計沿革」，正式證據改用 `dev/action_learn`
+   （見四之二第二段）——那份是預先註冊、可重現、且機制更清楚。
+
+---
+
 ## 五、仍然必須學會的統計
 
 改題**不會把統計降到零**，但會把它降到兩個概念：
