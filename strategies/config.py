@@ -1110,6 +1110,28 @@ elif _sens_param:
             print(f"[config] 敏感性分析（formation）：{_sens_param} ∈ {_vals} × {len(_bases)} 策略 → {len(_variants)} 變體")
 
 
+# ── 動作空間消融（env 開關；預設不啟用）─────────────────────────────────
+# `ACTION_SPACE_ABLATION=1` 時，把 dev/action_space/candidate_strategies.py 的
+# 五條臂附加到尾端並**只跑它們**，用於改題方向 A（見 thesis/draft/
+# RESTRUCTURE_PLAN.md 四之四）。與敏感性分析採同一種掛法。
+#
+# ⚠ 它會啟動已封存的三代自由持倉 DRL，實測**每對每期約 92 分鐘**；
+#   務必同時以 BACKTEST_START/BACKTEST_END 限制成一段連續子期間，
+#   否則全期單格要 18.8 天。候選宣告已把網格鎖成 top_n=1 × stop_loss=0。
+if os.environ.get("ACTION_SPACE_ABLATION", "").strip() == "1":
+    try:
+        from dev.action_space.candidate_strategies import build as _build_ablation
+        _abl = _build_ablation()
+        strategies_raw_all = strategies_raw_all + _abl
+        strategies_raw = _abl                       # 消融模式：只跑這五條
+        print(f"[config] 動作空間消融：附加 {len(_abl)} 條臂 "
+              f"（{BACKTEST_START} ~ {BACKTEST_END}）")
+        for _a in _abl:
+            print(f"           {_a['db_method']:<32} {_a['trading_module']}")
+    except Exception as _e:
+        print(f"⚠️ [config] 動作空間消融載入失敗：{type(_e).__name__}: {_e}")
+
+
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
 _DASHBOARD_FIXED_LINES = 8
 _ANSI_RE = re.compile(r"\033\[[^m]*m")
