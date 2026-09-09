@@ -19,8 +19,15 @@
 避免不小心觸發一次數天的回測。
 
     $env:ACTION_SPACE_ABLATION="1"
-    $env:BACKTEST_START="2006-01"; $env:BACKTEST_END="2012-12"
+    $env:BACKTEST_START="2009-07"; $env:BACKTEST_END="2018-12"
     python run_trading.py
+
+⚠ 視窗左緣**必須多墊 1.5 年**。`prepare_backtest_data` 只把價格索引向前
+回填 252 日，而跳過判定只看**交易期**日期；形成期起點早於索引起點的期
+不會被跳過，而是丟例外——**且只有 v1 會丟**（實測 v2/v3/v4/Z-Score 皆正常）。
+不墊就會讓 v1 少跑 18 期，五條臂不在同一組期上。
+2009-07~2018-12 的共同期為 108，且在 split_half 中點兩側各 54 期。
+判準與核對清單見 `thesis/draft/PREREG_action_space.md`。
 
 --------------------------------------------------------------------
 可行性（2026-09-09 實測，見 RESTRUCTURE_PLAN.md「四之四」）
@@ -53,9 +60,26 @@ import copy
 import os
 
 #: 消融的基底：借用哪一條現行策略的形成期配對（零重跑 formation）。
-#: 選 GICS-SSD 的理由：它是 §4.2.1 中效果量最大的配對底（+0.798pp），
-#: 且為傳統產業分組，不牽涉分群方法的爭議。
-BASE_DB_METHOD = "Grid (GICS-SSD-DRL)"
+#:
+#: 選 GICS-SDP 的理由（2026-09-09 改；原選 GICS-SSD 的理由「效果量最大
+#: +0.798pp」是**選擇偏誤**——那個數字是從 15 格裡挑出來的最大值）：
+#:
+#: 1. SDP := z(SSD) + z(DTW)（§3.2.4），DTW 佔一半權重，且對沖比率
+#:    與 DTW 臂同樣採雙向 OLS 取 ADF p 較低者；SSD 臂用的是另一套
+#:    （無截距、方向固定）。以 SDP 為底，是**延續**而非取代 DTW 路線。
+#: 2. 在 GICS 這一格，SDP 的 15 格等權 Sharpe 是三個配對底中最高的
+#:    （SDP 0.076 > DTW 0.068 > SSD 0.043），不是為了方便而選次優。
+#: 3. GICS-SDP 已有現成的 v4 臂，且在 §4.2.1 的逐日 HAC + BH 家族中
+#:    BH 校正 p = 0.0278（通過）；GICS-SSD 為 0.0504（不過）。
+#:
+#: 為何不直接用 GICS-DTW：它**沒有 v4 臂**。新建雖只要約 2.6 小時，
+#: 但會讓 §4.2.1 從五個配對底變六個，BH 家族重排。實測敏感度：新底
+#: 自身 p ≳ 0.06 時，現有的 GICS-SSD 與 K-means 會被推過 0.05，顯著數
+#: 由 3/5 掉到 2/6。事前無法得知新底的 p 落在哪邊，故不動這個家族。
+BASE_DB_METHOD = "Grid (GICS-SDP-DRL)"
+
+#: 同一配對底的 Z-Score（固定門檻）臂，作為消融的基準組。
+BASE_ZSCORE_DB_METHOD = "Grid (GICS-SDP)"
 
 #: 五條臂共用的對沖口徑。設為 "dollar" 是為了與 v1–v3 對齊——
 #: 它們沒有實作 signal 口徑，強行宣告只會讓 `Hedge_Mode` 再次說謊。
@@ -78,6 +102,15 @@ ARCHIVED_DRL_PARAMS = {
 _EP_OVERRIDE = os.environ.get("ABLATION_EPISODES", "").strip()
 if _EP_OVERRIDE.isdigit() and int(_EP_OVERRIDE) > 0:
     ARCHIVED_DRL_PARAMS["drl_episodes"] = int(_EP_OVERRIDE)
+
+#: **煙霧測試／成本探針的命名隔離**。`run_trading` 的完成判定「純以
+#: result.db 為準」：`strategy_summaries` 有該 config 的列就視為完成並跳過。
+#: 若探針用正式 db_method 落庫，正式跑會被**靜默跳過**，而且跳過的是
+#: episodes=2 的垃圾列。設 `ABLATION_TAG=SMOKE` 會把五條臂的
+#: name/sub_dir/db_method 全部加尾綴，與正式列永不同名。
+#: ⚠ 正式跑不可設它。
+_TAG = os.environ.get("ABLATION_TAG", "").strip().upper()
+_TAG = f"-{_TAG}" if _TAG else ""
 
 #: v4 專屬、v1–v3 不認得的參數，掛 v1–v3 時要拿掉。
 _V4_ONLY = ("thr_train_epochs", "thr_min_train_samples", "thr_menu_version")
@@ -109,10 +142,10 @@ def build():
 
     def _clone(suffix: str, module: str, trade_method: str, params_patch: dict):
         s = copy.deepcopy(tmpl)
-        s["name"] = f"{tmpl['name']}{suffix}"
+        s["name"] = f"{tmpl['name']}{suffix}{_TAG}"
         s["trading_module"] = module
-        s["sub_dir"] = f"{tmpl['sub_dir']}{suffix}"
-        s["db_method"] = f"{tmpl['db_method'][:-1]}{suffix})"
+        s["sub_dir"] = f"{tmpl['sub_dir']}{suffix}{_TAG}"
+        s["db_method"] = f"{tmpl['db_method'][:-1]}{suffix}{_TAG})"
         s["trade_method"] = trade_method
         for k in _V4_ONLY:
             s["params"].pop(k, None)
@@ -127,22 +160,23 @@ def build():
 
     # 同口徑的 v4 與 Z-Score 對照臂（不加，五條臂就不在同一個對沖口徑上）
     v4 = copy.deepcopy(tmpl)
-    v4["name"] += "-DOLLAR"
-    v4["sub_dir"] += "_DOLLAR"
-    v4["db_method"] = f"{tmpl['db_method'][:-1]}-DOLLAR)"
+    v4["name"] += f"-DOLLAR{_TAG}"
+    v4["sub_dir"] += f"_DOLLAR{_TAG}"
+    v4["db_method"] = f"{tmpl['db_method'][:-1]}-DOLLAR{_TAG})"
     v4["params"]["hedge_mode"] = HEDGE_MODE
     v4["params"].update(GRID_LOCK)
     out.append(v4)
 
-    zs = next(s for s in C.strategies_raw_all if s["db_method"] == "Grid (GICS-SSD)")
+    zs = next(s for s in C.strategies_raw_all
+              if s["db_method"] == BASE_ZSCORE_DB_METHOD)
     zs = copy.deepcopy(zs)
     # Z-Score 臂原本是形成期的**擁有者**（無 formation_strategy_id_base），
-    # 改名後會去找不存在的 "Grid GICS-SSD DOLLAR_MSR0" 而整條失敗。
+    # 改名後會去找不存在的 "Grid GICS-SDP DOLLAR_MSR0" 而整條失敗。
     # 明確宣告借用原臂的配對——與其他四條臂共用同一批配對正是消融的前提。
     zs["formation_strategy_id_base"] = zs["name"]
-    zs["name"] += " DOLLAR"
-    zs["sub_dir"] += "_DOLLAR"
-    zs["db_method"] = "Grid (GICS-SSD-DOLLAR)"
+    zs["name"] += f" DOLLAR{_TAG}"
+    zs["sub_dir"] += f"_DOLLAR{_TAG}"
+    zs["db_method"] = f"{BASE_ZSCORE_DB_METHOD[:-1]}-DOLLAR{_TAG})"
     zs["params"]["hedge_mode"] = HEDGE_MODE
     zs["params"].update(GRID_LOCK)
     out.append(zs)
