@@ -63,7 +63,15 @@ def get_db_connection(db_path="results/result.db", max_retries=5, retry_delay=0.
             # timeout 即 busy_timeout：SQLite 內部自動等待解鎖而非立刻拋錯
             conn = sqlite3.connect(db_path, timeout=_DB_BUSY_TIMEOUT)
             conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA synchronous=OFF;")
+            # synchronous 預設沿用 OFF（大量寫入時最快），但 OFF 搭配 WAL
+            # 對「行程被殺」安全、對**斷電不安全**：寫入在途時斷電可能損毀資料庫。
+            # result.db 已達 202 GB，磁碟餘量不足以備份，損毀即不可回復。
+            # 故開一個 env 逃生門：預期停電的長跑可設 SQLITE_SYNC=NORMAL，
+            # 在 WAL 下即無損毀風險（最多丟掉最後一次 commit）。不設則行為不變。
+            _sync = os.environ.get("SQLITE_SYNC", "OFF").strip().upper()
+            if _sync not in ("OFF", "NORMAL", "FULL"):
+                _sync = "OFF"
+            conn.execute(f"PRAGMA synchronous={_sync};")
             conn.execute("PRAGMA cache_size=-2000000;")
             conn.execute("PRAGMA temp_store=MEMORY;")
             return conn
