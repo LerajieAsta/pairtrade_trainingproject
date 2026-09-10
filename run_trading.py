@@ -912,6 +912,20 @@ def run_all_trading():
                 orig_name = cfg["name"]
             group_dict[orig_name].append(cfg)
 
+        # 動作空間消融：五條臂各自是一條「原始策略」，依上面的規則會分成五組，
+        # 而 `for group_cfgs in groups` 是**逐組循序**的——v1 與 v2 會前後跑而非
+        # 並行，牆鐘由 max(3.3, 2.4) 變成 3.3+2.4=5.8 天，而 max_workers 只在
+        # 單一組內生效，對只有一格的組毫無作用。消融模式下把五條臂併成同一組，
+        # 讓它們共用一個 worker 池（含 v4 故 is_drl_group 為真 → 無 CUDA 時上限 4）。
+        # 併入的鍵必須是 original_strategies_config 裡真實存在的名字，
+        # 否則下方以 orig["name"] 反查時整組會被靜默丟掉。
+        if os.environ.get("ACTION_SPACE_ABLATION", "").strip() == "1" and len(group_dict) > 1:
+            _merged = [c for o in original_strategies_config
+                         for c in group_dict.get(o["name"], [])]
+            _key = next(o["name"] for o in original_strategies_config
+                        if o["name"] in group_dict)
+            group_dict = {_key: _merged}
+
         # 保持原始定義順序，DRL 移到最後
         non_drl = []
         drl_groups = []
