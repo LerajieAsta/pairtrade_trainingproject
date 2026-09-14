@@ -9,12 +9,12 @@
 
 ```bash
 cd /c/Clark/YZU/Papper/Code
-ACTION_SPACE_ABLATION=1 \
+ACTION_SPACE_ABLATION=1 SQLITE_SYNC=NORMAL \
 BACKTEST_START=2009-07 BACKTEST_END=2018-12 \
-python -u run_trading.py
+python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' > run_ablation.log
 ```
 
-**就這一行，跟第一次完全相同。** 三件事會自動發生：
+比第一次多了兩處：`SQLITE_SYNC=NORMAL`（理由見第三節）與儀表板過濾（理由見第六節）。其餘完全相同。三件事會自動發生：
 
 1. v3（FQI）與 v4（門檻選擇）已完成並落庫，完成判定會直接跳過它們。
 2. v1／v2 從 `results/tiingo/.ckpt/` 的逐期 `.pkl` 續算，
@@ -186,3 +186,48 @@ PY
 09-12 19:05 電就回來了，卻白白多睡了 36 小時。
 若要補，方向是「可喚醒的排程工作」（每日固定時間喚醒一次），
 而不是去動電池的睡眠策略。
+
+
+---
+
+## 六、不要把儀表板直接接進檔案
+
+`run_trading.py` 的即時儀表板每秒重繪整個畫面。若用
+`python -u run_trading.py > xxx.log` 接走，檔案會以**約 1.3 GB／天**成長，
+而且幾乎全是 ANSI 控制碼。
+
+實測（2026-09-14 清理時**整檔數過，非抽樣**）：
+
+| 檔案 | 大小 | 總行數 | 含 ANSI | **獨特內容** |
+| :--- | ---: | ---: | ---: | ---: |
+| `formation_rerun_20260813.log` | 1.8 GB | 6,407,237 | 6,407,104 | **858 行** |
+| `drl_variance_run2.log` | 320 MB | 926,826 | 926,640 | **187 行** |
+| `smoke_ablation.log` | 125 MB | 360,848 | 360,789 | **51 行** |
+
+99.998% 的行是重繪。1.8 GB 裡真正的資訊約 2 MB——被放大 900 倍。
+該次清理刪掉 21 個這種檔，釋出 **6.86 GB**。
+
+### 做法：濾掉 ANSI，不要整個丟掉
+
+```bash
+python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' > run_ablation.log
+```
+
+> **不要用 `> /dev/null`。** 收尾的「績效總結報告」——每條策略的狀態、
+> 最終權益、耗時、錯誤訊息——也走 stdout，整個丟掉會連它一起丟。
+> 實測那份報告**不含任何 ANSI**，所以上面的過濾會把它完整留下：
+
+| 原始 | 過濾後 | 比例 |
+| ---: | ---: | ---: |
+| 11.0 MB | 3.3 KB | 0.0296% |
+| 35.7 MB | 3.4 KB | 0.0092% |
+
+`--line-buffered` **不可省**——沒有它 grep 會整塊緩衝，
+長跑期間看不到任何即時輸出（本專案踩過這個坑）。
+
+### 診斷本來就不靠這個檔
+
+真正有用的是 `results/tiingo/logs/run_trading/<策略>.log`——
+逐期逐配對的明細，單檔只有幾十 KB。本次抓到的兩個問題
+（v1 的左緣靜默失效、Modern Standby 停擺）都是從那裡看出來的，
+不是從主控台 log。所以就算主控台輸出全部濾掉，診斷能力也不受影響。
