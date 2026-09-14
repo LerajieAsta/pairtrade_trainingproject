@@ -9,12 +9,13 @@
 
 ```bash
 cd /c/Clark/YZU/Papper/Code
+set -o pipefail
 ACTION_SPACE_ABLATION=1 SQLITE_SYNC=NORMAL \
 BACKTEST_START=2009-07 BACKTEST_END=2018-12 \
-python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' > run_ablation.log
+python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' >> results/logs/run_ablation.log
 ```
 
-比第一次多了兩處：`SQLITE_SYNC=NORMAL`（理由見第三節）與儀表板過濾（理由見第六節）。其餘完全相同。三件事會自動發生：
+比第一次多了三處：`SQLITE_SYNC=NORMAL`（理由見第三節）、儀表板過濾（理由見第六節），以及 `set -o pipefail`（沒有它，`$?` 拿到的是 grep 而不是 python 的結束碼）。log 寫到 `results/logs/`，被 `.gitignore` 的 `logs/` 規則涵蓋，不會在專案根目錄留下未追蹤檔。其餘完全相同。三件事會自動發生：
 
 1. v3（FQI）與 v4（門檻選擇）已完成並落庫，完成判定會直接跳過它們。
 2. v1／v2 從 `results/tiingo/.ckpt/` 的逐期 `.pkl` 續算，
@@ -210,7 +211,7 @@ PY
 ### 做法：濾掉 ANSI，不要整個丟掉
 
 ```bash
-python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' > run_ablation.log
+python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' >> results/logs/run_ablation.log
 ```
 
 > **不要用 `> /dev/null`。** 收尾的「績效總結報告」——每條策略的狀態、
@@ -231,3 +232,82 @@ python -u run_trading.py 2>&1 | grep --line-buffered -av $'\x1b' > run_ablation.
 逐期逐配對的明細，單檔只有幾十 KB。本次抓到的兩個問題
 （v1 的左緣靜默失效、Modern Standby 停擺）都是從那裡看出來的，
 不是從主控台 log。所以就算主控台輸出全部濾掉，診斷能力也不受影響。
+
+
+---
+
+## 七、實戰紀錄：2026-09-15 Windows Update 自動重開（**第一次真正走續傳**）
+
+第五節那次是整機被掛起、行程活著；這次行程**真的被殺了**，第一節的續傳流程第一次被實際走過。
+
+| 時間 | 事件 |
+| :--- | :--- |
+| 09-15 02:43 | v2 寫下第 63 個 checkpoint（`2012-09-10.pkl`） |
+| 09-15 03:12 | v1 寫下第 71 個 checkpoint（`2013-05-14.pkl`） |
+| 03:14:08 | 事件 1074：`MoUsoCoreWorker.exe`（Windows Update）發起重開，原因「作業系統: Service Pack（計劃之中）」 |
+| 03:14–03:16 | 1074 → 6006 → 6005 連續三輪，**有序關機**；**無**事件 41／6008 |
+| 03:16:43 | 開機完成。python 全滅，背景工作回報 exit 4 |
+| 07:35 | 照第一節重啟 → v1 `[Resume] 已載入 71 期`、v2 `已載入 63 期`，權益自動重建 |
+
+**損失**：v1 約 2 分鐘、v2 約 30 分鐘（各自正在算的那一期）。**資料零損失。**
+
+**為何在凌晨**：使用時段設 06–21，03:14 在時段外，Windows 被允許重開。
+KB5129195（安全性更新）於 09-14 安裝；重開後 `RebootRequired = False`。
+
+| | 09-12（第五節） | 09-15（本節） |
+| :--- | :--- | :--- |
+| 原因 | 停電改吃電池 → Modern Standby | Windows Update 自動重開 |
+| 事件指紋 | 105、507 | **1074（`MoUsoCoreWorker.exe`）＋ 6006／6005** |
+| 行程 | 被掛起，活著 | **被殺** |
+| 恢復方式 | 喚醒即自動接續 | **須照第一節重啟** |
+| 損失 | 48.7 小時牆鐘 | 約 4 小時牆鐘＋半期計算 |
+
+### 重啟前實際做的核對
+
+| 項目 | 結果 |
+| :--- | :--- |
+| checkpoint 逐一 unpickle | v1 71 個、v2 63 個，**0 損毀**、無 `.tmp` 殘留 |
+| `result.db` 列數 | 1,622（主軸 1,620 ＋ v3、v4 各 119 期） |
+| `result.db` 的 `-wal` 殘留 | 無；mtime 仍為 09-10（v3／v4 落庫那次） |
+| `PRAGMA quick_check` | **略過**（理由見下） |
+
+略過 `quick_check` 的理由：第三節那條規則防的是「**斷電時有寫入在途**」。
+這次是有序關機（6006），且 DB 自 09-10 起沒被寫過，前提不成立；而 202 GB 全掃要數小時。
+**若事件記錄檔出現 41 或 6008（非預期關機），仍須照做。**
+
+主控台 log 首次改用第六節的過濾：開跑後 3.3 KB，前一份未過濾的是 3.53 GB，已刪除。
+
+### 順帶抓到：v1 在左緣邊界多一個「無聲空期」
+
+重啟前把兩臂的空 checkpoint 列出來（存於 `results/logs/ablation_empty_periods_20260915.json`，
+因為重啟會覆寫 detail log）：
+
+| 形成期起點 | v1 | v2 | 說明 |
+| :--- | :--- | :--- | :--- |
+| 2007-07-12 | 空 | 空 | 五臂皆無此期 |
+| 2007-08-10 ～ 2008-06-11（11 期） | 空 | 有 | 左緣例外，預先登記 4.1 已揭露 |
+| **2008-07-11** | **空（0 列）** | 有（126 列，MDT/SYK） | **預期外** |
+
+2008-07-11 的 v1 detail log **沒有** `Error simulating pair`——預先登記第九節核對清單第 1 項
+（只數 Error）**抓不到**這種失效。
+
+v1 其餘 58 個非空期全在其後，空期只出現在形成期 ≤ 2008-07-11，屬左緣邊界效應，
+不是中段隨機失效。→ **五臂共同期是 107，不是預期的 108**（門檻 ≥100，仍通過）。
+已記入預先登記的偏離紀錄，並在核對清單追加第 7 項。
+根因未查（當時的 detail log 已被覆寫）；推測墊補 1.5 年對 v1 仍差一期。
+
+### 兩個日期鍵不一樣（這次差點看錯）
+
+- **checkpoint 檔名**＝**形成期**起點
+- **`strategy_pairs.Period_Start`**＝**交易期**起點
+
+證據：v3 的 `Period_Start` 最後一筆是 2018-06-14。若它是形成期起點，交易期會延伸到 2019-12、
+超出價格索引而被跳過，不可能落庫；當成交易期起點，交易期迄 2018-12-13，與第四節視窗表吻合。
+**兩者比對前必須先換算，不能直接拿日期字串比。**
+
+### 防止再發生
+
+**暫停 Windows Update 需要系統管理員權限**，本 session 不是管理員，無法代勞。
+長跑前請人工：**設定 → Windows Update → 暫停更新 1 週**。
+
+使用時段最長 18 小時，無論怎麼設都留 6 小時可重開的窗口，**不是解法**。
