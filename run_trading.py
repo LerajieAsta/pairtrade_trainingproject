@@ -410,6 +410,13 @@ def worker_task(
             trade_end_idx = date_to_idx.get(pd.to_datetime(trade_end))
             if trade_start_idx is None or trade_end_idx is None:
                 print(f"  [Warning] Period dates ({trade_start} to {trade_end}) not found in database price index. Skipping period.")
+                # 必須在 continue 前清空：上方 allocate_capital 已把本期配對寫進 active_pairs，
+                # 而 continue 會跳過迴圈尾端的 pm.active_pairs.clear()。連續 top_n×並行期數 次
+                # 視窗外跳過就會塞滿槽位，下一個真正計算的期 allocate 回傳空 dict → 該期零配對、
+                # 無任何錯誤訊息、寫下空 checkpoint。子視窗回測（BACKTEST_START 非 2000-01）必中：
+                # 全新啟動時失去第一個視窗內的期；每次續傳又失去續傳後第一個計算的期（2026-09-15）。
+                # 全期回測從不跳過，不受影響。
+                pm.active_pairs.clear()
                 continue
             trade_dates = all_dates[trade_start_idx : trade_end_idx + 1]
 
