@@ -67,6 +67,10 @@ PIPELINE = [
     # 2026-08-28 補進本清單——它一直不在，重跑後會靜默留著舊數字。
     ("regime / 成本（等權）", "analysis.regime_cost_ew"),
     ("敏感度",             "analysis.sensitivity_report"),
+    # 2026-09-17 新增。動作空間消融（預先登記 PREREG_action_space.md）。
+    # 它有硬閘門：七項核對任一不過就拒絕輸出，故在消融尚未跑完時會以非零碼
+    # 結束——這是預期行為，不是管線壞掉。
+    ("消融：動作空間",     "analysis.ablation_action_space"),
     # 2026-09-08 新增。論文 4.4.3 的「期末強平後是否回歸」原本是一次性腳本、
     # 未進版本庫，2026-08-13 result.db 重建後該數字已無法重算。補成模組並入列。
     ("期末強平後續",       "analysis.forced_close_followup"),

@@ -298,8 +298,15 @@ def traded_notional(path_key: str, top_n: int, result_db: str = RESULT_DB,
             "SELECT Date, SUM(Daily_Delta) d FROM trade_logs "
             "WHERE strategy_id = ? GROUP BY Date ORDER BY Date", con, params=(path_key,))
         ent = pd.read_sql(
+            # 2026-09-17：事件集補上 REVERSE_*。反向＝平掉舊倉再開反向倉，
+            # 與一次「進場」收同樣的進出場費，且它被計入 strategy_summaries 的
+            # Entries（v3：173 ENTER + 361 REVERSE = 534）。漏掉會使有反向的臂
+            # 名目額低估 68%。REVERSE_* 只由封存的三支自由持倉模組產生，
+            # 現行 zscore/drl_threshold 兩支完全不含該字串，故對主軸 1,620 列
+            # 是 no-op（已以零列驗證）。
             "SELECT Date, COUNT(*) n FROM trade_logs "
-            "WHERE strategy_id = ? AND Status LIKE 'ENTER%' GROUP BY Date", con,
+            "WHERE strategy_id = ? AND (Status LIKE 'ENTER%' OR Status LIKE 'REVERSE%') "
+            "GROUP BY Date", con,
             params=(path_key,))
     finally:
         con.close()
