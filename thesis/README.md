@@ -45,10 +45,19 @@ Git 上是新的，網頁上是舊的，兩邊都「沒錯」。
 | :--- | :--- | :--- | :--- |
 | 一　緒論 | `01_緒論.md` | `notebooks/thesis/ch1_introduction.ipynb` | `docs/slides/thesis/ch1_introduction.html` |
 | 二　文獻探討 | `02_文獻探討.md` | `…/ch2_literature.ipynb` | `…/ch2_literature.html` |
-| 三　研究方法 | `03_研究方法.md` | `…/ch3_methodology.ipynb` | `…/ch3_methodology.html` |
+| 三　研究方法（系統設計） | `03_研究方法.md` | `…/ch3_methodology.ipynb` | `…/ch3_methodology.html` |
 | 四　實證結果 | `04_實證結果.md` | `…/ch4_results.ipynb` | `…/ch4_results.html` |
-| 五　結論 | `05_結論.md` | `…/ch5_conclusion.ipynb` | `…/ch5_conclusion.html` |
-| 附錄 A　前行研究差異定位 | `06_附錄A_前行研究差異定位.md` | — | — |
+| 五　討論 | `05_討論.md` | **待製** | **待製** |
+| 六　結論 | `06_結論.md` | **待製**（原 `ch5_conclusion` 需拆為兩支） | **待製** |
+| 附錄 A　前行研究差異定位 | `07_附錄A_前行研究差異定位.md` | — | — |
+| 附錄 B　實作缺陷記錄 | `08_附錄B_管線修正記錄.md` | — | — |
+| 附錄 C　交易端改良的受控否證 | `09_附錄C_交易端改良的受控否證.md` | — | — |
+| 附錄 D　動作空間消融的預先登記 | `10_附錄D_動作空間消融的預先登記.md` | — | — |
+
+> **② ③ 兩軌尚未跟上 2026-09-18 的重寫。** 現有 `notebooks/thesis/ch1`–`ch5`
+> 與 `docs/slides/thesis/*.html` 仍是舊的五章結構（渲染於 2026-09-08）。
+> 散文稿已改為六章＋四附錄，兩軌的同步與重新渲染列為後續工作
+> （見 `draft/THESIS_REVISION_PLAN.md` 階段 6）。**此時網站顯示的是舊版。**
 
 > 附錄 A **只有散文稿**，未做投影片。它是 §5.3 其九的展開（與許鈞翔 2025 的
 > 八項差異、其中進場時點一項的受控隔離結果），BH 校正後 0/3 顯著，
