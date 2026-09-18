@@ -1,0 +1,9 @@
+﻿#,檢查,通過,實際
+0,五臂皆已落庫,True,全部到齊
+1,每期交易日列數完整,True,"列數異常期數 {'Z-Score': 0, 'v4': 0, 'v1': 0, 'v2': 0, 'v3': 0}"
+2,缺期僅限左緣，且非 v1 四臂一致,True,"{'Z-Score': 1, 'v4': 1, 'v1': 12, 'v2': 1, 'v3': 1}"
+3,五臂共同期 ≥ 100,True,108 期
+4,v1/v2 逐期耗時 ≥ 60 分,True,"{'v1': 69.7, 'v2': 71.0}"
+5,五臂皆 dollar 口徑,True,"{'Z-Score': 'dollar', 'v4': 'dollar', 'v1': 'dollar', 'v2': 'dollar', 'v3': 'dollar'}"
+6,db_method 不含 PROBE/SMOKE,True,無
+7,中段無缺期,True,"{'Z-Score': 0, 'v4': 0, 'v1': 0, 'v2': 0, 'v3': 0}"

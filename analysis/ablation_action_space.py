@@ -192,6 +192,25 @@ def expected_periods() -> list:
     return sorted(per.loc[keep, "Trade_Start"])
 
 
+def left_edge_periods(expected: list) -> set:
+    """
+    **左緣期**＝形成期起點早於價格索引起點者。
+
+    只有 v1 需要形成期的價格（`_train_shared_agent` 取 formation_start~end 的
+    切片），故只有它在這些期會失敗；其餘四臂照常算。這個結構性不對稱是預先
+    登記 4.1 在**任何資料存在之前**就揭露的，處置也寫定為「分析取五臂共同期
+    交集」。判定只用價格日曆與形成期日期，不涉及任何結果。
+    """
+    cal = price_calendar()
+    lo = cal.searchsorted(pd.Timestamp(f"{BACKTEST_START}-01"))
+    idx_start = cal[max(0, lo - FORMATION_WINDOW)]
+    with _con(FORMATION_DB) as c:
+        per = pd.read_sql("SELECT DISTINCT Period_Start, Trade_Start FROM formation_pairs "
+                          "WHERE strategy_id = ?", c, params=(FORMATION_SID,))
+    f2t = dict(zip(per.Trade_Start, per.Period_Start))
+    return {t for t in expected if pd.Timestamp(f2t[t]) < idx_start}
+
+
 def period_table(sid: str, result_db=RESULT_DB) -> pd.DataFrame:
     """每期一列：交易日列數、進場次數（含反向）。"""
     q = ",".join("?" * len(ENTRY_STATUSES))
@@ -260,12 +279,16 @@ def run_gate(paths: dict, expected: list) -> tuple:
                    "通過": bool(bad_rows) and all(v == 0 for v in bad_rows.values()),
                    "實際": f"列數異常期數 {bad_rows}"})
 
-    # 2：五臂「視窗內應算期集合」相同（缺口只允許出現在左緣）
+    # 2：缺的期只能是左緣期，且四條非 v1 臂彼此完全相同
+    #    （不能要求五臂集合全等——預先登記 4.1 已揭露 v1 算不了左緣，
+    #      並把處置寫定為「取共同期交集」。）
     have = {k: set(t.Period_Start) for k, t in tables.items()}
     miss = {k: sorted(exp - v) for k, v in have.items()}
-    same = len({tuple(v) for v in miss.values()}) == 1 if miss else False
-    checks.append({"#": 2, "檢查": "五臂應算期集合相同",
-                   "通過": same,
+    left = left_edge_periods(expected)
+    only_left = all(set(v) <= left for v in miss.values()) if miss else False
+    others = {tuple(v) for k, v in miss.items() if k != "v1"}
+    checks.append({"#": 2, "檢查": "缺期僅限左緣，且非 v1 四臂一致",
+                   "通過": only_left and len(others) == 1,
                    "實際": {k: len(v) for k, v in miss.items()}})
 
     # 3：共同期 ≥ 100
@@ -288,9 +311,8 @@ def run_gate(paths: dict, expected: list) -> tuple:
     checks.append({"#": 6, "檢查": "db_method 不含 PROBE/SMOKE",
                    "通過": not tagged, "實際": tagged or "無"})
 
-    # 7：落庫配對期連續（中段不得缺期）
-    left_edge = expected[0] if expected else None
-    mid_gaps = {k: [p for p in v if p != left_edge] for k, v in miss.items()}
+    # 7：落庫配對期連續（中段不得缺期）。左緣期不算缺——見 left_edge_periods。
+    mid_gaps = {k: [p for p in v if p not in left] for k, v in miss.items()}
     n_mid = {k: len(v) for k, v in mid_gaps.items()}
     checks.append({"#": 7, "檢查": "中段無缺期",
                    "通過": bool(n_mid) and all(v == 0 for v in n_mid.values()),
