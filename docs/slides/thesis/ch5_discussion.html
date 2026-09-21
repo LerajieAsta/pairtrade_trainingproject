@@ -1179,6 +1179,88 @@ margin-right: 0; }
 <p>一致口徑重算：組合總報酬約 <strong>2.375%</strong>，即<strong>高於</strong>無風險利率 <strong>0.375 個百分點</strong>。 <code>Excess_Ret_RF</code> 自始即在資料庫中，但先前未進入正文。</p>
 </blockquote>
 </section>
+<section id="以-rf-超額重看那-15-格結論比帳面口徑更強" class="slide level2">
+<h2>以 rf 超額重看那 15 格——結論比帳面口徑更強</h2>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">分組</th>
+<th style="text-align: right;">SSD</th>
+<th style="text-align: right;">DTW</th>
+<th style="text-align: right;">SSD-DTW-PCA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">不分組</td>
+<td style="text-align: right;">−0.308%</td>
+<td style="text-align: right;"><strong>+0.009%</strong></td>
+<td style="text-align: right;">−0.391%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GICS 產業</td>
+<td style="text-align: right;">−0.705%</td>
+<td style="text-align: right;">−0.522%</td>
+<td style="text-align: right;">−0.471%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Agglomerative</td>
+<td style="text-align: right;">−1.042%</td>
+<td style="text-align: right;">−0.689%</td>
+<td style="text-align: right;">−0.771%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">HDBSCAN</td>
+<td style="text-align: right;">−1.380%</td>
+<td style="text-align: right;">−0.822%</td>
+<td style="text-align: right;">−1.015%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">K-means</td>
+<td style="text-align: right;">−1.577%</td>
+<td style="text-align: right;">−1.435%</td>
+<td style="text-align: right;">−1.456%</td>
+</tr>
+</tbody>
+</table>
+<p>（利用率一律落在 56.2%–57.6%）</p>
+<blockquote>
+<p><strong>15 格固定門檻基準，無一在 rf 超額口徑下為正。</strong> 最高者不分組 DTW 僅 <strong>+0.009 pp</strong>，實質為零。</p>
+<p>亦即<strong>單靠配對選擇與固定門檻，這 25 年連無風險利率都跑不贏</strong>； 唯二為正的是疊加 DL-THR 的兩條 GICS 臂（+0.375%、+0.390%）。</p>
+</blockquote>
+</section>
+<section id="但-dl-thr-的優勢有一部分是機械的" class="slide level2">
+<h2>但 DL-THR 的優勢有一部分是機械的</h2>
+<p>DL-THR 會 SKIP 三至四成配對期，利用率只有 42.6%／43.2%（固定門檻約 57%） → 被扣掉的 <code>rf × 利用率</code> 較小，rf 超額被墊高。</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th style="text-align: left;">配對來源</th>
+<th style="text-align: right;">Δ rf 超額</th>
+<th style="text-align: right;">真實報酬差</th>
+<th style="text-align: right;">閒置現金多收的 rf</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">GICS-SSD（DRL − Z-Score）</td>
+<td style="text-align: right;">+1.080 pp</td>
+<td style="text-align: right;"><strong>+0.798 pp</strong></td>
+<td style="text-align: right;">+0.282 pp</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">GICS-SDP（DRL − Z-Score）</td>
+<td style="text-align: right;">+0.861 pp</td>
+<td style="text-align: right;"><strong>+0.579 pp</strong></td>
+<td style="text-align: right;">+0.282 pp</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>拆出來的「真實報酬差」與 4.3 節的年化Δ逐位相同</strong>（+0.798、+0.579） ——一項內部一致性檢查。</p>
+<p><strong>那 +0.282 pp 不應計為技巧</strong>：它只是「少投入資本、多收利息」， 與 4.4 節「總曝險減少」那項替代解釋是同一件事的另一面。</p>
+</blockquote>
+</section>
 <section id="此更正使第一道界線變弱但不使其消失" class="slide level2">
 <h2>此更正使第一道界線變弱，但不使其消失</h2>
 <p><strong>其一，rf 超額口徑在機制上獎勵低利用率。</strong> 它等於「算術年化 − rf × 利用率」，故只動用兩成資本的策略， 其餘八成的 rf 利息會直接計入。實測即有此例：</p>
