@@ -1582,6 +1582,22 @@ margin-right: 0; }
 </blockquote>
 <p><span class="math inline">L</span> = 6 期使 108 期對應 <strong>18 個獨立區塊</strong>——本設計檢定力的實際上限。</p>
 </section>
+<section id="多重檢定校正為何是-fdr" class="slide level2">
+<h2>多重檢定校正：為何是 FDR</h2>
+<p>以 <strong>Benjamini-Hochberg 程序</strong>（Benjamini &amp; Hochberg, 1995）控制<strong>偽發現率</strong>， 同時報告原始與校正後 <span class="math inline">p</span> 值。</p>
+<p><strong>為何不用 Bonferroni 一類的 FWER 程序</strong>：主要族僅 6 個比較且彼此高度相關， FWER 校正會使檢定力降至無法偵測預先登記所設定的效果量。 FDR 控制的是「被拒絕的虛無假設中，偽陽性所佔的期望比例」。</p>
+<p><strong>族的界定（執行前寫定，不因結果調整）</strong>：消融主要族＝3 臂 × 2 基準 ＝ 6； H2、H3 各自成族；交易層主檢定族＝5 個配對來源。</p>
+</section>
+<section id="一項須揭露的前提比較族並不獨立" class="slide level2">
+<h2>一項須揭露的前提：比較族並不獨立</h2>
+<p>BH（1995）的原始證明<strong>假設檢定統計量相互獨立</strong>，而消融主要族的 6 個比較 兩兩共用成分——同一條臂對兩基準各比一次、三條臂又共用同一對基準 ——故相關性為正。</p>
+<blockquote>
+<p><strong>Benjamini &amp; Yekutieli（2001）</strong> 證明在<strong>正迴歸相依（PRDS）</strong>下， 同一程序仍控制 FDR。本族的結構（共用臂與共用基準）屬正向相依， 惟 <strong>PRDS 條件本身未經形式化驗證</strong>，此處標記為前提而非已證事實。</p>
+</blockquote>
+<p><strong>即使改用完全不依賴相依結構的保守變體，結論不變。</strong> BY（2001）的任意相依版本把門檻再除以 <span class="math inline">\sum_{i=1}^{m} 1/i</span>； <span class="math inline">m=6</span> 時約為 2.45 倍：</p>
+<p><span class="math display">0.0004 \times 2.45 \approx 0.001 \;&lt;\; 0.05</span></p>
+<p>消融主要族仍全數顯著，故此項選擇不影響第四章的結論。</p>
+</section>
 <section id="報告口徑與預先登記" class="slide level2">
 <h2>報告口徑與預先登記</h2>
 <p><strong>一切績效主張與統計檢定皆以 15 個參數配置的等權組合為口徑。</strong> 若改報「網格最佳配置」，該數字已內含「15 選 1」， 必須再以 DSR 之類的程序扣回——而其關鍵參數（試驗數 <span class="math inline">N</span>）是<strong>判斷而非事實</strong>。 等權組合沒有東西可挑，選擇偏誤自源頭消失。</p>
