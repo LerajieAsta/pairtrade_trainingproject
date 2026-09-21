@@ -82,3 +82,6 @@ dev/ml_formation/cache/
 
 # 背景執行的長跑日誌（run_hedge_variance 等）
 logs/
+
+# 本機備份目錄
+backup/
