@@ -46,6 +46,7 @@ Git 上是新的，網頁上是舊的，兩邊都「沒錯」。
 
 | 章 | ① 散文稿 | ② 投影片原始檔 | ③ 已發佈頁面 |
 | :--- | :--- | :--- | :--- |
+| 摘要（中英） | `00_摘要.md` | — | — |
 | 一　緒論 | `01_緒論.md` | `notebooks/thesis/ch1_introduction.ipynb` | `docs/slides/thesis/ch1_introduction.html` |
 | 二　文獻探討 | `02_文獻探討.md` | `…/ch2_literature.ipynb` | `…/ch2_literature.html` |
 | 三　研究方法（系統設計） | `03_研究方法.md` | `…/ch3_methodology.ipynb` | `…/ch3_methodology.html` |
