@@ -47,17 +47,19 @@ Git 上是新的，網頁上是舊的，兩邊都「沒錯」。
 | 二　文獻探討 | `02_文獻探討.md` | `…/ch2_literature.ipynb` | `…/ch2_literature.html` |
 | 三　研究方法（系統設計） | `03_研究方法.md` | `…/ch3_methodology.ipynb` | `…/ch3_methodology.html` |
 | 四　實證結果 | `04_實證結果.md` | `…/ch4_results.ipynb` | `…/ch4_results.html` |
-| 五　討論 | `05_討論.md` | **待製** | **待製** |
-| 六　結論 | `06_結論.md` | **待製**（原 `ch5_conclusion` 需拆為兩支） | **待製** |
+| 五　討論 | `05_討論.md` | `…/ch5_discussion.ipynb` | `…/ch5_discussion.html` |
+| 六　結論 | `06_結論.md` | `…/ch6_conclusion.ipynb` | `…/ch6_conclusion.html` |
 | 附錄 A　前行研究差異定位 | `07_附錄A_前行研究差異定位.md` | — | — |
 | 附錄 B　實作缺陷記錄 | `08_附錄B_管線修正記錄.md` | — | — |
 | 附錄 C　交易端改良的受控否證 | `09_附錄C_交易端改良的受控否證.md` | — | — |
 | 附錄 D　動作空間消融的預先登記 | `10_附錄D_動作空間消融的預先登記.md` | — | — |
 
-> **② ③ 兩軌尚未跟上 2026-09-18 的重寫。** 現有 `notebooks/thesis/ch1`–`ch5`
-> 與 `docs/slides/thesis/*.html` 仍是舊的五章結構（渲染於 2026-09-08）。
-> 散文稿已改為六章＋四附錄，兩軌的同步與重新渲染列為後續工作
-> （見 `draft/THESIS_REVISION_PLAN.md` 階段 6）。**此時網站顯示的是舊版。**
+> **② ③ 兩軌已於 2026-09-21 跟上重寫。** 六支投影片原始檔重寫並逐支渲染完成，
+> 舊的 `ch5_conclusion`（五章架構）之原始檔與已發佈頁面一併移除。
+> 同步點共五處：`notebooks/_quarto.yml` 渲染清單、`notebooks/_deck_nav.html` 的
+> `THESIS` 陣列、`docs/index.html` 卡片、`notebooks/README.md` 檔案樹、本表。
+> **渲染必須逐支執行**（多檔一次渲染只會成功第一支且回傳 0），
+> 且驗收要看 `docs/` 內的**內容標記**而非檔案時間。
 
 > 附錄 A **只有散文稿**，未做投影片。它是第五章 5.4 節其十一的展開（與許鈞翔 2025 的
 > 八項差異、其中進場時點一項的受控隔離結果），BH 校正後 0/3 顯著，

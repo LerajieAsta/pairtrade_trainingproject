@@ -9,12 +9,13 @@
 
 ```
 notebooks/
-├── thesis/                                 # ★ 論文正文五章
-│   ├── ch1_introduction.ipynb              # 緒論：兩個命題與三項方法論目標
-│   ├── ch2_literature.ipynb                # 文獻探討
-│   ├── ch3_methodology.ipynb               # 研究方法：四層架構、學習法、統計檢定
-│   ├── ch4_results.ipynb                   # 實證結果
-│   └── ch5_conclusion.ipynb                # 結論：三項方法論貢獻 + 實證貢獻
+├── thesis/                                 # ★ 論文正文六章
+│   ├── ch1_introduction.ipynb              # 緒論：三個研究問題與動作空間這個變因
+│   ├── ch2_literature.ipynb                # 文獻探討：含動作空間的設計空間與頻率相依
+│   ├── ch3_methodology.ipynb               # 研究方法：四層架構、動作空間消融、預先登記
+│   ├── ch4_results.ipynb                   # 實證結果：三段證據鏈
+│   ├── ch5_discussion.ipynb                # 討論：為何統計顯著仍不可交易、損益結構、限制
+│   └── ch6_conclusion.ipynb                # 結論：三個不一致的答案與五項貢獻
 │
 ├── main_results.ipynb                      # 兩大命題的實證結果與統計檢定（總覽）
 │

@@ -9,7 +9,8 @@ project:
     - thesis/ch2_literature.ipynb
     - thesis/ch3_methodology.ipynb
     - thesis/ch4_results.ipynb
-    - thesis/ch5_conclusion.ipynb
+    - thesis/ch5_discussion.ipynb
+    - thesis/ch6_conclusion.ipynb
     - main_results.ipynb
     # 附錄：分組三本 → 排序三本 → 交易端三本 → 總比較 → 指標定義
     - formation/hdbscan_cluster_pca5.ipynb
