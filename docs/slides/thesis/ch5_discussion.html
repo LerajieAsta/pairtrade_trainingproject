@@ -1075,7 +1075,7 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">一</td>
-<td style="text-align: left;">絕對績效低於無風險利率，且未達統計顯著</td>
+<td style="text-align: left;">絕對績效極低，且未達統計顯著</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">二</td>
@@ -1088,9 +1088,9 @@ margin-right: 0; }
 </tbody>
 </table>
 </section>
-<section id="第一道絕對績效低於無風險利率" class="slide level2">
-<h2>5.1.1 第一道：絕對績效低於無風險利率</h2>
-<p>主軸 15 格的等權年化（15 個參數配置等權組合口徑）：</p>
+<section id="第一道絕對績效極低且未達統計顯著" class="slide level2">
+<h2>5.1.1 第一道：絕對績效極低，且未達統計顯著</h2>
+<p>主軸 15 格的等權年化（<strong>帳面口徑</strong>，15 個參數配置等權組合）：</p>
 <table class="caption-top">
 <thead>
 <tr class="header">
@@ -1133,10 +1133,61 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p>疊加 DL-THR 後最佳為 GICS-SSD：年化 <strong>+1.026%</strong>、25 年終值 13,062、Sharpe 0.276。</p>
+<p>疊加 DL-THR 後最佳為 GICS-SSD：帳面年化 <strong>+1.026%</strong>、25 年終值 13,062、Sharpe 0.276。</p>
+</section>
+<section id="年化有三個口徑先前版本混用了兩個" class="slide level2">
+<h2>「年化」有三個口徑——先前版本混用了兩個</h2>
+<p>靜態槽位的分母是理論上限，該臂平均資金利用率僅 <strong>42.6%</strong>（逾半數資金長期閒置）：</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">口徑</th>
+<th style="text-align: right;">GICS-SSD＋DL-THR</th>
+<th style="text-align: right;">GICS-SDP＋DL-THR</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">帳面年化（閒置現金計 0%）</td>
+<td style="text-align: right;">+1.026%</td>
+<td style="text-align: right;">+1.016%</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">動用資本年化</td>
+<td style="text-align: right;">+2.793%</td>
+<td style="text-align: right;">+2.697%</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>rf 超額年化</strong>（閒置現金計息後超過 rf 的部分）</td>
+<td style="text-align: right;"><strong>+0.375%</strong></td>
+<td style="text-align: right;"><strong>+0.390%</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">平均資金利用率</td>
+<td style="text-align: right;">42.6%</td>
+<td style="text-align: right;">43.2%</td>
+</tr>
+</tbody>
+</table>
 <blockquote>
-<p><strong>同期僅持有無風險資產</strong>（年利率 2%），10,000 將成為約 <strong>16,400</strong>。 <strong>本研究的任何配置皆未達此水準。</strong></p>
+<p><strong>一項已更正的不一致。</strong> 先前的陳述是「僅持有無風險資產 10,000 將成為 16,400， 本研究的任何配置皆未達此水準」——該比較把<strong>策略的閒置現金當 0% 計息， 卻讓對照組整筆吃 2%</strong>。</p>
+<p>一致口徑重算：組合總報酬約 <strong>2.375%</strong>，即<strong>高於</strong>無風險利率 <strong>0.375 個百分點</strong>。 <code>Excess_Ret_RF</code> 自始即在資料庫中，但先前未進入正文。</p>
 </blockquote>
+</section>
+<section id="此更正使第一道界線變弱但不使其消失" class="slide level2">
+<h2>此更正使第一道界線變弱，但不使其消失</h2>
+<p><strong>其一，rf 超額口徑在機制上獎勵低利用率。</strong> 它等於「算術年化 − rf × 利用率」，故只動用兩成資本的策略， 其餘八成的 rf 利息會直接計入。實測即有此例：</p>
+<blockquote>
+<p><code>NOGRP-DTW-VG67</code> 的 rf 超額 <strong>+0.499%</strong> 高於兩條 DL-THR 臂， 但其資金利用率僅 <strong>20.4%</strong>。</p>
+<p><strong>該數字描述的是「組合的總報酬」，不是「配對交易這個動作本身賺了多少」。</strong></p>
+</blockquote>
+<p><strong>其二，+0.375 個百分點的超額，其 Sharpe 只有 0.276</strong>，低於 DSR 門檻 0.408。</p>
+<p>此更正改變的是「有沒有跑贏無風險」這個二分判斷， <strong>不改變「報酬與其承擔的變異不相稱」這件事</strong>。</p>
 </section>
 <section id="且絕對績效未達統計顯著" class="slide level2">
 <h2>且絕對績效未達統計顯著</h2>
@@ -1284,7 +1335,7 @@ margin-right: 0; }
 <tbody>
 <tr class="odd">
 <td style="text-align: left;">絕對績效</td>
-<td style="text-align: left;">最佳配置年化 1.026% &lt; 無風險利率；6/6 不顯著</td>
+<td style="text-align: left;">帳面年化 1.026%；rf 超額僅 +0.375 pp 且 Sharpe 0.276；6/6 不顯著</td>
 <td style="text-align: left;"><strong>全面</strong></td>
 </tr>
 <tr class="even">
@@ -1302,7 +1353,7 @@ margin-right: 0; }
 <blockquote>
 <p><strong>「相對於某個基準較優」與「本身可交易」是兩個不同的主張， 而本研究只支持前者。</strong></p>
 </blockquote>
-<p>這不是修辭上的保留，而是三道獨立證據的結果： 效果存在、方向一致（5/5）、機制可歸因（三來源排除三項替代解釋）， 但水準太低（1.026% &lt; 2%）、選擇偏誤校正後不足、且其中一個來源連成本都付不起。</p>
+<p>這不是修辭上的保留，而是三道獨立證據的結果： 效果存在、方向一致（5/5）、機制可歸因（三來源排除三項替代解釋）， 但水準太低（rf 超額僅 +0.375 pp，Sharpe 0.276）、選擇偏誤校正後不足、 且其中一個來源連成本都付不起。</p>
 </section></section>
 <section>
 <section id="損益結構三股流量與期末強平" class="title-slide slide level1 center">
