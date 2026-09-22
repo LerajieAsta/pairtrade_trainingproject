@@ -1294,6 +1294,21 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
     best_idx = vals.groupby([filtered_df[k] for k in keys]).idxmax().dropna()
     best = filtered_df.loc[best_idx].copy()
 
+    # 同組所有格的簡單平均＝論文 3.6.6 節的「全網格等權」口徑。基準格 15 格全在篩選內時，
+    # 與正文 5.1.1 的數字逐位相同（例：NOGRP-DTW 帳面 0.780%、GICS-SSD-DRL rf 超額 0.375%）；
+    # 篩掉部分 Top N／停損即不再是論文口徑，故並列 N CELLS 供核對。
+    grp = filtered_df.groupby([filtered_df[k] for k in keys])
+    ew = pd.DataFrame({
+        c: grp[c].apply(lambda x: pd.to_numeric(x, errors='coerce').mean())
+        for c in ('Ann_Ret_Raw', 'Excess_Ret_RF') if c in filtered_df.columns
+    })
+    ew['N'] = grp.size()
+    ew = ew.reindex(pd.MultiIndex.from_frame(best[keys]) if len(keys) > 1
+                    else pd.Index(best[keys[0]]))
+
+    def ew_pct(col):
+        return (ew[col].to_numpy() * 100) if col in ew.columns else np.nan
+
     def pct(col):
         return pd.to_numeric(best.get(col, np.nan), errors='coerce') * 100
 
@@ -1308,6 +1323,9 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
                               best.get('STOP LOSS %', '').astype(str)),
         'TRADE':             best.get('TRADE_METHOD', ''),
         'ANN. RETURN (%)':   pct('Ann_Ret_Raw'),
+        'EW ANN. RET (%)':   ew_pct('Ann_Ret_Raw'),
+        'EW RF EXCESS (%)':  ew_pct('Excess_Ret_RF'),
+        'N CELLS':           ew['N'].to_numpy(),
         'SHARPE':            num('Sharpe_Raw'),
         'SORTINO':           num('Sortino_Raw'),
         'CALMAR':            num('Calmar_Raw'),
@@ -1327,6 +1345,12 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
         out, width="stretch", hide_index=True, height=min(680, 40 + 36 * len(out)),
         column_config={
             'ANN. RETURN (%)':   st.column_config.NumberColumn(format="%.3f"),
+            'EW ANN. RET (%)':   st.column_config.NumberColumn(
+                format="%.3f", help="同組所有格的等權平均（帳面年化）＝論文報告口徑"),
+            'EW RF EXCESS (%)':  st.column_config.NumberColumn(
+                format="%.3f", help="同組所有格的等權平均 rf 超額年化"),
+            'N CELLS':           st.column_config.NumberColumn(
+                format="%d", help="等權所含格數；主軸基準格應為 15"),
             'SHARPE':            st.column_config.NumberColumn(format="%.3f"),
             'SORTINO':           st.column_config.NumberColumn(format="%.3f"),
             'CALMAR':            st.column_config.NumberColumn(format="%.3f"),
@@ -1343,6 +1367,8 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
         f"自 {len(filtered_df)} 個篩選後的配置壓縮而來。"
         "低利用率的臂（Utilization ≈ 0）其 Ann. Ret Employed 會極大，"
         "那是分母近乎零的假象而非績效——請對照 ENTRIES 與 UTILIZATION 一起讀。"
+        " **論文報的是 EW 欄**（N CELLS = 15 時與正文逐位相同）；"
+        "ANN. RETURN 是 15 選 1 之後的最佳格，未扣選擇偏誤（見 5.1.2 DSR）。"
     )
     st.download_button("⬇ Download summary CSV",
                        out.to_csv(index=False).encode('utf-8-sig'),

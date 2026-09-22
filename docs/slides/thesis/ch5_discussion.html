@@ -1133,7 +1133,7 @@ margin-right: 0; }
 </tr>
 </tbody>
 </table>
-<p>疊加 DL-THR 後最佳為 GICS-SSD：帳面年化 <strong>+1.026%</strong>、25 年終值 13,062、Sharpe 0.276。</p>
+<p>疊加 DL-THR 後，等權口徑下最佳的策略為 GICS-SSD：帳面年化 <strong>+1.026%</strong>、25 年終值 13,062、Sharpe 0.276。</p>
 </section>
 <section id="年化有三個口徑先前版本混用了兩個" class="slide level2">
 <h2>「年化」有三個口徑——先前版本混用了兩個</h2>
@@ -1226,7 +1226,7 @@ margin-right: 0; }
 <p>（利用率一律落在 56.2%–57.6%）</p>
 <blockquote>
 <p><strong>15 格固定門檻基準，無一在 rf 超額口徑下為正。</strong> 最高者不分組 DTW 僅 <strong>+0.009 pp</strong>，實質為零。</p>
-<p>亦即<strong>單靠配對選擇與固定門檻，這 25 年連無風險利率都跑不贏</strong>； 唯二為正的是疊加 DL-THR 的兩條 GICS 臂（+0.375%、+0.390%）。</p>
+<p>亦即<strong>以等權口徑衡量，單靠配對選擇與固定門檻，這 25 年連無風險利率都跑不贏</strong>； 唯二為正的是疊加 DL-THR 的兩條 GICS 臂（+0.375%、+0.390%）。 此為等權結論，不適用於單一參數配置：網格最佳格可達 +4.607 pp （不分組 DTW 的 Top1/SL0%），見 5.1.2 節——那是「15 選 1」之後的數字。</p>
 </blockquote>
 </section>
 <section id="但-dl-thr-的優勢有一部分是機械的" class="slide level2">
@@ -1284,10 +1284,23 @@ margin-right: 0; }
 <h2>5.1.2 第二道：DSR 無一通過</h2>
 <p>若改以「網格最佳配置」報告，須扣除選擇偏誤（Bailey &amp; López de Prado, 2014）。 試驗宇宙 53 個策略（config 口徑 1,392 格），門檻 <span class="math inline">SR_0</span> = 0.408：</p>
 <table class="caption-top">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 15%">
+</colgroup>
 <thead>
 <tr class="header">
 <th style="text-align: left;">策略</th>
 <th style="text-align: left;">最佳配置</th>
+<th style="text-align: right;">帳面年化</th>
+<th style="text-align: right;">動用資本年化</th>
+<th style="text-align: right;">rf 超額年化</th>
 <th style="text-align: right;">Sharpe</th>
 <th style="text-align: right;">DSR</th>
 <th style="text-align: center;">通過 0.95</th>
@@ -1297,6 +1310,9 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">不分組 × DTW</td>
 <td style="text-align: left;">Top1/SL0%</td>
+<td style="text-align: right;">+3.641%</td>
+<td style="text-align: right;">+9.553%</td>
+<td style="text-align: right;">+4.607%</td>
 <td style="text-align: right;">0.529</td>
 <td style="text-align: right;"><strong>0.738</strong></td>
 <td style="text-align: center;">✘</td>
@@ -1304,6 +1320,9 @@ margin-right: 0; }
 <tr class="even">
 <td style="text-align: left;">不分組 × SSD</td>
 <td style="text-align: left;">Top3/SL0%</td>
+<td style="text-align: right;">+2.202%</td>
+<td style="text-align: right;">+4.472%</td>
+<td style="text-align: right;">+1.600%</td>
 <td style="text-align: right;">0.455</td>
 <td style="text-align: right;">0.598</td>
 <td style="text-align: center;">✘</td>
@@ -1311,6 +1330,9 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">不分組 × SDP</td>
 <td style="text-align: left;">Top3/SL0%</td>
+<td style="text-align: right;">+1.994%</td>
+<td style="text-align: right;">+3.930%</td>
+<td style="text-align: right;">+1.253%</td>
 <td style="text-align: right;">0.436</td>
 <td style="text-align: right;">0.556</td>
 <td style="text-align: center;">✘</td>
@@ -1318,6 +1340,9 @@ margin-right: 0; }
 <tr class="even">
 <td style="text-align: left;">GICS × SDP</td>
 <td style="text-align: left;">Top3/SL0%</td>
+<td style="text-align: right;">+1.647%</td>
+<td style="text-align: right;">+3.171%</td>
+<td style="text-align: right;">+0.742%</td>
 <td style="text-align: right;">0.366</td>
 <td style="text-align: right;">0.412</td>
 <td style="text-align: center;">✘</td>
@@ -1325,12 +1350,16 @@ margin-right: 0; }
 <tr class="odd">
 <td style="text-align: left;">GICS × SSD</td>
 <td style="text-align: left;">Top5/SL0%</td>
+<td style="text-align: right;">+1.286%</td>
+<td style="text-align: right;">+2.336%</td>
+<td style="text-align: right;">+0.217%</td>
 <td style="text-align: right;">0.355</td>
 <td style="text-align: right;">0.392</td>
 <td style="text-align: center;">✘</td>
 </tr>
 </tbody>
 </table>
+<p>最佳格的年化遠高於 5.1.1 的等權數字：不分組 × DTW 帳面 +3.641%， 是同臂 15 格等權（+0.780%）的 4.7 倍。差距即「15 選 1」本身， DSR 扣回後無一通過，故這些數字<strong>不構成</strong>可交易的證據。</p>
 <p><strong>41 條策略無一通過 0.95。</strong> 命題二的六個主角同樣全數未過 （Sharpe 0.049–0.281，DSR 0.036–0.260）。</p>
 <blockquote>
 <p><strong>即 4.3 節通過多重檢定校正的那三組，在選擇偏誤校正下仍不足以宣稱技巧。</strong></p>
@@ -1338,7 +1367,7 @@ margin-right: 0; }
 </section>
 <section id="dsr-最高者正好是一個反例" class="slide level2">
 <h2>DSR 最高者正好是一個反例</h2>
-<p>形成窗 504 日的對照臂 <code>GICS-SSD-FW504</code>（Top3/SL0%）： 全期 Sharpe <strong>0.634</strong>、DSR <strong>0.885</strong>，為全部 53 個方法之冠，仍未達 0.95。</p>
+<p>形成窗 504 日的對照臂 <code>GICS-SSD-FW504</code>（Top3/SL0%）： 全期 Sharpe <strong>0.634</strong>、帳面年化 +3.045%、DSR <strong>0.885</strong>，為全部 53 個方法之冠，仍未達 0.95。</p>
 <blockquote>
 <p>之所以不列為主結果，是因為它<strong>後半期 Sharpe 為 −0.389</strong>（前半 +0.998） ——該值之高全部來自前半期，<strong>以全期 Sharpe 挑選即會選中它</strong>。</p>
 <p><strong>DSR 不足以獨力防止選擇偏誤</strong>：它校正的是「看過幾個候選」， 不校正「以全期指標挑選已在後半期失效的策略」。</p>
