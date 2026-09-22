@@ -279,6 +279,55 @@ def _canonical_method(path: str):
     return None
 
 
+# ── 論文使用（正）／附錄參考（副） ─────────────────────────────────────────
+# result.db 內 1,600 餘格裡，論文正文實際引用數字的只是其中一部分；其餘是
+# 開發過程的消融、對照與已否證的方向。分類依據為 thesis/03–05 正文，而非績效。
+ROLE_MAIN = "正 · 論文使用"
+ROLE_APPX = "副 · 附錄參考"
+
+#: 基準格：TradeLogs_Top{N}_SL{X}_ZWin0_MSR0.csv，無任何後綴。
+#: 與 analysis/proposition2_daily_hac.py 的 `_BASELINE_CELL` 同一套判定（附錄 B.5.2）。
+_BASELINE_CELL = re.compile(r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$")
+#: 4.4 門檻水準：entry_z ≠ 2.0 且無動態停損（`_EZ20_DSZ30/40/50` 是動態停損，不屬此列）。
+_ENTRY_Z_CELL = re.compile(r"_EZ(?!20_)\d+_DSZ0\.csv$")
+
+_MAIN_ARMS = {f"Grid ({g}-{d})" for g in ("NOGRP", "GICS", "AGG", "HDB", "KM")
+              for d in ("SSD", "DTW", "SDP")}
+_DLTHR_ARMS = {"Grid (AGG-SSD-DRL)", "Grid (HDB-SDP-DRL)", "Grid (KM-SSD-DRL)",
+               "Grid (GICS-SSD-DRL)", "Grid (GICS-SDP-DRL)"}
+#: 方法 → 正文章節；同樣只取基準格（FW504 另有 `_LAG` 消融格，未入正文）。
+#: `_VG67` 是該方法本身的識別後綴而非消融，判定前先剝除。
+_THESIS_METHODS = {
+    **{f"Grid (GICS-SDP-{a})": "4.1 動作空間消融"
+       for a in ("DOLLAR", "DRL-DOLLAR", "DRL-V1", "DRL-V2", "DRL-V3")},
+    **{f"Grid (AGG-SSD-RLTHR-{e})": "4.5 RL-THR" for e in ("E05", "E10", "E20D")},
+    "Grid (GICS-SSD-FW504)":   "5.1 引用對照",
+    "Grid (NOGRP-DTW-VG67)":   "5.1 引用對照",
+    "Grid (NOGRP-SSD-NF)":     "5.3 篩選層對照",
+    "Grid (AGG-SSD-NF-NOSEC)": "5.3 篩選層對照",
+    "Grid (AGG-SSD-NOSEC)":    "5.3 篩選層對照",
+}
+
+
+def thesis_role(path: str, method: str):
+    """回傳 (ROLE, THESIS §)。正＝數字出現在論文正文（第四、五章）的格，其餘為副。
+
+    主軸臂與 DL-THR 臂只有**基準格**屬正文（4.3）；同方法下的 `_LAG`／`_XZ`／
+    `_DSZ` 等後綴格是未進入正文的消融，歸副。entry_z 變體另屬 4.4。
+    """
+    base = re.sub(r"_VG\d+(?=\.csv$)", "", os.path.basename(str(path)))
+    if method in _THESIS_METHODS and _BASELINE_CELL.search(base):
+        return ROLE_MAIN, _THESIS_METHODS[method]
+    if method in _MAIN_ARMS or method in _DLTHR_ARMS:
+        if _BASELINE_CELL.search(base):
+            return ROLE_MAIN, "4.3 DL-THR" if method in _DLTHR_ARMS else "4.3 主軸 Z-Score"
+        if _ENTRY_Z_CELL.search(base):
+            return ROLE_MAIN, "4.4 門檻水準（entry_z）"
+    if str(method).startswith("HSU25"):
+        return ROLE_APPX, "附錄 A 前行研究"
+    return ROLE_APPX, "參考（未入正文）"
+
+
 def extract_features_from_path(path):
     path_lower = path.lower()
     dataset = "Current" if "current" in path_lower else "Tiingo" if "tiingo" in path_lower else "Full"
@@ -1223,7 +1272,7 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
     }
 
     st.markdown("### Strategy Summary")
-    st.caption("一個方法一列——每列是該方法在目前篩選下、依所選指標最佳的那一格。")
+    st.caption("一個方法（× 論文章節）一列——每列是該組在目前篩選下、依所選指標最佳的那一格。")
 
     if filtered_df.empty or 'METHOD' not in filtered_df.columns:
         st.info("No strategies match the current filters.")
@@ -1238,8 +1287,11 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
         st.info(f"Column {rank_col} not available.")
         return
 
+    # 以（範圍, 章節, 方法）分組：同一方法的基準格與 entry_z／消融格屬不同章節，
+    # 只按 METHOD 分組會讓「最佳格」跨章節挑選（例如挑到 `_LAG` 消融格）
+    keys = [c for c in ('ROLE', 'THESIS §', 'METHOD') if c in filtered_df.columns]
     vals = pd.to_numeric(filtered_df[rank_col], errors='coerce')
-    best_idx = vals.groupby(filtered_df['METHOD']).idxmax().dropna()
+    best_idx = vals.groupby([filtered_df[k] for k in keys]).idxmax().dropna()
     best = filtered_df.loc[best_idx].copy()
 
     def pct(col):
@@ -1249,6 +1301,8 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
         return pd.to_numeric(best.get(col, np.nan), errors='coerce')
 
     out = pd.DataFrame({
+        'ROLE':              best.get('ROLE', ''),
+        'THESIS §':          best.get('THESIS §', ''),
         'METHOD':            best['METHOD'],
         'BEST CELL':         (best.get('TOP N', '').astype(str) + ' / SL' +
                               best.get('STOP LOSS %', '').astype(str)),
@@ -1264,7 +1318,9 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
         'PROFIT FACTOR':     num('Profit_Factor'),
         'ENTRIES':           num('Entries'),
         'FINAL EQUITY ($)':  num('Final_Equity'),
-    }).sort_values(sort_col, ascending=False, na_position='last')
+    }).sort_values(['ROLE', sort_col], ascending=[False, False], na_position='last')
+    if out['ROLE'].nunique() <= 1:
+        out = out.drop(columns='ROLE')
     out.insert(0, '#', range(1, len(out) + 1))
 
     st.dataframe(
@@ -1283,7 +1339,7 @@ def render_strategy_summary(filtered_df: pd.DataFrame) -> None:
             'FINAL EQUITY ($)':  st.column_config.NumberColumn(format="$%.0f"),
         })
     st.caption(
-        f"{len(out)} methods · 依 **{rank_lab}** 挑格並排序 · "
+        f"{len(out)} rows（方法 × 章節）· 依 **{rank_lab}** 挑格並排序 · "
         f"自 {len(filtered_df)} 個篩選後的配置壓縮而來。"
         "低利用率的臂（Utilization ≈ 0）其 Ann. Ret Employed 會極大，"
         "那是分母近乎零的假象而非績效——請對照 ENTRIES 與 UTILIZATION 一起讀。"
@@ -1539,7 +1595,24 @@ def main():
     # ══════════════════════════════════════════════
     # FILTERS
     # ══════════════════════════════════════════════
+    _roles = [thesis_role(p, m) for p, m in zip(master_df['_path'], master_df['METHOD'])]
+    master_df['ROLE'] = [r for r, _ in _roles]
+    master_df['THESIS §'] = [s for _, s in _roles]
+
     st.markdown("### Filters")
+
+    # 策略範圍：先分正／副，其餘篩選的選項只列該範圍內的值
+    SCOPES = {
+        f"論文使用（正）· {int((master_df['ROLE'] == ROLE_MAIN).sum())}": [ROLE_MAIN],
+        f"附錄參考（副）· {int((master_df['ROLE'] == ROLE_APPX).sum())}": [ROLE_APPX],
+        f"全部 · {len(master_df)}": [ROLE_MAIN, ROLE_APPX],
+    }
+    scope_lab = st.radio("Strategy Scope", list(SCOPES), horizontal=True, key="filter_scope",
+                         help="正：數字出現在論文正文（第四、五章）的格；"
+                              "副：開發過程的消融、對照、前行研究復現與已否證方向。")
+    scope_key = SCOPES[scope_lab][0] if len(SCOPES[scope_lab]) == 1 else "all"
+    master_df = master_df[master_df['ROLE'].isin(SCOPES[scope_lab])].reset_index(drop=True)
+    scope_active = scope_key != "all"
 
     # 移除被廢棄的 ENTRY Z 與 DYN Z NUM
     FILTER_DEFS = [
@@ -1557,12 +1630,19 @@ def main():
                       if col in master_df.columns and master_df[col].nunique() > 1]
 
     sel_methods = []
-    
+    sel_sections = []
+
+    # key 帶上範圍：切換正／副後選項集合改變，沿用舊選取會落在選項之外
+    mc1, mc2 = st.columns([3, 2])
     method_col_present = 'METHOD' in master_df.columns and master_df['METHOD'].nunique() > 1
     if method_col_present:
         method_opts = sorted(master_df['METHOD'].dropna().unique(), key=natural_sort_key)
-        sel_methods = st.multiselect("Method (multi-select)", method_opts,
-                                     placeholder="All methods", key="filter_METHOD")
+        sel_methods = mc1.multiselect("Method (multi-select)", method_opts,
+                                      placeholder="All methods", key=f"filter_METHOD_{scope_key}")
+    if master_df['THESIS §'].nunique() > 1:
+        sec_opts = sorted(master_df['THESIS §'].unique(), key=natural_sort_key)
+        sel_sections = mc2.multiselect("Thesis Section (multi-select)", sec_opts,
+                                       placeholder="All sections", key=f"filter_SECTION_{scope_key}")
 
     # 其餘分類篩選：selectbox（每行最多 4 個）
     sel_vals = {}
@@ -1573,7 +1653,7 @@ def main():
         for ui_col, (col, label) in zip(cols_ui, row_filters):
             opts = ["All"] + sorted(master_df[col].dropna().unique(),
                                     key=lambda v: natural_sort_key(str(v)))
-            sel_vals[col] = ui_col.selectbox(label, opts, key=f"filter_{col}")
+            sel_vals[col] = ui_col.selectbox(label, opts, key=f"filter_{col}_{scope_key}")
     # 快捷數值篩選
     st.markdown("**Quick Filters:**")
     qf1, qf2, qf3 = st.columns([1, 1, 3])
@@ -1599,6 +1679,8 @@ def main():
     filtered_df = master_df.copy()
     if sel_methods:
         filtered_df = filtered_df[filtered_df['METHOD'].isin(sel_methods)]
+    if sel_sections:
+        filtered_df = filtered_df[filtered_df['THESIS §'].isin(sel_sections)]
     for col, chosen in sel_vals.items():
         if chosen != "All":
             filtered_df = filtered_df[filtered_df[col] == chosen]
@@ -1686,7 +1768,7 @@ def main():
 
     # 年份區間也算篩選：此時卡片上的數字已是 compute_range_metrics 的重算值，
     # 不標註會讓人誤以為是全期績效。
-    filter_note = " (filtered)" if (sel_methods or any(v != "All" for v in sel_vals.values())
+    filter_note = " (filtered)" if (scope_active or sel_methods or sel_sections or any(v != "All" for v in sel_vals.values())
                                     or qf_profitable or qf_high_sharpe
                                     or yr_filter_active) else ""
 
@@ -1764,12 +1846,14 @@ def main():
     display_df['STRATEGY CONFIG'] = display_df.apply(make_desc, axis=1)
 
     # 決定欄位集合
+    # 單一範圍時 ROLE 欄每列相同，只留章節欄
+    role_cols = (['THESIS §'] if scope_active else ['ROLE', 'THESIS §'])
     if expand_config:
-        config_cols = (['#'] +
+        config_cols = (['#'] + role_cols + ['METHOD'] +
                        [col for col, _ in FILTER_DEFS
                         if col in master_df.columns and master_df[col].nunique() > 1])
     else:
-        config_cols = ['#', 'STRATEGY CONFIG']
+        config_cols = ['#'] + role_cols + ['STRATEGY CONFIG']
 
     if show_detailed_metrics:
         metrics_cols = [
@@ -1850,6 +1934,8 @@ def main():
     column_config = {
         '#':                st.column_config.NumberColumn("#", width="small", help="排名或序號"),
         'STRATEGY CONFIG':  st.column_config.TextColumn("Strategy Config", width="large", help="策略完整參數組合與路徑名稱"),
+        'ROLE':             st.column_config.TextColumn("Role", width="small", help="正：論文正文使用；副：附錄／參考"),
+        'THESIS §':         st.column_config.TextColumn("Thesis §", width="medium", help="該格數字出現在論文的哪一節"),
         'DATASET':          st.column_config.TextColumn("Dataset", width="small", help="使用的股票資料集"),
         'RE-ENTRY':         st.column_config.TextColumn("Re-Entry", width="small", help="是否允許平倉後再次進場"),
         'VOL ADJ':          st.column_config.TextColumn("Vol Adj", width="small", help="波動度調整設定"),
