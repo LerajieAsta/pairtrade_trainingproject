@@ -1132,6 +1132,21 @@ if os.environ.get("ACTION_SPACE_ABLATION", "").strip() == "1":
         print(f"⚠️ [config] 動作空間消融載入失敗：{type(_e).__name__}: {_e}")
 
 
+# ── 延伸研究：核心 20 條策略的兩年形成期版本（env 開關；預設不啟用）──────
+# `FW504_EXTENSION=1` 時附加 dev/fw504_all/candidate_strategies.py 的條目並只跑它們。
+# 判準寫於結果之前：dev/fw504_all/PLAN.md。
+if os.environ.get("FW504_EXTENSION", "").strip() == "1":
+    try:
+        from dev.fw504_all.candidate_strategies import build as _build_fw504
+        _fw = _build_fw504()
+        _have = {s["name"] for s in strategies_raw_all}
+        strategies_raw_all = strategies_raw_all + [s for s in _fw if s["name"] not in _have]
+        strategies_raw = _fw
+        print(f"[config] 兩年形成期延伸研究：{len(_fw)} 條（{BACKTEST_START} ~ {BACKTEST_END}）")
+    except Exception as _e:
+        print(f"⚠️ [config] 兩年形成期延伸研究載入失敗：{type(_e).__name__}: {_e}")
+
+
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
 _DASHBOARD_FIXED_LINES = 8
 _ANSI_RE = re.compile(r"\033\[[^m]*m")
