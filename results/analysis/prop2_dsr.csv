@@ -1,0 +1,7 @@
+﻿配對底,交易端,N試驗,SR年化,門檻SR0,DSR,判定
+Agglomerative,Z-Score,72,0.203,0.546,0.041,✘
+Agglomerative,DRL,72,0.16,0.546,0.026,✘
+HDBSCAN,Z-Score,72,0.235,0.546,0.048,✘
+HDBSCAN,DRL,72,0.281,0.546,0.09,✘
+K-means,Z-Score,72,0.079,0.546,0.01,✘
+K-means,DRL,72,0.049,0.546,0.006,✘

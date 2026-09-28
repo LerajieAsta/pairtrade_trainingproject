@@ -11,6 +11,9 @@ method 口徑 N = 53 → 72。var_sr 依 regime_cost_dsr_eval 的定義重算（
 再加入 19 條算新值。DSR 表寫到 results/analysis/fw504/，不覆寫正式的
 breakeven_dsr.csv。
 
+2026-09-29：此結果已成為正式清點（regime_cost_dsr_eval.TRIAL_CENSUS = 72）。
+本檔保留為附錄 F.5 的重現腳本，比較基準固定為 09-01 的釘死值（53）。
+
 用法：python -m analysis.fw504_dsr
 """
 import os
@@ -25,12 +28,10 @@ import analysis.regime_cost_dsr_eval as R
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-NOT_TRIALS = ("-DOLLAR)", "-DRL-V1)", "-DRL-V2)", "-DRL-V3)", "EXPLORE")
 OUT = "results/analysis/fw504"
-
-
-def _is_trial(m: str) -> bool:
-    return not any(t in m for t in NOT_TRIALS) and m not in R.INCOMPLETE_RUNS
+#: 2026-09-01 的釘死值（附錄 F.5 的比較基準；TRIAL_CENSUS 其後已改為 72）
+CENSUS_0901 = (53, 0.00012531293253106)
+_is_trial = R.is_trial
 
 
 def run():
@@ -43,7 +44,7 @@ def run():
 
     var_old = float(np.var(means[~is_new], ddof=1)) / R.TRADING_DAYS
     var_new = float(np.var(means, ddof=1)) / R.TRADING_DAYS
-    n_old_pinned, var_pinned = R.TRIAL_CENSUS["method"]
+    n_old_pinned, var_pinned = CENSUS_0901
     n_new = n_old_pinned + int(is_new.sum())
     print(f"現存方法 {int((~is_new).sum())} 條：var_sr 重算 {var_old:.10f}"
           f"（釘死值 {var_pinned:.10f}）")

@@ -181,13 +181,42 @@ INCOMPLETE_RUNS = {
 #: `_BASELINE_CELL` 同一套判定。
 _BASELINE_CELL_RE = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
 
-TRIAL_CENSUS_DATE = "2026-09-01"
+TRIAL_CENSUS_DATE = "2026-09-29"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (53,    0.00012531293253106),
-    "config": (1392,  0.00035631902853788),
+    "method": (72,    0.00020320968454187),
+    "config": (2145,  0.00039074964581015),
 }
-# 2026-09-01 起 N 與 var_sr **來源不同**，這是刻意的，不是疏漏：
+
+# ── 不是試驗的列：不計入 N、不參與 var_sr、不列入評估（2026-09-29）────────
+# 依 CONTEXT.md「跑過回測即進入試驗宇宙」的規則，只有明文例外可排除：
+#   -DOLLAR)            動作空間消融的兩條基準臂（Z-Score、v4；見 ablation_action_space）
+#   -DRL-V1/V2/V3)      動作空間消融的三條處理組
+#                       —— 以上五臂：附錄 D 預先登記、不參與策略選擇（2026-09-21 定案；
+#                       論文 5.1.2 已載明計入時 N 的替代值）
+#   EXPLORE             附錄 E 的跨演算法探索（僅為消融的穩健性，同理不計入）
+NOT_TRIALS = ("-DOLLAR)", "-DRL-V1)", "-DRL-V2)", "-DRL-V3)", "EXPLORE")
+
+#: 跑過、看過、但結果已自 result.db 刪除的試驗（2026-09-01 對沖口徑修正時：
+#: 四支已退役的 METHOD 各 15 格，以及 MHD 掃描 180 格）。仍計入 N。
+DELETED_TRIALS = {"method": 4, "config": 240}
+
+
+def is_trial(method: str) -> bool:
+    return not any(t in method for t in NOT_TRIALS) and method not in INCOMPLETE_RUNS
+
+
+# 2026-09-29 起 N 與 var_sr **來源不同**，這是刻意的，不是疏漏：
+#
+#   N       = 實地清點（排除 NOT_TRIALS）＋ 2026-09-01 已刪除但跑過的試驗。
+#           method：實地 68 ＋ 4 支已退役 METHOD ＝ 72
+#                   （= 09-01 的 53 ＋ 附錄 F 新增的 19 條 FW504 方法）
+#           config：實地 1,905 ＋ 已刪除 240 格（MHD 180、退役 METHOD 60）＝ 2,145
+#   var_sr  = 實地 68 條／1,905 列重算（刪除者已無 Sharpe 可算）。
+#
+# 以下 09-01 的說明對「已刪除者仍計入 N」的理由仍然成立：
+#
+# （2026-09-01 的原始說明）N 與 var_sr **來源不同**，這是刻意的，不是疏漏：
 #
 #   N       維持 53 / 1392 —— 對沖口徑修正（REVIEW.md §A）之後，
 #           `result.db` 只剩 49 / 1152 列，因為 MHD 掃描（180 格）與四支已退役的
@@ -200,14 +229,26 @@ TRIAL_CENSUS = {
 #           必須取自同一個引擎的數字。拿舊引擎的離散度配新引擎的 Sharpe
 #           是兩個尺度混用。
 #
-# 副作用：`_trial_specs` 的漂移偵測會恆常示警（實地 49/1152 vs 釘死 53/1392）。
-# 該示警現在是**預期行為**，訊息已改寫說明原因，不要用「更新常數」消掉它。
+# （09-01 當時的副作用：漂移偵測恆常示警 49/1152 vs 53/1392。2026-09-29 起
+#  改為比對「實地＋DELETED_TRIALS」與釘死值，兩者相等即不示警。）
 # var_sr 的定義（2026-08-26 逆推確認，與 2026-08-20 的釘死值逐位相符）：
 #   method — 每個 METHOD 取其 15 格的**平均** Sharpe_Raw，再取橫斷面變異 ÷ 252
 #   config — 全部回測列的 Sharpe_Raw 橫斷面變異 ÷ 252
 # 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
 # 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-09-29  method 72 / config 2145；var_sr 0.00012531 → 0.00020321（method）、
+#               0.00035632 → 0.00039075（config）。兩項來源：
+#               (1) 附錄 F 的 19 條 FW504 方法（主軸 14＋DL-THR 5，各 15 格）依規則計入，
+#                   其 Sharpe 較高、擴大試驗間離散度 —— 這是 var_sr 上升的主因。
+#               (2) 09-01 之後在既有方法下加跑的 `_LAG`（執行延遲，228 格）與
+#                   `_XZ`（出場門檻，240 格）敏感度變體：method 數不變，config 增 468。
+#                   它們也改變了各 METHOD 的格平均，故 09-01 的釘死值 0.00012531
+#                   已無法由現存 49 條重現（重算得 0.00014691）——附錄 F.5 曾記為
+#                   「原因未查」，即此。
+#               同時新增 NOT_TRIALS，實地清點與預設評估清單皆排除之
+#               （此前預設清單會誤納 Grid (GICS-SDP-DOLLAR)）。
+#               影響：門檻 SR0 0.408 → 0.546；評估 55 條，仍無一達 0.95。
 #   2026-09-01  N 維持 53 / 1392；var_sr 依修正後的引擎重算
 #               （method 0.00010259 → 0.00012531；config 0.00033621 → 0.00035632）。
 #               起因：dev/trading_arch/ 的 §A 對沖權重修正與 §E 首列前視修正，
@@ -281,14 +322,14 @@ def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
         return float(np.var(v, ddof=1)) / TRADING_DAYS if len(v) > 1 else 0.0
 
     g = summ[summ.METHOD == method]
-    live = summ[~summ.METHOD.isin(INCOMPLETE_RUNS)]
+    live = summ[summ.METHOD.map(is_trial)]
     live_n = {"method": int(live.METHOD.nunique()), "config": int(len(live))}
     for spec, (pinned_n, _) in TRIAL_CENSUS.items():
-        if live_n[spec] < pinned_n:
-            print(f"  · 試驗宇宙：{spec} 實地 {live_n[spec]} < 釘死 {pinned_n} —— "
-                  f"預期行為。2026-09-01 對沖口徑修正後，MHD 掃描與四支已退役的 "
-                  f"METHOD 無法重現而刪除，但那些試驗跑過即計入 N。")
-        elif live_n[spec] > pinned_n:
+        if live_n[spec] + DELETED_TRIALS[spec] < pinned_n:
+            print(f"  ⚠ 試驗宇宙縮小：{spec} 實地 {live_n[spec]} ＋ 已刪除 "
+                  f"{DELETED_TRIALS[spec]} < 釘死 {pinned_n}。有結果被刪除——"
+                  f"跑過的試驗仍計入 N，請把它們加進 DELETED_TRIALS 而非降低 N。")
+        elif live_n[spec] + DELETED_TRIALS[spec] > pinned_n:
             print(f"  ⚠ 試驗宇宙已擴張：{spec} 口徑實地清點 {live_n[spec]}，"
                   f"TRIAL_CENSUS 釘死 {pinned_n}（清點於 {TRIAL_CENSUS_DATE}）。"
                   f"你新增了策略——請重新清點並同步修改論文的 N。")
@@ -313,7 +354,8 @@ def run(methods: list[str] = None):
 
     if methods is None:
         # 預設：所有 Z-Score 誠實策略（排除 formation-only 與純 DRL 對照）
-        methods = [m for m in summ.METHOD.unique() if "DRL" not in m]
+        # （NOT_TRIALS 亦排除：消融基準臂 GICS-SDP-DOLLAR 名稱不含 "DRL"）
+        methods = [m for m in summ.METHOD.unique() if "DRL" not in m and is_trial(m)]
 
     # 未完成的回測不列入評估——它們既不計入試驗宇宙（見 INCOMPLETE_RUNS），
     # 也不該以 3.4 年的 Sharpe 與其他族的 25 年 Sharpe 並列比較。
