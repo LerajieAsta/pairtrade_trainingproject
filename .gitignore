@@ -85,3 +85,6 @@ logs/
 
 # 本機備份目錄
 backup/
+
+# 論文稿件（本機保留，不上傳 Git）
+thesis/
