@@ -107,7 +107,7 @@ CONCURRENT_PERIODS = max(1, FORWARD_DAYS // rolling_step)
 def concurrent_periods(params: dict) -> int:
     """該策略的同時重疊交易期數 —— **唯一定義**。
 
-    引擎依此開槽位（`run_trading.py` 的 `max_pairs = top_n × 並行期數`），
+    引擎依此開槽位（`run_trading.py` 的 `max_pairs = slots_per_period × 並行期數`），
     故所有讀端的資金分母、利用率與名目額都必須用同一個數。
 
     params 缺欄時退回全域預設，與引擎的 `params.get(..., 預設)` 行為一致。
@@ -115,6 +115,28 @@ def concurrent_periods(params: dict) -> int:
     tw = int(params.get("trading_window", FORWARD_DAYS) or FORWARD_DAYS)
     rs = int(params.get("rolling_step", rolling_step) or rolling_step)
     return max(1, tw // max(1, rs))
+
+
+def max_active_of(params: dict):
+    """同一交易期內的同時持倉上限 K（`dev/max_active/`）；不生效時回傳 None。
+
+    K ≥ top_n 時上限永遠不會被觸及，等同未設定——回傳 None，
+    讓引擎走原路徑（逐位元同於接線前）、檔名也不加 `_MA` 後綴。
+    """
+    k = int(params.get("max_active", 0) or 0)
+    top_n = int(params.get("top_n", 10))
+    return k if 0 < k < top_n else None
+
+
+def slots_per_period(params: dict) -> int:
+    """每個交易期開的資金槽位數 —— **唯一定義**。
+
+    未設上限時為 top_n；設上限 K 時為 K（Top 20 候選、K=10 → 每對分到 1/10，
+    與 Top 10 相同）。引擎的 `capital_per_pair = equity / (槽位 × 並行期數)`，
+    故利用率、名目額、break-even 的分母都必須用這個數，不可再用 top_n。
+    """
+    k = max_active_of(params)
+    return k if k is not None else int(params.get("top_n", 10))
 
 # 無風險利率年化假設（Excess_Ret_RF 口徑用；市場中性策略的閒置現金與保證金收 rf）
 # 2000–2025 美國 3M T-bill 平均約 1.8–2.0%；可日後換成實際序列
@@ -1145,6 +1167,19 @@ if os.environ.get("FW504_EXTENSION", "").strip() == "1":
         print(f"[config] 兩年形成期延伸研究：{len(_fw)} 條（{BACKTEST_START} ~ {BACKTEST_END}）")
     except Exception as _e:
         print(f"⚠️ [config] 兩年形成期延伸研究載入失敗：{type(_e).__name__}: {_e}")
+
+
+# ── 延伸研究：同一交易期內的同時持倉上限 K（env 開關；預設不啟用）──────────
+# `MAX_ACTIVE_EXTENSION=1` 時只跑 dev/max_active/candidate_strategies.py 的條目。
+# 判準寫於結果之前：dev/max_active/PREREGISTRATION.md。
+if os.environ.get("MAX_ACTIVE_EXTENSION", "").strip() == "1":
+    try:
+        from dev.max_active.candidate_strategies import build as _build_ma
+        strategies_raw = _build_ma()
+        print(f"[config] 同時持倉上限 K 延伸研究：{len(strategies_raw)} 條")
+    except Exception as _e:
+        print(f"⚠️ [config] 同時持倉上限 K 延伸研究載入失敗：{type(_e).__name__}: {_e}")
+
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────

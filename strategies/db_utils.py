@@ -28,7 +28,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 # 定義策略初始資金常數，用於計算報酬率與部位佔比
-from strategies.config import INITIAL_CAPITAL, RF_ANNUAL, concurrent_periods
+from strategies.config import INITIAL_CAPITAL, RF_ANNUAL, concurrent_periods, max_active_of, slots_per_period
 
 
 # SQLite 的 busy_timeout（秒）。WAL 下寫入者互相排隊，每個 worker 要 executemany
@@ -196,6 +196,13 @@ def init_db(db_path="results/result.db"):
     # **舊列為 NULL 即代表 "dollar"**（修正前的行為）。
     # 這一欄的存在理由是：全網格重跑若中途中斷，result.db 會同時含兩種口徑的
     # 列，而它們**不可並列比較**。沒有這個標記就無從辨識，分析會靜默地混用。
+    # 同一交易期內的同時持倉上限 K（2026-09-29，dev/max_active/）。
+    # **NULL = 未設上限**（槽位數即 top_n），這是舊列的正確語意，不需回填。
+    try:
+        cursor.execute('ALTER TABLE strategy_summaries ADD COLUMN "Max_Active" INTEGER;')
+    except Exception:
+        pass
+
     try:
         cursor.execute('ALTER TABLE strategy_summaries ADD COLUMN "Hedge_Mode" TEXT;')
     except Exception:
@@ -354,7 +361,8 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
     # Avg_Utilization 縮成真值的 1/6、Ann_Ret_Employed 脹成 6 倍。
     # 2026-08-28 修正，見 dev/trading_arch/REVIEW.md §B。
     n_concurrent = concurrent_periods(params)
-    max_pairs = top_n_int * n_concurrent
+    # 槽位數不是 top_n：設了同時持倉上限 K 時為 K（config.slots_per_period）
+    max_pairs = slots_per_period(params) * n_concurrent
     avg_utilization = ann_ret_employed = excess_ret_rf = 0.0
     if 'Position' in df.columns and max_pairs > 0 and len(portfolio_daily) > 0:
         _daily_open = (
@@ -473,6 +481,8 @@ def calculate_metrics_from_params(df, strategy_name, params, dataset_name, path_
         # 引擎實際使用的並行期數。落庫的理由：讀端（metrics / analysis）
         # 拿不到 params，只能從此處取權威值，否則又會退回猜全域常數。
         'Concurrent_Periods': int(n_concurrent),
+        # 同時持倉上限 K；None = 未設（讀端 metrics._slots 依此決定槽位數）
+        'Max_Active': max_active_of(params),
         # 對沖權重口徑；NULL/舊列 = "dollar"（見 init_db 的遷移註解）
         'Hedge_Mode': str(params.get("hedge_mode", "signal")),
         '_path': path_key
@@ -525,8 +535,8 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             "Win_Rate", "Profit_Factor", "Avg_Trade_Days",
             "Entries", "Exits", "Stop_Losses", "Forced_Closes", "Gross_Profit", "Gross_Loss",
             "Avg_Utilization", "Ann_Ret_Employed", "Excess_Ret_RF",
-            "ENTRY Z", "DYN Z NUM", "Concurrent_Periods", "Hedge_Mode"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            "ENTRY Z", "DYN Z NUM", "Concurrent_Periods", "Hedge_Mode", "Max_Active"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """, (
             metrics['_path'], metrics['DATASET'],
             metrics['METHOD'], metrics['TRADE_METHOD'], metrics['TOP N'], metrics['STOP LOSS %'],
@@ -539,7 +549,7 @@ def export_df_to_db(df, strategy_name, params, dataset_name, path_key, db_path="
             metrics['Gross_Profit'], metrics['Gross_Loss'],
             metrics['Avg_Utilization'], metrics['Ann_Ret_Employed'], metrics['Excess_Ret_RF'],
             metrics['ENTRY Z'], metrics['DYN Z NUM'], metrics['Concurrent_Periods'],
-            metrics['Hedge_Mode']
+            metrics['Hedge_Mode'], metrics['Max_Active']
         ))
 
         df_db = df.copy()

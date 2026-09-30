@@ -153,8 +153,9 @@ def compute_range_metrics(path: str, y1: int, y2: int, top_n_str: str,
     # 權威值由引擎寫入 strategy_summaries.Concurrent_Periods
     # （2026-08-28，見 dev/trading_arch/REVIEW.md §B）。
     m = re.search(r"(\d+)", str(top_n_str or ""))
-    from strategies.metrics import concurrent_of
-    max_pairs = (int(m.group(1)) if m else 10) * concurrent_of(path, db_path)
+    from strategies.metrics import concurrent_of, slots_of
+    # 槽位數：設了同時持倉上限 K（_MA 後綴）時為 K，不是 TOP N
+    max_pairs = slots_of(path, int(m.group(1)) if m else 10, db_path) * concurrent_of(path, db_path)
     years = len(daily) / 252.0
     util = float(daily['n_open'].mean() / max_pairs) if max_pairs > 0 else 0.0
     ann_arith = final_pnl / cap / years if years > 0 else 0.0

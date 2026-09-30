@@ -94,6 +94,27 @@ def concurrent_of(path_key: str, result_db: str = RESULT_DB) -> int:
     return int(row[0])
 
 
+def slots_of(path_key: str, top_n: int, result_db: str = RESULT_DB) -> int:
+    """該策略每個交易期的資金槽位數：未設同時持倉上限時為 top_n，設了 K 時為 K。
+
+    呼叫端手上的 top_n 通常是從 `TOP N` 字串解析來的；Top 20 + K=10 的列若直接
+    拿 20 當槽位，利用率會低估一半、名目額也跟著錯——與 2026-08-28 並行期數那次
+    同一類錯誤，且同樣不會有任何徵狀。故由此處讀引擎落庫的 `Max_Active`。
+    NULL 是舊列與未設上限者的正確語意（槽位即 top_n），不是缺值。
+    """
+    con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
+    try:
+        row = con.execute(
+            'SELECT "Max_Active" FROM strategy_summaries WHERE _path = ?',
+            (path_key,)).fetchone()
+    except sqlite3.OperationalError:
+        row = None      # 欄位尚未建立 → 全庫都沒有上限列
+    finally:
+        con.close()
+    k = row[0] if row is not None else None
+    return int(k) if k is not None and 0 < int(k) < int(top_n) else int(top_n)
+
+
 def metrics_from_pnl(daily_pnl: pd.Series,
                      initial_capital: float = INITIAL_CAPITAL) -> pd.Series:
     """由逐日損益金額算報酬類指標。純函式，不碰 DB。
@@ -251,7 +272,7 @@ def metrics(path_key: str, dates=None, top_n: int = None,
     out = metrics_from_pnl(df["d"])
 
     if top_n:
-        max_pairs = int(top_n) * concurrent_of(path_key, result_db)
+        max_pairs = slots_of(path_key, top_n, result_db) * concurrent_of(path_key, result_db)
         years = len(df) / float(TRADING_DAYS)
         final_pnl = float(df["d"].sum())
         if years > 0 and max_pairs > 0:
@@ -291,7 +312,7 @@ def traded_notional(path_key: str, top_n: int, result_db: str = RESULT_DB,
     （實測 −$9 / −$2，見 `dev/breakeven_fix/`）。
     """
     conc = int(n_concurrent) if n_concurrent else concurrent_of(path_key, result_db)
-    max_pairs = max(1, int(top_n) * max(1, conc))
+    max_pairs = max(1, slots_of(path_key, top_n, result_db) * max(1, conc))
     con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
     try:
         pnl = pd.read_sql(
