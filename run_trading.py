@@ -39,6 +39,7 @@ from strategies.preprocess_equity import DataProcessor
 from strategies.portfolio_manager import PortfolioManager
 from strategies.db_utils import get_db_connection
 from strategies.max_active import resolve_max_active
+from strategies.dedup import resolve_new_period
 from strategies.config import (
     INITIAL_CAPITAL, CONCURRENT_PERIODS, concurrent_periods, WRITE_TRADE_CSV,
     max_active_of, slots_per_period,
@@ -156,6 +157,9 @@ def _build_filename(params: dict) -> str:
     _ma = max_active_of(params)
     if _ma is not None:
         suffix += f"_MA{_ma}"
+    # 跨期去重（dev/dedup/）：同一配對不得被多個重疊交易期同時持有。
+    if params.get("dedup_across_periods"):
+        suffix += "_DD"
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def effective_hedge_mode(strategy_config: dict) -> str:
@@ -309,6 +313,14 @@ def worker_task(
         _max_active = max_active_of(params)
         if _max_active is not None and (params.get("dynamic_slots") or params.get("vol_target_allocation")):
             raise ValueError("max_active 不可與 dynamic_slots / vol_target_allocation 併用（變因不唯一）")
+        # 跨期去重（dev/dedup/PREREGISTRATION.md）：同一配對（不分 A|B／B|A）同一日
+        # 最多只能被一個交易期持有。與其他改變槽位或資金的機制併用會使變因不唯一。
+        _dedup = bool(params.get("dedup_across_periods", False))
+        if _dedup and (_max_active is not None or params.get("dynamic_slots")
+                       or params.get("vol_target_allocation")
+                       or strategy_config.get("trade_method") == "DRL"):
+            raise ValueError("dedup_across_periods 不可與 max_active / dynamic_slots / "
+                             "vol_target_allocation / DRL 併用（變因不唯一）")
         pm = PortfolioManager(strategy_id=name, initial_capital=INITIAL_CAPITAL,
                               max_pairs=slots_per_period(params) * _concurrent,
                               dynamic_slots=bool(params.get("dynamic_slots", False)),
@@ -322,7 +334,9 @@ def worker_task(
         # 並自已存 logs 重建 PortfolioManager 權益（= 初始 + 累計已實現 PnL）。
         # summary/CSV 仍於全部期完成後定稿（需完整權益曲線）。
         import pickle
-        use_ckpt = strategy_config.get("trade_method") != "DRL"
+        # 跨期去重時，已算完的期仍可能因後續期的衝突而被重新模擬（直到它的交易期結束），
+        # 逐期 checkpoint 的「算完即定稿」前提不成立 → 停用，中斷時整格重跑。
+        use_ckpt = strategy_config.get("trade_method") != "DRL" and not _dedup
         ckpt_dir = os.path.join(output_root, ".ckpt", safe_name)
         done_periods = set()
         if use_ckpt:
@@ -365,6 +379,12 @@ def worker_task(
         # 化解迴圈永遠擋不下任何進場 → 直接拒絕。
         if _max_active is not None and "entry_gate" not in _valid_kwargs_keys:
             raise ValueError(f"{module_name} 不支援 entry_gate，無法套用 max_active")
+        if _dedup and "entry_gate" not in _valid_kwargs_keys:
+            raise ValueError(f"{module_name} 不支援 entry_gate，無法套用 dedup_across_periods")
+        # 跨期去重的視窗：尚未結束的各期的每個 (期序, 配對) 單位。
+        # {unit: {"df", "cap", "gate", "ctx", "rank", "blocked", "te"}}
+        _dd_units = {}
+        _dd_blocked_total = 0
 
         for i, (_, p_row) in enumerate(df_periods.iterrows()):
             period_start = p_row["Period_Start"]
@@ -451,20 +471,28 @@ def worker_task(
             _gate = (_build_vol_regime_gate(price_pivot, _vg) if _vg > 0 else
                      _build_dispersion_gate(price_pivot, _dg) if _dg > 0 else None)
 
-            def _simulate(pair, capital, gate):
-                """單一配對整個交易期的逐日紀錄；失敗或無資料回傳 None。"""
+            def _simulate(pair, capital, gate, ctx=None):
+                """單一配對整個交易期的逐日紀錄；失敗或無資料回傳 None。
+
+                ctx：(param_map, 延伸價格, trade_dates, period_start, trade_start, trade_end)。
+                本函式是迴圈內的閉包，這些名稱是**延遲綁定**的——回頭重新模擬舊期時
+                （跨期去重）若不傳 ctx，會讀到「目前這一期」的價格與參數而靜默算錯。
+                未傳時取當期值，與接線前逐位元相同。
+                """
+                _pmap, _px, _tdates, _ps, _ts, _te = ctx if ctx is not None else (
+                    param_map, trade_prices_extended, trade_dates, period_start, trade_start, trade_end)
                 ticker_a, ticker_b = pair
-                pair_data = param_map[pair]
+                pair_data = _pmap[pair]
                 form_params = pair_data["Params"]
                 kwargs = {
-                    "price_df": trade_prices_extended,  # 傳入延伸價格數據，修復前期 NaN 交易缺失問題
+                    "price_df": _px,  # 傳入延伸價格數據，修復前期 NaN 交易缺失問題
                     "entry_gate": gate,
-                    "trade_dates": trade_dates,
+                    "trade_dates": _tdates,
                     "selected_pairs": pd.DataFrame(),
                     "capital_per_pair": capital,
                     "full_price_df": price_pivot,
-                    "formation_start": period_start,
-                    "formation_end": trade_start,
+                    "formation_start": _ps,
+                    "formation_end": _ts,
                     "variant_id": name,  # 完整展開後的策略變體名稱（含 Top_n/停損/MSR），供需要行程內共享狀態的
                                          # 交易模組（如 DRL-THR）區分彼此，避免不同變體共用同一份訓練狀態
                 }
@@ -494,8 +522,8 @@ def worker_task(
                         except (TypeError, ValueError):
                             ols_alpha_val = None
                         df_log = trading_instance._simulate_pair(
-                            period_start=trade_start,
-                            period_end=trade_end,
+                            period_start=_ts,
+                            period_end=_te,
                             sector=pair_data["Sector_A"] if pair_data["Sector_A"] == pair_data["Sector_B"] else "CrossSector",
                             ticker_a=ticker_a,
                             ticker_b=ticker_b,
@@ -518,7 +546,7 @@ def worker_task(
                             # 直接標記最後一筆為 FORCED_CLOSE_DELISTED，P&L 已由
                             # 模擬器的 PERIOD_END_EXIT 邏輯正確結算，無需再截斷。
                             last_sim_date = pd.to_datetime(df_log['Date'].iloc[-1])
-                            expected_end   = pd.to_datetime(trade_end)
+                            expected_end   = pd.to_datetime(_te)
                             if last_sim_date < expected_end:
                                 last_idx = df_log.index[-1]
                                 df_log.loc[last_idx, 'Status'] = 'FORCED_CLOSE_DELISTED'
@@ -536,9 +564,50 @@ def worker_task(
                 final_realized_pnl = df_log['Realized_PnL'].iloc[-1]
                 pm.process_closed_trade(pair, final_realized_pnl)
 
-            if _max_active is None:
+            if _max_active is None and not _dedup:
                 for pair, capital in allocations.items():
                     _commit(pair, _simulate(pair, capital, _gate))
+            elif _dedup:
+                # 跨期去重（strategies/dedup.py）。交易期已在本期開始前結束的單位
+                # 不可能再與本期及往後各期衝突 → 先定稿移出視窗。
+                _ts_now = pd.Timestamp(trade_start)
+                for _u in sorted(u for u, r in _dd_units.items() if r["te"] < _ts_now):
+                    _df = _dd_units.pop(_u)["df"]
+                    if _df is not None and not _df.empty:
+                        all_trade_logs.append(_df)
+
+                _ctx = (param_map, trade_prices_extended, trade_dates,
+                        period_start, trade_start, trade_end)
+                _new = set()
+                for pair, capital in allocations.items():
+                    _df = _simulate(pair, capital, _gate, ctx=_ctx)
+                    if _df is None or _df.empty:
+                        continue
+                    _u = (i, pair)
+                    _dd_units[_u] = {"df": _df, "cap": capital, "gate": _gate, "ctx": _ctx,
+                                     "rank": param_map[pair]["Rank"], "blocked": set(),
+                                     "te": pd.Timestamp(trade_end)}
+                    _new.add(_u)
+                    # 與無去重時同一時點入帳（同 _commit），兩者的權益路徑只差在去重本身
+                    pm.process_closed_trade(pair, _df['Realized_PnL'].iloc[-1])
+
+                def _dd_resim(u, blocked):
+                    rec = _dd_units[u]
+                    g = dict(rec["gate"]) if rec["gate"] is not None else {}
+                    for d in blocked:
+                        g[d] = False
+                    # 必須傳該單位自己那一期的 ctx（見 _simulate 的 docstring）
+                    return _simulate(u[1], rec["cap"], g, ctx=rec["ctx"])
+
+                _changed, _nb = resolve_new_period(_dd_units, _new, _dd_resim)
+                # 被重新模擬的單位先前已以舊損益入帳 → 補差額
+                for _u, _old in _changed.items():
+                    _nd = _dd_units[_u]["df"]
+                    _new_pnl = float(_nd['Realized_PnL'].iloc[-1]) if _nd is not None and not _nd.empty else 0.0
+                    pm.current_equity += _new_pnl - float(_old['Realized_PnL'].iloc[-1])
+                _dd_blocked_total += _nb
+                if _nb:
+                    print(f"  [Dedup] 擋下 {_nb} 次跨期重複進場（重新模擬 {len(_changed)} 個單位）")
             else:
                 # 同一交易期內同時持倉 ≤ K（strategies/max_active.py）。
                 # 被擋的日子以 entry_gate=False 表達，與既有的分散度／波動閘門取交集。
@@ -578,6 +647,15 @@ def worker_task(
                     print(f"  [Warning] checkpoint 寫入失敗（{period_start}）: {_e}")
 
         conn.close()  # type: ignore
+
+        if _dedup:
+            # 視窗內剩下的單位（最後幾期）定稿
+            for _u in sorted(_dd_units):
+                _df = _dd_units[_u]["df"]
+                if _df is not None and not _df.empty:
+                    all_trade_logs.append(_df)
+            _dd_units.clear()
+            print(f"  [Dedup] 全期共擋下 {_dd_blocked_total} 次跨期重複進場")
 
         # 合併與儲存交易結果
         if all_trade_logs:
@@ -885,6 +963,8 @@ def run_all_trading():
                 new_raw["name"] += f"_XZ{int(round(float(xz) * 100))}"
             if _ma_eff is not None:
                 new_raw["name"] += f"_MA{_ma_eff}"
+            if new_params.get("dedup_across_periods"):
+                new_raw["name"] += "_DD"
 
             expanded_strategies_raw.append(new_raw)
 

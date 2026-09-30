@@ -1180,6 +1180,15 @@ if os.environ.get("MAX_ACTIVE_EXTENSION", "").strip() == "1":
     except Exception as _e:
         print(f"⚠️ [config] 同時持倉上限 K 延伸研究載入失敗：{type(_e).__name__}: {_e}")
 
+# `DEDUP_EXTENSION=1` 時只跑 dev/dedup/candidate_strategies.py 的條目。
+# 判準寫於結果之前：dev/dedup/PREREGISTRATION.md。
+if os.environ.get("DEDUP_EXTENSION", "").strip() == "1":
+    try:
+        from dev.dedup.candidate_strategies import build as _build_dd
+        strategies_raw = _build_dd()
+        print(f"[config] 跨期去重延伸研究：{len(strategies_raw)} 條")
+    except Exception as _e:
+        print(f"⚠️ [config] 跨期去重延伸研究載入失敗：{type(_e).__name__}: {_e}")
 
 
 # ── 儀表板與 ProgressAwareStdout 類別與函數 ───────────────────────────────
