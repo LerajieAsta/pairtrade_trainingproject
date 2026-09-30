@@ -1095,7 +1095,10 @@ def run_all_trading():
                 drl_groups.append(grp)
             else:
                 non_drl.append(grp)
-        groups = non_drl + drl_groups
+        # 非 DRL 各組併成一組：`for group_cfgs in groups` 逐組循序，max_workers 只在組內生效，
+        # 一組只有 6 格（如 K 網格每臂 6 格）時 22 核只用到 6 核（2026-09-30）。
+        # 各格互相獨立、結果不依執行順序，合併只改排程。DRL 維持分組（記憶體上限）。
+        groups = ([[c for g in non_drl for c in g]] if non_drl else []) + drl_groups
 
     # 根據 CPU_LIMIT_PCT 限制 CPU 使用率
     max_cores = max(1, int((os.cpu_count() or 4) * CPU_LIMIT_PCT))
@@ -1154,7 +1157,13 @@ def run_all_trading():
                 futures = {}
                 pending = list(group_cfgs)
                 while pending:
-                    batch, pending = pending[:group_workers], pending[group_workers:]
+                    # 非 DRL：一次全部送進池子，由 max_workers 控制並行、跑完一格即遞補。
+                    # 舊作法每批要等最慢的一格（Top20 比 Top3 慢數倍）才開下一批，核心常閒置。
+                    # DRL 維持分批（記憶體）。
+                    if is_drl_group:
+                        batch, pending = pending[:group_workers], pending[group_workers:]
+                    else:
+                        batch, pending = pending, []
                     batch_futures = {}
                     for config in batch:
                         f = executor.submit(
