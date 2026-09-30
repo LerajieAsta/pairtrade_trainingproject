@@ -76,7 +76,9 @@ def concurrent_of(path_key: str, result_db: str = RESULT_DB) -> int:
     con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
     try:
         row = con.execute(
-            'SELECT "Concurrent_Periods" FROM strategy_summaries WHERE _path = ?',
+            # 欄名**不可加雙引號**：SQLite 對不存在的雙引號識別字會退回成字串常數
+            # （回傳 'Concurrent_Periods' 而不拋錯），下面的 except 就永遠接不到。
+            'SELECT Concurrent_Periods FROM strategy_summaries WHERE _path = ?',
             (path_key,)).fetchone()
     except sqlite3.OperationalError as e:
         raise RuntimeError(
@@ -105,7 +107,9 @@ def slots_of(path_key: str, top_n: int, result_db: str = RESULT_DB) -> int:
     con = sqlite3.connect(f"file:{result_db}?mode=ro", uri=True)
     try:
         row = con.execute(
-            'SELECT "Max_Active" FROM strategy_summaries WHERE _path = ?',
+            # 欄名不可加雙引號（見 concurrent_of）：result.db 沒有此欄時，
+            # '"Max_Active"' 會回傳字串 'Max_Active'，int() 失敗（2026-09-30 實際發生）。
+            'SELECT Max_Active FROM strategy_summaries WHERE _path = ?',
             (path_key,)).fetchone()
     except sqlite3.OperationalError:
         row = None      # 欄位尚未建立 → 全庫都沒有上限列
