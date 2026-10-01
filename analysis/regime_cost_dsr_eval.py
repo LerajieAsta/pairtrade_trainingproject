@@ -181,11 +181,11 @@ INCOMPLETE_RUNS = {
 #: `_BASELINE_CELL` 同一套判定。
 _BASELINE_CELL_RE = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
 
-TRIAL_CENSUS_DATE = "2026-09-29"
+TRIAL_CENSUS_DATE = "2026-10-01"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (72,    0.00020320968454187),
-    "config": (2145,  0.00039074964581015),
+    "method": (72,    0.00019747411850110),
+    "config": (2280,  0.00037232252826505),
 }
 
 # ── 不是試驗的列：不計入 N、不參與 var_sr、不列入評估（2026-09-29）────────
@@ -200,6 +200,13 @@ NOT_TRIALS = ("-DOLLAR)", "-DRL-V1)", "-DRL-V2)", "-DRL-V3)", "EXPLORE")
 #: 跑過、看過、但結果已自 result.db 刪除的試驗（2026-09-01 對沖口徑修正時：
 #: 四支已退役的 METHOD 各 15 格，以及 MHD 掃描 180 格）。仍計入 N。
 DELETED_TRIALS = {"method": 4, "config": 240}
+
+#: 跑過、計入試驗宇宙，但結果存於 result.db 以外的試驗（2026-10-01）：
+#: 同時持倉上限 K 的 75 格（results/max_active.db，另有 15 格無上限 Top 10 與
+#: result.db 逐位元相同、不重複計）與跨期去重的 60 格（results/dedup.db）。
+#: 兩者皆為既有 15 支主軸 METHOD 下的配置變體，故 method 數不變。
+#: var_sr 以 result.db 的試驗列＋這 135 格一併重算（見 dev/dedup/RESULTS.md）。
+EXTERNAL_TRIALS = {"method": 0, "config": 135}
 
 
 def is_trial(method: str) -> bool:
@@ -237,6 +244,13 @@ def is_trial(method: str) -> bool:
 # 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
 # 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-10-01  method 72（不變）/ config 2145 → 2280；var_sr 0.00020321 → 0.00019747
+#               （method）、0.00039075 → 0.00037232（config）。來源為論文附錄 G 的兩組
+#               延伸實驗：同時持倉上限 K（75 格）與跨期去重（60 格），皆為既有 15 支主軸
+#               METHOD 下的配置變體，結果存於 max_active.db／dedup.db（EXTERNAL_TRIALS）。
+#               上限格使 HDB／KM 等較弱 METHOD 的格平均上升、方法間離散度變小，
+#               故門檻 SR0 0.546 → 0.538（略降）；評估 55 條，仍無一達 0.95。
+#               DL 權重（RI／MO）未過閘、未進入引擎重跑，依其預先登記不計入。
 #   2026-09-29  method 72 / config 2145；var_sr 0.00012531 → 0.00020321（method）、
 #               0.00035632 → 0.00039075（config）。兩項來源：
 #               (1) 附錄 F 的 19 條 FW504 方法（主軸 14＋DL-THR 5，各 15 格）依規則計入，
@@ -325,11 +339,12 @@ def _trial_specs(summ: pd.DataFrame, method: str) -> dict:
     live = summ[summ.METHOD.map(is_trial)]
     live_n = {"method": int(live.METHOD.nunique()), "config": int(len(live))}
     for spec, (pinned_n, _) in TRIAL_CENSUS.items():
-        if live_n[spec] + DELETED_TRIALS[spec] < pinned_n:
+        counted = live_n[spec] + DELETED_TRIALS[spec] + EXTERNAL_TRIALS[spec]
+        if counted < pinned_n:
             print(f"  ⚠ 試驗宇宙縮小：{spec} 實地 {live_n[spec]} ＋ 已刪除 "
-                  f"{DELETED_TRIALS[spec]} < 釘死 {pinned_n}。有結果被刪除——"
-                  f"跑過的試驗仍計入 N，請把它們加進 DELETED_TRIALS 而非降低 N。")
-        elif live_n[spec] + DELETED_TRIALS[spec] > pinned_n:
+                  f"{DELETED_TRIALS[spec]} ＋ 庫外 {EXTERNAL_TRIALS[spec]} < 釘死 {pinned_n}。"
+                  f"有結果被刪除——跑過的試驗仍計入 N，請把它們加進 DELETED_TRIALS 而非降低 N。")
+        elif counted > pinned_n:
             print(f"  ⚠ 試驗宇宙已擴張：{spec} 口徑實地清點 {live_n[spec]}，"
                   f"TRIAL_CENSUS 釘死 {pinned_n}（清點於 {TRIAL_CENSUS_DATE}）。"
                   f"你新增了策略——請重新清點並同步修改論文的 N。")

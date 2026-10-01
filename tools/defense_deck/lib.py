@@ -1,7 +1,7 @@
 """口試簡報產生器的共用版面元件（沿用 thesis/1150922.pptx 的視覺系統）。
 
 座標一律以英吋為單位；投影片 13.333 × 7.5 in。
-文字標記：**粗體**、^^強調色粗體^^、~~灰色~~。
+文字標記：**粗體**、^^強調色粗體^^、~~灰色~~、{{斜體}}。
 """
 import copy
 import re
@@ -40,16 +40,18 @@ def rgb(hexstr):
 
 # ── 文字 ──────────────────────────────────────────────────────────────
 
-_TOKEN = re.compile(r"(\*\*.+?\*\*|\^\^.+?\^\^|~~.+?~~)")
+_TOKEN = re.compile(r"(\*\*.+?\*\*|\^\^.+?\^\^|~~.+?~~|\{\{.+?\}\})")
 
 
 def _parse_runs(text):
-    """把標記字串拆成 [(文字, 樣式)]，樣式 ∈ {None, 'b', 'accent', 'muted'}。"""
+    """把標記字串拆成 [(文字, 樣式)]，樣式 ∈ {None, 'b', 'accent', 'muted', 'i'}。"""
     out = []
     for part in _TOKEN.split(text):
         if not part:
             continue
-        if part.startswith("**"):
+        if part.startswith("{{"):
+            out.append((part[2:-2], "i"))
+        elif part.startswith("**"):
             out.append((part[2:-2], "b"))
         elif part.startswith("^^"):
             out.append((part[2:-2], "accent"))
@@ -67,6 +69,9 @@ def _set_font(run, size, bold, color):
     f.color.rgb = rgb(color)
     f.name = FONT
     rpr = run._r.get_or_add_rPr()
+    # 標明語言，PowerPoint 才會套用中文的避頭尾規則（標點不落在行首）
+    rpr.set("lang", "zh-TW")
+    rpr.set("altLang", "en-US")
     ea = rpr.find(qn("a:ea"))
     if ea is None:
         ea = etree.SubElement(rpr, qn("a:ea"))
@@ -99,6 +104,9 @@ def fill_text_frame(tf, paras, size=17, color=TEXT, bold=False, align="l",
                 _set_font(r, psize, True, accent)
             elif style == "muted":
                 _set_font(r, psize, pbold, muted)
+            elif style == "i":
+                _set_font(r, psize, pbold, pcolor)
+                r.font.italic = True
             else:
                 _set_font(r, psize, pbold, pcolor)
     return tf
@@ -154,8 +162,8 @@ class Deck:
         self.prs.save(path)
 
 
-def header(slide, label, dark=False):
-    text(slide, LEFT, 0.42, CONTENT_W, 0.30, label, size=12, bold=True,
+def header(slide, label, dark=False, size=12):
+    text(slide, LEFT, 0.42, CONTENT_W, 0.30, label, size=size, bold=True,
          color=(LIGHT if dark else GREY), space_after=2)
 
 

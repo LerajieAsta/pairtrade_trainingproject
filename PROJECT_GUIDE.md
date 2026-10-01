@@ -76,7 +76,10 @@ pairtrade_trainingproject/
 ├── tools/                         # 輔助工具（皆從專案根執行）
 │   ├── status.py                  #   pt status：資料/形成期/交易期/投影片 狀態總覽 + 建議動作
 │   ├── snapshot_run.py            #   全量重跑前歸檔 result.db（原根目錄，2026-07 移入）
-│   └── run_drl_variance.py        #   DL-THR 訓練變異數多輪評估（原根目錄，2026-07 移入）
+│   ├── run_drl_variance.py        #   DL-THR 訓練變異數多輪評估（原根目錄，2026-07 移入）
+│   └── defense_deck/              #   口試簡報產生器（60 分鐘版）：build_60min.py → thesis/1150922_60min.pptx
+│                                  #   章節同論文；頁首章節名讀 thesis/NN_*.md 標題（common.py）、順序見 outline.py、
+│                                  #   參考文獻頁讀 thesis/14_參考文獻.md（extra.py）；講稿中〔可略〕段落不計入建議時間
 ├── dashboard.py                   # Streamlit 績效比對儀表板
 ├── run_formation.py               # 形成期主程式
 ├── run_trading.py                 # 交易期主程式
@@ -213,7 +216,7 @@ STRATEGIES_SLICE="0:15" python run_trading.py   # 只跑主軸 15 格
   最佳固定門檻配置為不分組 × DTW（12,827）。
   同期無風險（2%）約 16,400——**任何配置皆未達此水準**。
   對「日均報酬為零」的檢定 **6/6 不顯著**；
-  DSR 於 N=72、SR0=0.546 下無一通過 0.95（最高 0.681，為 GICS-SSD-FW504，後半 Sharpe −0.389）。
+  DSR 於 N=72、SR0=0.538 下無一通過 0.95（最高 0.696，為 GICS-SSD-FW504，後半 Sharpe −0.389）。
   前後半分割：491 個可分割基準格中僅 **29 個（5.9%）**兩半皆正；
   以前半 Sharpe 取前 10，後半 **10/10 為負**。
   **相對顯著不等於可交易**——交易層通過的是相對於 Z-Score 的差。
