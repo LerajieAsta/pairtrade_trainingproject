@@ -1,38 +1,21 @@
 """第三章：研究方法（系統設計）。"""
-from common import chap, reg, sec, std, supp
+from common import chap, cite, reg, sec, std, supp
 from lib import (ACCENT, BLUE, GREY, LEFT, LIGHT, NAVY, TEXT, WHITE, box,
                  callout, line_seg, refs, stat, table, text, arrow, CONTENT_W)
 
-REF_EG = ("Engle, R. F., & Granger, C. W. J. (1987). Co-integration and error "
-          "correction: Representation, estimation, and testing. Econometrica, 55(2), 251–276.")
-REF_MK = ("MacKinnon, J. G. (2010). Critical values for cointegration tests (Queen's "
-          "Economics Department Working Paper No. 1227). Queen's University.")
-REF_PO = ("Phillips, P. C. B., & Ouliaris, S. (1990). Asymptotic properties of residual "
-          "based tests for cointegration. Econometrica, 58(1), 165–193.")
-REF_SC = ("Sakoe, H., & Chiba, S. (1978). Dynamic programming algorithm optimization for "
-          "spoken word recognition. IEEE Transactions on Acoustics, Speech, and Signal "
-          "Processing, ASSP-26(1), 43–49.")
-REF_AL = ("Avellaneda, M., & Lee, J.-H. (2010). Statistical arbitrage in the U.S. equities "
-          "market. Quantitative Finance, 10(7), 761–782.")
-REF_HDB = ("Campello, R. J. G. B., Moulavi, D., Zimek, A., & Sander, J. (2015). Hierarchical "
-           "density estimates for data clustering, visualization, and outlier detection. "
-           "ACM Transactions on Knowledge Discovery from Data, 10(1), Article 5.")
-REF_HUR = ("Hurlbert, S. H. (1984). Pseudoreplication and the design of ecological field "
-           "experiments. Ecological Monographs, 54(2), 187–211.")
-REF_KUN = ("Künsch, H. R. (1989). The jackknife and the bootstrap for general stationary "
-           "observations. The Annals of Statistics, 17(3), 1217–1241.")
-REF_PR = ("Politis, D. N., & Romano, J. P. (1992). A circular block-resampling procedure "
-          "for stationary data. In R. LePage & L. Billard (Eds.), Exploring the limits of "
-          "bootstrap (pp. 263–270). Wiley.")
-REF_BH = ("Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: A "
-          "practical and powerful approach to multiple testing. Journal of the Royal "
-          "Statistical Society: Series B, 57(1), 289–300.")
-REF_KK = ("Kim, T., & Kim, H. Y. (2019). Optimizing the pairs-trading strategy using deep "
-          "reinforcement learning with trading and stop-loss boundaries. Complexity, 2019, 3582516.")
-REF_SH = ("Sarmento, S. M., & Horta, N. (2020). Enhancing a pairs trading strategy with "
-          "the application of machine learning. Expert Systems with Applications, 158, 113490.")
-REF_DF12 = ("Do, B., & Faff, R. (2012). Are pairs trading profits robust to trading costs? "
-            "Journal of Financial Research, 35(2), 261–287.")
+REF_EG = cite("Engle", 1987)
+REF_MK = cite("MacKinnon", 2010)
+REF_PO = cite("Phillips", 1990)
+REF_SC = cite("Sakoe", 1978)
+REF_AL = cite("Avellaneda", 2010)
+REF_HDB = cite("Campello, R. J. G. B., Moulavi", 2015)
+REF_HUR = cite("Hurlbert", 1984)
+REF_KUN = cite("Künsch", 1989)
+REF_PR = cite("Politis", 1992)
+REF_BH = cite("Benjamini, Y., & Hochberg", 1995)
+REF_KK = cite("Kim, T.", 2019)
+REF_SH = cite("Sarmento", 2020)
+REF_DF12 = cite("Do, B., & Faff", 2012)
 
 
 

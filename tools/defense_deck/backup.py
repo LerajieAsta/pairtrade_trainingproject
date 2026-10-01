@@ -1,5 +1,5 @@
 """附錄投影片：對應論文附錄 A–G 與正文各節的補充（不在正式報告時間內）。順序與目錄見 outline.py、extra.app_index。"""
-from common import app, reg, std, supp
+from common import app, cite, reg, std, supp
 from lib import (ACCENT, BLUE, GREY, LEFT, LIGHT, NAVY, TEXT, WHITE, box,
                  callout, page_number, refs, table, text, CONTENT_W)
 
@@ -246,10 +246,8 @@ def b10_fdr(d):
     callout(s, LEFT, 4.60, CONTENT_W, 1.45, "就算改用任意相依都成立的保守版本，結論也不變",
             ["保守變體把門檻再除以 Σ1/i（m＝6 時約緊縮 2.45 倍）。消融主要族校正後 p ≤ 0.0004 → "
              "0.0004 × 2.45 ≈ 0.001 < 0.05，**仍全數顯著**。"], style="dark", size=14)
-    refs(s, ["Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: A practical and "
-             "powerful approach to multiple testing. Journal of the Royal Statistical Society: Series B, 57(1), 289–300.",
-             "Benjamini, Y., & Yekutieli, D. (2001). The control of the false discovery rate in multiple testing "
-             "under dependency. The Annals of Statistics, 29(4), 1165–1188."], y=6.30)
+    refs(s, [cite("Benjamini, Y., & Hochberg", 1995),
+             cite("Benjamini, Y., & Yekutieli", 2001)], y=6.30)
     return """
 如果老師問多重檢定的選擇，用這張。我控制 FDR 而不是 FWER，因為比較數少而且高度相關，FWER 太保守。要揭露的前提是比較族不獨立；BH 在正迴歸相依下仍然成立，但這個條件我沒有形式化驗證。不過就算改用任意相依都成立的保守版本，消融的主要結果仍然全部顯著。
 """

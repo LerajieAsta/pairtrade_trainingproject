@@ -44,6 +44,44 @@ def _load_headings():
 
 SECS, CHAPS, APPS = _load_headings()
 
+
+def load_references():
+    """讀 thesis/NN_參考文獻.md，回傳 [(小標, [條目字串])]；條目內 {{…}} 為斜體、**…** 為粗體。"""
+    path = [p for p in os.listdir(THESIS) if re.match(r"\d\d_參考文獻\.md$", p)]
+    if len(path) != 1:
+        raise FileNotFoundError("thesis/ 下找不到唯一的 NN_參考文獻.md")
+    with open(os.path.join(THESIS, path[0]), encoding="utf-8") as f:
+        body = f.read().split("# 查證紀錄")[0]
+    groups = []
+    for block in re.split(r"\n\s*\n", body):
+        block = block.strip()
+        if not block or block.startswith((">", "---")) or block == "# 參考文獻":
+            continue
+        if block.startswith("## "):
+            groups.append((block[3:].strip(), []))
+            continue
+        lines = [ln.strip() for ln in block.split("\n")]
+        cjk = ord(lines[0][0]) > 0x2E7F
+        entry = ("" if cjk else " ").join(lines)
+        entry = re.sub(r"\*\*(.+?)\*\*", "\x00\\1\x01", entry)
+        entry = re.sub(r"\*(.+?)\*", r"{{\1}}", entry)
+        entry = entry.replace("\x00", "**").replace("\x01", "**")
+        groups[-1][1].append(entry)
+    return groups
+
+
+REF_GROUPS = load_references()
+_REF_PLAIN = [re.sub(r"\*\*|\{\{|\}\}", "", e) for _, es in REF_GROUPS for e in es]
+
+
+def cite(author, year):
+    """頁尾書目：自論文的參考文獻清單取出該筆（去掉標記與 DOI），確保與論文逐字相同。"""
+    hits = [e for e in _REF_PLAIN
+            if e.startswith(author) and re.search(r"[（(]%s[）)]" % year, e[:160])]
+    if len(hits) != 1:
+        raise KeyError(f"參考文獻中找不到唯一的 {author}（{year}）：{len(hits)} 筆")
+    return re.sub(r"\s*https?://\S+$", "", hits[0])
+
 # 章節＝論文的章。索引 0 為摘要，1–6 為第一章至第六章。
 PARTS = [("摘要", "摘要", "")] + [
     (f"第{_CN[i]}章", CHAPS[i], "") for i in range(1, 7)]

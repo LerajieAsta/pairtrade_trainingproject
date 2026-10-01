@@ -1,20 +1,15 @@
 """章節分隔頁、摘要、第二章與 3.7 節新增的投影片、參考文獻頁、附錄目錄。"""
 import math
-import os
 import re
 
-from common import (APPS, PAGE, SECS, THESIS, app, divider, reg, sec, std,
-                    supp)
+from common import (APPS, PAGE, REF_GROUPS, SECS, app, cite, divider, reg, sec,
+                    std, supp)
 from lib import (ACCENT, GREY, LEFT, LIGHT, NAVY, TEXT, WHITE, box, callout,
                  refs, table, text, CONTENT_W)
 
-REF_RAD = ("Rad, H., Low, R. K. Y., & Faff, R. (2016). The profitability of pairs trading "
-           "strategies: Distance, cointegration and copula methods. Quantitative Finance, "
-           "16(10), 1541–1558.")
-REF_HUCK = ("Huck, N., & Afawubo, K. (2015). Pairs trading and selection methods: Is "
-            "cointegration superior? Applied Economics, 47(6), 599–613.")
-REF_HAN = ("Han, C., He, Z., & Toh, A. J. W. (2023). Pairs trading via unsupervised "
-           "learning. European Journal of Operational Research, 307(2), 929–947.")
+REF_RAD = cite("Rad", 2016)
+REF_HUCK = cite("Huck", 2015)
+REF_HAN = cite("Han, C.", 2023)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -363,31 +358,6 @@ def _em(s):
     return sum(1.0 if ord(c) > 0x2E7F else 0.5 for c in s)
 
 
-def load_references():
-    """回傳 [(小標, [條目字串])]；條目內 {{…}} 為斜體、**…** 為粗體。"""
-    path = [p for p in os.listdir(THESIS) if re.match(r"\d\d_參考文獻\.md$", p)]
-    if len(path) != 1:
-        raise FileNotFoundError("thesis/ 下找不到唯一的 NN_參考文獻.md")
-    with open(os.path.join(THESIS, path[0]), encoding="utf-8") as f:
-        body = f.read().split("# 查證紀錄")[0]
-    groups = []
-    for block in re.split(r"\n\s*\n", body):
-        block = block.strip()
-        if not block or block.startswith((">", "---")) or block == "# 參考文獻":
-            continue
-        if block.startswith("## "):
-            groups.append((block[3:].strip(), []))
-            continue
-        lines = [ln.strip() for ln in block.split("\n")]
-        cjk = ord(lines[0][0]) > 0x2E7F
-        entry = ("" if cjk else " ").join(lines)
-        entry = re.sub(r"\*\*(.+?)\*\*", "\x00\\1\x01", entry)
-        entry = re.sub(r"\*(.+?)\*", r"{{\1}}", entry)
-        entry = entry.replace("\x00", "**").replace("\x01", "**")
-        groups[-1][1].append(entry)
-    return groups
-
-
 REF_SIZE = 11.5
 REF_LINE_EM = 66          # 一行可容納的全形字數（保守估計）
 REF_LINE_H = 0.20         # 行高（英吋）
@@ -415,7 +385,6 @@ def _paginate(groups):
     return pages
 
 
-REF_GROUPS = load_references()
 REF_COUNT = {head: len(entries) for head, entries in REF_GROUPS}
 _REF_PAGES = _paginate(REF_GROUPS)
 REF_LABEL = ("參考文獻　｜　APA 第七版，共 %d 筆（%s）；書目欄位皆經查證" % (

@@ -1,33 +1,20 @@
 """開場，以及第一章（緒論）、第二章（文獻探討）沿用的投影片；順序見 outline.py。"""
 import math
 
-from common import agenda_rows, reg, sec, std
+from common import agenda_rows, cite, reg, sec, std
 from lib import (ACCENT, BLUE, GREY, LEFT, LIGHT, NAVY, TEXT, WHITE, box,
                  callout, dot, line_seg, page_number, polyline, refs, stat,
                  table, text, arrow, CONTENT_W)
 
-REF_GGR = ("Gatev, E., Goetzmann, W. N., & Rouwenhorst, K. G. (2006). Pairs trading: "
-           "Performance of a relative-value arbitrage rule. The Review of Financial "
-           "Studies, 19(3), 797–827.")
-REF_DF10 = ("Do, B., & Faff, R. (2010). Does simple pairs trading still work? "
-            "Financial Analysts Journal, 66(4), 83–95.")
-REF_DF12 = ("Do, B., & Faff, R. (2012). Are pairs trading profits robust to trading "
-            "costs? Journal of Financial Research, 35(2), 261–287.")
-REF_KRAUSS = ("Krauss, C. (2017). Statistical arbitrage pairs trading strategies: "
-              "Review and outlook. Journal of Economic Surveys, 31(2), 513–545.")
-REF_HAN = ("Han, C., He, Z., & Toh, A. J. W. (2023). Pairs trading via unsupervised "
-           "learning. European Journal of Operational Research, 307(2), 929–947.")
-REF_SH = ("Sarmento, S. M., & Horta, N. (2020). Enhancing a pairs trading strategy "
-          "with the application of machine learning. Expert Systems with "
-          "Applications, 158, 113490.")
-REF_KK = ("Kim, T., & Kim, H. Y. (2019). Optimizing the pairs-trading strategy using "
-          "deep reinforcement learning with trading and stop-loss boundaries. "
-          "Complexity, 2019, 3582516.")
-REF_SUN = ("Sun, Y. (2025). A survey of statistical arbitrage pair trading with "
-           "machine learning, deep learning, and reinforcement learning methods "
-           "(Working Papers No. 22/2025). University of Warsaw.")
-REF_KPL = ("Kim, S.-H., Park, D.-Y., & Lee, K.-H. (2022). Hybrid deep reinforcement "
-           "learning for pairs trading. Applied Sciences, 12(3), Article 944.")
+REF_GGR = cite("Gatev", 2006)
+REF_DF10 = cite("Do, B., & Faff", 2010)
+REF_DF12 = cite("Do, B., & Faff", 2012)
+REF_KRAUSS = cite("Krauss, C. (", 2017)
+REF_HAN = cite("Han, C.", 2023)
+REF_SH = cite("Sarmento", 2020)
+REF_KK = cite("Kim, T.", 2019)
+REF_SUN = cite("Sun, Y.", 2025)
+REF_KPL = cite("Kim, S.-H.", 2022)
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -510,7 +497,7 @@ def scope(d):
     return """
 第一章的最後，我想先把範圍講清楚：我主張什麼、不主張什麼。
 
-我會檢驗的，是動作空間的設計對學習式交易端的影響，透過剛剛那三段證據。三段共用一個原則：任兩條被拿來比較的策略，只能差一個地方。
+我會檢驗的，是動作空間的設計對學習式交易端的影響，用三段證據分別回答剛剛那三個問題。三段共用一個原則：任兩條被拿來比較的策略，只能差一個地方。
 
 我不主張的有三件事。第一，我不主張這個交易端可以實際獲利——第五章會講為什麼。第二，我不主張資料驅動的分群比產業分組好——這在我的資料條件下沒有被支持，我只做描述。第三，我不涉及日內頻率。
 

@@ -1,14 +1,11 @@
 """第五章（討論）與第六章（結論）。"""
-from common import PAGE, reg, sec, std, supp
+from common import PAGE, cite, reg, sec, std, supp
 from lib import (ACCENT, BLUE, GREY, LEFT, LIGHT, NAVY, TEXT, WHITE, box,
                  callout, bar_chart, header, page_number, refs, stat, table,
                  text, title, CONTENT_W)
 
-REF_BLP = ("Bailey, D. H., & López de Prado, M. (2014). The deflated Sharpe ratio: "
-           "Correcting for selection bias, backtest overfitting, and non-normality. The "
-           "Journal of Portfolio Management, 40(5), 94–107.")
-REF_DF10 = ("Do, B., & Faff, R. (2010). Does simple pairs trading still work? Financial "
-            "Analysts Journal, 66(4), 83–95.")
+REF_BLP = cite("Bailey", 2014)
+REF_DF10 = cite("Do, B., & Faff", 2010)
 
 RF_CATS = ["KM SDP", "KM DTW", "KM SSD", "HDB SDP", "HDB DTW", "HDB SSD", "AGG SDP",
            "AGG DTW", "AGG SSD", "GICS SDP", "GICS DTW", "GICS SSD", "不分組 SDP",
@@ -248,12 +245,13 @@ def limitations(d):
         ("十", "樣本限於大型股", "衰減在大型股最嚴重，結論未必外推到中小型股或其他市場"),
         ("十一", "與前行研究的差距", "八項實作差異只隔離了一項（進場時點），差距仍未解釋（附錄 A）"),
         ("十二", "演算法穩健性只有探索性證據", "附錄 E 未預先登記、每臂一次、無檢定"),
+        ("十三", "形成期長度只測了兩種", "252 與 504 日（附錄 F）；504 只在前半期較好，不得推論最適窗長"),
     ]
     col_x = [LEFT, 6.85]
     for i, (num, head, body) in enumerate(items):
-        c = 0 if i < 6 else 1
-        r = i if i < 6 else i - 6
-        y = 1.85 + r * 0.74
+        c = 0 if i < 7 else 1
+        r = i if i < 7 else i - 7
+        y = 1.80 + r * 0.67
         text(s, col_x[c], y, 0.7, 0.4, num, size=14, bold=True, color=ACCENT)
         text(s, col_x[c] + 0.62, y, 5.1, 0.75, [
             {"text": head, "size": 14, "bold": True, "color": NAVY, "after": 1},
@@ -270,7 +268,7 @@ def limitations(d):
 
 〔可略〕第六到第九項，是統計上的：交易層的逐日序列只有一輪；再配置效應沒有直接驗證；門檻下界 1.5 從來沒跑過；形成期層的檢定力不足。
 
-〔可略〕最後兩項：跟前一屆研究（許鈞翔，2025）的回測差距，我只隔離了八項差異中的一項，差距本身還沒解釋，細節在附錄 A；還有剛剛講的附錄 E，演算法穩健性目前只有探索性的證據。
+〔可略〕最後三項：跟前一屆研究（許鈞翔，2025）的回測差距，我只隔離了八項差異中的一項，差距本身還沒解釋，細節在附錄 A；還有附錄 E 換演算法的探索，目前只有探索性的證據；形成期長度我也只測了 252 跟 504 兩種，結果在附錄 F。
 """
 
 
@@ -355,6 +353,7 @@ def recommendations(d):
              "**補完門檻掃描**——下界 1.5 從未執行；最佳常數多數期選中 3.0",
              "**直接驗證槽位週轉假說**——需要重跑回測，事後重抽涵蓋不了",
              "**形成期要比較，先解決檢定力**——構造「兩臂同一批標的」的配對設計",
+             "**重新檢視缺值插補的影響**——產業中位數插補是一條隱性的產業資訊管道",
              "**把演算法穩健性正式化**——種子多輪＋策略梯度法（REINFORCE、PPO）＋預先登記"],
             style="plain", size=13, heading_size=17)
     callout(s, 7.25, 1.85, 5.35, 4.45, "對實務",
@@ -372,7 +371,7 @@ def recommendations(d):
 
 對後續研究，最直接的是：在其他配對來源跟格點上重複這個消融，可以先用成本比較低的 FQI 擴大覆蓋；然後為學習臂固定種子、跑多輪，這是比較更小的設計差異時的前提。
 
-〔可略〕另外門檻水準要掃完整，尤其是從沒跑過的 1.5；再配置效應要直接驗證；形成期層如果要比較，要先想辦法構造「兩臂同一批標的」的配對設計。最後一項是附錄 E 延伸出來的：把演算法穩健性正式化，補上策略梯度法這一類，而且依照附錄 D 的規格預先登記。
+〔可略〕另外門檻水準要掃完整，尤其是從沒跑過的 1.5；再配置效應要直接驗證；形成期層如果要比較，要先想辦法構造「兩臂同一批標的」的配對設計；缺值用產業中位數插補會偷偷帶進產業資訊，這對既有的分群研究值得重新檢視。最後一項是附錄 E 延伸出來的：把演算法穩健性正式化，補上策略梯度法這一類，而且依照附錄 D 的規格預先登記。
 
 對實務，我不建議直接採用我檢驗的策略。但如果還是要做配對交易，我的證據支持四件事：第一，動作空間要設計成每期少數次決策，而不是天天決定——這是我證據最強的一項——而且要有拒絕交易的選項。第二，不要期待模型能逐對辨識，把力氣放在選單設計上，回報可能比特徵工程大。第三，要記得獲利高度集中在動盪期：這個策略實質上是在賣出波動率的均值回歸選擇權。第四，不要為了分散而拿掉重疊組合裡的跨期重複持有，它其實是分批加碼；也不要期待靠資金權重或持倉上限加分——我參考彭鈺玶（2025）的資金配置設計，做了三項預先登記的實驗，都沒有改善，細節在附錄 G。
 """
