@@ -73,6 +73,11 @@ PAIRS = [
     ("K-means",       "Grid (KM-SSD)",   "Grid (KM-SSD-DRL)"),
     ("GICS-SSD（傳統）", "Grid (GICS-SSD)", "Grid (GICS-SSD-DRL)"),
     ("GICS-SDP（傳統）", "Grid (GICS-SDP)", "Grid (GICS-SDP-DRL)"),
+    # 不分組底（2026-10-05，dev/nogrp_dlthr/PREREGISTRATION.md）：3.2 宣稱五個來源都做交易端對照，
+    # 但上面五組不含不分組。三種排序全做；BH 族由 5 擴為 8（跑前寫明）。
+    ("不分組-SSD", "Grid (NOGRP-SSD)", "Grid (NOGRP-SSD-DRL)"),
+    ("不分組-DTW", "Grid (NOGRP-DTW)", "Grid (NOGRP-DTW-DRL)"),
+    ("不分組-SDP", "Grid (NOGRP-SDP)", "Grid (NOGRP-SDP-DRL)"),
 ]
 
 
