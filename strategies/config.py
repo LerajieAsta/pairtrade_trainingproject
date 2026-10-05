@@ -947,6 +947,28 @@ for _cm_f, _cs_f in (("hdbscan", "HDB"), ("agglomerative", "AGG"), ("kmeans", "K
                        "impute_scope": "global"},
         })
 
+# ── 不分組底 × DL-THR（2026-10-05，dev/nogrp_dlthr/PREREGISTRATION.md）──────────
+# 3.2 節宣稱五個配對來源都做交易端對照，但上方的 DL-THR 條目只涵蓋 GICS（兩次）與
+# 三種 ML 分群，不分組從未疊加。本組補上：不分組 × {SSD, DTW, SDP} 三種排序全做
+# （不依結果再挑排序）。參數＝各自的 Z-Score 條目逐鍵複製＋與既有 DL-THR 相同的三個
+# 超參數，與 GICS DL-THR 條目的組法一致；形成期配對直接借用，零重跑 formation。
+# 置於 _grid_entries 末尾，不移動既有網格條目的索引。
+_by_name_dd = {e["name"]: e for e in _grid_entries}
+for _rk_s in ("SSD", "DTW", "SDP"):
+    _znog = _by_name_dd[f"Grid NOGRP-{_rk_s}"]
+    _grid_entries.append({
+        "name":             f"Grid NOGRP-{_rk_s} DRL",
+        "formation_module": _znog["formation_module"],
+        "formation_strategy_id_base": f"Grid NOGRP-{_rk_s}",
+        "trading_module":   "strategies.trading.drl_threshold_trading",
+        "sub_dir":          f"Grid_NOGRP_{_rk_s}_DRL",
+        "db_method":        f"Grid (NOGRP-{_rk_s}-DRL)",
+        "trade_method":     "DRL",
+        "params":           {**copy.deepcopy(_znog["params"]),
+                             "drl_hidden_size": 64, "thr_train_epochs": 40,
+                             "thr_min_train_samples": 200},
+    })
+
 strategies_raw_all[_fo_idx:_fo_idx] = _grid_entries
 
 strategies_raw = strategies_raw_all[:]
@@ -1179,6 +1201,13 @@ if os.environ.get("MAX_ACTIVE_EXTENSION", "").strip() == "1":
         print(f"[config] 同時持倉上限 K 延伸研究：{len(strategies_raw)} 條")
     except Exception as _e:
         print(f"⚠️ [config] 同時持倉上限 K 延伸研究載入失敗：{type(_e).__name__}: {_e}")
+
+# `NOGRP_DLTHR_EXTENSION=1` 時只跑不分組底 × DL-THR 的三條（條目本身常駐於上方網格）。
+# 判準寫於結果之前：dev/nogrp_dlthr/PREREGISTRATION.md。
+if os.environ.get("NOGRP_DLTHR_EXTENSION", "").strip() == "1":
+    strategies_raw = [s for s in strategies_raw_all
+                      if s["name"] in ("Grid NOGRP-SSD DRL", "Grid NOGRP-DTW DRL", "Grid NOGRP-SDP DRL")]
+    print(f"[config] 不分組 × DL-THR 延伸研究：{len(strategies_raw)} 條")
 
 # `DEDUP_EXTENSION=1` 時只跑 dev/dedup/candidate_strategies.py 的條目。
 # 判準寫於結果之前：dev/dedup/PREREGISTRATION.md。
