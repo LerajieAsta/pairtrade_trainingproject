@@ -295,7 +295,11 @@ _ENTRY_Z_CELL = re.compile(r"_EZ(?!20_)\d+_DSZ0\.csv$")
 _MAIN_ARMS = {f"Grid ({g}-{d})" for g in ("NOGRP", "GICS", "AGG", "HDB", "KM")
               for d in ("SSD", "DTW", "SDP")}
 _DLTHR_ARMS = {"Grid (AGG-SSD-DRL)", "Grid (HDB-SDP-DRL)", "Grid (KM-SSD-DRL)",
-               "Grid (GICS-SSD-DRL)", "Grid (GICS-SDP-DRL)"}
+               "Grid (GICS-SSD-DRL)", "Grid (GICS-SDP-DRL)",
+               # 2026-10-06 補疊於不分組（dev/nogrp_dlthr/），論文 4.3 已納入（8 組）
+               "Grid (NOGRP-SSD-DRL)", "Grid (NOGRP-DTW-DRL)", "Grid (NOGRP-SDP-DRL)"}
+#: 2026-10-06 動作空間消融的 504 形成期版本（dev/action_space_fw504/）：尚未寫入論文，歸副。
+_ABLATION_FW504 = {f"Grid (GICS-SDP-FW504-{a})" for a in ("DOLLAR", "DRL-DOLLAR", "DRL-V3")}
 #: 方法 → 正文章節；同樣只取基準格（FW504 另有 `_LAG` 消融格，未入正文）。
 #: `_VG67` 是該方法本身的識別後綴而非消融，判定前先剝除。
 _THESIS_METHODS = {
@@ -324,6 +328,8 @@ def thesis_role(path: str, method: str):
             return ROLE_MAIN, "4.3 DL-THR" if method in _DLTHR_ARMS else "4.3 主軸 Z-Score"
         if _ENTRY_Z_CELL.search(base):
             return ROLE_MAIN, "4.4 門檻水準（entry_z）"
+    if method in _ABLATION_FW504:
+        return ROLE_APPX, "消融 504 形成期（延伸，未入正文）"
     if str(method).startswith("HSU25"):
         return ROLE_APPX, "附錄 A 前行研究"
     return ROLE_APPX, "參考（未入正文）"
