@@ -36,7 +36,7 @@ APPENDIX = [
     "b6_appendix_c", "b5_regime",       # 附錄 C
     "b1_checks",                        # 附錄 D
     "appendix_e", "b11_appendix_e",     # 附錄 E
-    "b13_fw504",                        # 附錄 F
+    "b13_fw504", "b13b_ablation_fw504", # 附錄 F
     "b14_allocation",                   # 附錄 G
     "b9_ari",                           # 3.2.4
     "params_learning",                  # 3.3.2、3.4

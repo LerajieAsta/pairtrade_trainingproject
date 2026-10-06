@@ -421,7 +421,7 @@ def app_index(d):
     items = [(f"附錄 {k}", APPS[k], v) for k, v in [
         ("A", ["b7_appendix_a"]), ("B", ["b4_fixes"]),
         ("C", ["b6_appendix_c", "b5_regime"]), ("D", ["b1_checks"]),
-        ("E", ["appendix_e", "b11_appendix_e"]), ("F", ["b13_fw504"]),
+        ("E", ["appendix_e", "b11_appendix_e"]), ("F", ["b13_fw504", "b13b_ablation_fw504"]),
         ("G", ["b14_allocation"])]]
     items += [
         ("補充", "3.2.4 " + SECS["3.2.4"], ["b9_ari"]),
