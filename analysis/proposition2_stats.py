@@ -61,10 +61,22 @@ TRADING_DAYS = 252
 GRID = ["TOP N", "STOP LOSS %", "MAX SEC %"]
 
 # (配對底名稱, Z-Score 策略, DRL 策略)
+# 一、二（配對 t、逐輪）只做命題二原本的三個 ML 分群來源——五輪重訓資料只涵蓋這三組。
 PAIRS = [
     ("Agglomerative", "Grid (AGG-SSD)", "Grid (AGG-SSD-DRL)"),
     ("HDBSCAN",       "Grid (HDB-SDP)", "Grid (HDB-SDP-DRL)"),
     ("K-means",       "Grid (KM-SSD)",  "Grid (KM-SSD-DRL)"),
+]
+
+# 三、四（絕對檢定、DSR）涵蓋主檢定的全部八組（同 proposition2_daily_hac.PAIRS）。
+# 2026-10-06 擴充：原本只做上面三組（論文的「6/6 不顯著」），但論文的絕對績效主張
+# 引用的是 GICS 與不分組臂，三組不足以支撐；改為 8 組 × 2 交易端 = 16 條。
+ABS_PAIRS = PAIRS + [
+    ("GICS-SSD",   "Grid (GICS-SSD)",  "Grid (GICS-SSD-DRL)"),
+    ("GICS-SDP",   "Grid (GICS-SDP)",  "Grid (GICS-SDP-DRL)"),
+    ("不分組-SSD", "Grid (NOGRP-SSD)", "Grid (NOGRP-SSD-DRL)"),
+    ("不分組-DTW", "Grid (NOGRP-DTW)", "Grid (NOGRP-DTW-DRL)"),
+    ("不分組-SDP", "Grid (NOGRP-SDP)", "Grid (NOGRP-SDP-DRL)"),
 ]
 
 
@@ -152,7 +164,7 @@ def _absolute_tests(summ, summ_all=None):
 
     # 表三：等權組合。取該 METHOD 全部基準格的逐日損益後逐日平均
     ew_paths, best = {}, {}
-    for name, zs, drl in PAIRS:
+    for name, zs, drl in ABS_PAIRS:
         for tag, m in (("Z-Score", zs), ("DRL", drl)):
             g = summ[summ.METHOD == m]
             if len(g):
