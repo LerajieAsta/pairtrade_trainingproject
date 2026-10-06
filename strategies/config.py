@@ -1176,6 +1176,25 @@ if os.environ.get("ACTION_SPACE_ABLATION", "").strip() == "1":
         print(f"⚠️ [config] 動作空間消融載入失敗：{type(_e).__name__}: {_e}")
 
 
+# ── 動作空間消融的兩年形成期版本（env 開關；預設不啟用）──────────────────
+# `ABLATION_FW504=1` 時附加 dev/action_space_fw504/candidate_strategies.py 的三條臂
+# （v3 ＋ v4 ＋ Z-Score，皆以 GICS-SDP-FW504 的配對）並只跑它們。
+# 須同時設 SKIP_TRUNCATED_FORMATION=1、BACKTEST_START=2008-07、BACKTEST_END=2018-12。
+# 判準寫於結果之前：dev/action_space_fw504/PREREGISTRATION.md。
+if os.environ.get("ABLATION_FW504", "").strip() == "1":
+    try:
+        from dev.action_space_fw504.candidate_strategies import build as _build_abl504
+        _abl504 = _build_abl504()
+        _have = {s["name"] for s in strategies_raw_all}
+        strategies_raw_all = strategies_raw_all + [s for s in _abl504 if s["name"] not in _have]
+        strategies_raw = _abl504
+        print(f"[config] 動作空間消融（504 形成期）：{len(_abl504)} 條臂（{BACKTEST_START} ~ {BACKTEST_END}）")
+        if os.environ.get("SKIP_TRUNCATED_FORMATION", "").strip() != "1":
+            print("⚠️ [config] 未設 SKIP_TRUNCATED_FORMATION=1：左緣的期形成期會被截斷（見預先登記 §二）")
+    except Exception as _e:
+        print(f"⚠️ [config] 動作空間消融（504 形成期）載入失敗：{type(_e).__name__}: {_e}")
+
+
 # ── 延伸研究：核心 20 條策略的兩年形成期版本（env 開關；預設不啟用）──────
 # `FW504_EXTENSION=1` 時附加 dev/fw504_all/candidate_strategies.py 的條目並只跑它們。
 # 判準寫於結果之前：dev/fw504_all/PLAN.md。

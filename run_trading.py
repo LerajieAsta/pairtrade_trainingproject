@@ -386,10 +386,20 @@ def worker_task(
         _dd_units = {}
         _dd_blocked_total = 0
 
+        _SKIP_TRUNC = os.environ.get("SKIP_TRUNCATED_FORMATION", "").strip() == "1"
         for i, (_, p_row) in enumerate(df_periods.iterrows()):
             period_start = p_row["Period_Start"]
             trade_start = p_row["Trade_Start"]
             trade_end = p_row["Trade_End"]
+
+            # 形成期被價格索引截斷的期（dev/action_space_fw504/PREREGISTRATION.md）。
+            # prepare_backtest_data 只回填 FORMATION_WINDOW(=252) 日，是否執行只看交易期日期；
+            # 形成期較長（如 504）或子期間左緣時，學習式交易端以 full_price_df.loc[形成期] 取價
+            # 會被 pandas 默默截斷而不報錯。預設關閉以保持既有結果可重現；開啟時直接跳過，
+            # 位置在讀配對與配置資金之前，不佔槽位。
+            if _SKIP_TRUNC and pd.Timestamp(period_start) < price_pivot.index[0]:
+                print(f"Period {i+1}/{total_periods}: {period_start} -> 形成期起點早於價格索引，跳過")
+                continue
 
             # 逐期續傳：已完成期直接跳過（logs 與權益已於上方 checkpoint 載入階段還原）
             if use_ckpt and str(period_start) in done_periods:
