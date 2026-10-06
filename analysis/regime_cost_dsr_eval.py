@@ -181,11 +181,11 @@ INCOMPLETE_RUNS = {
 #: `_BASELINE_CELL` 同一套判定。
 _BASELINE_CELL_RE = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
 
-TRIAL_CENSUS_DATE = "2026-10-01"
+TRIAL_CENSUS_DATE = "2026-10-06"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (72,    0.00019747411850110),
-    "config": (2280,  0.00037232252826505),
+    "method": (75,    0.00019818558341087),
+    "config": (2325,  0.00037168202364925),
 }
 
 # ── 不是試驗的列：不計入 N、不參與 var_sr、不列入評估（2026-09-29）────────
@@ -244,6 +244,14 @@ def is_trial(method: str) -> bool:
 # 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
 # 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-10-06  method 72 → 75 / config 2280 → 2325；var_sr 0.00019747 → 0.00019819（method）、
+#               0.00037232 → 0.00037168（config）。來源：DL-THR 補疊於不分組三種排序
+#               （Grid (NOGRP-{SSD,DTW,SDP}-DRL)，各 15 格，存於 result.db；
+#               dev/nogrp_dlthr/PREREGISTRATION.md）。實地 71 ＋ 已刪除 4 ＝ 75；
+#               實地 1,950 ＋ 已刪除 240 ＋ 庫外 135 ＝ 2,325。門檻 SR0 0.538 → 0.543。
+#               run() 預設排除 DL-THR，故評估仍為 55 條、無一達 0.95；DL-THR 最佳格另算，
+#               最高為 NOGRP-DTW-DRL Top1/SL0（Sharpe 0.562、DSR 0.541）。
+#               第 2–5 輪重訓為同一批配置的重跑，寫入 nogrp_dlthr_variance.db，不另計 config。
 #   2026-10-01  method 72（不變）/ config 2145 → 2280；var_sr 0.00020321 → 0.00019747
 #               （method）、0.00039075 → 0.00037232（config）。來源為論文附錄 G 的兩組
 #               延伸實驗：同時持倉上限 K（75 格）與跨期去重（60 格），皆為既有 15 支主軸
