@@ -77,6 +77,9 @@ pairtrade_trainingproject/
 │   ├── status.py                  #   pt status：資料/形成期/交易期/投影片 狀態總覽 + 建議動作
 │   ├── snapshot_run.py            #   全量重跑前歸檔 result.db（原根目錄，2026-07 移入）
 │   ├── run_drl_variance.py        #   DL-THR 訓練變異數多輪評估（原根目錄，2026-07 移入）
+│   ├── thesis_docx/               #   論文 Word 檔產生器：build_docx.py → thesis/論文全文.docx（另存 .pdf）
+│   │                              #   依元智大學研究所學位論文格式規範（邊界、頁碼、章節、表號表名、目錄與表目錄）；
+│   │                              #   表名集中在 captions.py；封面的系所全銜、學位英文名稱、提送年月在 build_docx.py 的 META
 │   └── defense_deck/              #   口試簡報產生器（60 分鐘版）：build_60min.py → thesis/1150922_60min.pptx
 │                                  #   章節同論文；頁首章節名讀 thesis/NN_*.md 標題（common.py）、順序見 outline.py、
 │                                  #   參考文獻頁讀 thesis/14_參考文獻.md（extra.py）；講稿中〔可略〕段落不計入建議時間
