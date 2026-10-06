@@ -2,7 +2,7 @@
 
 用法（於 repo 根目錄）：
     Project/Scripts/python.exe tools/defense_deck/build_60min.py
-輸出：thesis/1150922_60min.pptx（以 thesis/1150922.pptx 的母片為底，不改動原檔）。
+輸出：thesis/論文簡報.pptx（以 thesis/1150922.pptx 的母片為底，不改動原檔）。
 
 章節順序與標題同論文（摘要 → 第一章至第六章 → 參考文獻 → 附錄）；
 投影片順序由 outline.py 決定，頁首的章名與節名由 common.py 讀論文標題產生。
@@ -23,7 +23,7 @@ from lib import Deck, notes  # noqa: E402
 PART_MODULES = ["part0_2", "part3", "part4", "part5_6", "extra", "backup"]
 
 TEMPLATE = os.path.join(ROOT, "thesis", "1150922.pptx")
-OUT = os.path.join(ROOT, "thesis", "1150922_60min.pptx")
+OUT = os.path.join(ROOT, "thesis", "論文簡報.pptx")
 
 CUE_REFS = "【參考文獻：不講述，供查閱】"
 CUE_APPENDIX = "【附錄：不在正式報告時間內，問答時依問題翻到這一頁】"
