@@ -1221,6 +1221,47 @@ if os.environ.get("MAX_ACTIVE_EXTENSION", "").strip() == "1":
     except Exception as _e:
         print(f"⚠️ [config] 同時持倉上限 K 延伸研究載入失敗：{type(_e).__name__}: {_e}")
 
+# `POT_EXTENSION=1` 時只跑「獲利潛力排序」的 5 條（形成期與交易期皆用此開關）：
+# 參數逐字複製 Grid {G}-SSD，只把 ranking_backend 換成 "pot"；各自擁有形成期（新 strategy_id）。
+# 判準寫於結果之前：dev/profit_potential/PREREGISTRATION.md。
+if os.environ.get("POT_EXTENSION", "").strip() == "1":
+    _pot = []
+    for _g in ("NOGRP", "GICS", "HDB", "AGG", "KM"):
+        _e = copy.deepcopy(next(s for s in strategies_raw_all if s["name"] == f"Grid {_g}-SSD"))
+        _e["name"] = f"Grid {_g}-POT"
+        _e["sub_dir"] = f"Grid_{_g}_POT"
+        _e["db_method"] = f"Grid ({_g}-POT)"
+        _e["params"]["ranking_backend"] = "pot"
+        if _g in ("HDB", "AGG", "KM"):
+            # 沿用 SSD 臂存檔的分組：HDBSCAN 重跑與存檔不同（同群關係 9% 不一致），不沿用會混入分組差異
+            _e["params"]["reuse_groups_from"] = f"Grid {_g}-SSD_MSR0"
+        _e.pop("formation_strategy_id_base", None)
+        _pot.append(_e)
+    strategies_raw = _pot
+    print(f"[config] 獲利潛力排序延伸研究：{len(strategies_raw)} 條")
+
+# `OU_THRESHOLD_EXTENSION=1` 時只跑 OU 解析最適門檻（DL-THR 的解析式對照）的 8 條：
+# 4.3 節的 8 組配對來源，各借用其 Z-Score 臂的形成期配對；交易端換成 ou_threshold_trading。
+# 每條為新的 METHOD（`Grid (X-OUTHR)`）。判準寫於結果之前：dev/ou_threshold/PREREGISTRATION.md。
+# 測試旗標 OU_FORCE_BASELINE=1：強制每期選 (2.0, 0)（僅供接線驗證 V2）。
+if os.environ.get("OU_THRESHOLD_EXTENSION", "").strip() == "1":
+    _ou = []
+    for _src in ("GICS-SSD", "GICS-SDP", "HDB-SDP", "KM-SSD", "AGG-SSD",
+                 "NOGRP-SSD", "NOGRP-DTW", "NOGRP-SDP"):
+        _z = next(s for s in strategies_raw_all if s["name"] == f"Grid {_src}")
+        _e = copy.deepcopy(_z)
+        _e["name"] = f"Grid {_src} OUTHR"
+        _e["formation_strategy_id_base"] = _z["name"]
+        _e["trading_module"] = "strategies.trading.ou_threshold_trading"
+        _e["sub_dir"] = f"{_z['sub_dir']}_OUTHR"
+        _e["db_method"] = f"Grid ({_src}-OUTHR)"
+        _e["trade_method"] = "OU-THR"
+        if os.environ.get("OU_FORCE_BASELINE", "").strip() == "1":
+            _e["params"]["ou_force_baseline"] = True
+        _ou.append(_e)
+    strategies_raw = _ou
+    print(f"[config] OU 解析最適門檻延伸研究：{len(strategies_raw)} 條")
+
 # `RESIDUAL_SPREAD_EXTENSION=1` 時只跑主軸 15 臂的殘差報酬價差版本（spread_mode="residual_return"）。
 # 條目沿用主軸的 name／sub_dir／db_method（形成期配對共用），以檔名 `_RR` 後綴並存。
 # 判準寫於結果之前：dev/residual_spread/PREREGISTRATION.md。
@@ -1233,6 +1274,32 @@ if os.environ.get("RESIDUAL_SPREAD_EXTENSION", "").strip() == "1":
             _rr.append(_e)
     strategies_raw = _rr
     print(f"[config] 殘差報酬價差延伸研究：{len(strategies_raw)} 條")
+
+# `RESIDUAL_LEVEL_HEDGE_EXTENSION=1` 時只跑主軸 15 臂的「殘差報酬訊號＋水準價差部位」版本（檔名 `_RRL`）。
+# 判準寫於結果之前：dev/residual_level_hedge/PREREGISTRATION.md。
+if os.environ.get("RESIDUAL_LEVEL_HEDGE_EXTENSION", "").strip() == "1":
+    _rrl = []
+    for _g in ("NOGRP", "GICS", "HDB", "AGG", "KM"):
+        for _r in ("SSD", "DTW", "SDP"):
+            _e = copy.deepcopy(next(s for s in strategies_raw_all if s["name"] == f"Grid {_g}-{_r}"))
+            _e["params"]["spread_mode"] = "residual_return"
+            _e["params"]["residual_hedge"] = "level"
+            _rrl.append(_e)
+    strategies_raw = _rrl
+    print(f"[config] 殘差訊號＋水準部位延伸研究：{len(strategies_raw)} 條")
+
+# `SCALE_IN_EXTENSION=1` 時只跑 4.3 節 8 組配對來源的分層加碼版本（scale_in_z=3.0，|z|>2 先投半份）。
+# 條目沿用主軸的 name／sub_dir／db_method（形成期配對共用），以檔名 `_SI30` 後綴並存。
+# 判準寫於結果之前：dev/scale_in/PREREGISTRATION.md。`SCALE_IN_Z`／`SCALE_IN_FRAC` 僅供接線驗證。
+if os.environ.get("SCALE_IN_EXTENSION", "").strip() == "1":
+    _si = []
+    for _n in ("GICS-SSD", "GICS-SDP", "HDB-SDP", "KM-SSD", "AGG-SSD", "NOGRP-SSD", "NOGRP-DTW", "NOGRP-SDP"):
+        _e = copy.deepcopy(next(s for s in strategies_raw_all if s["name"] == f"Grid {_n}"))
+        _e["params"]["scale_in_z"] = float(os.environ.get("SCALE_IN_Z", "3.0"))
+        _e["params"]["scale_in_frac"] = float(os.environ.get("SCALE_IN_FRAC", "0.5"))
+        _si.append(_e)
+    strategies_raw = _si
+    print(f"[config] 分層加碼延伸研究：{len(strategies_raw)} 條")
 
 # `NOGRP_DLTHR_EXTENSION=1` 時只跑不分組底 × DL-THR 的三條（條目本身常駐於上方網格）。
 # 判準寫於結果之前：dev/nogrp_dlthr/PREREGISTRATION.md。

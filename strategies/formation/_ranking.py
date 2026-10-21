@@ -65,6 +65,18 @@ def rank_within_groups(
             kw["adf_pvalue_threshold"] = adf_pvalue_threshold
         return _SSDFormation(**kw).run()
 
+    if method == "pot":
+        # 獲利潛力排序（dev/profit_potential/）：候選、避險、價差、ADF 同 SSD，只換排序
+        from strategies.formation.ssd_potential import Formation as _POTFormation
+        kw = dict(
+            price_df=price_df, form_start=form_start, form_end=form_end, top_n=top_n,
+            sector_mapping=group_map, min_tickers_for_pairing=min_tickers_for_pairing,
+            trading_window=trading_window, enable_filters=enable_filters, trace=trace,
+            adf_only=adf_only, normalize_mode=normalize_mode,
+        )
+        if adf_pvalue_threshold is not None:
+            kw["adf_pvalue_threshold"] = adf_pvalue_threshold
+        return _POTFormation(**kw).run()
     if method in ("dtw", "ssd_dtw_pca"):
         from strategies.formation.DTW_Cointegration_Paper import Formation as _DTWFormation
         kw = dict(

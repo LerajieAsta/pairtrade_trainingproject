@@ -53,6 +53,7 @@ class PairState:
     is_stopped: bool = False
     prev_total_pnl: float = 0.0
     cooldown_dir: int = 0
+    tiers: int = 0          # 分層加碼（dev/scale_in/）：目前已投入的層數；停用時恆為 0
 
 #: 本模組是否真的實作 `hedge_mode`（dev/drl_hedge/PREREGISTRATION.md §四）。
 #: `run_trading` 據此決定落庫的 `Hedge_Mode`——未宣告者一律記為 "dollar"。
@@ -74,7 +75,9 @@ class Trading:
                  execution_lag: int = 0, exec_lag_scope: str = "both",
                  spread_mode: str = "level",
                  full_price_df: pd.DataFrame = None,
-                 formation_start: str = None, formation_end: str = None):
+                 formation_start: str = None, formation_end: str = None,
+                 scale_in_z: float = 0.0, scale_in_frac: float = 0.5,
+                 residual_hedge: str = "return"):
         # 清洗結果快取於來源 DataFrame，故逐配對重建 Trading 不會重算（見 clean_prices）
         self.price_df = clean_prices(price_df)
         self.trade_dates = trade_dates
@@ -135,6 +138,20 @@ class Trading:
         self.formation_start = formation_start
         self.formation_end = formation_end
         self._form_px = clean_prices(full_price_df) if spread_mode == "residual_return" else None
+        # 殘差訊號的部位口徑（2026-10-21，dev/residual_level_hedge/PREREGISTRATION.md）：
+        #   "return"（預設）：1:|β_ret|，既有 _RR 行為
+        #   "level"         ：部位與現行水準價差完全相同（形成期水準 β、_leg_scales 權重），只換進出場訊號
+        if residual_hedge not in ("return", "level"):
+            raise ValueError(f"residual_hedge 只能是 'return' 或 'level'，收到 {residual_hedge!r}")
+        self.residual_hedge = residual_hedge
+
+        # 分層加碼（2026-10-21，dev/scale_in/PREREGISTRATION.md）：|z| > entry_z 先投入
+        # scale_in_frac 份，持有中 |z| > scale_in_z（同方向）再加碼其餘部分；單一配對最大名目額
+        # 仍為 capital_per_pair。scale_in_z = 0（預設）時所有分支短路，結果逐位元同於接線前。
+        self.scale_in_z = float(scale_in_z or 0.0)
+        self.scale_in_frac = float(scale_in_frac)
+        if self.scale_in_z > 0 and not (0.0 < self.scale_in_frac <= 1.0):
+            raise ValueError(f"scale_in_frac 須介於 (0, 1]，收到 {scale_in_frac!r}")
 
         # 市場波動政體過濾：vol_regime_threshold > 0 時，年化波動率超過閾值期間暫停新開倉
         self.vol_regime_threshold = vol_regime_threshold
@@ -199,6 +216,14 @@ class Trading:
             return False, 0.0
         v_a = self.capital_per_pair * (w_a / total_weight)
         v_b = self.capital_per_pair * (w_b / total_weight)
+        if self.scale_in_z > 0:
+            # 進場當日已超過加碼門檻 → 兩層同時（整份）；否則只投入第一層
+            if abs(z) > self.scale_in_z:
+                state.tiers = 2
+            else:
+                state.tiers = 1
+                v_a *= self.scale_in_frac
+                v_b *= self.scale_in_frac
 
         if z > self.entry_z:
             state.position = -1
@@ -217,6 +242,33 @@ class Trading:
         state.days_held = 0
         return True, -state.trade_entry_fee
 
+    def _execute_scale_in(self, state: PairState, p_a: float, p_b: float, hedge_ratio: float) -> float:
+        """分層加碼的第二層：以當日收盤價加碼 (1 − scale_in_frac) 份，兩腳權重同 `_execute_entry`。
+
+        持倉成本改為加權平均進場價（兩次同方向，股數同號，加權平均即正確成本），
+        進場費累加至 `trade_entry_fee`。回傳加碼的摩擦成本（正數）；不加碼時回傳 0。
+        """
+        rest = 1.0 - self.scale_in_frac
+        s_a, s_b = self._leg_w
+        w_a, w_b = s_a, s_b * abs(hedge_ratio)
+        total_weight = w_a + w_b
+        state.tiers = 2
+        if not (rest > 0.0 and total_weight > 0.0):
+            return 0.0
+        add_a = self.capital_per_pair * rest * (w_a / total_weight) / p_a
+        add_b = self.capital_per_pair * rest * (w_b / total_weight) / p_b
+        if state.position == -1:
+            add_a, add_b = -add_a, add_b
+        else:
+            add_a, add_b = add_a, -add_b
+        new_a, new_b = state.shares_a + add_a, state.shares_b + add_b
+        state.entry_price_a = (state.shares_a * state.entry_price_a + add_a * p_a) / new_a
+        state.entry_price_b = (state.shares_b * state.entry_price_b + add_b * p_b) / new_b
+        state.shares_a, state.shares_b = new_a, new_b
+        fee = (abs(add_a) * p_a + abs(add_b) * p_b) * self.friction_rate
+        state.trade_entry_fee += fee
+        return fee
+
     def _execute_close(self, state: PairState, current_trade_pnl: float, stop_loss: bool = False):
         """處理平倉與停損邏輯"""
         state.realized_pnl += current_trade_pnl
@@ -225,6 +277,7 @@ class Trading:
             state.is_stopped = True if not self.allow_reentry else False
 
         state.position = 0
+        state.tiers = 0
         state.shares_a = 0.0
         state.shares_b = 0.0
         state.entry_price_a = 0.0
@@ -399,9 +452,14 @@ class Trading:
         if self.spread_mode == "residual_return":
             zscore, beta_ret = self._residual_spread(ticker_a, ticker_b, price_a, price_b)
             if zscore is None: return pd.DataFrame()
-            beta_series = pd.Series(beta_ret, index=common_idx)
-            # ΔX = r_A − β r_B，故金額比 1:|β|，與路徑 A 相同 → 腳縮放 (1, 1)
-            self._leg_w = (1.0, 1.0)
+            if self.residual_hedge == "level":
+                # 訊號來自殘差報酬，部位沿用現行水準價差的口徑（形成期水準 β 與 signal 權重）
+                beta_series = pd.Series(hedge_ratio, index=common_idx)
+                self._leg_w = self._leg_scales(ols_alpha, log_std_a, log_std_b, log_mean_a, first_price_a)
+            else:
+                beta_series = pd.Series(beta_ret, index=common_idx)
+                # ΔX = r_A − β r_B，故金額比 1:|β|，與路徑 A 相同 → 腳縮放 (1, 1)
+                self._leg_w = (1.0, 1.0)
         else:
             zscore, beta_series = self._compute_spread(
                 price_a, price_b, common_idx,
@@ -436,6 +494,7 @@ class Trading:
         out_hr, out_z, out_pos = [], [], []
         out_unrealized, out_realized, out_cum = [], [], []
         out_status, out_trade_pnl, out_days, out_delta = [], [], [], []
+        out_tier = []           # 分層加碼才輸出（SI_Tier 欄）
 
         # §F：決策索引恆為 i-L，成交索引恆為 i。L=0 時 j == i，下方全部退化為
         # 接線前的寫法（無分支、無特例），這正是 P1「逐位元相同」的依據。
@@ -484,6 +543,7 @@ class Trading:
                 out_trade_pnl.append(0.0)
                 out_days.append(0)
                 out_delta.append(0.0)
+                out_tier.append(0)
                 continue
 
             if state.position != 0:
@@ -529,6 +589,19 @@ class Trading:
                     else:
                         unrealized_pnl = current_trade_pnl
                         current_status = "HOLDING"
+                        # 分層加碼：第一層持有中、z 同方向超過加碼門檻（讀 bar j_en，與進場同一訊號）
+                        if (self.scale_in_z > 0 and state.tiers == 1 and j_en >= 0
+                                and ((state.position == -1 and z_en > self.scale_in_z)
+                                     or (state.position == 1 and z_en < -self.scale_in_z))
+                                and not (self.vol_regime_threshold > 0
+                                         and self._mkt_vol_dict.get(date, 0.0) > self.vol_regime_threshold)
+                                and not (self.entry_gate is not None and not self.entry_gate.get(date, True))):
+                            self._execute_scale_in(state, p_a, p_b, c_beta)
+                            raw_unrealized = (state.shares_a * (p_a - state.entry_price_a)
+                                              + state.shares_b * (p_b - state.entry_price_b))
+                            exit_fee_est = (abs(state.shares_a)*p_a + abs(state.shares_b)*p_b) * self.friction_rate
+                            unrealized_pnl = raw_unrealized - state.trade_entry_fee - exit_fee_est
+                            current_status = "SCALE_IN"
             else:
                 # 市場波動政體過濾：年化波動率超過閾值時暫停新開倉
                 in_high_vol = (
@@ -572,6 +645,7 @@ class Trading:
             out_trade_pnl.append(float(closed_trade_pnl))
             out_days.append(state.days_held)
             out_delta.append(float(daily_delta))
+            out_tier.append(state.tiers)
 
             if current_status in ["STOP_LOSS_TRIGGERED", "TIME_STOP", "EXIT"]:
                 state.days_held = 0
@@ -594,6 +668,7 @@ class Trading:
                 out_trade_pnl.extend([0.0] * n_remain)
                 out_days.extend([0] * n_remain)
                 out_delta.extend([0.0] * n_remain)
+                out_tier.extend([0] * n_remain)
                 break
 
         if state.position != 0 and out_status:
@@ -631,6 +706,8 @@ class Trading:
                        "Unrealized_PnL", "Realized_PnL", "Cumulative_PnL",
                        "Trade_PnL", "Daily_Delta"]
         df_out[_round_cols] = df_out[_round_cols].round(4)
+        if self.scale_in_z > 0:
+            df_out["SI_Tier"] = out_tier
 
         base_log = {
             "Period_Start": period_start, "Period_End": period_end,

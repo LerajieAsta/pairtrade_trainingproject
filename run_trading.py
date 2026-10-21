@@ -163,6 +163,15 @@ def _build_filename(params: dict) -> str:
     # 殘差報酬累積價差（dev/residual_spread/）。預設 "level" 不加後綴。
     if str(params.get("spread_mode", "level")) == "residual_return":
         suffix += "_RR"
+        if str(params.get("residual_hedge", "return")) == "level":
+            suffix += "L"
+    # 分層加碼（dev/scale_in/）。預設 0 不加後綴；scale_in_frac 非 0.5 時另加後綴，避免撞名。
+    _si = float(params.get("scale_in_z", 0.0) or 0.0)
+    if _si > 0:
+        suffix += f"_SI{int(round(_si * 10))}"
+        _sf = float(params.get("scale_in_frac", 0.5))
+        if abs(_sf - 0.5) > 1e-9:
+            suffix += f"F{int(round(_sf * 100))}"
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def effective_hedge_mode(strategy_config: dict) -> str:
@@ -980,6 +989,14 @@ def run_all_trading():
                 new_raw["name"] += "_DD"
             if str(new_params.get("spread_mode", "level")) == "residual_return":
                 new_raw["name"] += "_RR"
+                if str(new_params.get("residual_hedge", "return")) == "level":
+                    new_raw["name"] += "L"
+            _si = float(new_params.get("scale_in_z", 0.0) or 0.0)
+            if _si > 0:
+                new_raw["name"] += f"_SI{int(round(_si * 10))}"
+                _sf = float(new_params.get("scale_in_frac", 0.5))
+                if abs(_sf - 0.5) > 1e-9:
+                    new_raw["name"] += f"F{int(round(_sf * 100))}"
 
             expanded_strategies_raw.append(new_raw)
 

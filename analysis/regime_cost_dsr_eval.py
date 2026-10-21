@@ -184,8 +184,8 @@ _BASELINE_CELL_RE = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
 TRIAL_CENSUS_DATE = "2026-10-21"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (75,    0.00019537330870557),
-    "config": (2550,  0.00035897161829467),
+    "method": (88,    0.00019530298072440),
+    "config": (3090,  0.00037177398625249),
 }
 
 # ── 不是試驗的列：不計入 N、不參與 var_sr、不列入評估（2026-09-29）────────
@@ -208,7 +208,15 @@ DELETED_TRIALS = {"method": 4, "config": 240}
 #: var_sr 以 result.db 的試驗列＋這 135 格一併重算（見 dev/dedup/RESULTS.md）。
 #: 2026-10-21 再加殘差報酬價差的 225 格（results/residual_spread.db，主軸 15 支 METHOD 下的
 #: `_RR` 配置變體；dev/residual_spread/）。
-EXTERNAL_TRIALS = {"method": 0, "config": 360}
+#: 2026-10-21（二）再加 OU 解析最適門檻的 8 條新方法、120 格（results/ou_threshold.db；dev/ou_threshold/）。
+#: 該庫已依預先登記刪除逐日紀錄（Q1 不成立），只剩摘要——var_sr 由摘要的 Sharpe_Raw 計算，不受影響。
+#: 2026-10-21（三）再加獲利潛力排序的 5 條新方法、75 格（results/profit_potential.db；dev/profit_potential/），
+#: 同樣已刪除逐日紀錄、只剩摘要。max_active.db 中 15 格無上限 Top 10（Max_Active 為空）與 result.db 重複，不計。
+#: 2026-10-21（四）再加分層加碼的 120 格（results/scale_in.db，4.3 節 8 支 METHOD 下的 `_SI30` 配置變體；
+#: dev/scale_in/），已刪除逐日紀錄、只剩摘要。
+#: 2026-10-21（五）再加殘差報酬訊號＋水準部位的 225 格（results/residual_level_hedge.db，主軸 15 支 METHOD 下的
+#: `_RRL` 配置變體；dev/residual_level_hedge/），已刪除逐日紀錄、只剩摘要。
+EXTERNAL_TRIALS = {"method": 13, "config": 900}
 
 
 def is_trial(method: str) -> bool:
@@ -246,6 +254,23 @@ def is_trial(method: str) -> bool:
 # 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
 # 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-10-21（五）method 88（不變）/ config 2865 → 3090；var_sr 0.00019515 → 0.00019530（method）、
+#               0.00036829 → 0.00037177（config）。來源：殘差報酬訊號＋水準價差部位（residual_hedge="level"，
+#               主軸 15 臂 × 15 格，存於 residual_level_hedge.db；dev/residual_level_hedge/）。既有 METHOD 下的
+#               配置變體，method 數不變；庫外計數 config 675 → 900。門檻 SR0 0.5511 → 0.5513。
+#   2026-10-21（四）method 88（不變）/ config 2745 → 2865；var_sr 0.00019527 → 0.00019515（method）、
+#               0.00037253 → 0.00036829（config）。來源：分層加碼（|z|>2 先投半份、|z|>3 加碼另一半，
+#               scale_in_z=3.0，8 組配對來源 × 15 格，存於 scale_in.db；dev/scale_in/）。既有 METHOD 下的
+#               配置變體，method 數不變；庫外計數 config 555 → 675。門檻 SR0 0.551 → 0.551（四捨五入後不變）。
+#   2026-10-21（三）method 83 → 88 / config 2670 → 2745；var_sr 0.00018679 → 0.00019527（method）、
+#               0.00037140 → 0.00037253（config）。來源：獲利潛力排序（形成期以 NZC×(2·sd(S)/D−2f) 取代 SSD，
+#               Grid (X-POT)，5 種分組 × 15 格，存於 profit_potential.db；dev/profit_potential/）。
+#               新排序準則，各計為新方法；庫外計數 method 8 → 13、config 480 → 555。門檻 SR0 0.535 → 0.551
+#               （POT 格平均 Sharpe 皆為負，拉大方法間離散度）。以 result.db＋庫外重算的舊值與（二）的釘死值逐位相同後再加入。
+#   2026-10-21（二）method 75 → 83 / config 2550 → 2670；var_sr 0.00019537 → 0.00018679（method）、
+#               0.00035897 → 0.00037140（config）。來源：OU 解析最適門檻（DL-THR 的解析式對照，
+#               Grid (X-OUTHR)，8 組配對來源 × 15 格，存於 ou_threshold.db；dev/ou_threshold/）。
+#               新交易端，各計為新方法；庫外計數 method 0 → 8、config 360 → 480。門檻 SR0 0.539 → 0.535。
 #   2026-10-21  method 75（不變）/ config 2325 → 2550；var_sr 0.00019819 → 0.00019537（method）、
 #               0.00037168 → 0.00035897（config）。來源：殘差報酬累積價差（spread_mode=residual_return，
 #               主軸 15 臂 × 15 格，存於 residual_spread.db；dev/residual_spread/）。皆為既有 METHOD

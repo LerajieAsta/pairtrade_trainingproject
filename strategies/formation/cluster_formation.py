@@ -46,6 +46,12 @@ class Formation:
         # "none"：完全不分組（全市場單一組），分組維度的零點對照
         cluster_method: str = "agglomerative",
         ranking_backend: str = "ssd",
+        # 沿用既有臂的分組（dev/profit_potential/）：給 strategy_id 時，資料驅動分群改讀
+        # formation_groups 中該臂同一形成期的原始群編號，不重新分群。用於「只換排序」的對照——
+        # HDBSCAN 以現行程式重跑與當初存檔的分組不同（2026-10-21 實測同群關係 9% 不一致），
+        # 不沿用就會混入分組差異。None（預設）＝照常分群，行為不變。
+        reuse_groups_from: str = None,
+        groups_db_path: str = "formation_data/formation_pairs_sp500_Tiingo.db",
         # ranking_backend="reversal" 專用（Han, He & Toh 2021 的選對準則）。
         # 預設值即原文設定：過去 1 個月（21 交易日）、1 倍橫斷面 SD。
         # sd_scope 對應原文未明言的歧義（"cross-sectional" 是群內或全體）。
@@ -99,6 +105,8 @@ class Formation:
         self.feature_mode = feature_mode
         self.cluster_method = cluster_method
         self.ranking_backend = ranking_backend
+        self.reuse_groups_from = reuse_groups_from
+        self.groups_db_path = groups_db_path
         self.reversal_lookback = reversal_lookback
         self.reversal_sd_mult = reversal_sd_mult
         self.reversal_sd_scope = reversal_sd_scope
@@ -142,6 +150,22 @@ class Formation:
         # formation_groups / formation_ranked 兩張表。
         self.collect_trace = os.environ.get("FORMATION_TRACE", "").strip() in ("1", "true", "yes")
         self.stage_trace_: list | None = None
+
+    def _load_groups(self):
+        """讀 formation_groups 中 reuse_groups_from 臂、同一形成期的原始群編號。"""
+        import sqlite3
+        con = sqlite3.connect(f"file:{self.groups_db_path}?mode=ro", uri=True, timeout=600)
+        rows = con.execute("SELECT Ticker, Cluster_Label FROM formation_groups "
+                           "WHERE strategy_id = ? AND Period_Start = ?",
+                           (self.reuse_groups_from, self.form_start)).fetchall()
+        con.close()
+        if not rows:
+            raise RuntimeError(f"formation_groups 查無 {self.reuse_groups_from} @ {self.form_start}")
+        stored = {t: int(l) for t, l in rows}
+        valid = [t for t in self.price_df.columns if t in stored]
+        if len(valid) != len(stored):
+            raise RuntimeError(f"{self.form_start}：存檔分組 {len(stored)} 檔，本期價格只對上 {len(valid)} 檔")
+        return valid, np.array([stored[t] for t in valid])
 
     def _lookup_sector(self, ticker: str) -> str:
         return self.real_sector_mapping.get(
@@ -265,12 +289,16 @@ class Formation:
             print(f"  [Formation] GICS 產業分組：{n_groups} 產業 | "
                   f"Unknown {n_unknown}/{len(valid_tickers)} 檔（排除）")
         else:
-            X, valid_tickers = self._build_feature_matrix()
+            if self.reuse_groups_from:
+                valid_tickers, labels = self._load_groups()
+            else:
+                X, valid_tickers = self._build_feature_matrix()
             if len(valid_tickers) < self.min_tickers_for_pairing:
                 self.selected_pairs = pd.DataFrame()
                 return self.selected_pairs
 
-            labels = self._cluster(X)
+            if not self.reuse_groups_from:
+                labels = self._cluster(X)
             self.cluster_labels_ = {t: int(l) for t, l in zip(valid_tickers, labels)}
 
             # 群標籤 → 分組 map（過小群 / 噪音 併入 Unknown，排序端自動跳過）
