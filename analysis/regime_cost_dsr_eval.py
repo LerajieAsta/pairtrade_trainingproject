@@ -181,11 +181,11 @@ INCOMPLETE_RUNS = {
 #: `_BASELINE_CELL` 同一套判定。
 _BASELINE_CELL_RE = r"TradeLogs_Top\d+_SL\d+_ZWin\d+_MSR\d+\.csv$"
 
-TRIAL_CENSUS_DATE = "2026-10-06"
+TRIAL_CENSUS_DATE = "2026-10-21"
 TRIAL_CENSUS = {
     #          N      var_sr（每日尺度）
-    "method": (75,    0.00019818558341087),
-    "config": (2325,  0.00037168202364925),
+    "method": (75,    0.00019537330870557),
+    "config": (2550,  0.00035897161829467),
 }
 
 # ── 不是試驗的列：不計入 N、不參與 var_sr、不列入評估（2026-09-29）────────
@@ -206,7 +206,9 @@ DELETED_TRIALS = {"method": 4, "config": 240}
 #: result.db 逐位元相同、不重複計）與跨期去重的 60 格（results/dedup.db）。
 #: 兩者皆為既有 15 支主軸 METHOD 下的配置變體，故 method 數不變。
 #: var_sr 以 result.db 的試驗列＋這 135 格一併重算（見 dev/dedup/RESULTS.md）。
-EXTERNAL_TRIALS = {"method": 0, "config": 135}
+#: 2026-10-21 再加殘差報酬價差的 225 格（results/residual_spread.db，主軸 15 支 METHOD 下的
+#: `_RR` 配置變體；dev/residual_spread/）。
+EXTERNAL_TRIALS = {"method": 0, "config": 360}
 
 
 def is_trial(method: str) -> bool:
@@ -244,6 +246,12 @@ def is_trial(method: str) -> bool:
 # 兩者皆排除 INCOMPLETE_RUNS。取平均而非最佳：var_sr 要描述「試驗之間的離散度」，
 # 取最佳會混入格內選擇偏誤（實測取最佳為 0.00014852，明顯偏高）。
 # 清點沿革（每次改動都要同步修改論文的 N）：
+#   2026-10-21  method 75（不變）/ config 2325 → 2550；var_sr 0.00019819 → 0.00019537（method）、
+#               0.00037168 → 0.00035897（config）。來源：殘差報酬累積價差（spread_mode=residual_return，
+#               主軸 15 臂 × 15 格，存於 residual_spread.db；dev/residual_spread/）。皆為既有 METHOD
+#               下的配置變體，method 數不變；庫外計數 135 → 360。門檻 SR0 0.543 → 0.539（略降：
+#               `_RR` 格使多數 METHOD 的格平均上升、方法間離散度變小）。以 result.db＋庫外重算的舊值
+#               與 2026-10-06 釘死值逐位相同後再加入。
 #   2026-10-06  method 72 → 75 / config 2280 → 2325；var_sr 0.00019747 → 0.00019819（method）、
 #               0.00037232 → 0.00037168（config）。來源：DL-THR 補疊於不分組三種排序
 #               （Grid (NOGRP-{SSD,DTW,SDP}-DRL)，各 15 格，存於 result.db；

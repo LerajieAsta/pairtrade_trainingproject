@@ -1221,6 +1221,19 @@ if os.environ.get("MAX_ACTIVE_EXTENSION", "").strip() == "1":
     except Exception as _e:
         print(f"⚠️ [config] 同時持倉上限 K 延伸研究載入失敗：{type(_e).__name__}: {_e}")
 
+# `RESIDUAL_SPREAD_EXTENSION=1` 時只跑主軸 15 臂的殘差報酬價差版本（spread_mode="residual_return"）。
+# 條目沿用主軸的 name／sub_dir／db_method（形成期配對共用），以檔名 `_RR` 後綴並存。
+# 判準寫於結果之前：dev/residual_spread/PREREGISTRATION.md。
+if os.environ.get("RESIDUAL_SPREAD_EXTENSION", "").strip() == "1":
+    _rr = []
+    for _g in ("NOGRP", "GICS", "HDB", "AGG", "KM"):
+        for _r in ("SSD", "DTW", "SDP"):
+            _e = copy.deepcopy(next(s for s in strategies_raw_all if s["name"] == f"Grid {_g}-{_r}"))
+            _e["params"]["spread_mode"] = "residual_return"
+            _rr.append(_e)
+    strategies_raw = _rr
+    print(f"[config] 殘差報酬價差延伸研究：{len(strategies_raw)} 條")
+
 # `NOGRP_DLTHR_EXTENSION=1` 時只跑不分組底 × DL-THR 的三條（條目本身常駐於上方網格）。
 # 判準寫於結果之前：dev/nogrp_dlthr/PREREGISTRATION.md。
 if os.environ.get("NOGRP_DLTHR_EXTENSION", "").strip() == "1":

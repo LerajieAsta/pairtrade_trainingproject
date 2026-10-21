@@ -160,6 +160,9 @@ def _build_filename(params: dict) -> str:
     # 跨期去重（dev/dedup/）：同一配對不得被多個重疊交易期同時持有。
     if params.get("dedup_across_periods"):
         suffix += "_DD"
+    # 殘差報酬累積價差（dev/residual_spread/）。預設 "level" 不加後綴。
+    if str(params.get("spread_mode", "level")) == "residual_return":
+        suffix += "_RR"
     return f"TradeLogs_Top{top_n}_SL{sl}_ZWin{zwin}_MSR{msr}{suffix}.csv"
 
 def effective_hedge_mode(strategy_config: dict) -> str:
@@ -975,6 +978,8 @@ def run_all_trading():
                 new_raw["name"] += f"_MA{_ma_eff}"
             if new_params.get("dedup_across_periods"):
                 new_raw["name"] += "_DD"
+            if str(new_params.get("spread_mode", "level")) == "residual_return":
+                new_raw["name"] += "_RR"
 
             expanded_strategies_raw.append(new_raw)
 

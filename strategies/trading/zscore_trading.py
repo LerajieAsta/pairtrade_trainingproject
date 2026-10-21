@@ -71,7 +71,10 @@ class Trading:
                  max_holding_days: int = 0,
                  entry_gate: dict = None,
                  hedge_mode: str = "signal",
-                 execution_lag: int = 0, exec_lag_scope: str = "both"):
+                 execution_lag: int = 0, exec_lag_scope: str = "both",
+                 spread_mode: str = "level",
+                 full_price_df: pd.DataFrame = None,
+                 formation_start: str = None, formation_end: str = None):
         # 清洗結果快取於來源 DataFrame，故逐配對重建 Trading 不會重算（見 clean_prices）
         self.price_df = clean_prices(price_df)
         self.trade_dates = trade_dates
@@ -119,6 +122,19 @@ class Trading:
             raise ValueError(f"hedge_mode 只能是 'signal' 或 'dollar'，收到 {hedge_mode!r}")
         self.hedge_mode = hedge_mode
         self._leg_w: tuple = (1.0, 1.0)   # 逐配對由 _simulate_pair 設定
+
+        # 價差定義（2026-10-20，dev/residual_spread/PREREGISTRATION.md）：
+        #   "level"（預設）        ：形成期標準化的對數股價（_compute_spread 的路徑 A／B），既有行為
+        #   "residual_return"      ：Avellaneda & Lee (2010) 的殘差報酬累積，見 _residual_spread
+        # 預設值下 full_price_df／formation_* 只被保存、從不讀取，結果逐位元同於接線前。
+        if spread_mode not in ("level", "residual_return"):
+            raise ValueError(f"spread_mode 只能是 'level' 或 'residual_return'，收到 {spread_mode!r}")
+        if spread_mode == "residual_return" and int(zscore_window or 0) != 0:
+            raise ValueError("residual_return 只定義在 zscore_window=0（形成期參數固定）下")
+        self.spread_mode = spread_mode
+        self.formation_start = formation_start
+        self.formation_end = formation_end
+        self._form_px = clean_prices(full_price_df) if spread_mode == "residual_return" else None
 
         # 市場波動政體過濾：vol_regime_threshold > 0 時，年化波動率超過閾值期間暫停新開倉
         self.vol_regime_threshold = vol_regime_threshold
@@ -325,6 +341,44 @@ class Trading:
 
         return zscore, beta_series
 
+    #: 形成期至少要有這麼多筆日報酬才估 α、β（不足即不交易該配對期，並印出計數用的訊息）
+    MIN_FORM_RETURNS = 60
+
+    def _residual_spread(self, ticker_a: str, ticker_b: str,
+                         price_a: pd.Series, price_b: pd.Series):
+        """殘差報酬累積價差（Avellaneda & Lee, 2010）。
+
+        形成期 [formation_start, formation_end) 以日對數報酬 OLS：$r_A=lpha+eta r_B+arepsilon$；
+        $X(t)=\sum_{s\le t}(r_A-lpha-eta r_B)$ 自形成期首日累加、延續至交易期；
+        $Z=(X-ar X_{form})/\mathrm{sd}(X_{form})$（ddof=1）。所有參數只用形成期估計，交易期不重估。
+        $\Delta X=r_A-eta r_B$，故部位金額比 $1:|eta|$——呼叫端以 β 取代 hedge_ratio、腳縮放設 (1, 1)。
+
+        回傳 (zscore, beta)，zscore 以 price_a 的索引為準；形成期資料不足時回傳 (None, None)。
+        """
+        fp = self._form_px
+        if fp is None or ticker_a not in fp.columns or ticker_b not in fp.columns:
+            return None, None
+        fs, fe = pd.Timestamp(self.formation_start), pd.Timestamp(self.formation_end)
+        form = fp.loc[fs:fe, [ticker_a, ticker_b]]
+        form = form[form.index < fe].dropna()
+        if len(form) - 1 < self.MIN_FORM_RETURNS:
+            print(f"  [RR] 形成期報酬不足，不交易：{ticker_a}-{ticker_b} {self.formation_start}"
+                  f"（{max(0, len(form) - 1)} 筆）")
+            return None, None
+        la, lb = np.log(form[ticker_a].values), np.log(form[ticker_b].values)
+        ra, rb = np.diff(la), np.diff(lb)
+        design = np.column_stack([np.ones_like(rb), rb])
+        (alpha, beta), *_ = np.linalg.lstsq(design, ra, rcond=None)
+        x_form = np.cumsum(ra - alpha - beta * rb)
+        mu = float(x_form.mean())
+        sd = max(float(x_form.std(ddof=1)), self.min_spread_std)
+        # 交易期：以形成期最後一日為基準接續累加
+        ta = np.log(np.concatenate([[form[ticker_a].values[-1]], price_a.values]))
+        tb = np.log(np.concatenate([[form[ticker_b].values[-1]], price_b.values]))
+        x_trade = x_form[-1] + np.cumsum(np.diff(ta) - alpha - beta * np.diff(tb))
+        z = np.clip((x_trade - mu) / sd, -self.zscore_clip, self.zscore_clip)
+        return pd.Series(z, index=price_a.index), float(beta)
+
     def _simulate_pair(self, period_start: str, period_end: str, sector: str, ticker_a: str, ticker_b: str, pair_rank: int, hedge_ratio: float,
                        form_spread_mean: float, form_spread_std: float, log_mean_a=None, log_std_a: float = 1.0, log_mean_b=None, log_std_b: float = 1.0,
                        first_price_a: float = 0.0, first_price_b: float = 0.0,
@@ -342,18 +396,25 @@ class Trading:
 
         if len(price_a) < 5: return pd.DataFrame()
 
-        zscore, beta_series = self._compute_spread(
-            price_a, price_b, common_idx,
-            hedge_ratio, form_spread_mean, form_spread_std,
-            log_mean_a, log_std_a, log_mean_b, log_std_b,
-            first_price_a, first_price_b, ols_alpha,
-        )
-        if zscore.empty: return pd.DataFrame()
+        if self.spread_mode == "residual_return":
+            zscore, beta_ret = self._residual_spread(ticker_a, ticker_b, price_a, price_b)
+            if zscore is None: return pd.DataFrame()
+            beta_series = pd.Series(beta_ret, index=common_idx)
+            # ΔX = r_A − β r_B，故金額比 1:|β|，與路徑 A 相同 → 腳縮放 (1, 1)
+            self._leg_w = (1.0, 1.0)
+        else:
+            zscore, beta_series = self._compute_spread(
+                price_a, price_b, common_idx,
+                hedge_ratio, form_spread_mean, form_spread_std,
+                log_mean_a, log_std_a, log_mean_b, log_std_b,
+                first_price_a, first_price_b, ols_alpha,
+            )
+            if zscore.empty: return pd.DataFrame()
 
-        # 兩腳的每單位報酬縮放係數，供 _execute_entry 分配資金。逐配對求一次
-        # （σ 來自形成期，整段交易期不變；β 則可能逐日變動，故留在 _execute_entry）。
-        self._leg_w = self._leg_scales(ols_alpha, log_std_a, log_std_b,
-                                       log_mean_a, first_price_a)
+            # 兩腳的每單位報酬縮放係數，供 _execute_entry 分配資金。逐配對求一次
+            # （σ 來自形成期，整段交易期不變；β 則可能逐日變動，故留在 _execute_entry）。
+            self._leg_w = self._leg_scales(ols_alpha, log_std_a, log_std_b,
+                                           log_mean_a, first_price_a)
 
         valid_idx = common_idx.intersection(self.trade_dates)
         if len(valid_idx) == 0: return pd.DataFrame()
