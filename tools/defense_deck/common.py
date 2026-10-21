@@ -28,7 +28,7 @@ def _load_headings():
                     fence = not fence
                 if fence:
                     continue
-                m = re.match(r"#{2,3} ((?:\d+|[A-G])(?:\.\d+)+)\s+(.+?)\s*$", line)
+                m = re.match(r"#{2,3} ((?:\d+|[A-H])(?:\.\d+)+)\s+(.+?)\s*$", line)
                 if m:
                     secs[m.group(1)] = m.group(2).strip()
                     continue
@@ -36,7 +36,7 @@ def _load_headings():
                 if m:
                     chaps[_CN.index(m.group(1))] = m.group(2).strip()
                     continue
-                m = re.match(r"# 附錄 ([A-G])\s*(.+?)\s*$", line)
+                m = re.match(r"# 附錄 ([A-H])\s*(.+?)\s*$", line)
                 if m:
                     apps[m.group(1)] = m.group(2).strip()
     return secs, chaps, apps

@@ -28,7 +28,7 @@ MAIN = [
 
 # 參考文獻頁由 extra.py 依 thesis/14_參考文獻.md 動態產生（extra.REF_SLIDES）。
 
-# 附錄：先依論文附錄 A–G，再放正文各節的補充（依節次）。
+# 附錄：先依論文附錄 A–H，再放正文各節的補充（依節次）。
 APPENDIX = [
     "app_index",
     "b7_appendix_a",                    # 附錄 A
@@ -36,8 +36,10 @@ APPENDIX = [
     "b6_appendix_c", "b5_regime",       # 附錄 C
     "b1_checks",                        # 附錄 D
     "appendix_e", "b11_appendix_e",     # 附錄 E
-    "b13_fw504", "b13b_ablation_fw504", # 附錄 F
+    "b13_fw504", "b13a_fw504_returns", "b13c_fw504_best", "b13b_ablation_fw504", # 附錄 F
     "b14_allocation",                   # 附錄 G
+    "b15_extensions",                   # 附錄 H
+    "han_steps", "han_example", "han_results",  # 2.2.4、2.4（Han, He & Toh 的做法）
     "b9_ari",                           # 3.2.4
     "params_learning",                  # 3.3.2、3.4
     "rlthr", "counterfactual",          # 3.5、4.5（RL-THR 受控對照）
@@ -45,6 +47,6 @@ APPENDIX = [
     "b8_sensitivity",                   # 3.7
     "level_tension",                    # 4.4（門檻水準的替代解釋）
     "b2_retrain",                       # 4.6.1
-    "b3_measures", "b12_cells",         # 5.1.1
+    "b3_measures", "b12_cells", "b12b_dlthr_cells",         # 5.1.1
     "sources_descriptive",              # 5.3
 ]
